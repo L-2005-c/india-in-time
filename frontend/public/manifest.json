@@ -1,0 +1,27 @@
+{
+  "name": "India In-Time",
+  "short_name": "In-Time",
+  "description": "Your AI-powered India travel companion",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080e1a",
+  "theme_color": "#c9a84c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png?v=20260603-logo",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png?v=20260603-logo",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "navigation", "lifestyle"],
+  "screenshots": [],
+  "lang": "en-IN"
+}

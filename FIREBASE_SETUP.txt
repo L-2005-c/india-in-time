@@ -1,0 +1,68 @@
+FIREBASE SETUP GUIDE — India In-Time
+=====================================
+
+You need to do this ONE TIME to get your Firebase config keys.
+It takes about 5 minutes and is completely FREE.
+
+STEP 1 — Create a Firebase project
+------------------------------------
+1. Go to: https://console.firebase.google.com
+2. Sign in with your Google account
+3. Click "Create a project"
+4. Name it: india-in-time
+5. Disable Google Analytics (not needed) → Click "Create project"
+6. Wait for it to finish → Click "Continue"
+
+STEP 2 — Enable Google Sign-In
+--------------------------------
+1. In the left menu, click "Authentication"
+2. Click "Get started"
+3. Click "Google" under Sign-in providers
+4. Toggle it ON (Enable)
+5. Enter your support email (your Gmail)
+6. Click "Save"
+
+STEP 3 — Create Firestore Database
+-------------------------------------
+1. In the left menu, click "Firestore Database"
+2. Click "Create database"
+3. Choose "Start in test mode" → Click "Next"
+4. Choose any location (e.g. asia-south1 for India) → Click "Enable"
+5. Wait for it to set up
+
+STEP 4 — Get your config keys
+--------------------------------
+1. Click the gear icon ⚙️ next to "Project Overview"
+2. Click "Project settings"
+3. Scroll down to "Your apps"
+4. Click the </> (Web) icon
+5. App nickname: india-in-time-web → Click "Register app"
+6. You will see a block of code like this:
+
+   const firebaseConfig = {
+     apiKey: "AIzaSy...",
+     authDomain: "india-in-time-xxxxx.firebaseapp.com",
+     projectId: "india-in-time-xxxxx",
+     storageBucket: "india-in-time-xxxxx.appspot.com",
+     messagingSenderId: "123456789",
+     appId: "1:123456789:web:abcdef"
+   };
+
+7. COPY all of this — you will paste it into index.html
+
+STEP 5 — Add your config to the app
+--------------------------------------
+1. Open: india-in-time\frontend\public\index.html
+2. Find this line near the bottom:
+      // PASTE YOUR FIREBASE CONFIG HERE
+3. Replace that line with your copied firebaseConfig block
+4. Save the file
+
+STEP 6 — Add your domain to Firebase Auth
+-------------------------------------------
+1. Go back to Firebase Console → Authentication → Settings
+2. Click "Authorized domains"
+3. Add: localhost
+   (it may already be there — if so, you're good!)
+
+DONE! Restart your server and the login screen will appear.
