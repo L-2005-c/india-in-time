@@ -178,9 +178,7 @@ body::before {
 /* Pills row */
 .header-pills-wrap {
   flex:1 1 0%; min-width:0; overflow-x:auto; display:flex; align-items:center; gap:5px;
-  white-space:nowrap; scrollbar-width:none; padding:6px 0;
-  mask-image:linear-gradient(to right,black 88%,transparent 100%);
-  -webkit-mask-image:linear-gradient(to right,black 88%,transparent 100%);
+  white-space:nowrap; padding:6px 0;
   -webkit-overflow-scrolling:touch;
 }
 .header-pills-wrap::-webkit-scrollbar{display:none;}
@@ -312,7 +310,7 @@ body::before {
   position:relative;
   z-index:1;
   display:grid;
-  grid-template-columns:minmax(0,1.1fr) minmax(280px,0.9fr);
+  grid-template-columns:1fr;
   gap:18px;
   align-items:stretch;
 }
@@ -1903,7 +1901,7 @@ body::after{
 <div id="login-screen">
   <div class="login-card">
     <div class="login-ornament"></div>
-    <img class="login-flag" src="/logo-mark.png?v=20260603-logo" alt="India In-Time logo">
+    <img class="login-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo">
     <h1 class="login-title">India <span>In-Time</span></h1>
     <p class="login-sub">AI Travel Companion</p>
     <button class="btn-google" onclick="signInWithGoogle()">
@@ -1945,7 +1943,7 @@ body::after{
 
 <!-- SPLASH -->
 <div id="splash">
-  <img class="splash-flag" src="/logo-mark.png?v=20260603-logo" alt="India In-Time logo">
+  <img class="splash-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo">
   <h1 class="splash-title">India <span>In-Time</span></h1>
   <p class="splash-sub">Your Intelligent Travel Companion</p>
   <div class="splash-line"></div>
@@ -1993,7 +1991,6 @@ body::after{
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <div class="gps-badge" onclick="resetGPS()" id="gps-badge"><span class="gps-dot"></span><span id="gps-txt">GPS</span></div>
-        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
         <img id="user-avatar" class="user-avatar" src="" alt="Me" style="display:none" onclick="toggleUserMenu()">
       </div>
     </div>
@@ -2068,37 +2065,6 @@ body::after{
                   <div class="hero-metric-label">Travel mode</div>
                   <div class="hero-metric-value" id="hero-mode">Balanced</div>
                 </div>
-              </div>
-            </div>
-            <div class="hero-visual">
-              <div class="hero-video-badge"><span class="hero-video-dot"></span>Live visual mood</div>
-              <div class="hero-anim-canvas">
-                <!-- Animated gradient background layers -->
-                <div class="hanim-layer hanim-bg"></div>
-                <div class="hanim-layer hanim-aurora1"></div>
-                <div class="hanim-layer hanim-aurora2"></div>
-                <!-- Floating orbs -->
-                <div class="hanim-orb hanim-orb1"></div>
-                <div class="hanim-orb hanim-orb2"></div>
-                <div class="hanim-orb hanim-orb3"></div>
-                <!-- Grid shimmer overlay -->
-                <div class="hanim-grid"></div>
-                <!-- Floating travel icons -->
-                <div class="hanim-icons">
-                  <span class="hanim-icon hi1">🕌</span>
-                  <span class="hanim-icon hi2">🌴</span>
-                  <span class="hanim-icon hi3">⛵</span>
-                  <span class="hanim-icon hi4">🏔️</span>
-                  <span class="hanim-icon hi5">🎪</span>
-                  <span class="hanim-icon hi6">🦚</span>
-                </div>
-                <!-- Scan line animation -->
-                <div class="hanim-scan"></div>
-              </div>
-              <div class="hero-video-copy">
-                <div class="hero-video-kicker">Live visual mood</div>
-                <div class="hero-video-title">India's spirit — animated, alive, always moving.</div>
-                <p>A living canvas of India's landscapes, landmarks, and cultural energy — no video needed.</p>
               </div>
             </div>
           </div>
