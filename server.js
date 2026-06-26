@@ -97,6 +97,7 @@ try {
   app.use(helmet({
     contentSecurityPolicy: false, // disable CSP (our inline scripts/styles need it)
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false, // disable COOP so Firebase OAuth popups work on mobile
   }));
 } catch (_e) {
   console.warn('⚠️  helmet package not installed — skipping security headers');
