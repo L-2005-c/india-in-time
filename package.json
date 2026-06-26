@@ -4,7 +4,7 @@
   "description": "Backend API server for India In-Time travel app — production-grade fullstack",
   "main": "server.js",
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   },
   "scripts": {
     "start": "node server.js",
