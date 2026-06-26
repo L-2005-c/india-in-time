@@ -157,6 +157,70 @@
     return text;
   }
 
+  // ── Trips API (save/load/share) ─────────────────────────────────────────────
+
+  async function saveTrip(city, cityLat, cityLon, tripConfig, stops, userId) {
+    return post('/api/trips', { city, cityLat, cityLon, config: tripConfig, stops, userId });
+  }
+
+  async function listTrips(userId) {
+    return get('/api/trips', { userId });
+  }
+
+  async function loadTrip(tripId) {
+    return get(`/api/trips/${tripId}`);
+  }
+
+  async function deleteTrip(tripId, userId) {
+    const res = await fetch(BASE + `/api/trips/${tripId}?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`DELETE /api/trips/${tripId} → ${res.status}`);
+    return res.json();
+  }
+
+  async function shareTrip(tripId) {
+    return post(`/api/trips/${tripId}/share`, {});
+  }
+
+  async function loadSharedTrip(shareToken) {
+    return get(`/api/trips/shared/${shareToken}`);
+  }
+
+  // ── Favorites API (bookmarks) ───────────────────────────────────────────────
+
+  async function addFavorite(userId, placeName, city, lat, lon, category) {
+    return post('/api/favorites', { userId, placeName, city, lat, lon, category });
+  }
+
+  async function listFavorites(userId, city) {
+    const params = { userId };
+    if (city) params.city = city;
+    return get('/api/favorites', params);
+  }
+
+  async function removeFavorite(favoriteId, userId) {
+    const res = await fetch(BASE + `/api/favorites/${favoriteId}?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`DELETE /api/favorites/${favoriteId} → ${res.status}`);
+    return res.json();
+  }
+
+  // ── Analytics API ───────────────────────────────────────────────────────────
+
+  async function getAnalytics(hours = 24) {
+    return get('/api/analytics/summary', { hours });
+  }
+
+  // ── Health Check ────────────────────────────────────────────────────────────
+
+  async function healthCheck() {
+    return get('/api/health/ready');
+  }
+
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts,
@@ -165,5 +229,10 @@
     aiTripRating, aiReplanner, aiFoodRecommend, aiVoiceChat,
     aiFestivalRadar, aiHiddenGem, aiArOverlay, aiHartaalAlert,
     aiFoodSafety, aiCrowdPredict, aiFareNegotiator, aiTripTribe,
+    // v2.0 — New APIs
+    saveTrip, listTrips, loadTrip, deleteTrip, shareTrip, loadSharedTrip,
+    addFavorite, listFavorites, removeFavorite,
+    getAnalytics, healthCheck,
   };
 })();
+

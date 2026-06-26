@@ -1,10 +1,12 @@
-// routes/places.js — v5 (fixed truncation issue)
+// routes/places.js — v6 (uses unified services)
 const express = require('express');
 const fetch   = require('node-fetch');
 const router  = express.Router();
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const PLACE_CACHE_TTL_MS = 30 * 60 * 1000;
-const placeCache = new Map();
+const config  = require('../config');
+const { callGeminiText } = require('../services/gemini');
+const { placesCache } = require('../services/cache');
+const { distKm } = require('../utils/geo');
+const PLACE_CACHE_TTL_MS = config.cache.placesTtlMs;
 
 function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
   return [
@@ -17,18 +19,12 @@ function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
 }
 
 function getCachedPlaces(key) {
-  const cached = placeCache.get(key);
-  if (!cached) return null;
-  if (Date.now() - cached.ts > PLACE_CACHE_TTL_MS) {
-    placeCache.delete(key);
-    return null;
-  }
-  return cached.payload;
+  return placesCache.get(key) || null;
 }
 
 function setCachedPlaces(key, payload) {
   if (!payload || !Array.isArray(payload.places) || payload.places.length === 0) return;
-  placeCache.set(key, { ts: Date.now(), payload });
+  placesCache.set(key, payload, PLACE_CACHE_TTL_MS);
 }
 
 function staticCityPlaces(cityName) {
@@ -156,37 +152,20 @@ function staticCityPlaces(cityName) {
 }
 
 function deleteCachedPlaces(key) {
-  placeCache.delete(key);
-}
-
-function distKm(lat1,lon1,lat2,lon2){
-  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  placesCache.delete(key);
 }
 
 async function callGemini(prompt) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not set');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 16384, // Large enough for 50-place lists
-        responseMimeType: 'application/json'  // Force JSON response
-      }
-    }),
-    signal: AbortSignal.timeout(15000),
+  const text = await callGeminiText(prompt, {
+    timeoutMs: 45000,
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 16384,
+      responseMimeType: 'application/json'
+    }
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text().then(t=>t.slice(0,200))}`);
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  console.log('[places] Response length:', text.length, '| First 200:', text.slice(0,200));
-  return text;
+  console.log('[places] Response length:', (text||'').length, '| First 200:', (text||'').slice(0,200));
+  return text || '';
 }
 
 async function getPlaces(cityName, lat, lon, totalMinutes) {
@@ -195,8 +174,8 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   // Scale count: enough landmark-first names for a full trip without flooding
   // Nominatim with low-value local suggestions.
   const daysEst   = Math.max(1, Math.ceil((totalMinutes || 600) / 600));
-  const placeCount = Math.min(36, Math.max(16, daysEst * 8));
-  const foodCount  = Math.max(3, Math.floor(placeCount * 0.25));
+  const placeCount = Math.min(50, Math.max(30, daysEst * 12));
+  const foodCount  = Math.max(6, Math.floor(placeCount * 0.25));
   const prompt = `List ${placeCount} real places a tourist should consider in ${cityName}, India.
   Return ONLY valid JSON, no markdown: {"places":[{"name":"X","category":"scenic","importance":"must_see","visit_minutes":60,"open_time":"09:00","close_time":"18:00"}]}
   Categories allowed: scenic, temple, beach, food.
@@ -208,7 +187,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   - Only physical tourist destinations: beaches, forts, palaces, temples, mosques, churches, museums, parks, hills, lakes, viewpoints, ghats, waterfalls, gardens, monuments, caves, zoos, lighthouses, archaeological sites, nature reserves, botanical gardens.
   - Include only a few hidden gems or lesser-known spots after the famous attractions.
 - Include at least ${foodCount} food entries: famous local restaurants, food streets, seafood spots, biryani joints, famous cafes, sweet shops — real named establishments only.
-- DO NOT include: roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, shopping malls, or generic areas.
+- DO NOT include: stores, shops, retail, supermarkets, boutiques, markets, shopping malls, roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, or generic areas.
 - Only real named places a tourist would visit. No coordinates. No duplicate entries.`;
 
   const raw = await callGemini(prompt);
@@ -289,7 +268,7 @@ async function fetchWiki(lat, lon, cityName) {
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) return [];
   const data = await res.json();
-  const SKIP    = /\b(nagar|colony|peta|palle|village|layout|block|phase|mandal|taluk|district|ward|station|bypass|road|street|highway|slum|mohalla|chowk|circle|junction|sector|zone|area|suburb|locality|division|tehsil|residency|apartment|towers?)\b/i;
+  const SKIP    = /\b(nagar|colony|peta|palle|village|layout|block|phase|mandal|taluk|district|ward|station|bypass|road|street|highway|slum|mohalla|chowk|circle|junction|sector|zone|area|suburb|locality|division|tehsil|residency|apartment|towers?|store|stores|shop|shops|supermarket|mart|boutique)\b/i;
   const TOURIST = /beach|fort|palace|temple|church|mosque|museum|lake|park|garden|hill|falls|cave|zoo|monument|ghat|dam|island|sanctuary|mandir|masjid|shrine|bagh|maidan|viewpoint|lighthouse|harbour|harbor|waterfall|reservoir|valley|tower|bazaar|pier|aquarium|botanical|heritage|archaeological/i;
   return (data?.query?.geosearch || [])
     .filter(el => TOURIST.test(el.title) && !SKIP.test(el.title) && distKm(lat, lon, el.lat, el.lon) <= 35)
@@ -365,8 +344,7 @@ async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
     return true;
   });
 
-  // Geocode in parallel batches of 4 — 4x faster than sequential
-  const CONCURRENCY = 4;
+  const CONCURRENCY = 1;
   const out = [];
   let fixed = 0;
 
@@ -382,8 +360,8 @@ async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
         fixed++;
       }
     }
-    // Brief pause between batches to stay polite to Nominatim
-    if (i + CONCURRENCY < unique.length) await new Promise(r => setTimeout(r, 300));
+    // Strict 1-second pause to respect Nominatim limits
+    if (i + CONCURRENCY < unique.length) await new Promise(r => setTimeout(r, 1100));
   }
 
   console.log(`[places] Nominatim geocoded ${fixed}/${unique.length} AI places`);
@@ -421,7 +399,7 @@ async function fetchCuratedFoodFallback(lat, lon, cityName) {
         importance: 'famous',
         importanceScore: 70,
       });
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 1100)); // Strict 1-second delay
     } catch (_e) {}
   }
 
@@ -488,7 +466,7 @@ async function fetchCuratedCityFallback(lat, lon, cityName) {
         importance: 'must_see',
         importanceScore: Math.max(70, 98 - out.length * 3),
       });
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 1100)); // Strict 1-second delay
     } catch (_e) {}
   }
 
@@ -550,7 +528,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
   ]);
 
   // Name-level blocklist — reject anything whose name matches these patterns
-  const NAME_BLOCK = /\b(road|street|highway|nagar|colony|layout|phase|block|sector|ward|bypass|circle|junction|cross|taluk|mandal|district|division|tehsil|zone|area|peta|palle|village|town|suburb|locality|apartment|residency|complex|towers?|plaza|mall)\b/i;
+  const NAME_BLOCK = /\b(road|street|highway|nagar|colony|layout|phase|block|sector|ward|bypass|circle|junction|cross|taluk|mandal|district|division|tehsil|zone|area|peta|palle|village|town|suburb|locality|apartment|residency|complex|towers?|plaza|mall|store|stores|shop|shops|supermarket|mart|boutique)\b/i;
 
   // Queries: tourist-specific so Nominatim returns tourist OSM nodes, not roads
   const queries = foodOnly
@@ -626,7 +604,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
           importanceScore: 25,
         });
       }
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 1100)); // Strict 1-second delay for Nominatim
     } catch (_e) {}
   }
 
@@ -788,27 +766,36 @@ router.post('/', async (req, res) => {
     // Strategy: gather every reliable source simultaneously, then merge & dedup.
     // Never return early — always combine AI names (Nominatim-geocoded) +
     // Wikipedia (ground-truth coords) + Nominatim fallback search.
-    // This guarantees 30-50+ places for multi-day trips.
-    const [wikiResult, curatedCityResult, nominatimResult, aiResult] = await Promise.allSettled([
-      wantFoodOnly ? Promise.resolve([]) : fetchWiki(lat, lon, cityName),
-      wantFoodOnly ? Promise.resolve([]) : fetchCuratedCityFallback(lat, lon, cityName),
-      fetchNominatimFallback(lat, lon, cityName, { foodOnly: wantFoodOnly }),
-      wantFoodOnly ? Promise.resolve([]) : getPlaces(cityName, lat, lon, totalMinutes),
-    ]);
+    // ── Fetch sources safely without overloading Nominatim ──────────────────
+    // Wikipedia and Gemini API can run concurrently.
+    const pWiki = wantFoodOnly ? Promise.resolve([]) : fetchWiki(lat, lon, cityName);
+    const pAi   = wantFoodOnly ? Promise.resolve([]) : getPlaces(cityName, lat, lon, totalMinutes);
 
-    const wiki = wikiResult.status === 'fulfilled' ? wikiResult.value : [];
-    const curatedCity = curatedCityResult.status === 'fulfilled' ? curatedCityResult.value : [];
-    const nominatimRaw = nominatimResult.status === 'fulfilled' ? nominatimResult.value : [];
-    const aiPlacesRaw = aiResult.status === 'fulfilled' ? aiResult.value : [];
+    // Nominatim strictly limits to 1 request per second globally per IP.
+    // We MUST execute Curated (which geocodes) and Nominatim Fallback sequentially
+    // to avoid HTTP 429 Too Many Requests, which breaks the subsequent AI geocoding.
+    let curatedCity = [];
+    if (!wantFoodOnly) {
+      curatedCity = await fetchCuratedCityFallback(lat, lon, cityName).catch(e => {
+        console.error('[places] Curated fallback failed:', e.message); return [];
+      });
+    }
+
+    const nominatimRaw = await fetchNominatimFallback(lat, lon, cityName, { foodOnly: wantFoodOnly }).catch(e => {
+      console.error('[places] Nominatim fallback failed:', e.message); return [];
+    });
+
+    const wikiResult = await pWiki.catch(e => { console.error('[places] Wiki failed:', e.message); return []; });
+    const aiResult   = await pAi.catch(e => { console.error('[places] AI discovery failed:', e.message); return []; });
+
+    const wiki = Array.isArray(wikiResult) ? wikiResult : [];
+    const aiPlacesRaw = Array.isArray(aiResult) ? aiResult : [];
+    
+    // Now that fallbacks are done, hydrate AI places (this also geocodes sequentially)
     const aiRanked = filterPlacesByPrefs(
       await hydrateAiPlaces(aiPlacesRaw, [...staticPlaces, ...curatedCity, ...wiki, ...nominatimRaw], lat, lon, cityName),
       prefs
     );
-
-    
-    if (wikiResult.status    === 'rejected') console.error('[places] Wiki failed:',     wikiResult.reason?.message);
-    if (nominatimResult.status=== 'rejected') console.error('[places] Nominatim failed:', nominatimResult.reason?.message);
-    if (aiResult.status      === 'rejected') console.error('[places] AI discovery failed:', aiResult.reason?.message);
 
     console.log(`[places] Sources: AI-ranked:${aiRanked.length} Static:${staticPlaces.length} Wiki:${wiki.length} Curated:${curatedCity.length} Nominatim:${nominatimRaw.length}`);
 
@@ -863,11 +850,9 @@ router.post('/', async (req, res) => {
   } catch(err) {
     console.error('[places] Error:', err.message);
     try {
-      const [wiki, nominatimFallback, curatedCity] = await Promise.all([
-        fetchWiki(lat, lon, cityName).catch(() => []),
-        fetchNominatimFallback(lat, lon, cityName, { foodOnly: wantFoodOnly }).catch(() => []),
-        fetchCuratedCityFallback(lat, lon, cityName).catch(() => []),
-      ]);
+      const wiki = await fetchWiki(lat, lon, cityName).catch(() => []);
+      const curatedCity = await fetchCuratedCityFallback(lat, lon, cityName).catch(() => []);
+      const nominatimFallback = await fetchNominatimFallback(lat, lon, cityName, { foodOnly: wantFoodOnly }).catch(() => []);
       const all = filterPlacesByPrefs(
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&

@@ -1,19 +1,23 @@
 {
   "name": "india-in-time-backend",
-  "version": "1.0.0",
-  "description": "Backend API server for India In-Time travel app",
+  "version": "2.0.0",
+  "description": "Backend API server for India In-Time travel app — production-grade fullstack",
   "main": "server.js",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "backup": "node scripts/backup-db.js"
   },
   "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "compression": "^1.7.5",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
+    "helmet": "^8.0.0",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {

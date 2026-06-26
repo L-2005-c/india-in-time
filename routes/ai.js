@@ -1,5 +1,6 @@
-// routes/ai.js
-// Secure Gemini API proxy. The API key never leaves the server.
+// routes/ai.js — v2.0
+// Secure Gemini API proxy using unified Gemini service.
+// The API key never leaves the server.
 //
 // All endpoints: POST, JSON body.
 //
@@ -11,38 +12,13 @@
 //  POST /api/ai/souvenir    { city }
 //  POST /api/ai/budget      { city, limit, spent, expenses[] }
 //  POST /api/ai/alternative { city, currentStop }
+//  + caption, translate, triprating, replanner, foodrecommend, voicechat
+//  + festival, hiddenGem, arOverlay, hartaalAlert, foodSafety
+//  + crowdPredict, fareNegotiator, tripTribe
 
 const express = require('express');
-const fetch   = require('node-fetch');
 const router  = express.Router();
-
-const GEMINI_MODEL = 'gemini-2.5-flash';
-
-// ── Core Gemini caller ───────────────────────────────────────────────────────
-
-async function callGemini(parts) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not set in environment');
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
-  const body = { contents: [{ parts }] };
-
-  const res = await fetch(url, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
-    signal:  AbortSignal.timeout(20000),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${err.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-}
+const { callGeminiText, callGeminiVision } = require('../services/gemini');
 
 // ── Generic wrapper to handle errors uniformly ───────────────────────────────
 
@@ -53,7 +29,7 @@ function handler(fn) {
       res.json({ text: result });
     } catch (err) {
       console.error(`[ai:${req.path}]`, err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   };
 }
@@ -66,12 +42,10 @@ router.post('/chat', handler(({ message, city, plan }) => {
     ? plan.join(', ')
     : 'none';
 
-  const prompt = `You are a friendly India travel assistant.
+  return callGeminiText(`You are a friendly India travel assistant.
 Tourist in ${city || 'India'} asked: "${message}"
 Current itinerary stops: ${planStr}.
-Answer in max 3 short lines. Use emojis. Be specific and helpful.`;
-
-  return callGemini([{ text: prompt }]);
+Answer in max 3 short lines. Use emojis. Be specific and helpful.`, { cache: true });
 }));
 
 // ── /api/ai/vibe ─────────────────────────────────────────────────────────────
@@ -79,31 +53,18 @@ Answer in max 3 short lines. Use emojis. Be specific and helpful.`;
 
 router.post('/vibe', handler(({ vibe, city, locations }) => {
   const locList = (locations || []).join(', ');
-  const prompt = `I am visiting ${city}. My mood/vibe is: "${vibe}".
+  return callGeminiText(`I am visiting ${city}. My mood/vibe is: "${vibe}".
 Out of these places: [${locList}], pick the best ones that match the vibe.
-Return ONLY their exact names separated by commas. No explanation.`;
-
-  return callGemini([{ text: prompt }]);
+Return ONLY their exact names separated by commas. No explanation.`, { cache: true });
 }));
 
 // ── /api/ai/lens ─────────────────────────────────────────────────────────────
 // Identify a landmark from a base64 photo
 
 router.post('/lens', handler(({ imageBase64, imageType, city }) => {
-  const parts = [
-    {
-      inline_data: {
-        mime_type: imageType || 'image/jpeg',
-        data:      imageBase64,
-      },
-    },
-    {
-      text: `What landmark or tourist spot is shown in this photo, possibly in ${city || 'India'}?
-Answer in 2 sentences. Include the name, location, and one interesting fact.`,
-    },
-  ];
-
-  return callGemini(parts);
+  return callGeminiVision(imageBase64, imageType,
+    `What landmark or tourist spot is shown in this photo, possibly in ${city || 'India'}?
+Answer in 2 sentences. Include the name, location, and one interesting fact.`);
 }));
 
 // ── /api/ai/prep ─────────────────────────────────────────────────────────────
@@ -111,11 +72,9 @@ Answer in 2 sentences. Include the name, location, and one interesting fact.`,
 
 router.post('/prep', handler(({ city, stops }) => {
   const stopStr = (stops || []).slice(0, 3).join(', ') || 'various attractions';
-  const prompt = `Give packing and preparation tips for visiting ${city}, India.
+  return callGeminiText(`Give packing and preparation tips for visiting ${city}, India.
 Planned stops include: ${stopStr}.
-Provide exactly 4 short bullet points. Use emojis. Be practical.`;
-
-  return callGemini([{ text: prompt }]);
+Provide exactly 4 short bullet points. Use emojis. Be practical.`, { cache: true });
 }));
 
 // ── /api/ai/insta ────────────────────────────────────────────────────────────
@@ -123,20 +82,16 @@ Provide exactly 4 short bullet points. Use emojis. Be practical.`;
 
 router.post('/insta', handler(({ city, stops }) => {
   const stopStr = (stops || []).slice(0, 2).join(' and ') || city;
-  const prompt = `What are the 3 best photo spots or angles at ${stopStr} in ${city}?
-Include the best time of day, composition tips. Use emojis. Keep each tip brief.`;
-
-  return callGemini([{ text: prompt }]);
+  return callGeminiText(`What are the 3 best photo spots or angles at ${stopStr} in ${city}?
+Include the best time of day, composition tips. Use emojis. Keep each tip brief.`, { cache: true });
 }));
 
 // ── /api/ai/souvenir ─────────────────────────────────────────────────────────
 // What to buy / souvenirs
 
 router.post('/souvenir', handler(({ city }) => {
-  const prompt = `What are the top 3 authentic souvenirs to buy in ${city}, India?
-Include fair price ranges and where exactly to buy them. Bullet list with emojis.`;
-
-  return callGemini([{ text: prompt }]);
+  return callGeminiText(`What are the top 3 authentic souvenirs to buy in ${city}, India?
+Include fair price ranges and where exactly to buy them. Bullet list with emojis.`, { cache: true });
 }));
 
 // ── /api/ai/budget ───────────────────────────────────────────────────────────
@@ -144,36 +99,25 @@ Include fair price ranges and where exactly to buy them. Bullet list with emojis
 
 router.post('/budget', handler(({ city, limit, spent, expenses }) => {
   const expStr = (expenses || []).map(e => `${e.n}(₹${e.c})`).join(', ');
-  const prompt = `Tourist in ${city}. Total budget ₹${limit}, spent ₹${spent} on: ${expStr}.
+  return callGeminiText(`Tourist in ${city}. Total budget ₹${limit}, spent ₹${spent} on: ${expStr}.
 Give 3 concise budget tips. Flag anything that seems overpriced vs local rates.
-Short bullet list with emojis.`;
-
-  return callGemini([{ text: prompt }]);
+Short bullet list with emojis.`);
 }));
 
 // ── /api/ai/alternative ──────────────────────────────────────────────────────
 // Suggest a hidden-gem alternative to the current stop
 
 router.post('/alternative', handler(({ city, currentStop }) => {
-  const prompt = `A tourist in ${city} wants to skip ${currentStop}.
-Suggest ONE hidden gem or lesser-known alternative nearby. Max 2 sentences. Use emojis.`;
-  return callGemini([{ text: prompt }]);
+  return callGeminiText(`A tourist in ${city} wants to skip ${currentStop}.
+Suggest ONE hidden gem or lesser-known alternative nearby. Max 2 sentences. Use emojis.`, { cache: true });
 }));
 
 // ── /api/ai/caption ──────────────────────────────────────────────────────────
 // Generate Instagram caption for a trip photo
-// POST { imageBase64, imageType, city, stopName }
 
 router.post('/caption', handler(({ imageBase64, imageType, city, stopName }) => {
-  const parts = [
-    {
-      inline_data: {
-        mime_type: imageType || 'image/jpeg',
-        data: imageBase64,
-      },
-    },
-    {
-      text: `Generate 3 creative Instagram captions for this travel photo taken at ${stopName || 'a tourist spot'} in ${city || 'India'}.
+  return callGeminiVision(imageBase64, imageType,
+    `Generate 3 creative Instagram captions for this travel photo taken at ${stopName || 'a tourist spot'} in ${city || 'India'}.
 Each caption should:
 - Be 1-2 lines max
 - Include relevant emojis
@@ -182,26 +126,15 @@ Each caption should:
 Format as:
 1. [caption + hashtags]
 2. [caption + hashtags]
-3. [caption + hashtags]`,
-    },
-  ];
-  return callGemini(parts);
+3. [caption + hashtags]`);
 }));
 
 // ── /api/ai/translate ────────────────────────────────────────────────────────
 // Translate text/signs from a photo
-// POST { imageBase64, imageType, city }
 
 router.post('/translate', handler(({ imageBase64, imageType, city }) => {
-  const parts = [
-    {
-      inline_data: {
-        mime_type: imageType || 'image/jpeg',
-        data: imageBase64,
-      },
-    },
-    {
-      text: `Look at this image taken in ${city || 'India'}.
+  return callGeminiVision(imageBase64, imageType,
+    `Look at this image taken in ${city || 'India'}.
 1. Identify and extract ALL text visible in the image (signs, menus, boards, labels)
 2. Detect the language of each text
 3. Translate everything to English
@@ -211,22 +144,18 @@ Format your response clearly with:
 📝 ORIGINAL TEXT: [what you see]
 🌐 LANGUAGE: [detected language]
 ✅ TRANSLATION: [English translation]
-💡 TIP: [any helpful context about what this means for a tourist]`,
-    },
-  ];
-  return callGemini(parts);
+💡 TIP: [any helpful context about what this means for a tourist]`);
 }));
 
 // ── /api/ai/triprating ───────────────────────────────────────────────────────
 // Rate completed trip and give improvement tips
-// POST { city, stops[], duration, expenses[], stamps[] }
 
 router.post('/triprating', handler(({ city, stops, duration, expenses, stamps }) => {
   const stopList   = (stops   || []).join(', ') || 'various spots';
   const expTotal   = (expenses|| []).reduce((s, e) => s + (e.c || 0), 0);
   const stampCount = (stamps  || []).length;
 
-  const prompt = `A tourist just completed a trip to ${city}, India.
+  return callGeminiText(`A tourist just completed a trip to ${city}, India.
 Trip details:
 - Places visited: ${stopList}
 - Duration: ${duration || 'one day'}
@@ -240,20 +169,17 @@ Please provide:
 💡 NEXT TIME: 3 specific tips to make the next trip to ${city} even better
 🗺️ MISSED: 2 must-see spots they should visit next time
 
-Keep it fun, encouraging, and use emojis throughout!`;
-
-  return callGemini([{ text: prompt }]);
+Keep it fun, encouraging, and use emojis throughout!`);
 }));
 
 // ── /api/ai/replanner ────────────────────────────────────────────────────────
 // Smart day replanner when running late
-// POST { city, completedStops[], remainingStops[], minutesLate, currentTime }
 
 router.post('/replanner', handler(({ city, completedStops, remainingStops, minutesLate, currentTime }) => {
   const done = (completedStops || []).join(', ') || 'none yet';
   const rem  = (remainingStops || []).map(s => `${s.name}(${s.vt}min)`).join(', ') || 'none';
 
-  const prompt = `A tourist in ${city} is running ${minutesLate || 30} minutes late. Current time: ${currentTime || 'unknown'}.
+  return callGeminiText(`A tourist in ${city} is running ${minutesLate || 30} minutes late. Current time: ${currentTime || 'unknown'}.
 Completed stops: ${done}
 Remaining stops with visit times: ${rem}
 
@@ -264,19 +190,16 @@ Please create a smart reschedule:
 🔄 NEW ORDER: Suggest the optimal visiting order for remaining stops
 💨 TIME SAVERS: 2-3 quick tips to make up time (faster transport, skip queues, etc.)
 
-Be practical and specific. Use emojis. Keep each point brief.`;
-
-  return callGemini([{ text: prompt }]);
+Be practical and specific. Use emojis. Keep each point brief.`);
 }));
 
 // ── /api/ai/foodrecommend ────────────────────────────────────────────────────
 // AI food recommendations for a specific stop/location
-// POST { city, stopName, cat, timeOfDay }
 
 router.post('/foodrecommend', handler(({ city, stopName, cat, timeOfDay }) => {
   const time = timeOfDay || 'afternoon';
 
-  const prompt = `A tourist is visiting ${stopName} in ${city}, India at ${time}.
+  return callGeminiText(`A tourist is visiting ${stopName} in ${city}, India at ${time}.
 Give them a mouth-watering food guide:
 
 🍽️ MUST TRY: Top 3 local dishes/foods specific to this area of ${city}
@@ -285,19 +208,16 @@ Give them a mouth-watering food guide:
 ⚠️ PRO TIPS: 2 tips (e.g. what to avoid, best time to eat, how to order like a local)
 🌶️ SPICE WARNING: Rate the local food spice level (Mild/Medium/Spicy/Very Spicy)
 
-Keep it fun and use emojis! Make them hungry!`;
-
-  return callGemini([{ text: prompt }]);
+Keep it fun and use emojis! Make them hungry!`, { cache: true });
 }));
 
 // ── /api/ai/voicechat ────────────────────────────────────────────────────────
 // Voice-optimised short response for voice assistant
-// POST { message, city, plan[], context }
 
 router.post('/voicechat', handler(({ message, city, plan, context }) => {
   const planStr = Array.isArray(plan) && plan.length ? plan.join(', ') : 'none';
 
-  const prompt = `You are a friendly voice assistant for India travel app.
+  return callGeminiText(`You are a friendly voice assistant for India travel app.
 Tourist in ${city || 'India'} asked: "${message}"
 Current stops: ${planStr}
 ${context ? `Context: ${context}` : ''}
@@ -306,17 +226,15 @@ IMPORTANT: Give a SHORT, conversational response (2-3 sentences max).
 - Speak naturally as if talking, not writing
 - No bullet points, no markdown, no asterisks
 - Use simple words that sound good when spoken aloud
-- Be warm, helpful and specific to ${city || 'India'}`;
-
-  return callGemini([{ text: prompt }]);
+- Be warm, helpful and specific to ${city || 'India'}`);
 }));
 
 // ── /api/ai/festival ─────────────────────────────────────────────────────────
-// Festival & Event Radar — what's happening today near the city
+// Festival & Event Radar
 router.post('/festival', handler(({ city, month, date }) => {
   const today = date || new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
   const m = month || new Date().toLocaleString('en-IN', { month:'long' });
-  const prompt = `You are an expert on Indian festivals, local events, and cultural happenings.
+  return callGeminiText(`You are an expert on Indian festivals, local events, and cultural happenings.
 Today is ${today}. The tourist is in ${city}, India.
 
 List ALL festivals, events, melas, temple celebrations, local markets, or cultural events that are:
@@ -335,15 +253,14 @@ For each event provide:
 
 Also mention any upcoming events in next 3 days.
 If no specific events known, mention the most likely seasonal/weekly events for ${m} in ${city}.
-Use emojis. Be specific and helpful.`;
-  return callGemini([{ text: prompt }]);
+Use emojis. Be specific and helpful.`, { cache: true, cacheTtlMs: 30 * 60 * 1000 });
 }));
 
 // ── /api/ai/hiddenGem ────────────────────────────────────────────────────────
-// Hidden Gem Detector — places locals love, tourists never find
+// Hidden Gem Detector
 router.post('/hiddenGem', handler(({ city, prefs }) => {
   const prefStr = (prefs || []).join(', ') || 'any';
-  const prompt = `You are a local resident of ${city}, India who knows every secret spot.
+  return callGeminiText(`You are a local resident of ${city}, India who knows every secret spot.
 Find 5 HIDDEN GEMS that locals love but tourists almost never visit. These should NOT be on typical tourist lists.
 
 Preferences: ${prefStr}
@@ -359,16 +276,14 @@ For each hidden gem:
 ⚠️ LOCAL TIP: (insider advice, what to avoid, what to order)
 
 These should be genuinely off-the-beaten-path — local chai shops, hidden viewpoints, secret beaches, underground art spaces, local dhabas that only residents know, etc.
-NOT Tripadvisor top 10. Real hidden gems only.`;
-  return callGemini([{ text: prompt }]);
+NOT Tripadvisor top 10. Real hidden gems only.`, { cache: true });
 }));
 
 // ── /api/ai/arOverlay ────────────────────────────────────────────────────────
 // AR Overlay — identify building, show history, price, photo tips
 router.post('/arOverlay', handler(({ imageBase64, imageType, city }) => {
-  const parts = [
-    { inline_data: { mime_type: imageType || 'image/jpeg', data: imageBase64 } },
-    { text: `You are an expert Indian historian and travel guide analyzing a photo taken in ${city || 'India'}.
+  return callGeminiVision(imageBase64, imageType,
+    `You are an expert Indian historian and travel guide analyzing a photo taken in ${city || 'India'}.
 
 Analyze this image and provide an AUGMENTED REALITY style overlay with:
 
@@ -389,9 +304,7 @@ Analyze this image and provide an AUGMENTED REALITY style overlay with:
 ⚡ HIDDEN DETAIL: One secret/lesser-known fact most tourists miss
 🗺️ NEARBY: 2 places to visit within walking distance
 
-Format like an AR overlay card. Use emojis. Be specific and accurate.` }
-  ];
-  return callGemini(parts);
+Format like an AR overlay card. Use emojis. Be specific and accurate.`);
 }));
 
 // ── /api/ai/hartaalAlert ─────────────────────────────────────────────────────
@@ -399,7 +312,7 @@ Format like an AR overlay card. Use emojis. Be specific and accurate.` }
 router.post('/hartaalAlert', handler(({ city, date }) => {
   const today = date || new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const month = new Date(date || Date.now()).toLocaleString('en-IN', { month:'long' });
-  const prompt = `You are a local news monitor for ${city}, India. Today is ${today}.
+  return callGeminiText(`You are a local news monitor for ${city}, India. Today is ${today}.
 
 Provide a SAFETY & DISRUPTION REPORT for tourists visiting ${city}:
 
@@ -425,16 +338,14 @@ Provide a SAFETY & DISRUPTION REPORT for tourists visiting ${city}:
 - 3 specific tips to handle disruptions in ${city}
 - Emergency numbers specific to ${city} (local police station, hospital)
 
-Be honest and practical. Use emojis. If specific current data unavailable, give historically accurate patterns for ${city}.`;
-  return callGemini([{ text: prompt }]);
+Be honest and practical. Use emojis. If specific current data unavailable, give historically accurate patterns for ${city}.`, { cache: true, cacheTtlMs: 60 * 60 * 1000 });
 }));
 
 // ── /api/ai/foodSafety ───────────────────────────────────────────────────────
 // Street Food Safety Scanner
 router.post('/foodSafety', handler(({ imageBase64, imageType, city }) => {
-  const parts = [
-    { inline_data: { mime_type: imageType || 'image/jpeg', data: imageBase64 } },
-    { text: `You are a food safety expert and street food specialist for India.
+  return callGeminiVision(imageBase64, imageType,
+    `You are a food safety expert and street food specialist for India.
 Analyze this photo of a food stall/dish/street food in ${city || 'India'}.
 
 Provide a FOOD SAFETY REPORT:
@@ -465,9 +376,7 @@ Provide a FOOD SAFETY REPORT:
 🏆 VERDICT: Eat it / Approach with caution / Skip it
 👅 TASTE PREDICTION: What it will taste like
 
-Be honest but encouraging. Street food is usually safe! Use emojis.` }
-  ];
-  return callGemini(parts);
+Be honest but encouraging. Street food is usually safe! Use emojis.`);
 }));
 
 // ── /api/ai/crowdPredict ─────────────────────────────────────────────────────
@@ -475,7 +384,7 @@ Be honest but encouraging. Street food is usually safe! Use emojis.` }
 router.post('/crowdPredict', handler(({ city, stopName, cat, dayOfWeek, currentHour }) => {
   const day  = dayOfWeek  || new Date().toLocaleDateString('en-IN', { weekday:'long' });
   const hour = currentHour || new Date().getHours();
-  const prompt = `You are a crowd analytics expert for Indian tourist destinations.
+  return callGeminiText(`You are a crowd analytics expert for Indian tourist destinations.
 Analyze crowd patterns for: ${stopName} in ${city}, India
 Category: ${cat || 'tourist attraction'}
 Current: ${day}, ${hour}:00
@@ -508,8 +417,7 @@ Show crowd levels for key hours today as a simple chart:
 🚫 AVOID THESE TIMES:
 Specific dates/times that are always overcrowded (holidays, weekends, festivals)
 
-Use emojis. Be specific to ${city} culture and tourism patterns.`;
-  return callGemini([{ text: prompt }]);
+Use emojis. Be specific to ${city} culture and tourism patterns.`, { cache: true });
 }));
 
 // ── /api/ai/fareNegotiator ───────────────────────────────────────────────────
@@ -517,7 +425,7 @@ Use emojis. Be specific to ${city} culture and tourism patterns.`;
 router.post('/fareNegotiator', handler(({ city, fromPlace, toPlace, distanceKm, vehicleType }) => {
   const dist  = distanceKm  || '?';
   const vehicle = vehicleType || 'auto rickshaw';
-  const prompt = `You are a local resident of ${city} who knows every transport hack.
+  return callGeminiText(`You are a local resident of ${city} who knows every transport hack.
 A tourist needs to go from ${fromPlace || 'current location'} to ${toPlace || 'destination'} by ${vehicle}.
 Distance: ~${dist} km
 
@@ -555,14 +463,13 @@ Specific tips for finding trustworthy autos/taxis in ${city}
 🚌 CHEAPER ALTERNATIVE:
 Is there a bus/metro/share auto option? Cost and details.
 
-Be very specific with prices for ${city}. Use ₹ symbol. Use emojis.`;
-  return callGemini([{ text: prompt }]);
+Be very specific with prices for ${city}. Use ₹ symbol. Use emojis.`, { cache: true });
 }));
 
 // ── /api/ai/tripTribe ────────────────────────────────────────────────────────
 // Trip Tribe matchmaking profile generator
 router.post('/tripTribe', handler(({ city, userName, interests, travelStyle, dates }) => {
-  const prompt = `Generate a fun Trip Tribe traveller profile for someone visiting ${city}.
+  return callGeminiText(`Generate a fun Trip Tribe traveller profile for someone visiting ${city}.
 
 Name: ${userName || 'Traveller'}
 Interests: ${(interests || []).join(', ') || 'sightseeing, food, culture'}
@@ -576,8 +483,7 @@ Create:
 4. What kind of travel buddy they're looking for
 5. Their travel motto (one catchy line)
 
-Keep it fun, friendly and accurate to ${city}. Use emojis throughout.`;
-  return callGemini([{ text: prompt }]);
+Keep it fun, friendly and accurate to ${city}. Use emojis throughout.`, { cache: true });
 }));
 
 module.exports = router;

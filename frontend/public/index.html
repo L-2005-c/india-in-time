@@ -11,11 +11,28 @@
 <meta name="apple-mobile-web-app-title" content="India In-Time">
 <title>India In-Time 🇮🇳</title>
 <link rel="manifest" href="/manifest.json?v=20260603-logo">
-<meta name="theme-color" content="#c9a84c">
+<meta name="theme-color" content="#a855f7">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=20260603-logo">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260603-logo">
 <meta name="apple-mobile-web-app-title" content="India In-Time">
+<meta name="description" content="Your AI-powered travel companion for exploring India. Get hyper-localized itineraries, live weather alerts, and smart budget tracking.">
+<meta property="og:title" content="India In-Time 🇮🇳">
+<meta property="og:description" content="Your AI-powered travel companion for exploring India. Get hyper-localized itineraries, live weather alerts, and smart budget tracking.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://your-startup-domain.com">
+<meta property="og:image" content="https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=1200&h=630&fit=crop">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Google Analytics 4 Placeholder -->
+<!-- Replace G-XXXXXXXXXX with your actual Measurement ID -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -24,11 +41,11 @@
    LUXURY DESIGN TOKENS
 ═══════════════════════════════════════════ */
 :root {
-  /* Brand palette — deep navy + gold */
-  --gold:        #c9a84c;
-  --gold-light:  #e8c97a;
-  --gold-glow:   rgba(201,168,76,0.15);
-  --gold-border: rgba(201,168,76,0.3);
+  /* Brand palette — deep navy + electric cyan */
+  --gold:        #a855f7;
+  --gold-light:  #d946ef;
+  --gold-glow:   rgba(168,85,247,0.12);
+  --gold-border: rgba(168,85,247,0.3);
   --teal:        #00d4b8;
   --teal-glow:   rgba(0,212,184,0.12);
   --rose:        #ff6b8a;
@@ -39,39 +56,39 @@
   --sand:        #f0c074;
   --purple:      #a78bfa;
 
-  /* Dark theme surfaces */
-  --bg-base:    #080e1a;
-  --bg-layer1:  #0d1525;
-  --bg-layer2:  #111d30;
-  --bg-layer3:  #162238;
-  --bg-card:    rgba(13,21,37,0.96);
-  --bg-glass:   rgba(255,255,255,0.03);
-  --bg-input:   rgba(0,0,0,0.4);
+  /* Dark theme surfaces - Cosmic Purple base */
+  --bg-base:    #0a0514;
+  --bg-layer1:  #10091d;
+  --bg-layer2:  #160e28;
+  --bg-layer3:  #1d1334;
+  --bg-card:    rgba(16,9,29,0.96);
+  --bg-glass:   rgba(255,255,255,0.04);
+  --bg-input:   rgba(0,0,0,0.45);
 
   /* Text */
-  --text-primary:   #f0e8d8;
-  --text-secondary: rgba(220,200,170,0.65);
-  --text-muted:     rgba(160,140,110,0.5);
+  --text-primary:   #e8f0fa;
+  --text-secondary: rgba(180,210,240,0.7);
+  --text-muted:     rgba(120,150,180,0.5);
   --text-accent:    var(--gold);
 
   /* Borders */
-  --border-subtle:  rgba(201,168,76,0.08);
-  --border-mid:     rgba(201,168,76,0.18);
-  --border-strong:  rgba(201,168,76,0.35);
-  --border-default: rgba(255,255,255,0.06);
+  --border-subtle:  rgba(168,85,247,0.06);
+  --border-mid:     rgba(168,85,247,0.15);
+  --border-strong:  rgba(168,85,247,0.35);
+  --border-default: rgba(255,255,255,0.07);
 
   /* Shadows */
-  --shadow-card:  0 8px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(201,168,76,0.08) inset;
-  --shadow-btn:   0 4px 20px rgba(201,168,76,0.25);
+  --shadow-card:  0 8px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(168,85,247,0.06) inset;
+  --shadow-btn:   0 4px 20px rgba(168,85,247,0.2);
   --shadow-sm:    0 2px 12px rgba(0,0,0,0.4);
 
   /* Nav */
-  --header-bg:    rgba(8,14,26,0.97);
-  --bottomnav-bg: rgba(8,14,26,0.98);
-  --sidebar-bg:   rgba(10,17,28,0.99);
+  --header-bg:    rgba(6,11,22,0.97);
+  --bottomnav-bg: rgba(6,11,22,0.98);
+  --sidebar-bg:   rgba(8,15,26,0.99);
 
-  --tag-bg:     rgba(201,168,76,0.06);
-  --tag-border: rgba(201,168,76,0.15);
+  --tag-bg:     rgba(168,85,247,0.06);
+  --tag-border: rgba(168,85,247,0.15);
 
   --map-filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(85%);
 
@@ -80,27 +97,31 @@
 }
 
 [data-theme="light"] {
-  --bg-base:    #faf7f0;
+  --bg-base:    #f4f8fc;
   --bg-layer1:  #ffffff;
-  --bg-layer2:  #f8f4ec;
-  --bg-layer3:  #f0ebe0;
+  --bg-layer2:  #eef4fa;
+  --bg-layer3:  #e4eef6;
   --bg-card:    rgba(255,255,255,0.98);
-  --bg-glass:   rgba(201,168,76,0.04);
-  --bg-input:   rgba(100,80,40,0.05);
-  --text-primary:   #1a1208;
-  --text-secondary: rgba(60,45,20,0.7);
-  --text-muted:     rgba(100,80,40,0.45);
-  --text-accent:    #8a6a1a;
-  --border-subtle:  rgba(160,120,40,0.1);
-  --border-mid:     rgba(160,120,40,0.2);
-  --border-strong:  rgba(160,120,40,0.4);
-  --border-default: rgba(100,80,40,0.1);
-  --shadow-card:    0 4px 24px rgba(100,80,40,0.1);
+  --bg-glass:   rgba(0,180,220,0.04);
+  --bg-input:   rgba(0,60,100,0.05);
+  --text-primary:   #0a1628;
+  --text-secondary: rgba(20,50,80,0.7);
+  --text-muted:     rgba(40,80,120,0.45);
+  --text-accent:    #9333ea;
+  --gold:        #9333ea;
+  --gold-light:  #a855f7;
+  --gold-glow:   rgba(147,51,234,0.1);
+  --gold-border: rgba(147,51,234,0.25);
+  --border-subtle:  rgba(0,120,180,0.08);
+  --border-mid:     rgba(0,120,180,0.18);
+  --border-strong:  rgba(0,120,180,0.35);
+  --border-default: rgba(0,60,100,0.08);
+  --shadow-card:    0 4px 24px rgba(0,60,120,0.08);
   --header-bg:    rgba(255,255,255,0.97);
   --bottomnav-bg: rgba(255,255,255,0.98);
-  --sidebar-bg:   rgba(252,249,242,0.99);
-  --tag-bg:     rgba(160,120,40,0.06);
-  --tag-border: rgba(160,120,40,0.15);
+  --sidebar-bg:   rgba(248,252,255,0.99);
+  --tag-bg:     rgba(147,51,234,0.06);
+  --tag-border: rgba(147,51,234,0.15);
   --map-filter: none;
   color-scheme: light;
 }
@@ -141,7 +162,7 @@ body::before {
   height:calc(58px + env(safe-area-inset-top));
   display:flex; align-items:flex-end;
   /* subtle gold shimmer line at top */
-  box-shadow: 0 1px 0 var(--border-subtle), 0 0 40px rgba(201,168,76,0.04);
+  box-shadow: 0 1px 0 var(--border-subtle), 0 0 40px rgba(168,85,247,0.04);
 }
 .header-inner{width:100%;height:58px;display:flex;align-items:center;gap:10px;}
 
@@ -172,9 +193,9 @@ body::before {
   user-select:none; letter-spacing:0.3px;
 }
 .hpill:active{transform:scale(.93);}
-.hpill-credits { background:rgba(201,168,76,.1); border-color:var(--gold-border); color:var(--gold); }
+.hpill-credits { background:rgba(168,85,247,.08); border-color:var(--gold-border); color:var(--gold); }
 .hpill-jade    { background:rgba(0,229,160,.08); border-color:rgba(0,229,160,.2); color:var(--jade); }
-.hpill-install { background:linear-gradient(135deg,var(--gold),#a8862e); border-color:var(--gold); color:#000; font-weight:700; }
+.hpill-install { background:linear-gradient(135deg,var(--gold),#7e22ce); border-color:var(--gold); color:#000; font-weight:700; }
 .hpill-ocean   { background:var(--ocean-glow); border-color:rgba(0,200,240,.2); color:var(--ocean); }
 .hpill-wa      { background:rgba(37,211,102,.08); border-color:rgba(37,211,102,.2); color:#86efac; }
 .hpill-live    { background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.2); color:#fca5a5; }
@@ -200,8 +221,15 @@ body::before {
    CONTENT
 ═══════════════════════════════════════════ */
 #content{flex:1;overflow:hidden;position:relative;}
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 .view{display:none;height:100%;flex-direction:column;overflow:hidden;}
-.view.active{display:flex;}
+.view.active{
+  display:flex;
+  animation: viewFadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
 
 /* ═══════════════════════════════════════════
    MAP VIEW
@@ -274,7 +302,7 @@ body::before {
   margin-bottom:18px;
   background:
     radial-gradient(circle at top right, rgba(0,212,184,.18), transparent 32%),
-    radial-gradient(circle at bottom left, rgba(201,168,76,.16), transparent 38%),
+    radial-gradient(circle at bottom left, rgba(168,85,247,.14), transparent 38%),
     linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
     linear-gradient(160deg, #0f1b2f, #08121f 58%, #050c16);
   border:1px solid rgba(255,255,255,.08);
@@ -318,7 +346,7 @@ body::before {
   background:
     linear-gradient(180deg, rgba(6,12,22,.08), rgba(6,12,22,.72)),
     radial-gradient(circle at top right, rgba(0,212,184,.2), transparent 30%),
-    linear-gradient(120deg, rgba(201,168,76,.2), transparent 45%);
+    linear-gradient(120deg, rgba(168,85,247,.18), transparent 45%);
 }
 .hero-video-copy{
   position:absolute;
@@ -396,7 +424,7 @@ body::before {
 }
 .hanim-bg{
   background:
-    radial-gradient(ellipse 130% 80% at 20% 110%, rgba(201,168,76,.32) 0%, transparent 60%),
+    radial-gradient(ellipse 130% 80% at 20% 110%, rgba(168,85,247,.25) 0%, transparent 60%),
     radial-gradient(ellipse 100% 70% at 85% -10%, rgba(0,200,240,.28) 0%, transparent 55%),
     linear-gradient(160deg, #060d1a 0%, #0a1628 50%, #0d1e34 100%);
   animation:hanimBgShift 12s ease-in-out infinite alternate;
@@ -410,7 +438,7 @@ body::before {
   background:conic-gradient(
     from 210deg at 30% 60%,
     transparent 0deg,
-    rgba(201,168,76,.18) 40deg,
+    rgba(168,85,247,.15) 40deg,
     rgba(0,212,184,.14) 90deg,
     transparent 140deg
   );
@@ -455,7 +483,7 @@ body::before {
 .hanim-orb2{
   width:140px;height:140px;
   bottom:60px;left:-20px;
-  background:radial-gradient(circle, rgba(201,168,76,.65) 0%, transparent 70%);
+  background:radial-gradient(circle, rgba(168,85,247,.55) 0%, transparent 70%);
   animation:hanimOrb2 11s ease-in-out infinite alternate;
 }
 @keyframes hanimOrb2{
@@ -476,8 +504,8 @@ body::before {
   position:absolute;
   inset:0;
   background-image:
-    linear-gradient(rgba(201,168,76,.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(201,168,76,.06) 1px, transparent 1px);
+    linear-gradient(rgba(168,85,247,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168,85,247,.05) 1px, transparent 1px);
   background-size:32px 32px;
   animation:hanimGrid 20s linear infinite;
 }
@@ -494,7 +522,7 @@ body::before {
   position:absolute;
   font-size:22px;
   opacity:0;
-  filter:drop-shadow(0 0 12px rgba(201,168,76,.6));
+  filter:drop-shadow(0 0 12px rgba(168,85,247,.5));
   animation:hanimIconFloat 6s ease-in-out infinite;
 }
 .hi1{top:18%;left:15%;animation-delay:0s;animation-duration:7s;}
@@ -513,7 +541,7 @@ body::before {
   position:absolute;
   left:0;right:0;
   height:2px;
-  background:linear-gradient(90deg, transparent, rgba(201,168,76,.5), rgba(0,212,184,.4), transparent);
+  background:linear-gradient(90deg, transparent, rgba(168,85,247,.45), rgba(0,212,184,.4), transparent);
   animation:hanimScan 5s linear infinite;
   opacity:.6;
 }
@@ -713,13 +741,13 @@ body::before {
   color:var(--text-primary); font-size:14px; font-family:'DM Sans',sans-serif;
   outline:none; transition:all .2s;
 }
-.search-inp:focus{border-color:var(--gold-border);background:var(--gold-glow);box-shadow:0 0 0 3px rgba(201,168,76,.06);}
+.search-inp:focus{border-color:var(--gold-border);background:var(--gold-glow);box-shadow:0 0 0 3px rgba(168,85,247,.06);}
 .search-inp::placeholder{color:var(--text-muted);}
 .search-btn {
   padding:0 20px; border-radius:14px; font-size:13px; font-weight:700;
-  background:linear-gradient(135deg,var(--gold),#a8862e);
+  background:linear-gradient(135deg,var(--gold),#7e22ce);
   border:none; color:#000; cursor:pointer; white-space:nowrap;
-  transition:all .15s; box-shadow:0 4px 16px rgba(201,168,76,.25);
+  transition:all .15s; box-shadow:0 4px 16px rgba(168,85,247,.2);
   font-family:'DM Sans',sans-serif;
 }
 .search-btn:active{transform:scale(.97);}
@@ -731,7 +759,7 @@ body::before {
   font-weight:600; border-radius:14px; padding:11px 40px 11px 16px;
   width:100%; margin-bottom:16px; outline:none; cursor:pointer;
   appearance:none; -webkit-appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23c9a84c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23a855f7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat:no-repeat; background-position:right 12px center; background-size:16px;
   transition:border-color .2s;
 }
@@ -766,7 +794,7 @@ body::before {
 .exp-chip:has(input:checked){
   background:var(--gold-glow); border-color:var(--gold-border);
   color:var(--gold); font-weight:600;
-  box-shadow:0 0 16px rgba(201,168,76,.08);
+  box-shadow:0 0 16px rgba(168,85,247,.08);
 }
 .exp-chip:active{transform:scale(.97);}
 
@@ -786,16 +814,16 @@ body::before {
 /* Generate button */
 .btn-gen {
   width:100%; padding:14px; border-radius:14px;
-  background:linear-gradient(135deg,#c9a84c 0%,#e8c97a 50%,#a8862e 100%);
+  background:linear-gradient(135deg,#00d4ff 0%,#5ee7ff 50%,#0099b8 100%);
   border:none; color:#0d0a04;
   font-family:'Playfair Display',serif; font-size:15px; font-weight:700;
   cursor:pointer; letter-spacing:0.5px;
   display:flex; align-items:center; justify-content:center; gap:8px;
-  transition:all .2s; box-shadow:0 6px 24px rgba(201,168,76,.35);
+  transition:all .2s; box-shadow:0 6px 24px rgba(0,212,255,.25);
   margin-top:4px; position:relative; overflow:hidden;
 }
 .btn-gen::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none;}
-.btn-gen:active{transform:scale(.98);box-shadow:0 2px 8px rgba(201,168,76,.2);}
+.btn-gen:active{transform:scale(.98);box-shadow:0 2px 8px rgba(168,85,247,.15);}
 
 .btn-secondary {
   width:100%; padding:11px; border-radius:14px; margin-top:8px;
@@ -891,7 +919,7 @@ body::before {
 .qc-blue  {background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.2);color:#a5b4fc;}
 .qc-amber {background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2);color:#fcd34d;}
 .qc-jade  {background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.22);color:#86efac;}
-.qc-full  {grid-column:1/-1;background:rgba(201,168,76,.08);border-color:var(--gold-border);color:var(--gold);}
+.qc-full  {grid-column:1/-1;background:rgba(168,85,247,.06);border-color:var(--gold-border);color:var(--gold);}
 
 /* ═══════════════════════════════════════════
    AI TOOLS — Card grid redesign
@@ -929,7 +957,7 @@ body::before {
 .ai-card-wide .ai-card-label{font-size:11px;color:var(--text-primary);}
 
 /* Colour accents per card */
-.ai-accent-gold  {border-color:rgba(201,168,76,.2);}
+.ai-accent-gold  {border-color:rgba(168,85,247,.2);}
 .ai-accent-teal  {border-color:rgba(0,212,184,.2);}
 .ai-accent-purple{border-color:rgba(167,139,250,.2);}
 .ai-accent-rose  {border-color:rgba(255,107,138,.2);}
@@ -955,7 +983,7 @@ body::before {
   font-family:'DM Sans',sans-serif; letter-spacing:0.3px; white-space:nowrap;
 }
 .itn-btn:active{transform:scale(.94);}
-.itnb-gold   {background:rgba(201,168,76,.1);border-color:var(--gold-border);color:var(--gold);}
+.itnb-gold   {background:rgba(168,85,247,.08);border-color:var(--gold-border);color:var(--gold);}
 .itnb-blue   {background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.2);color:#a5b4fc;}
 .itnb-green  {background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.2);color:#6ee7b7;}
 .itnb-teal   {background:var(--teal-glow);border-color:rgba(0,212,184,.2);color:var(--teal);}
@@ -1034,8 +1062,8 @@ body::before {
 .break-card{
   padding:14px 15px;
   border-radius:16px;
-  border:1px solid rgba(201,168,76,.18);
-  background:linear-gradient(135deg, rgba(201,168,76,.1), rgba(255,255,255,.03));
+  border:1px solid rgba(168,85,247,.15);
+  background:linear-gradient(135deg, rgba(168,85,247,.08), rgba(255,255,255,.03));
   box-shadow:0 8px 22px rgba(0,0,0,.16);
 }
 .break-card-top{
@@ -1107,7 +1135,7 @@ body::before {
 
 /* Empty state */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:52px 24px;text-align:center;gap:10px;}
-.empty-icon{font-size:48px;filter:drop-shadow(0 4px 12px rgba(201,168,76,.2));}
+.empty-icon{font-size:48px;filter:drop-shadow(0 4px 12px rgba(168,85,247,.15));}
 .empty-txt{font-size:13px;color:var(--text-muted);line-height:1.7;max-width:220px;}
 .empty-sub{font-size:11px;color:var(--text-muted);opacity:.6;}
 
@@ -1170,7 +1198,7 @@ body::before {
   box-shadow:0 2px 8px rgba(0,0,0,.15);
 }
 .bubble.user-b{
-  background:rgba(201,168,76,.08); border-color:var(--gold-border);
+  background:rgba(168,85,247,.06); border-color:var(--gold-border);
   border-bottom-left-radius:16px; border-bottom-right-radius:4px; color:var(--text-primary);
 }
 .bubble strong{color:var(--text-primary);font-weight:600;}
@@ -1189,11 +1217,11 @@ body::before {
 #chat-in::placeholder{color:var(--text-muted);}
 .send-btn{
   width:40px; height:40px;
-  background:linear-gradient(135deg,var(--gold),#a8862e);
+  background:linear-gradient(135deg,var(--gold),#7e22ce);
   border:none; border-radius:50%; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   color:#000; font-size:16px; flex-shrink:0;
-  box-shadow:0 4px 12px rgba(201,168,76,.3); transition:all .15s;
+  box-shadow:0 4px 12px rgba(168,85,247,.2); transition:all .15s;
 }
 .send-btn:active{transform:scale(.9);}
 
@@ -1266,7 +1294,7 @@ body::before {
 
 .passport-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-bottom:80px;}
 .passport-stamp{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-layer1);border:1.5px solid var(--border-default);border-radius:14px;padding:14px 6px;gap:5px;cursor:pointer;transition:all .2s;text-align:center;}
-.passport-stamp.unlocked{border-color:var(--gold-border);background:var(--gold-glow);box-shadow:0 0 16px rgba(201,168,76,.1);}
+.passport-stamp.unlocked{border-color:var(--gold-border);background:var(--gold-glow);box-shadow:0 0 16px rgba(168,85,247,.08);}
 .passport-stamp:active{transform:scale(.94);}
 .stamp-icon{font-size:26px;}
 .stamp-name{font-size:9px;font-weight:600;color:var(--text-muted);line-height:1.3;}
@@ -1319,7 +1347,7 @@ body::before {
 }
 #splash::before{
   content:''; position:absolute; inset:0; pointer-events:none;
-  background:radial-gradient(ellipse 60% 50% at 50% 60%, rgba(201,168,76,.06), transparent);
+  background:radial-gradient(ellipse 60% 50% at 50% 60%, rgba(168,85,247,.05), transparent);
 }
 .splash-flag{width:88px;height:122px;object-fit:contain;animation:splashfloat 3s ease-in-out infinite;position:relative;z-index:1;}
 @keyframes splashfloat{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-14px) rotate(2deg);}}
@@ -1352,7 +1380,7 @@ body::before {
 #login-screen::before{
   content:''; position:absolute; inset:0; pointer-events:none;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 80%, rgba(201,168,76,.05), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 80%, rgba(168,85,247,.04), transparent),
     radial-gradient(ellipse 40% 40% at 20% 20%, rgba(0,212,184,.03), transparent);
 }
 .login-card{
@@ -1364,7 +1392,7 @@ body::before {
   width:60px; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent);
   margin:0 auto 20px;
 }
-.login-flag{width:76px;height:105px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(201,168,76,.2));}
+.login-flag{width:76px;height:105px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(168,85,247,.15));}
 .login-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--text-primary);}
 .login-title span{color:var(--gold);font-style:italic;}
 .login-sub{font-size:10px;color:var(--text-muted);margin-top:5px;margin-bottom:28px;letter-spacing:2px;text-transform:uppercase;}
@@ -1430,24 +1458,95 @@ body::before {
 /* Light mode tweaks */
 [data-theme="light"] #plan-view,[data-theme="light"] #chat-view,[data-theme="light"] #tools-view,[data-theme="light"] #plan-list{background:var(--bg-base);}
 [data-theme="light"] .stop-card{background:#fff;}
-[data-theme="light"] .bubble{background:#faf6ee;}
+[data-theme="light"] .bubble{background:#f0f6ff;}
 [data-theme="light"] .tool-card,[data-theme="light"] .lingo-card,[data-theme="light"] .emer-card,[data-theme="light"] .budget-card,[data-theme="light"] .passport-stamp,[data-theme="light"] .login-card{background:#fff;}
 
 /* ═══════════════════════════════════════════
-   RESPONSIVE
+   RESPONSIVE — Mobile-first enhanced design
 ═══════════════════════════════════════════ */
-@media(max-width:400px){
-  .hpill{padding:4px 8px;font-size:9px;}
-  .gps-badge{padding:4px 7px;font-size:8px;}
-  .nav-dest{font-size:17px;}
+
+/* ── Extra small phones (≤360px) ── */
+@media(max-width:360px){
+  .logo{font-size:14px;gap:5px;}
+  .header-logo-mark{width:16px;height:23px;}
+  .hpill{padding:3px 7px;font-size:8px;gap:3px;}
+  .gps-badge{padding:3px 6px;font-size:7px;}
+  .theme-btn{width:30px;height:30px;font-size:13px;}
+  .user-avatar{width:28px;height:28px;}
+  .hero-title{font-size:22px;max-width:100%;}
+  .hero-copy{font-size:11px;}
+  .hero-kicker{font-size:9px;padding:5px 8px;}
+  .hero-btn{min-height:38px;padding:0 12px;font-size:11px;border-radius:12px;}
+  .hero-metrics{grid-template-columns:1fr 1fr;gap:6px;}
+  .hero-metric{padding:8px 10px;border-radius:12px;}
+  .hero-metric-label{font-size:7px;}
+  .hero-metric-value{font-size:12px;}
+  .plan-section{padding:12px 10px 0;}
+  .search-inp{padding:9px 12px;font-size:13px;border-radius:12px;}
+  .search-btn{padding:0 14px;font-size:12px;border-radius:12px;}
+  .city-select{font-size:13px;padding:9px 36px 9px 12px;border-radius:12px;}
+  .setting-card{padding:8px 10px;border-radius:12px;}
+  .exp-grid{grid-template-columns:1fr;gap:6px;}
+  .exp-chip{padding:9px 10px;font-size:11px;border-radius:10px;}
+  .btn-gen{padding:12px;font-size:13px;border-radius:12px;}
   .ai-grid{grid-template-columns:1fr 1fr;}
-  .hero-grid{grid-template-columns:1fr;}
-  .hero-title{font-size:27px;}
-  .hero-metrics{grid-template-columns:1fr 1fr;}
+  .ai-card{padding:10px 6px;border-radius:12px;}
+  .ai-card-icon{font-size:18px;}
+  .ai-card-label{font-size:8px;}
+  .stop-card{padding:10px 10px 8px;border-radius:0 12px 12px 0;}
+  .sc-img{width:42px;height:42px;border-radius:10px;}
+  .sc-name{font-size:12px;}
+  .nav-dest{font-size:16px;}
+  .nav-card{border-radius:16px;padding:10px 12px;}
+  .tool-cards{grid-template-columns:1fr;}
+  .tool-card{padding:14px 10px;border-radius:14px;}
+  .passport-grid{grid-template-columns:repeat(2,1fr);gap:6px;}
+  .login-card{padding:28px 18px;border-radius:22px;}
+  .login-title{font-size:24px;}
+  .btn-google{padding:12px;font-size:13px;border-radius:14px;}
   .planner-insights{grid-template-columns:1fr;}
   .planner-config-grid{grid-template-columns:1fr;}
+  .hero-grid{grid-template-columns:1fr;}
+  .transport-grid{grid-template-columns:repeat(2,1fr);}
+  .budget-day-card{min-width:100px;}
+  .trip-settings{grid-template-columns:1fr;gap:6px;}
+  .quick-controls{grid-template-columns:1fr;gap:5px;}
+  .qc-btn{padding:10px 6px;font-size:12px;}
+  .nav-stats{grid-template-columns:1fr;gap:6px;}
+  .itin-footer{padding:8px 10px;gap:4px;}
+  .stat-val{font-size:11px;}
+  .fin-val{font-size:18px;}
+  .chat-input-bar{padding:8px 10px;}
+  #chat-in{padding:9px 14px;font-size:12px;}
+  .send-btn{width:36px;height:36px;font-size:14px;}
+  .bubble{padding:8px 10px;font-size:11px;border-radius:14px;border-bottom-left-radius:3px;}
 }
 
+/* ── Small phones (≤480px) ── */
+@media(max-width:480px){
+  .hpill{padding:4px 8px;font-size:9px;}
+  .gps-badge{padding:4px 7px;font-size:8px;}
+  .hero-grid{grid-template-columns:1fr;}
+  .hero-visual{min-height:200px;border-radius:20px;}
+  .hero-title{font-size:24px;max-width:100%;}
+  .hero-copy{font-size:12px;}
+  .hero-metrics{grid-template-columns:1fr 1fr;gap:7px;}
+  .hero-actions{flex-direction:column;}
+  .hero-btn{width:100%;text-align:center;justify-content:center;}
+  .ai-grid{grid-template-columns:1fr 1fr;}
+  .planner-insights{grid-template-columns:1fr;}
+  .planner-config-grid{grid-template-columns:1fr;}
+  .setting-stack,.setting-stack.three{grid-template-columns:1fr;}
+  .nav-dest{font-size:17px;}
+  .exp-grid{grid-template-columns:1fr;gap:6px;}
+  .transport-grid{grid-template-columns:repeat(2,1fr);}
+  .budget-day-card{min-width:110px;}
+  .tool-cards{grid-template-columns:1fr;}
+  .plan-hero{padding:18px 14px;border-radius:22px;}
+  .passport-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+/* ── Medium phones & small tablets (≤720px) ── */
 @media(max-width:720px){
   .hero-grid{grid-template-columns:1fr;}
   .hero-visual{min-height:220px;}
@@ -1456,6 +1555,96 @@ body::before {
   .planner-config-grid{grid-template-columns:1fr;}
   .setting-stack,.setting-stack.three{grid-template-columns:1fr;}
 }
+
+/* ── Tablet landscape & small desktop (≥768px) ── */
+@media(min-width:768px){
+  .plan-section{padding:20px 20px 0;}
+  .plan-hero{padding:28px 24px;border-radius:30px;}
+  .hero-title{font-size:36px;}
+  .hero-copy{font-size:14px;max-width:40rem;}
+  .hero-metrics{grid-template-columns:repeat(4,1fr);gap:12px;}
+  .hero-metric{padding:14px 16px;}
+  .hero-btn{min-height:46px;padding:0 22px;font-size:13px;}
+  .planner-insights{grid-template-columns:repeat(3,1fr);gap:12px;}
+  .planner-config-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+  .ai-grid{grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .tool-cards{grid-template-columns:1fr 1fr;gap:10px;}
+  .stop-card{padding:14px 16px 12px;}
+  .sc-img{width:56px;height:56px;}
+  .sc-name{font-size:14px;}
+  .passport-grid{grid-template-columns:repeat(3,1fr);}
+  .login-card{max-width:400px;padding:42px 34px;}
+  .exp-grid{grid-template-columns:1fr 1fr;gap:8px;}
+}
+
+/* ── Desktop (≥1024px) ── */
+@media(min-width:1024px){
+  .plan-section{padding:24px 28px 0;}
+  #plan-list{padding:12px 28px 100px;}
+  .hero-grid{grid-template-columns:minmax(0,1.1fr) minmax(320px,0.9fr);gap:24px;}
+  .hero-title{font-size:42px;}
+  .hero-copy{font-size:14px;}
+  .stop-card{padding:16px 18px 14px;}
+  .ai-grid{gap:10px;}
+  .plan-hero{padding:32px 28px;border-radius:32px;}
+  .budget-day-card{min-width:140px;}
+  .tool-card{padding:18px 14px;}
+}
+
+/* ── Touch device optimizations (Mobile First) ── */
+@media(hover:none) and (pointer:coarse), (max-width: 480px){
+  .hpill{min-height:48px; padding: 0 16px; font-size: 11px;}
+  .hero-btn{min-height:52px; font-size: 14px;}
+  .qc-btn{min-height:48px; font-size: 12px;}
+  .sc-action{min-height:48px; min-width:48px; display:flex; align-items:center; justify-content:center;}
+  .exp-chip{min-height:48px; padding: 0 16px;}
+  .nav-item{padding:12px 4px 14px;}
+  .setting-card{min-height:52px; padding: 12px;}
+  .search-btn{min-height:48px;}
+  .btn-gen{min-height:56px; font-size: 16px;}
+  .day-tab{min-height:44px;}
+  
+  /* Additional UI tweaks for better native feel */
+  input, select, textarea { 
+    background: rgba(var(--brand-main-rgb), 0.15);
+    box-shadow: 0 4px 12px rgba(var(--brand-main-rgb), 0.2);
+  }
+  .btn:active, .hpill:active, .ai-tool:active, .day-card:active {
+    transform: scale(0.96);
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .day-card {
+    animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    will-change: transform, opacity;
+  }
+  .day-card:nth-child(1) { animation-delay: 0.05s; }
+  .day-card:nth-child(2) { animation-delay: 0.10s; }
+  .day-card:nth-child(3) { animation-delay: 0.15s; }
+  .day-card:nth-child(4) { animation-delay: 0.20s; }
+  .day-card:nth-child(5) { animation-delay: 0.25s; }
+  input, select, textarea { font-size: 16px !important; } /* Prevents iOS auto-zoom */
+  .stop-card { border-radius: 20px; }
+  .itin-hdr { padding: 12px 14px; }
+}
+
+/* ── Landscape orientation on phones ── */
+@media(max-height:500px) and (orientation:landscape){
+  #header{height:calc(44px + env(safe-area-inset-top));}
+  .header-inner{height:44px;}
+  #bottom-nav{padding-bottom:env(safe-area-inset-bottom);}
+  .nav-item{padding:6px 4px 8px;gap:2px;}
+  .nav-ico{font-size:16px;}
+  .nav-lbl{font-size:8px;}
+  .plan-hero{padding:14px 16px;}
+  .hero-title{font-size:22px;}
+  .hero-visual{min-height:160px;}
+}
+
 
 /* ── BACK NAVIGATION ── */
 .back-btn{display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--gold);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;padding:5px 0;transition:all .15s;flex-shrink:0;letter-spacing:0.3px;}
@@ -1491,7 +1680,222 @@ body::before {
 .drawer-sec{font-size:8px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);opacity:.8;margin:16px 0 10px;display:flex;align-items:center;gap:8px;}
 .drawer-sec::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--border-mid),transparent);}
 .drawer-sec:first-child{margin-top:4px;}
+
+/* ═══════════════════════════════════════════
+   BUDGET OPTIMIZER
+═══════════════════════════════════════════ */
+.budget-opt-section{margin:0 0 16px;}
+.budget-opt-card{
+  padding:16px;border-radius:18px;
+  background:linear-gradient(180deg,rgba(0,229,160,.06),rgba(255,255,255,.02));
+  border:1px solid rgba(0,229,160,.15);
+  box-shadow:0 8px 24px rgba(0,0,0,.16);
+}
+.budget-opt-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.budget-opt-title{font-size:8px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--jade);}
+.budget-opt-total{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--text-primary);}
+.budget-input-row{display:flex;gap:8px;margin-bottom:12px;}
+.budget-input-card{
+  flex:1;background:var(--bg-layer1);border:1px solid var(--border-default);
+  border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;
+}
+.budget-input-lbl{font-size:7px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
+.budget-input-val{
+  background:none;border:none;outline:none;color:var(--text-primary);
+  font-family:'Space Mono',monospace;font-size:15px;font-weight:700;width:100%;
+}
+.budget-day-scroll{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 0 8px;margin-bottom:8px;}
+.budget-day-scroll::-webkit-scrollbar{display:none;}
+.budget-day-card{
+  flex-shrink:0;min-width:130px;padding:10px 12px;border-radius:14px;
+  background:var(--bg-layer1);border:1px solid var(--border-default);
+  transition:border-color .2s;
+}
+.budget-day-card.active{border-color:var(--gold-border);background:var(--gold-glow);}
+.budget-day-label{font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);}
+.budget-day-amount{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--text-primary);margin-top:4px;}
+.budget-cat-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:6px;gap:1px;}
+.budget-cat-seg{height:100%;border-radius:2px;transition:width .4s ease;}
+.budget-cat-seg.transport{background:var(--ocean);}
+.budget-cat-seg.food{background:var(--sand);}
+.budget-cat-seg.entry{background:var(--purple);}
+.budget-cat-seg.misc{background:var(--text-muted);}
+.budget-cat-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;}
+.budget-cat-item{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:600;color:var(--text-secondary);}
+.budget-cat-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* ═══════════════════════════════════════════
+   TRANSPORT OPTIONS GRID
+═══════════════════════════════════════════ */
+.transport-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px;
+}
+.transport-card{
+  padding:6px 5px;border-radius:8px;text-align:center;cursor:pointer;
+  background:var(--bg-glass);border:1px solid var(--border-default);
+  transition:all .15s;text-decoration:none;display:flex;flex-direction:column;
+  align-items:center;gap:2px;position:relative;color:inherit;
+}
+.transport-card:active{transform:scale(.95);}
+.transport-card:hover{border-color:var(--border-mid);background:var(--gold-glow);}
+.transport-card .t-icon{font-size:14px;line-height:1;}
+.transport-card .t-mode{font-size:7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);}
+.transport-card .t-fare{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:var(--text-primary);}
+.transport-card .t-time{font-size:8px;color:var(--text-secondary);}
+.transport-badge{
+  position:absolute;top:-4px;right:-4px;padding:1px 4px;border-radius:4px;
+  font-size:6px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  line-height:1.4;
+}
+.transport-badge.fastest{background:var(--ocean);color:#000;}
+.transport-badge.cheapest{background:var(--jade);color:#000;}
+
+/* ═══════════════════════════════════════════
+   SMART TIME & TRAFFIC INDICATORS
+═══════════════════════════════════════════ */
+.smart-time-row{display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;}
+.traffic-badge{
+  display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;
+  font-size:8px;font-weight:700;letter-spacing:.3px;
+}
+.traffic-badge.light{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.2);color:var(--jade);}
+.traffic-badge.moderate{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);color:#fcd34d;}
+.traffic-badge.heavy{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);color:#fca5a5;}
+.crowd-badge{
+  display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;
+  font-size:8px;font-weight:700;letter-spacing:.3px;
+}
+.crowd-badge.low{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.15);color:var(--jade);}
+.crowd-badge.medium{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);color:#fcd34d;}
+.crowd-badge.high{background:rgba(255,107,90,.06);border:1px solid rgba(255,107,90,.15);color:#fca5a5;}
+.crowd-badge.extreme{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#f87171;}
+
+/* Budget summary in footer */
+.budget-footer-stat{text-align:center;}
+.budget-footer-val{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--jade);}
+
+@media(max-width:400px){
+  .transport-grid{grid-template-columns:repeat(2,1fr);}
+  .budget-day-card{min-width:110px;}
+}
+
+/* ═══════════════════════════════════════════
+   ADVANCED UI ENHANCEMENTS
+═══════════════════════════════════════════ */
+
+/* Shimmer animation on generate button */
+.btn-gen{position:relative;overflow:hidden;}
+.btn-gen::after{
+  content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  animation:btnShimmer 3s ease-in-out infinite;
+}
+@keyframes btnShimmer{
+  0%{left:-100%;}
+  50%,100%{left:120%;}
+}
+
+/* Smooth hover glow for interactive cards */
+.stop-card{transition:all .25s cubic-bezier(.4,0,.2,1);}
+.stop-card:hover{
+  border-color:var(--border-mid);
+  box-shadow:0 4px 20px rgba(168,85,247,.06), 0 2px 12px rgba(0,0,0,.2);
+  transform:translateY(-1px);
+}
+
+.ai-card{transition:all .22s cubic-bezier(.4,0,.2,1);}
+.ai-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(168,85,247,.08);
+  border-color:var(--border-mid);
+}
+
+.tool-card{transition:all .22s cubic-bezier(.4,0,.2,1);}
+.tool-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 28px rgba(168,85,247,.08);
+  border-color:var(--border-mid);
+}
+
+/* Enhanced glassmorphism on nav elements */
+#header{
+  background:linear-gradient(180deg,var(--header-bg),rgba(6,11,22,0.92));
+}
+
+#bottom-nav{
+  background:linear-gradient(0deg,var(--bottomnav-bg),rgba(6,11,22,0.93));
+}
+
+/* Subtle ambient glow on body */
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 40% 30% at 15% 85%, rgba(168,85,247,.03), transparent),
+    radial-gradient(ellipse 35% 25% at 85% 15%, rgba(0,212,184,.025), transparent);
+}
+
+/* Focus ring for accessibility */
+.search-inp:focus,
+.setting-inp:focus,
+.vibe-area:focus,
+#chat-in:focus{
+  outline:none;
+  box-shadow:0 0 0 2px rgba(168,85,247,.15), 0 0 0 4px rgba(168,85,247,.05);
+}
+
+/* Smooth view transitions */
+.view{transition:opacity .25s ease;}
+
+/* Bottom nav hover glow */
+.nav-item{transition:all .2s cubic-bezier(.4,0,.2,1);}
+.nav-item:hover .nav-lbl{color:var(--text-secondary);}
+.nav-item.active{
+  background:linear-gradient(180deg,rgba(168,85,247,.06),transparent);
+}
+
+/* Day tab enhanced active state */
+.day-tab.active{
+  background:var(--gold);border-color:var(--gold);color:#000;
+  box-shadow:0 2px 12px rgba(168,85,247,.2);
+}
+
+/* Hero section gradient shimmer */
+.plan-hero{transition:box-shadow .3s ease;}
+.plan-hero:hover{
+  box-shadow:0 20px 70px rgba(0,0,0,.4), 0 0 60px rgba(168,85,247,.04);
+}
+
+/* Pulse animation for live indicators */
+@keyframes cyanPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,.4);}
+  50%{box-shadow:0 0 0 6px rgba(168,85,247,0);}
+}
+
+/* Enhanced login card */
+.login-card{
+  box-shadow:
+    0 8px 40px rgba(0,0,0,.6),
+    0 0 80px rgba(168,85,247,.04),
+    0 1px 0 rgba(168,85,247,.06) inset;
+}
+
+/* Scroll indicator fade for pills */
+.header-pills-wrap{
+  mask-image:linear-gradient(to right,black 85%,transparent 100%);
+  -webkit-mask-image:linear-gradient(to right,black 85%,transparent 100%);
+}
+
+/* Smooth scrolling everywhere */
+#plan-view,#chat-messages,#tools-view,.budget-day-scroll,.day-tabs{
+  scroll-behavior:smooth;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* Selection color */
+::selection{background:rgba(168,85,247,.2);color:var(--text-primary);}
+::-moz-selection{background:rgba(168,85,247,.2);color:var(--text-primary);}
 </style>
+
 </head>
 <body>
 
@@ -1523,6 +1927,7 @@ body::before {
   <div class="um-item" onclick="toggleLoadPanel();toggleUserMenu()">📂 My Saved Plans</div>
   <div class="um-item" onclick="switchToView('tools-view',3);renderBudget();toggleUserMenu()">💸 My Budget</div>
   <div class="um-item" onclick="switchToView('tools-view',3);renderPassport();toggleUserMenu()">🛂 My Passport</div>
+  <div class="um-item" id="install-app-btn" onclick="installPWA()" style="display:none; color: var(--accent);">⬇️ Install App</div>
   <div class="um-item um-signout" onclick="doSignOut()">🚪 Sign Out</div>
 </div>
 
@@ -1551,8 +1956,9 @@ body::before {
 
 <!-- AI Tools Side Drawer -->
 <div id="ai-drawer-overlay" onclick="closeAiDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
-<div id="ai-drawer" style="position:fixed;top:0;right:0;bottom:0;width:min(340px,92vw);z-index:8001;background:var(--bg-layer1);border-left:1px solid var(--border-mid);box-shadow:-8px 0 40px rgba(0,0,0,.5);overflow-y:auto;transform:translateX(110%);transition:transform .32s cubic-bezier(.4,0,.2,1);">
-  <div style="position:sticky;top:0;z-index:10;background:var(--bg-layer1);border-bottom:1px solid var(--border-subtle);padding:16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);">
+<div id="ai-drawer" style="position:fixed;bottom:0;left:0;right:0;max-height:85vh;z-index:8001;background:var(--bg-layer1);border-top:1px solid var(--border-mid);border-top-left-radius:24px;border-top-right-radius:24px;box-shadow:0 -8px 40px rgba(0,0,0,.6);overflow-y:auto;transform:translateY(110%);transition:transform .35s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom);">
+  <div style="width:36px;height:5px;background:var(--border-strong);border-radius:3px;margin:12px auto 4px;"></div>
+  <div style="position:sticky;top:0;z-index:10;background:var(--bg-layer1);border-bottom:1px solid var(--border-subtle);padding:0 16px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);">
     <div>
       <div style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--text-primary);">AI Tools</div>
       <div style="font-size:9px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Powered by Gemini AI</div>
@@ -1580,7 +1986,7 @@ body::before {
       <div class="header-pills-wrap">
         <div class="hpill hpill-credits">⚡ <span id="cr-cnt">50</span></div>
         <div class="hpill hpill-jade">💎 Pro</div>
-        <button class="hpill hpill-install" onclick="handleInstall()">📲 Install</button>
+        <button class="hpill hpill-install" onclick="installPWA()">📲 Install</button>
         <button class="hpill hpill-ocean" id="btn-replay" style="display:none">🎬 Replay</button>
         <button class="hpill hpill-live"  id="btn-ls"     style="display:none">🔴 Live</button>
         <button class="hpill hpill-wa"    id="btn-wa"     style="display:none" onclick="waShare()">💬 WhatsApp</button>
@@ -1818,6 +2224,12 @@ body::before {
           <textarea class="vibe-area" id="vibe" placeholder="Describe your mood… e.g., peaceful sunrise by the beach with local breakfast"></textarea>
         </div>
 
+        <div class="sec-label">Trip Budget</div>
+        <div class="setting-card" style="margin-bottom:14px">
+          <div class="setting-lbl">Your Total Budget (₹)</div>
+          <input type="number" class="setting-inp" id="trip-budget-input" value="5000" min="0" step="500" placeholder="e.g. 5000">
+        </div>
+
         <button class="btn-gen" onclick="generatePlan()">
           <span>Generate Itinerary</span> <span>✦</span>
         </button>
@@ -1832,8 +2244,12 @@ body::before {
           <span class="plan-summary-chip" id="plan-summary-chip-days">1 day</span>
           <span class="plan-summary-chip" id="plan-summary-chip-stops">0 stops</span>
           <span class="plan-summary-chip" id="plan-summary-chip-duration">0h of exploration</span>
+          <span class="plan-summary-chip" id="plan-summary-chip-budget" style="display:none">💰 Est. ₹0</span>
         </div>
       </div>
+
+      <!-- Budget Breakdown — rendered by JS after plan generation -->
+      <div id="budget-breakdown" class="budget-opt-card" style="display:none;margin:0 14px 14px"></div>
 
       <!-- Phase 2 — hidden until plan generated -->
       <div id="phase2-section" class="plan-section" style="display:none">
@@ -1860,7 +2276,7 @@ body::before {
       <!-- AI Tools — floating button triggers side drawer -->
       <div id="aitools-section" style="display:none">
         <div style="padding:8px 14px 14px;">
-          <button onclick="openAiDrawer()" style="width:100%;padding:12px 16px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#a8862e);border:none;color:#000;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 20px rgba(201,168,76,.3);">
+          <button onclick="openAiDrawer()" style="width:100%;padding:12px 16px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#0099b8);border:none;color:#000;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 20px rgba(0,212,255,.2);">
             <span style="font-size:18px">✦</span> AI Tools & Exclusive Features
             <span style="margin-left:auto;font-size:16px">→</span>
           </button>
@@ -1892,6 +2308,7 @@ body::before {
       <div class="itin-footer">
         <div class="stat-col"><div class="stat-lbl">🚗 Travel</div><div class="stat-val" id="st-travel">0m</div></div>
         <div class="stat-col"><div class="stat-lbl">🏛️ Visit</div><div class="stat-val" id="st-visit">0m</div></div>
+        <div class="stat-col budget-footer-stat"><div class="stat-lbl">💰 Budget</div><div class="budget-footer-val" id="st-budget">₹0</div></div>
         <div class="finish-card">
           <div class="fin-lbl">Est. Finish</div>
           <div class="fin-val" id="st-finish">--:--</div>
@@ -1999,7 +2416,7 @@ Object.assign(window, {
   switchCity, searchCity, generatePlan, startTrip, skipStop, optimizeRoute,
   smartExtend, addNearby, aiSuggestAlternative, prepGuide, postcard,
   handleAiLens, getInstaSpots, getSouvenirGuide, switchToView, toggleTheme,
-  handleInstall, resetGPS, toggleVoice, handleChat, saveIt, shareIt, waShare,
+  installPWA, resetGPS, toggleVoice, handleChat, saveIt, shareIt, waShare,
   toggleLoadPanel, loadPlan, delPlan, addExpense, delExp, updateBudget,
   analyzeBudget, renderToolsHome, renderLingo, renderSafety, renderBudget,
   renderPassport, switchDay, chatAbout, shareEmergency, speak,
@@ -2182,6 +2599,240 @@ const LOCAL_PLACE_SEEDS = {
     ['Arsalan Park Circus','food',22.5415,88.3657,45,'11:00','23:30'],
   ],
 };
+
+// ══════════════════════════════════════════════════
+// CITY TRANSPORT CONFIG — Per-city fare rates & modes
+// ══════════════════════════════════════════════════
+const CITY_TRANSPORT_CONFIG = {
+  vizag:     { hasMetro:false, hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:10, cabBase:50,  cabPerKm:14, trainFare:[10,40], congestion:0.9  },
+  hyderabad: { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:12, cabBase:50,  cabPerKm:15, trainFare:[10,30], metroFare:[10,60], congestion:1.15 },
+  goa:       { hasMetro:false, hasTrain:false, busFare:[10,25],  autoBase:30, autoPerKm:14, cabBase:80,  cabPerKm:18, congestion:0.75 },
+  jaipur:    { hasMetro:true,  hasTrain:true,  busFare:[10,25],  autoBase:25, autoPerKm:11, cabBase:50,  cabPerKm:14, trainFare:[10,25], metroFare:[10,30], congestion:1.0  },
+  udaipur:   { hasMetro:false, hasTrain:false, busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:50,  cabPerKm:14, congestion:0.85 },
+  delhi:     { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:11, cabBase:50,  cabPerKm:16, trainFare:[10,30], metroFare:[10,60], congestion:1.3  },
+  mumbai:    { hasMetro:true,  hasTrain:true,  busFare:[5,25],   autoBase:23, autoPerKm:14, cabBase:50,  cabPerKm:18, trainFare:[5,15],  metroFare:[10,50], congestion:1.35 },
+  bengaluru: { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:30, autoPerKm:13, cabBase:50,  cabPerKm:16, trainFare:[10,25], metroFare:[10,55], congestion:1.25 },
+  kochi:     { hasMetro:true,  hasTrain:true,  busFare:[8,25],   autoBase:25, autoPerKm:12, cabBase:50,  cabPerKm:15, trainFare:[10,20], metroFare:[10,40], congestion:0.9  },
+  agra:      { hasMetro:false, hasTrain:true,  busFare:[10,25],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,25], congestion:1.0  },
+  varanasi:  { hasMetro:false, hasTrain:true,  busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,20], congestion:1.05 },
+  kolkata:   { hasMetro:true,  hasTrain:true,  busFare:[7,25],   autoBase:25, autoPerKm:12, cabBase:40,  cabPerKm:14, trainFare:[5,15],  metroFare:[5,30],  congestion:1.2  },
+};
+const DEFAULT_TRANSPORT_CONFIG = { hasMetro:false, hasTrain:false, busFare:[10,30], autoBase:25, autoPerKm:12, cabBase:50, cabPerKm:15, congestion:1.0 };
+
+const ENTRY_FEE_ESTIMATES = { scenic:50, temple:0, beach:0, food:0, break:0 };
+
+// ── Transport & Traffic Intelligence ──────────────────────────────────────────
+function getTransportConfig(cityId){ return CITY_TRANSPORT_CONFIG[cityId] || CITY_TRANSPORT_CONFIG[currentCityId] || DEFAULT_TRANSPORT_CONFIG; }
+
+function getTrafficMultiplier(cityId, minuteOfDay){
+  const config = getTransportConfig(cityId);
+  const base = config.congestion || 1.0;
+  if(minuteOfDay >= 8*60 && minuteOfDay < 10*60)  return base * 1.5;
+  if(minuteOfDay >= 10*60 && minuteOfDay < 12*60) return base * 1.15;
+  if(minuteOfDay >= 12*60 && minuteOfDay < 14*60) return base * 1.1;
+  if(minuteOfDay >= 14*60 && minuteOfDay < 17*60) return base * 1.05;
+  if(minuteOfDay >= 17*60 && minuteOfDay < 20*60) return base * 1.6;
+  if(minuteOfDay >= 20*60 && minuteOfDay < 22*60) return base * 0.9;
+  if(minuteOfDay >= 22*60 || minuteOfDay < 6*60)  return base * 0.7;
+  return base * 1.0;
+}
+
+function getTrafficLevel(multiplier){
+  if(multiplier <= 1.05) return { level:'light',   label:'Light Traffic',    emoji:'🟢' };
+  if(multiplier <= 1.35) return { level:'moderate', label:'Moderate Traffic',  emoji:'🟡' };
+  return                        { level:'heavy',    label:'Heavy Traffic',    emoji:'🔴' };
+}
+
+function getCrowdMultiplier(stop, dayOfWeek, minuteOfDay){
+  let mult = 1.0;
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  if(isWeekend) mult += 0.2;
+  const month = new Date().getMonth();
+  if(month >= 9 || month <= 2) mult += 0.15;
+  if(minuteOfDay >= 10*60 && minuteOfDay < 14*60) mult += 0.2;
+  if(minuteOfDay >= 16*60 && minuteOfDay < 18*60) mult += 0.15;
+  if(minuteOfDay < 8*60 || minuteOfDay >= 20*60) mult -= 0.15;
+  if(stop?.cat === 'scenic') mult += 0.1;
+  if(stop?.cat === 'temple' && (minuteOfDay >= 6*60 && minuteOfDay < 9*60)) mult += 0.15;
+  if(stop?.cat === 'beach' && isWeekend) mult += 0.2;
+  if(stop?.importance === 'must_see') mult += 0.15;
+  return Math.max(0.7, Math.min(2.0, mult));
+}
+
+function getCrowdLevel(multiplier){
+  if(multiplier <= 0.9) return { level:'low',     label:'Low Crowd',    emoji:'🟢' };
+  if(multiplier <= 1.2) return { level:'medium',  label:'Medium Crowd', emoji:'🟡' };
+  if(multiplier <= 1.5) return { level:'high',    label:'High Crowd',   emoji:'🟠' };
+  return                       { level:'extreme', label:'Very Crowded', emoji:'🔴' };
+}
+
+function getSmartTravelTime(fromCoords, toCoords, cityId, arriveMin, isFirstStop){
+  if(!fromCoords || !toCoords) return isFirstStop ? 10 : 20;
+  const km = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
+  const baseMinutes = Math.max(isFirstStop ? 10 : 12, Math.min(45, Math.round(km / 0.42)));
+  const trafficMult = getTrafficMultiplier(cityId, arriveMin);
+  return Math.round(baseMinutes * trafficMult);
+}
+
+function getSmartVisitTime(stop, arriveMin, dayOfWeek){
+  const baseVt = stop?.vt || 60;
+  const crowdMult = getCrowdMultiplier(stop, typeof dayOfWeek==='number'?dayOfWeek:new Date().getDay(), arriveMin);
+  const crowdAdjust = 1 + (crowdMult - 1) * 0.4;
+  return Math.round(baseVt * Math.max(0.85, Math.min(1.4, crowdAdjust)));
+}
+
+function getTransportOptions(fromCoords, toCoords, cityId, arriveMin){
+  const config = getTransportConfig(cityId);
+  const km = fromCoords && toCoords ? hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) : 3;
+  const trafficMult = getTrafficMultiplier(cityId, arriveMin);
+  const options = [];
+  if(km <= 2.0){
+    options.push({ mode:'walk', icon:'🚶', label:'Walk', fare:0, fareStr:'Free', time:Math.round(km * 14),
+      link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=walking` : '#' });
+  }
+  options.push({ mode:'bus', icon:'🚌', label:'Bus',
+    fare:Math.round(config.busFare[0] + (config.busFare[1]-config.busFare[0]) * Math.min(1, km/10)),
+    get fareStr(){ return `₹${this.fare}`; },
+    time:Math.round((km / 0.3) * trafficMult),
+    link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=transit` : '#' });
+  if(config.hasMetro){
+    const mf = config.metroFare || [10,60];
+    let modeLabel = 'Metro';
+    let lastMileFare = 0;
+    let lastMileTime = 0;
+    if (km > 3.5) {
+      const lastMileKm = Math.min(3, km * 0.2); // assume nearest metro is 1-3km from dest
+      if (lastMileKm > 1.2) {
+        lastMileFare = Math.round(config.autoBase + (lastMileKm * config.autoPerKm));
+        lastMileTime = Math.round((lastMileKm / 0.4) * trafficMult);
+        modeLabel = 'Metro+Auto';
+      } else {
+        lastMileTime = Math.round(lastMileKm * 14);
+        modeLabel = 'Metro+Walk';
+      }
+    }
+    options.push({ mode:'metro', icon:'🚇', label:modeLabel,
+      fare:Math.round(mf[0] + (mf[1]-mf[0]) * Math.min(1, km/15)) + lastMileFare,
+      get fareStr(){ return `₹${this.fare}`; },
+      time:Math.round(km / 0.55 + 8) + lastMileTime,
+      link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=transit` : '#' });
+  }
+  if(config.hasTrain && km > 3){
+    const tf = config.trainFare || [10,30];
+    let modeLabel = 'Train';
+    let lastMileFare = 0;
+    let lastMileTime = 0;
+    if (km > 5.0) {
+      const lastMileKm = Math.min(4, km * 0.25);
+      if (lastMileKm > 1.2) {
+        lastMileFare = Math.round(config.autoBase + (lastMileKm * config.autoPerKm));
+        lastMileTime = Math.round((lastMileKm / 0.4) * trafficMult);
+        modeLabel = 'Train+Auto';
+      } else {
+        lastMileTime = Math.round(lastMileKm * 14);
+        modeLabel = 'Train+Walk';
+      }
+    }
+    options.push({ mode:'train', icon:'🚂', label:modeLabel,
+      fare:Math.round(tf[0] + (tf[1]-tf[0]) * Math.min(1, km/20)) + lastMileFare,
+      get fareStr(){ return `₹${this.fare}`; },
+      time:Math.round(km / 0.5 + 12) + lastMileTime,
+      link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=transit` : '#' });
+  }
+  options.push({ mode:'auto', icon:'🛺', label:'Auto',
+    fare:Math.round(config.autoBase + config.autoPerKm * km),
+    get fareStr(){ return `₹${this.fare}`; },
+    time:Math.round((km / 0.4) * trafficMult),
+    link:toCoords ? `https://book.olacabs.com/?drop_lat=${toCoords[0]}&drop_lng=${toCoords[1]}` : '#' });
+  options.push({ mode:'cab', icon:'🚕', label:'Cab',
+    fare:Math.round(config.cabBase + config.cabPerKm * km),
+    get fareStr(){ return `₹${this.fare}`; },
+    time:Math.round((km / 0.45) * trafficMult),
+    link:toCoords ? `https://m.uber.com/ul/?action=setPickup&dropoff[latitude]=${toCoords[0]}&dropoff[longitude]=${toCoords[1]}` : '#' });
+  const cheapest = options.reduce((a,b) => a.fare <= b.fare ? a : b);
+  const fastest  = options.reduce((a,b) => a.time <= b.time ? a : b);
+  cheapest.isCheapest = true;
+  if(fastest.mode !== cheapest.mode) fastest.isFastest = true;
+  return { options, km, trafficMult };
+}
+
+// ── Budget Calculator ─────────────────────────────────────────────────────────
+function calculateStopBudget(stop, prevCoords, cityId){
+  const config = getTransportConfig(cityId);
+  const km = prevCoords && stop?.coords ? hvKm(prevCoords[0], prevCoords[1], stop.coords[0], stop.coords[1]) : 0;
+  const transport = Math.round(config.autoBase + config.autoPerKm * km);
+  const entry = ENTRY_FEE_ESTIMATES[stop?.cat] || 0;
+  const food = stop?.cat === 'food' ? 300 : 0;
+  return { transport, entry, food, misc:0, total:transport+entry+food };
+}
+
+function calculateDayBudget(dayStops, cityId, startCoords){
+  let totals = { transport:0, entry:0, food:0, misc:0, total:0 };
+  let prevCoords = startCoords;
+  for(const stop of (dayStops||[])){
+    if(stop.isBreak){ prevCoords = stop.coords; continue; }
+    const b = calculateStopBudget(stop, prevCoords, cityId);
+    totals.transport += b.transport;
+    totals.entry += b.entry;
+    totals.food += b.food;
+    totals.total += b.total;
+    prevCoords = stop.coords;
+  }
+  return totals;
+}
+
+function calculateTripBudget(plan, cityId, startCoords){
+  const days = [];
+  let grandTotal = { transport:0, entry:0, food:0, misc:0, total:0 };
+  for(const dayStops of (plan||[])){
+    const db = calculateDayBudget(dayStops, cityId, startCoords);
+    days.push(db);
+    grandTotal.transport += db.transport;
+    grandTotal.entry += db.entry;
+    grandTotal.food += db.food;
+    grandTotal.total += db.total;
+  }
+  return { days, grandTotal };
+}
+
+let tripBudgetData = null;
+
+function renderBudgetBreakdown(){
+  const el = document.getElementById('budget-breakdown');
+  if(!el || !tripBudgetData) { if(el) el.style.display='none'; return; }
+  el.style.display='block';
+  const { days, grandTotal } = tripBudgetData;
+  const userBudget = parseFloat(document.getElementById('trip-budget-input')?.value) || 0;
+  const overBudget = userBudget > 0 && grandTotal.total > userBudget;
+  const budgetPct = userBudget > 0 ? Math.min(100, (grandTotal.total / userBudget) * 100) : 0;
+  const catTotal = Math.max(1, grandTotal.transport + grandTotal.food + grandTotal.entry);
+  el.innerHTML = `
+    <div class="budget-opt-header">
+      <div class="budget-opt-title">💰 Estimated Trip Budget</div>
+      <div class="budget-opt-total" style="color:${overBudget?'#f87171':'var(--jade)'}">₹${grandTotal.total.toLocaleString('en-IN')}</div>
+    </div>
+    ${userBudget > 0 ? `<div class="prog-bar"><div class="prog-fill" style="width:${budgetPct}%;background:${budgetPct>90?'#ef4444':budgetPct>75?'#f59e0b':'var(--jade)'}"></div></div>
+    <div class="bud-meta" style="margin-bottom:10px"><span>${overBudget?'⚠️ Over budget':'Within budget'}</span><span>₹${grandTotal.total} / ₹${userBudget}</span></div>` : ''}
+    <div class="budget-day-scroll">
+      ${days.map((d,i) => {
+        const ct = Math.max(1, d.transport + d.food + d.entry);
+        return `<div class="budget-day-card${i===dayIdx?' active':''}">
+          <div class="budget-day-label">Day ${i+1}</div>
+          <div class="budget-day-amount">₹${d.total.toLocaleString('en-IN')}</div>
+          <div class="budget-cat-bar">
+            <div class="budget-cat-seg transport" style="width:${(d.transport/ct*100).toFixed(0)}%"></div>
+            <div class="budget-cat-seg food" style="width:${(d.food/ct*100).toFixed(0)}%"></div>
+            <div class="budget-cat-seg entry" style="width:${(d.entry/ct*100).toFixed(0)}%"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="budget-cat-legend">
+      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--ocean)"></span>Transport ₹${grandTotal.transport}</div>
+      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--sand)"></span>Food ₹${grandTotal.food}</div>
+      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--purple)"></span>Entry ₹${grandTotal.entry}</div>
+    </div>`;
+}
 
 // ── App State ─────────────────────────────────────────────────────────────────
 let currentCityName='India',currentCityId='india',LOCS=[];
@@ -2598,7 +3249,7 @@ function prioritizePlanStops(stops,start,prefs=[]){
     attractionStops = [...attractionStops]
       .sort((a,b)=>famousPlaceScore(b,start)-famousPlaceScore(a,start))
       .slice(0, Math.min(attractionStops.length, 50)); // enough for multi-day trips
-    attractionStops = optimizeStopOrder(attractionStops,start);
+    attractionStops = sortNearestNeighbor(attractionStops, start?.[0], start?.[1]);
   }
 
   if(foodStops.length){
@@ -2702,19 +3353,27 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
     let best = null;
     for(let i=0;i<remaining.length;i++){
       const loc = remaining[i];
-      const travel = estimateTravelMinutes(prevCoords, loc, day.length===0);
-      const visit = loc.vt || 60;
+      const travel = getSmartTravelTime(prevCoords, loc.coords, currentCityId, currentMin, day.length===0);
+      const visit = getSmartVisitTime(loc, currentMin + travel, new Date().getDay());
       const shouldBreak = day.length>0 && breakEvery>0 && breakDuration>0 && activeSinceBreak>0 && (activeSinceBreak + travel + visit > breakEvery);
       const breakLead = shouldBreak ? breakDuration : 0;
       const arrive = currentMin + breakLead + travel;
-      const depart = arrive + visit;
+      let actualVisit = visit;
+      if(used + breakLead + travel + actualVisit > maxT) {
+        actualVisit = maxT - (used + breakLead + travel);
+      }
+      if(actualVisit < 30) continue;
+      
+      const depart = arrive + actualVisit;
       const openMin = t2m(loc.ot || '06:00');
-      const closeMin = t2m(loc.ct || '23:00');
-      if(used + breakLead + travel + visit > maxT) continue;
+      const closeMin = Math.max(t2m(loc.ct || '23:00'), 19.5 * 60);
       if(arrive < openMin || depart > closeMin) continue;
-      const score = stopTimeScore(loc, arrive, temp, i);
+      
+      // Pure Nearest Neighbor: use exact km distance to dominate the score, as travel minutes are floored.
+      const km = hvKm(prevCoords[0], prevCoords[1], loc.coords[0], loc.coords[1]);
+      const score = -(km * 10000) + stopTimeScore(loc, arrive, temp, i);
       if(!best || score > best.score || (score === best.score && travel < best.travel)){
-        best = { index:i, loc, travel, visit, arrive, depart, score, breakLead };
+        best = { index:i, loc, travel, visit: actualVisit, arrive, depart, score, breakLead };
       }
     }
 
@@ -2734,6 +3393,7 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
     const picked = {
       ...best.loc,
       tt: best.travel,
+      vt: best.visit,
       slotLabel: dayPartForMinutes(best.arrive),
       climateNote: stopClimateNote(best.loc, best.arrive, temp),
     };
@@ -3584,7 +4244,7 @@ function renderToolsHome(){
   if(!el) return;
 
   el.innerHTML = [
-    '<div class="budget-card" style="margin-bottom:18px;background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(0,212,184,.08));border-color:rgba(201,168,76,.2)">',
+    '<div class="budget-card" style="margin-bottom:18px;background:linear-gradient(135deg,rgba(0,212,255,.08),rgba(0,212,184,.08));border-color:rgba(0,212,255,.15)">',
       '<div class="budget-row">',
         `<div><div class="inp-lbl">Trip snapshot</div><div class="tools-section-title" style="margin:4px 0 0;font-size:18px;letter-spacing:0;color:var(--text-primary);text-transform:none">${c}</div></div>`,
         `<div class="bud-rem" style="font-size:18px">${totalStops || LOCS.length || 0}</div>`,
@@ -3745,8 +4405,11 @@ function getCurTime(){let t=getScheduleStart();if(tripActive&&tripStart)t=new Da
 function updateItinUI(){
   const list=document.getElementById('plan-list');list.innerHTML='';
   if(!itin.length){list.innerHTML='<div class="empty-state"><div class="empty-icon">🏁</div><p class="empty-txt">All done for today!</p><p class="empty-sub">The current day has no remaining stops.</p></div>';document.getElementById('st-finish').textContent='--:--';updatePlannerShowcase();return;}
-  let tv=0,tt=0;const ft=itin[itin.length-1]?.ets||'--:--';
+  let tv=0,tt=0,dayBudgetTotal=0;
+  const ft=itin[itin.length-1]?.ets||'--:--';
   const imgs={beach:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=96&h=96&fit=crop',temple:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=96&h=96&fit=crop',food:'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=96&h=96&fit=crop',scenic:'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=96&h=96&fit=crop'};
+  const startMin = t2m(document.getElementById('s-time')?.value || '09:00');
+  const dow = new Date().getDay();
   itin.forEach((loc,i)=>{
     tv+=loc.vt;tt+=loc.tt;const isN=i===0&&tripActive;
     if(loc.isBreak){
@@ -3758,11 +4421,17 @@ function updateItinUI(){
       if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
       return;
     }
-    const km=i===0&&nsDist!='--'?parseFloat(nsDist):hvKm(i>0?itin[i-1].coords[0]:loc.coords[0],i>0?itin[i-1].coords[1]:loc.coords[1],loc.coords[0],loc.coords[1]);
-    const fMin=Math.round(km*12),fMax=Math.round(km*18);
-    const cab=`https://m.uber.com/ul/?action=setPickup&dropoff[latitude]=${loc.coords[0]}&dropoff[longitude]=${loc.coords[1]}&dropoff[nickname]=${encodeURIComponent(loc.name)}`;
-    const ola=`https://book.olacabs.com/?drop_lat=${loc.coords[0]}&drop_lng=${loc.coords[1]}`;
-    const drv=`https://www.google.com/maps/dir/?api=1&destination=${loc.coords[0]},${loc.coords[1]}`;
+    // Smart calculations
+    const prevCoords = i>0 ? itin[i-1].coords : (getCityCenter() || loc.coords);
+    const arriveMin = loc.std ? (loc.std.getHours()*60 + loc.std.getMinutes()) : (startMin + tt);
+    const transport = getTransportOptions(prevCoords, loc.coords, currentCityId, arriveMin);
+    const trafficMult = transport.trafficMult;
+    const trafficInfo = getTrafficLevel(trafficMult);
+    const crowdMult = getCrowdMultiplier(loc, dow, arriveMin);
+    const crowdInfo = getCrowdLevel(crowdMult);
+    const stopBudget = calculateStopBudget(loc, prevCoords, currentCityId);
+    dayBudgetTotal += stopBudget.total;
+    const km = transport.km;
     const sv=`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${loc.coords[0]},${loc.coords[1]}`;
     const zomato=`https://www.zomato.com/search?q=${encodeURIComponent(loc.name)}`;
     const swiggy=`https://www.swiggy.com/search?query=${encodeURIComponent(loc.name)}`;
@@ -3770,13 +4439,58 @@ function updateItinUI(){
     const foodLinksHTML=loc.cat==='food'?`<div class="food-links"><a href="${zomato}" target="_blank" class="food-link fl-zomato">🍽️ Zomato</a><a href="${swiggy}" target="_blank" class="food-link fl-swiggy">🛵 Swiggy</a><a href="${gmFood}" target="_blank" class="food-link fl-maps">📍 Nearby</a></div>`:`<div class="food-links"><a href="${gmFood}" target="_blank" class="food-link fl-maps" style="flex:none;padding:5px 10px">🍴 Food Nearby</a></div>`;
     const wxBadgeHTML=`<div class="wx-alert good" id="wx-${loc.id}" style="display:none"></div>`;
     const planMeta=[loc.slotLabel,loc.climateNote].filter(Boolean).join(' • ');
+
+    // Transport options grid HTML
+    const transportHTML = km > 0.1 ? `<div class="transport-grid">${transport.options.map(opt => {
+      let badge = '';
+      if(opt.isFastest) badge = '<span class="transport-badge fastest">⚡Fast</span>';
+      else if(opt.isCheapest) badge = '<span class="transport-badge cheapest">💰Best</span>';
+      return `<a href="${opt.link}" target="_blank" class="transport-card">${badge}<div class="t-icon">${opt.icon}</div><div class="t-mode">${opt.label}</div><div class="t-fare">${opt.fareStr}</div><div class="t-time">~${fmtM(opt.time)}</div></a>`;
+    }).join('')}</div>` : '';
+
+    // Traffic + Crowd badges
+    const smartBadgesHTML = `<div class="smart-time-row"><span class="traffic-badge ${trafficInfo.level}">${trafficInfo.emoji} ${trafficInfo.label}</span><span class="crowd-badge ${crowdInfo.level}">${crowdInfo.emoji} ${crowdInfo.label}</span></div>`;
+
     const div=document.createElement('div');div.className='stop-card'+(isN?' is-next':'')+' fade-in';
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${loc.name}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${loc.name}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span>${km>0?`<span class="fare-tag">🚕 ₹${fMin}–${fMax}</span>`:''}</div></div></div>${wxBadgeHTML}${foodLinksHTML}<div class="sc-actions"><a href="${cab}" target="_blank" class="sc-action" title="Uber" style="font-size:18px">🚕</a><a href="${ola}" target="_blank" class="sc-action" title="Ola" style="font-size:18px">🛺</a><a href="${drv}" target="_blank" class="sc-action" title="Directions" style="font-size:18px">🚘</a><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    
+    let nearestSpot = null;
+    let minD = Infinity;
+    if (typeof LOCS !== 'undefined' && LOCS.length) {
+      for(const spot of LOCS) {
+        if(spot.id === loc.id || spot.name === loc.name) continue;
+        if(spot.cat === 'food' || spot.cat === 'break' || spot.isBreak) continue;
+        const d = hvKm(loc.coords[0], loc.coords[1], spot.coords[0], spot.coords[1]);
+        if(d < minD) { minD = d; nearestSpot = spot; }
+      }
+    }
+    const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
+
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${loc.name}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${loc.name}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
   });
   document.getElementById('st-travel').textContent=fmtM(tt);document.getElementById('st-visit').textContent=fmtM(tv);document.getElementById('st-finish').textContent=ft;
+  
+  // Update trip-wide budget data
+  const startCoords = getCityCenter() || itin[0]?.coords;
+  if (mdPlan.length > 0) tripBudgetData = calculateTripBudget(mdPlan, currentCityId, startCoords);
+  renderBudgetBreakdown();
+  
+  // Update budget footer
+  const budgetEl=document.getElementById('st-budget');
+  if(budgetEl){
+    const dayBud = tripBudgetData?.days?.[dayIdx];
+    budgetEl.textContent = dayBud ? `₹${dayBud.total.toLocaleString('en-IN')}` : `₹${dayBudgetTotal.toLocaleString('en-IN')}`;
+  }
+  
+  // Update plan summary budget chip
+  const budChip = document.getElementById('plan-summary-chip-budget');
+  if (budChip && tripBudgetData) {
+    budChip.style.display = 'inline-flex';
+    budChip.textContent = `💰 Est. ₹${tripBudgetData.grandTotal.total.toLocaleString('en-IN')}`;
+  }
+  
   updatePlannerShowcase();
 }
 
@@ -3830,8 +4544,26 @@ async function chkArrival(){
 }
 
 // ── Install PWA ───────────────────────────────────────────────────────────────
-let dPr;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dPr=e;});
-function handleInstall(){if(dPr){dPr.prompt();dPr.userChoice.then(()=>dPr=null);}else alert("Use 'Add to Home Screen' in your browser menu!");}
+let dPr;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  dPr = e;
+  const btn = document.getElementById('install-app-btn');
+  if (btn) btn.style.display = 'block';
+});
+
+function installPWA() {
+  if (dPr) {
+    dPr.prompt();
+    dPr.userChoice.then((choiceResult) => {
+      dPr = null;
+      document.getElementById('install-app-btn').style.display = 'none';
+      if (typeof toggleUserMenu === 'function') toggleUserMenu();
+    });
+  } else {
+    alert("Use 'Add to Home Screen' in your browser menu!");
+  }
+}
 
 window.addEventListener('offline',()=>{const t=document.getElementById('off-toast');t.style.display='block';setTimeout(()=>t.style.display='none',4000);});
 window.addEventListener('online',()=>addMsg('📶 Back online!'));
@@ -4023,13 +4755,13 @@ function openAiDrawer() {
   document.getElementById('ai-drawer-overlay').style.display='block';
   const drawer = document.getElementById('ai-drawer');
   drawer.style.display='block';
-  setTimeout(()=>drawer.style.transform='translateX(0)',10);
+  setTimeout(()=>drawer.style.transform='translateY(0)',10);
   renderDrawerContent();
 }
 
 function closeAiDrawer() {
   const drawer = document.getElementById('ai-drawer');
-  drawer.style.transform='translateX(110%)';
+  drawer.style.transform='translateY(110%)';
   setTimeout(()=>{
     drawer.style.display='none';
     document.getElementById('ai-drawer-overlay').style.display='none';
