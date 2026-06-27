@@ -3572,7 +3572,7 @@ function updateStreetQuestProgress(){
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
-function applyTheme(){document.documentElement.setAttribute('data-theme',isDark?'dark':'light');document.getElementById('theme-btn').textContent=isDark?'🌙':'☀️';localStorage.setItem('tt_theme',isDark?'dark':'light');}
+function applyTheme(){document.documentElement.setAttribute('data-theme','dark');localStorage.setItem('tt_theme','dark');}
 function toggleTheme(){isDark=!isDark;applyTheme();}
 
 // ── Firebase Auth ─────────────────────────────────────────────────────────────
