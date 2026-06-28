@@ -8,7 +8,7 @@ const router  = express.Router();
 const { addFavorite, getUserFavorites, removeFavorite, isFavorite } = require('../db/queries');
 
 // ── Add favorite ─────────────────────────────────────────────────────────────
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { userId, placeName, city, lat, lon, category, notes } = req.body;
 
@@ -17,11 +17,11 @@ router.post('/', (req, res) => {
     }
 
     // Check if already favorited
-    if (isFavorite(userId, placeName, city)) {
+    if (await isFavorite(userId, placeName, city)) {
       return res.status(409).json({ error: 'Already in favorites', alreadyFavorited: true });
     }
 
-    addFavorite({ userId, placeName, city, lat, lon, category, notes });
+    await addFavorite({ userId, placeName, city, lat, lon, category, notes });
     res.status(201).json({ message: 'Added to favorites', placeName, city });
   } catch (err) {
     console.error('[favorites:add]', err.message);
@@ -30,7 +30,7 @@ router.post('/', (req, res) => {
 });
 
 // ── List favorites ───────────────────────────────────────────────────────────
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const userId = req.query.userId;
     if (!userId) {
@@ -38,7 +38,7 @@ router.get('/', (req, res) => {
     }
 
     const city = req.query.city || null;
-    const favorites = getUserFavorites(userId, city);
+    const favorites = await getUserFavorites(userId, city);
 
     res.json({ favorites, count: favorites.length });
   } catch (err) {
@@ -48,17 +48,14 @@ router.get('/', (req, res) => {
 });
 
 // ── Remove favorite ──────────────────────────────────────────────────────────
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const userId = req.query.userId || req.body?.userId;
     if (!userId) {
       return res.status(400).json({ error: 'Missing userId' });
     }
 
-    const result = removeFavorite(parseInt(req.params.id, 10), userId);
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Favorite not found or not authorized' });
-    }
+    await removeFavorite(parseInt(req.params.id, 10), userId);
 
     res.json({ message: 'Removed from favorites' });
   } catch (err) {

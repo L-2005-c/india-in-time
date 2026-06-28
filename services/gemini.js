@@ -149,7 +149,7 @@ async function callGemini(parts, opts = {}) {
   
   // 2. Check persistent DB cache
   try {
-    const dbCached = getCachedAiResponse(cacheKey);
+    const dbCached = await getCachedAiResponse(cacheKey);
     if (dbCached) {
       stats.cached++;
       geminiCache.set(cacheKey, dbCached, opts.cacheTtlMs); // Hydrate mem cache
@@ -183,7 +183,7 @@ async function callGemini(parts, opts = {}) {
         if (cacheKey && result) {
           geminiCache.set(cacheKey, result, opts.cacheTtlMs);
           try {
-            setCachedAiResponse(cacheKey, result);
+            await setCachedAiResponse(cacheKey, result);
           } catch (err) {
             console.warn('[gemini] DB Cache write error:', err.message);
           }

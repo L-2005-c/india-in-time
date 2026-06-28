@@ -17,17 +17,25 @@ if (cluster.isPrimary) {
   console.log(`   Forking ${numCPUs} workers for high concurrency...`);
   
   const { initDatabase, closeDatabase } = require('./db/init');
-  initDatabase(config.db.path);
+  
+  (async () => {
+    try {
+      await initDatabase();
+      
+      // Purge expired cache on startup
+      try {
+        const { purgeExpiredCache } = require('./db/queries');
+        await purgeExpiredCache();
+      } catch (_e) {}
 
-  // Purge expired cache on startup
-  try {
-    const { purgeExpiredCache } = require('./db/queries');
-    purgeExpiredCache();
-  } catch (_e) {}
-
-  for (let i = 0; i < numCPUs; i++) {
-    cluster.fork();
-  }
+      for (let i = 0; i < numCPUs; i++) {
+        cluster.fork();
+      }
+    } catch (err) {
+      console.error('Failed to initialize primary database:', err);
+      process.exit(1);
+    }
+  })();
 
   cluster.on('exit', (worker, code, signal) => {
     console.warn(`⚠️  Worker ${worker.process.pid} died. Forking a new one...`);
@@ -36,8 +44,7 @@ if (cluster.isPrimary) {
 
   function primaryShutdown(signal) {
     console.log(`\n🛑 Primary received ${signal} — shutting down...`);
-    closeDatabase();
-    process.exit(0);
+    closeDatabase().then(() => process.exit(0));
   }
   process.on('SIGTERM', () => primaryShutdown('SIGTERM'));
   process.on('SIGINT',  () => primaryShutdown('SIGINT'));
@@ -45,7 +52,6 @@ if (cluster.isPrimary) {
 } else {
 // ── Initialize Database for Worker ───────────────────────────────────────────
 const { initDatabase, closeDatabase } = require('./db/init');
-initDatabase(config.db.path);
 
 // ── Import middleware ────────────────────────────────────────────────────────
 const { requestLogger }   = require('./middleware/requestLogger');
@@ -210,46 +216,51 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ── Start Server ─────────────────────────────────────────────────────────────
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`   ✅ Worker ${process.pid} started and listening on port ${PORT}`);
-});
-
-// ── Graceful Shutdown ────────────────────────────────────────────────────────
-function gracefulShutdown(signal) {
-  console.log(`\n🛑  ${signal} received — shutting down gracefully...`);
-
-  // Stop accepting new connections
-  server.close(() => {
-    console.log('   ✅ HTTP server closed');
-
-    // Close database
-    closeDatabase();
-
-    // Purge expired cache
-    try {
-      const { purgeExpiredCache } = require('./db/queries');
-      purgeExpiredCache();
-    } catch (_e) {}
-
-    console.log('   ✅ Cleanup complete. Goodbye!\n');
-    process.exit(0);
+initDatabase().then(() => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`   ✅ Worker ${process.pid} started and listening on port ${PORT}`);
   });
 
-  // Force exit after timeout
-  setTimeout(() => {
-    console.error('   ⚠️  Forced shutdown after timeout');
-    process.exit(1);
-  }, config.server.shutdownTimeoutMs);
-}
+  // ── Graceful Shutdown ────────────────────────────────────────────────────────
+  function gracefulShutdown(signal) {
+    console.log(`\n🛑  ${signal} received — shutting down gracefully...`);
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
-process.on('uncaughtException', (err) => {
-  console.error('💥  Uncaught exception:', err);
-  gracefulShutdown('uncaughtException');
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('💥  Unhandled rejection:', reason);
+    // Stop accepting new connections
+    server.close(async () => {
+      console.log('   ✅ HTTP server closed');
+
+      // Close database
+      await closeDatabase();
+
+      // Purge expired cache
+      try {
+        const { purgeExpiredCache } = require('./db/queries');
+        await purgeExpiredCache();
+      } catch (_e) {}
+
+      console.log('   ✅ Cleanup complete. Goodbye!\n');
+      process.exit(0);
+    });
+
+    // Force exit after timeout
+    setTimeout(() => {
+      console.error('   ⚠️  Forced shutdown after timeout');
+      process.exit(1);
+    }, config.server.shutdownTimeoutMs);
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+  process.on('uncaughtException', (err) => {
+    console.error('💥  Uncaught exception:', err);
+    gracefulShutdown('uncaughtException');
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('💥  Unhandled rejection:', reason);
+  });
+}).catch(err => {
+  console.error('💥 Failed to start worker database:', err);
+  process.exit(1);
 });
 
 } // End of cluster worker block

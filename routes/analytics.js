@@ -37,10 +37,10 @@ function analyticsMiddleware(req, res, next) {
 }
 
 // ── Summary endpoint ─────────────────────────────────────────────────────────
-router.get('/summary', (req, res) => {
+router.get('/summary', async (req, res) => {
   try {
     const hours = parseInt(req.query.hours, 10) || 24;
-    const usage = getApiUsageSummary(Math.min(hours, 168)); // max 7 days
+    const usage = await getApiUsageSummary(Math.min(hours, 168)); // max 7 days
 
     // Add cache stats
     const cacheStats = {
