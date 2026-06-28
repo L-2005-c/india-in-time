@@ -310,7 +310,7 @@ body::before {
   position:relative;
   z-index:1;
   display:grid;
-  grid-template-columns:1fr;
+  grid-template-columns:minmax(0,1.1fr) minmax(280px,0.9fr);
   gap:18px;
   align-items:stretch;
 }
@@ -2065,6 +2065,31 @@ body::after{
                   <div class="hero-metric-label">Travel mode</div>
                   <div class="hero-metric-value" id="hero-mode">Balanced</div>
                 </div>
+              </div>
+            </div>
+            <div class="hero-visual">
+              <div class="hero-anim-canvas">
+                <!-- Animated gradient background layers -->
+                <div class="hanim-layer hanim-bg"></div>
+                <div class="hanim-layer hanim-aurora1"></div>
+                <div class="hanim-layer hanim-aurora2"></div>
+                <!-- Floating orbs -->
+                <div class="hanim-orb hanim-orb1"></div>
+                <div class="hanim-orb hanim-orb2"></div>
+                <div class="hanim-orb hanim-orb3"></div>
+                <!-- Grid shimmer overlay -->
+                <div class="hanim-grid"></div>
+                <!-- Floating travel icons -->
+                <div class="hanim-icons">
+                  <span class="hanim-icon hi1">🕌</span>
+                  <span class="hanim-icon hi2">🌴</span>
+                  <span class="hanim-icon hi3">⛵</span>
+                  <span class="hanim-icon hi4">🏔️</span>
+                  <span class="hanim-icon hi5">🎪</span>
+                  <span class="hanim-icon hi6">🦚</span>
+                </div>
+                <!-- Scan line animation -->
+                <div class="hanim-scan"></div>
               </div>
             </div>
           </div>
