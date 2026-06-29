@@ -1982,9 +1982,9 @@ body::after{
         <span class="logo-accent">In-Time</span>
       </div>
       <div class="header-pills-wrap">
-        <div class="hpill hpill-credits">⚡ <span id="cr-cnt">50</span></div>
-        <div class="hpill hpill-jade">💎 Pro</div>
-        <button class="hpill hpill-install" onclick="installPWA()">📲 Install</button>
+        <!-- <div class="hpill hpill-credits">⚡ <span id="cr-cnt">50</span></div> -->
+        <!-- <div class="hpill hpill-jade">💎 Pro</div> -->
+        <!-- <button class="hpill hpill-install" onclick="installPWA()">📲 Install</button> -->
         <button class="hpill hpill-ocean" id="btn-replay" style="display:none">🎬 Replay</button>
         <button class="hpill hpill-live"  id="btn-ls"     style="display:none">🔴 Live</button>
         <button class="hpill hpill-wa"    id="btn-wa"     style="display:none" onclick="waShare()">💬 WhatsApp</button>
@@ -2832,7 +2832,7 @@ let map,rLine,mkrs=[],liveMkr=null;
 let cLat=null,cLon=null,tripActive=false,tripStart=null;
 let nsDist='--',nsEta='--',realTemp=28,wid=null,voiceOn=false;
 let expenses=[],stamps=new Set();
-let isDark=(localStorage.getItem('tt_theme')||'dark')==='dark';
+let isDark=true; // forced dark mode
 let notifTimers=[];
 let autoFollowLive=true;
 let streetQuestActive=false;
@@ -5039,8 +5039,9 @@ window.history.pushState({ page: 'home' }, '', window.location.href);
 // ── Init ──────────────────────────────────────────────────────────────────────// ── Init ──────────────────────────────────────────────────────────────────────
 window.onload=()=>{
   applyTheme();
-  setTimeout(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',600);},1800);
-  document.getElementById('cr-cnt').textContent=credits;
+  setTimeout(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',300);},500);
+  const crCnt = document.getElementById('cr-cnt');
+  if(crCnt) crCnt.textContent=credits;
   map=L.map('map',{zoomControl:false}).setView([20.5937,78.9629],5);
   L.control.zoom({position:'bottomright'}).addTo(map);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:20}).addTo(map);

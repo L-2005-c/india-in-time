@@ -1,6 +1,8 @@
 // db/init.js — PostgreSQL database setup & migrations
 
-const { Pool } = require('pg');
+const { Pool, neonConfig } = require('@neondatabase/serverless');
+const ws = require('ws');
+neonConfig.webSocketConstructor = ws; // Required for Node.js
 require('dotenv').config();
 
 let pool = null;

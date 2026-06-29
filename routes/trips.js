@@ -139,14 +139,14 @@ router.post('/:id/share', async (req, res) => {
 
     // If already has a share token, return it
     if (trip.share_token) {
-      return res.json({ shareToken: trip.share_token, shareUrl: \`/api/trips/shared/\${trip.share_token}\` });
+      return res.json({ shareToken: trip.share_token, shareUrl: `/api/trips/shared/${trip.share_token}` });
     }
 
     // Generate a short, URL-safe token
     const token = crypto.randomBytes(8).toString('base64url');
     await updateTripShareToken(req.params.id, token);
 
-    res.json({ shareToken: token, shareUrl: \`/api/trips/shared/\${token}\` });
+    res.json({ shareToken: token, shareUrl: `/api/trips/shared/${token}` });
   } catch (err) {
     console.error('[trips:share]', err.message);
     res.status(500).json({ error: 'Failed to generate share link' });

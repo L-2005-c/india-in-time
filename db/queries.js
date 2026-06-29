@@ -168,7 +168,7 @@ async function getApiUsageSummary(hours = 24) {
     WHERE created_at >= $1
   `, [since]);
 
-  return { period: \`\${hours}h\`, since, byEndpoint: byEndpointRes.rows, totals: totalsRes.rows[0] };
+  return { period: `${hours}h`, since, byEndpoint: byEndpointRes.rows, totals: totalsRes.rows[0] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
