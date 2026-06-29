@@ -5,6 +5,7 @@
 
 const config  = require('./config');
 const express = require('express');
+require('express-async-errors');
 const cors    = require('cors');
 const path    = require('path');
 const cluster = require('cluster');
