@@ -2987,6 +2987,7 @@ function mergePlacePools(...pools){
     if(!place?.coords?.length) continue;
     const key=String(place.name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     if(!key) continue;
+    place.id = place.id || key;
     const existing=byName.get(key);
     if(!existing){
       byName.set(key,place);
@@ -2995,6 +2996,7 @@ function mergePlacePools(...pools){
     byName.set(key,{
       ...place,
       ...existing,
+      id: existing.id || place.id || key,
       importanceScore:Math.max(existing.importanceScore||0,place.importanceScore||0),
       importance:(existing.importanceScore||0)>=(place.importanceScore||0)?existing.importance:place.importance,
     });
@@ -3822,7 +3824,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
 
   if(!force && placeLoadPromises.has(cacheKey)){
     const pending = await placeLoadPromises.get(cacheKey);
-    LOCS = (pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
+    LOCS = (pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') }));
     return pending;
   }
 
@@ -3873,7 +3875,7 @@ async function ensureCityPlaces(city, minCount=1){
   if(placeLoadPromises.has(cacheKey)){
     try{
       const pending = await placeLoadPromises.get(cacheKey);
-      LOCS = (pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
+      LOCS = (pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') }));
     }catch(_e){}
   }
   if(LOCS.length>=minCount) return true;
@@ -3994,8 +3996,8 @@ async function generatePlan(){
   let avail=LOCS.filter(l=>prefs.includes(l.cat));
   
   if (window.customSelectedPlaces && window.customSelectedPlaces.length > 0) {
-    avail = avail.filter(l => window.customSelectedPlaces.includes(l.id));
-    if(!avail.length) { addMsg('⚠️ None of your custom selected places match the experience filters. Using all available custom places instead.'); avail = LOCS.filter(l => window.customSelectedPlaces.includes(l.id)); }
+    avail = LOCS.filter(l => window.customSelectedPlaces.includes(String(l.id)));
+    if(!avail.length) { addMsg('⚠️ None of your custom selected places could be found. Using filters instead.'); avail = LOCS.filter(l=>prefs.includes(l.cat)); }
   }
 
   if(!avail.length && prefs.length===1 && prefs[0]==='food'){
