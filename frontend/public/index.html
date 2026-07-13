@@ -2222,7 +2222,7 @@ body::after{
         </div>
 
         <div style="display:flex;gap:10px;">
-          <button class="btn-gen" onclick="openCustomizeModal()" style="flex:1;background:var(--bg-layer3);border:1px solid var(--border-strong);">
+          <button class="btn-gen" onclick="openCustomizeModal()" style="flex:1;background:var(--bg-layer3);border:1px solid var(--border-strong);color:var(--text-primary);">
             <span>Customize Places</span> <span>🛠️</span>
           </button>
           <button class="btn-gen" onclick="generatePlan()" style="flex:1;">
@@ -5058,14 +5058,16 @@ async function openCustomizeModal() {
     return;
   }
   
-  addMsg(`🤖 Fetching places for ${city.name} to customize...`);
-  const loadTyping = addTypingIndicator();
-  try {
-    await ensureCityPlaces(city, 8);
-  } catch (e) {
-    console.error('Failed to load places for customize modal:', e);
+  if (LOCS.length < 8) {
+    addMsg(`🤖 Fetching places for ${city.name} to customize...`);
+    const loadTyping = addTypingIndicator();
+    try {
+      await ensureCityPlaces(city, 8);
+    } catch (e) {
+      console.error('Failed to load places for customize modal:', e);
+    }
+    loadTyping.remove();
   }
-  loadTyping.remove();
 
   if (!LOCS.length) {
     addMsg('⚠️ Could not load places to customize. Please try again.');
