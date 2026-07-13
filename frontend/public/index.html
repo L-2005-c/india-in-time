@@ -2835,7 +2835,7 @@ let currentCityName='India',currentCityId='india',LOCS=[];
 let credits=50,mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
 let cLat=null,cLon=null,tripActive=false,tripStart=null;
-let nsDist='--',nsEta='--',realTemp=28,wid=null,voiceOn=false;
+let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
 let expenses=[],stamps=new Set();
 let isDark=true; // forced dark mode
 let notifTimers=[];
@@ -3812,6 +3812,7 @@ async function fetchWeatherUI(lat,lon){
   try{
     const d=await API.fetchWeather(lat,lon);
     realTemp=d.temp;
+    realWeatherMain=d.main || 'Clear';
     document.getElementById('wx-display').textContent=d.display;
     updatePlannerShowcase();
   }catch(e){}
