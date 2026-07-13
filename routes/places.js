@@ -161,7 +161,28 @@ async function callGemini(prompt) {
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 16384,
-      responseMimeType: 'application/json'
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          places: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                category: { type: 'string', enum: ['scenic', 'temple', 'beach', 'food'] },
+                importance: { type: 'string', enum: ['must_see', 'famous', 'local'] },
+                visit_minutes: { type: 'integer' },
+                open_time: { type: 'string' },
+                close_time: { type: 'string' }
+              },
+              required: ['name', 'category', 'importance', 'visit_minutes', 'open_time', 'close_time']
+            }
+          }
+        },
+        required: ['places']
+      }
     }
   });
   console.log('[places] Response length:', (text||'').length, '| First 200:', (text||'').slice(0,200));
@@ -188,6 +209,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   - Include only a few hidden gems or lesser-known spots after the famous attractions.
 - Include at least ${foodCount} food entries: famous local restaurants, food streets, seafood spots, biryani joints, famous cafes, sweet shops — real named establishments only.
 - DO NOT include: stores, shops, retail, supermarkets, boutiques, markets, shopping malls, roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, or generic areas.
+- CRITICAL: Provide the EXACT, official, map-searchable name for each place so it can be accurately found on GPS and maps. Do NOT use generic or abbreviated names.
 - Only real named places a tourist would visit. No coordinates. No duplicate entries.`;
 
   const raw = await callGemini(prompt);
