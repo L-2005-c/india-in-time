@@ -174,10 +174,17 @@ async function callGemini(prompt) {
                 category: { type: 'string', enum: ['scenic', 'temple', 'beach', 'food'] },
                 importance: { type: 'string', enum: ['must_see', 'famous', 'local'] },
                 visit_minutes: { type: 'integer' },
-                open_time: { type: 'string' },
-                close_time: { type: 'string' }
+                open_time: { type: 'string', description: "24-hour format e.g. 09:00" },
+                close_time: { type: 'string', description: "24-hour format e.g. 18:00" },
+                best_visiting_hours: { type: 'string', description: "e.g. 06:00-09:00, or 16:00-19:00" },
+                peak_hours: { type: 'string', description: "e.g. 11:00-15:00" },
+                is_sunrise_spot: { type: 'boolean' },
+                is_sunset_spot: { type: 'boolean' },
+                has_nightlife: { type: 'boolean' },
+                indoor_outdoor: { type: 'string', enum: ['indoor', 'outdoor', 'mixed'] },
+                best_seasons: { type: 'string', description: "e.g. Winter, Monsoon" }
               },
-              required: ['name', 'category', 'importance', 'visit_minutes', 'open_time', 'close_time']
+              required: ['name', 'category', 'importance', 'visit_minutes', 'open_time', 'close_time', 'indoor_outdoor']
             }
           }
         },
@@ -198,7 +205,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   const placeCount = Math.min(50, Math.max(30, daysEst * 12));
   const foodCount  = Math.max(6, Math.floor(placeCount * 0.25));
   const prompt = `List ${placeCount} real places a tourist should consider in ${cityName}, India.
-  Return ONLY valid JSON, no markdown: {"places":[{"name":"X","category":"scenic","importance":"must_see","visit_minutes":60,"open_time":"09:00","close_time":"18:00"}]}
+  Return ONLY valid JSON, no markdown.
   Categories allowed: scenic, temple, beach, food.
   Importance allowed: must_see, famous, local.
   STRICT RULES:
@@ -210,6 +217,9 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
 - Include at least ${foodCount} food entries: famous local restaurants, food streets, seafood spots, biryani joints, famous cafes, sweet shops — real named establishments only.
 - DO NOT include: stores, shops, retail, supermarkets, boutiques, markets, shopping malls, roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, or generic areas.
 - CRITICAL: Provide the EXACT, official, map-searchable name for each place so it can be accurately found on GPS and maps. Do NOT use generic or abbreviated names.
+- Provide accurate 'open_time' and 'close_time' in 24-hour format. If open 24 hours, use 00:00 to 23:59.
+- Provide 'indoor_outdoor' categorization (indoor, outdoor, mixed).
+- Identify if the spot is famous for sunrise (is_sunrise_spot) or sunset (is_sunset_spot).
 - Only real named places a tourist would visit. No coordinates. No duplicate entries.`;
 
   const raw = await callGemini(prompt);
@@ -279,6 +289,13 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
       vt: Math.min(Math.max(parseInt(p.visit_minutes)||60, 20), 240),
       ot: p.open_time  || (cat==='food'?'11:00':'06:00'),
       ct: p.close_time || (cat==='food'?'23:00':'20:00'),
+      best_visiting_hours: p.best_visiting_hours || null,
+      peak_hours: p.peak_hours || null,
+      is_sunrise_spot: !!p.is_sunrise_spot,
+      is_sunset_spot: !!p.is_sunset_spot,
+      has_nightlife: !!p.has_nightlife,
+      indoor_outdoor: p.indoor_outdoor || 'outdoor',
+      best_seasons: p.best_seasons || null
     };
   }).filter(Boolean);
 }

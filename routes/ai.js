@@ -37,7 +37,7 @@ function handler(fn) {
 // ── /api/ai/chat ─────────────────────────────────────────────────────────────
 // General travel Q&A chatbot
 
-router.post('/chat', handler(({ message, city, plan }) => {
+router.post('/chat', handler(({ message, city, plan, currentTime }) => {
   const planStr = Array.isArray(plan) && plan.length
     ? plan.join(', ')
     : 'none';
@@ -45,6 +45,9 @@ router.post('/chat', handler(({ message, city, plan }) => {
   return callGeminiText(`You are a friendly India travel assistant.
 Tourist in ${city || 'India'} asked: "${message}"
 Current itinerary stops: ${planStr}.
+Current Local Time: ${currentTime || 'Unknown'}
+
+If the user is asking about their current plan or next stop, give real-time time-based advice (e.g. "Golden hour is starting soon!", "That place closes in 45 mins", "It's too hot for an outdoor walk right now").
 Answer in max 3 short lines. Use emojis. Be specific and helpful.`, { cache: true });
 }));
 

@@ -52,8 +52,8 @@
 
   // ── AI endpoints ─────────────────────────────────────────────────────────────
 
-  async function aiChat(message, city, plan = []) {
-    const { text } = await post('/api/ai/chat', { message, city, plan });
+  async function aiChat(message, city, plan = [], currentTime = null) {
+    const { text } = await post('/api/ai/chat', { message, city, plan, currentTime });
     return text;
   }
 

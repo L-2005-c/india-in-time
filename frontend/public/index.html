@@ -2869,6 +2869,69 @@ const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m
 const sync=()=>{if(mdPlan.length>0)mdPlan[dayIdx]=itin;};
 const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
+
+// --- TIME BASED BEHAVIOUR HELPERS ---
+function getCurrentLocalMin() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function getPlaceDynamicStatus(loc) {
+  const now = getCurrentLocalMin();
+  const ot = t2m(loc.ot || '06:00');
+  const ct = t2m(loc.ct || '23:00');
+  
+  if (now < ot || now > ct) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
+  if (ct - now <= 60) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
+  return { status: 'open', label: '🟢 Open', color: 'var(--success-color)' };
+}
+
+function getCrowdPrediction(loc) {
+  const now = getCurrentLocalMin();
+  const isWeekend = [0, 6].includes(new Date().getDay());
+  let level = isWeekend ? 'Moderate' : 'Low';
+  
+  if (loc.peak_hours) {
+    const parts = loc.peak_hours.split('-');
+    if (parts.length === 2) {
+      const pStart = t2m(parts[0].trim());
+      const pEnd = t2m(parts[1].trim());
+      if (now >= pStart && now <= pEnd) {
+        level = isWeekend ? 'Very High' : 'High';
+      }
+    }
+  }
+  return level;
+}
+
+function getTimeBadgesHtml(loc) {
+  const status = getPlaceDynamicStatus(loc);
+  const crowd = getCrowdPrediction(loc);
+  const now = getCurrentLocalMin();
+  
+  let html = `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${status.color}; color:#fff; display:inline-block; margin-top:4px; margin-right:4px;">${status.label}</span>`;
+  
+  if (crowd === 'High' || crowd === 'Very High') {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,100,100,0.2); display:inline-block; margin-top:4px; margin-right:4px;">👥 Peak Crowd</span>`;
+  }
+  
+  if (loc.is_sunrise_spot && now >= 300 && now <= 420) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,200,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌅 Best at Sunrise</span>`;
+  }
+  if (loc.is_sunset_spot && now >= 1020 && now <= 1140) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,100,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌇 Best at Sunset</span>`;
+  }
+  
+  if (realTemp && realTemp > 35 && loc.indoor_outdoor === 'outdoor') {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,0,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🔥 Hot Weather</span>`;
+  }
+  if (realWeatherMain && /rain|storm|drizzle/i.test(realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(0,100,255,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌧 Rain Alert</span>`;
+  }
+  
+  return html;
+}
+
 function getTripMinutes(){return Math.max(30,parseInt(document.getElementById('t-time')?.value,10)||600);}
 function getBreakEveryMinutes(){return Math.max(0,parseInt(document.getElementById('break-every')?.value,10)||0);}
 function getBreakDurationMinutes(){return Math.max(0,parseInt(document.getElementById('break-duration')?.value,10)||0);}
@@ -3344,6 +3407,8 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
   let used = 0;
   let activeSinceBreak = 0;
   let prevCoords = startCoords;
+  let hasLunch = false;
+  let hasDinner = false;
   const remaining = [...(stops || [])];
   const day = [];
 
@@ -3365,11 +3430,37 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       const depart = arrive + actualVisit;
       const openMin = t2m(loc.ot || '06:00');
       const closeMin = Math.max(t2m(loc.ct || '23:00'), 19.5 * 60);
-      if(arrive < openMin || depart > closeMin) continue;
+      if(arrive < openMin || arrive >= closeMin) continue; // Hard reject if closed
       
-      // Pure Nearest Neighbor: use exact km distance to dominate the score, as travel minutes are floored.
+      // Nearest Neighbor Base Score
       const km = hvKm(prevCoords[0], prevCoords[1], loc.coords[0], loc.coords[1]);
-      const score = -(km * 10000) + stopTimeScore(loc, arrive, temp, i);
+      let score = -(km * 10000) + stopTimeScore(loc, arrive, temp, i);
+
+      // --- STRICT TIME-BASED FOOD SCHEDULING ---
+      if (loc.cat === 'food') {
+         let isLunchTime = arrive >= 12.5*60 && arrive <= 15*60 && !hasLunch;
+         let isDinnerTime = arrive >= 19.5*60 && arrive <= 22*60 && !hasDinner;
+         
+         if (isLunchTime || isDinnerTime) {
+            score += 1000000; // Force selecting food
+         } else {
+            score -= 1000000; // Force avoiding food outside meal times
+         }
+      } else {
+         // If we are deep into meal time and haven't eaten, strictly penalize non-food
+         if (!hasLunch && arrive >= 13.5*60 && arrive <= 15*60) score -= 1000000;
+         if (!hasDinner && arrive >= 20.5*60 && arrive <= 22*60) score -= 1000000;
+      }
+      
+      // --- HEAT AVOIDANCE ---
+      if (temp && temp > 35 && loc.indoor_outdoor === 'outdoor' && arrive >= 12*60 && arrive <= 16*60) {
+        score -= 500000;
+      }
+      
+      // --- SUNRISE / SUNSET BOOSTS ---
+      if (loc.is_sunrise_spot && arrive >= 5*60 && arrive <= 7*60) score += 500000;
+      if (loc.is_sunset_spot && arrive >= 17.5*60 && arrive <= 18.5*60) score += 500000;
+
       if(!best || score > best.score || (score === best.score && travel < best.travel)){
         best = { index:i, loc, travel, visit: actualVisit, arrive, depart, score, breakLead };
       }
@@ -3403,6 +3494,13 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       activeSinceBreak = 0;
     }
     day.push(picked);
+    
+    // Update Meal Flags
+    if (picked.cat === 'food') {
+      if (best.arrive >= 12*60 && best.arrive <= 15.5*60) hasLunch = true;
+      if (best.arrive >= 18*60 && best.arrive <= 22.5*60) hasDinner = true;
+    }
+
     remaining.splice(best.index, 1);
     used += best.travel + (picked.vt || 60);
     currentMin = best.depart;
@@ -4123,7 +4221,7 @@ async function handleChat(){
   }
   if(lq.match(/\b(weather|hot|cold|rain|temp)\b/)){typing.remove();addMsg(`🌤️ ${currentCityName} is ~<strong>${realTemp}°C</strong> right now.<br>${realTemp>32?'☀️ Hot! Carry water & SPF50.':realTemp>25?'🌥️ Pleasant — great for sightseeing!':'😎 Cool and comfortable!'}`);return;}
   if(lq.match(/\b(time|schedule|when|open|close)\b/)&&itin.length){typing.remove();addMsg(`🕒 <strong>Today's Schedule</strong><br>${itin.slice(0,4).map((x,i)=>`${i+1}. <strong>${x.name}</strong> ${x.sts||'--'}–${x.ets||'--'}`).join('<br>')}${itin.length>4?`<br><small>+${itin.length-4} more</small>`:''}`);return;}
-  try{const text=await API.aiChat(val,currentCityName,itin.map(i=>i.name));typing.remove();addMsg(text?text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>'):` Ask me about cab fares or food in ${currentCityName}! 📍`);}
+  try{const text=await API.aiChat(val,currentCityName,itin.map(i=>i.name), m2t(getCurrentLocalMin()));typing.remove();addMsg(text?text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>'):` Ask me about cab fares or food in ${currentCityName}! 📍`);}
   catch{
     typing.remove();
     addMsg(localChatReply(val) || nextStopFriendlyFallback());
@@ -4469,7 +4567,7 @@ function updateItinUI(){
     }
     const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
 
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${loc.name}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${loc.name}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${loc.name}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${loc.name}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc)}</div>${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
@@ -4871,6 +4969,7 @@ function renderAiToolsGrid() {
 
 // ═══════════════════════════════════════
 */
+// ═══════════════════════════════════════
 // 8 UNIQUE FEATURES — NOT ON GOOGLE MAPS
 // ═══════════════════════════════════════
 
@@ -5060,11 +5159,11 @@ async function openCustomizeModal() {
     return;
   }
   
-  if (LOCS.length < 8) {
-    addMsg(`🤖 Fetching places for ${city.name} to customize...`);
+  if (LOCS.length < 30) {
+    addMsg(`🤖 Fetching comprehensive places list for ${city.name} to customize...`);
     const loadTyping = addTypingIndicator();
     try {
-      await ensureCityPlaces(city, 8);
+      await ensureCityPlaces(city, 35);
     } catch (e) {
       console.error('Failed to load places for customize modal:', e);
     }
@@ -5079,18 +5178,13 @@ async function openCustomizeModal() {
   const listEl = document.getElementById('customize-places-list');
   listEl.innerHTML = '';
 
-  const prefs = Array.from(document.querySelectorAll('.pref:checked')).map(c=>c.value);
-  let availableToSelect = LOCS;
-  
-  if (prefs.length > 0) {
-    availableToSelect = LOCS.filter(l => prefs.includes(l.cat));
-    if (availableToSelect.length === 0) availableToSelect = LOCS; // Fallback if filters are too strict
-  }
+  let availableToSelect = LOCS; // ALL PLACES, completely bypassing the 'prefs' experience filters
 
   availableToSelect.forEach(loc => {
     const isSelected = window.customSelectedPlaces ? window.customSelectedPlaces.includes(loc.id) : true;
     const catIcons = { scenic: '⛰️', beach: '🏖️', temple: '🛕', food: '🍛' };
     const icon = catIcons[loc.cat] || '📍';
+    const badgesHtml = getTimeBadgesHtml(loc);
     
     const item = document.createElement('label');
     item.style.cssText = 'display:flex;align-items:center;padding:12px;background:var(--bg-layer2);border:1px solid var(--border-subtle);border-radius:12px;cursor:pointer;gap:12px;transition:all 0.2s;';
@@ -5099,6 +5193,7 @@ async function openCustomizeModal() {
       <div style="flex:1;display:flex;flex-direction:column;">
         <span style="font-weight:600;font-size:15px;color:var(--text-primary);">${loc.name}</span>
         <span style="font-size:12px;color:var(--text-muted);">${icon} ${loc.cat.charAt(0).toUpperCase() + loc.cat.slice(1)} • ${loc.vt} mins</span>
+        <div style="margin-top:4px;">${badgesHtml}</div>
       </div>
     `;
     listEl.appendChild(item);
