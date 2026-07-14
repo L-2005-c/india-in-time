@@ -2876,18 +2876,18 @@ function getCurrentLocalMin() {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function getPlaceDynamicStatus(loc) {
-  const now = getCurrentLocalMin();
+function getPlaceDynamicStatus(loc, evalTime) {
+  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const ot = t2m(loc.ot || '06:00');
   const ct = t2m(loc.ct || '23:00');
   
-  if (now < ot || now > ct) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
-  if (ct - now <= 60) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
+  if (now < ot || now >= ct) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
+  if (ct - now <= 60 && ct - now > 0) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
   return { status: 'open', label: '🟢 Open', color: 'var(--success-color)' };
 }
 
-function getCrowdPrediction(loc) {
-  const now = getCurrentLocalMin();
+function getCrowdPrediction(loc, evalTime) {
+  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const isWeekend = [0, 6].includes(new Date().getDay());
   let level = isWeekend ? 'Moderate' : 'Low';
   
@@ -2904,10 +2904,10 @@ function getCrowdPrediction(loc) {
   return level;
 }
 
-function getTimeBadgesHtml(loc) {
-  const status = getPlaceDynamicStatus(loc);
-  const crowd = getCrowdPrediction(loc);
-  const now = getCurrentLocalMin();
+function getTimeBadgesHtml(loc, evalTime) {
+  const status = getPlaceDynamicStatus(loc, evalTime);
+  const crowd = getCrowdPrediction(loc, evalTime);
+  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   
   let html = `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${status.color}; color:#fff; display:inline-block; margin-top:4px; margin-right:4px;">${status.label}</span>`;
   
@@ -4588,7 +4588,7 @@ function updateItinUI(){
     }
     const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
 
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${loc.name}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${loc.name}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc)}</div>${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${loc.name}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${loc.name}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
