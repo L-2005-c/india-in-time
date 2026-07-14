@@ -172,7 +172,7 @@ body::before {
   letter-spacing:0.3px; color:var(--text-primary); white-space:nowrap;
   flex-shrink:0; display:flex; align-items:center; gap:7px;
 }
-.header-logo-mark { width:19px; height:27px; object-fit:contain; flex-shrink:0; }
+.header-logo-mark { height:27px; width:auto; object-fit:contain; flex-shrink:0; }
 .logo-accent { color:var(--gold); font-weight:400; font-style:italic; }
 
 /* Pills row */
@@ -1347,7 +1347,7 @@ body::before {
   content:''; position:absolute; inset:0; pointer-events:none;
   background:radial-gradient(ellipse 60% 50% at 50% 60%, rgba(168,85,247,.05), transparent);
 }
-.splash-flag{width:88px;height:122px;object-fit:contain;animation:splashfloat 3s ease-in-out infinite;position:relative;z-index:1;}
+.splash-flag{height:122px;width:auto;object-fit:contain;animation:splashfloat 3s ease-in-out infinite;position:relative;z-index:1;}
 @keyframes splashfloat{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-14px) rotate(2deg);}}
 .splash-title{
   font-family:'Playfair Display',serif; font-size:40px; font-weight:700;
@@ -1390,7 +1390,7 @@ body::before {
   width:60px; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent);
   margin:0 auto 20px;
 }
-.login-flag{width:76px;height:105px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(168,85,247,.15));}
+.login-flag{height:105px;width:auto;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(168,85,247,.15));}
 .login-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--text-primary);}
 .login-title span{color:var(--gold);font-style:italic;}
 .login-sub{font-size:10px;color:var(--text-muted);margin-top:5px;margin-bottom:28px;letter-spacing:2px;text-transform:uppercase;}
@@ -1466,7 +1466,7 @@ body::before {
 /* ── Extra small phones (≤360px) ── */
 @media(max-width:360px){
   .logo{font-size:14px;gap:5px;}
-  .header-logo-mark{width:16px;height:23px;}
+  .header-logo-mark{height:23px;width:auto;}
   .hpill{padding:3px 7px;font-size:8px;gap:3px;}
   .gps-badge{padding:3px 6px;font-size:7px;}
   .theme-btn{width:30px;height:30px;font-size:13px;}
@@ -5236,7 +5236,7 @@ window.onload=()=>{
   if(crCnt) crCnt.textContent=credits;
   map=L.map('map',{zoomControl:false}).setView([20.5937,78.9629],5);
   L.control.zoom({position:'bottomright'}).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:20}).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',subdomains:'abcd',maxZoom:20}).addTo(map);
   map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
   map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
   document.getElementById('chat-in').addEventListener('keypress',e=>{if(e.key==='Enter')handleChat();});
