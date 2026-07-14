@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "allowJs": true,
+    "target": "ES2022",
+    "moduleResolution": "node",
+    "baseUrl": "."
+  },
+  "exclude": ["node_modules", "dist", ".vercel"]
+}
