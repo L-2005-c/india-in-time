@@ -1347,7 +1347,7 @@ body::before {
   content:''; position:absolute; inset:0; pointer-events:none;
   background:radial-gradient(ellipse 60% 50% at 50% 60%, rgba(168,85,247,.05), transparent);
 }
-.splash-flag{height:122px;width:auto;object-fit:contain;animation:splashfloat 3s ease-in-out infinite;position:relative;z-index:1;}
+.splash-flag{height:122px;width:auto;max-width:100%;object-fit:contain;animation:splashfloat 3s ease-in-out infinite;position:relative;z-index:1;flex-shrink:0;}
 @keyframes splashfloat{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-14px) rotate(2deg);}}
 .splash-title{
   font-family:'Playfair Display',serif; font-size:40px; font-weight:700;
@@ -1390,7 +1390,7 @@ body::before {
   width:60px; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent);
   margin:0 auto 20px;
 }
-.login-flag{display:block;max-width:100%;height:auto;max-height:105px;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(168,85,247,.15));}
+.login-flag{display:block;max-width:100%;height:105px;width:auto;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(168,85,247,.15));flex-shrink:0;}
 .login-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--text-primary);}
 .login-title span{color:var(--gold);font-style:italic;}
 .login-sub{font-size:10px;color:var(--text-muted);margin-top:5px;margin-bottom:28px;letter-spacing:2px;text-transform:uppercase;}
@@ -5237,6 +5237,7 @@ window.onload=()=>{
   map=L.map('map',{zoomControl:false}).setView([20.5937,78.9629],5);
   L.control.zoom({position:'bottomright'}).addTo(map);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',subdomains:'abcd',maxZoom:19}).addTo(map);
+  window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
   map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
   map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
   document.getElementById('chat-in').addEventListener('keypress',e=>{if(e.key==='Enter')handleChat();});
