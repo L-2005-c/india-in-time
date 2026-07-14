@@ -571,18 +571,8 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
 
   // Queries: tourist-specific so Nominatim returns tourist OSM nodes, not roads
   const queries = foodOnly
-    ? [
-        'famous restaurant', 'street food', 'seafood restaurant', 'biryani restaurant',
-        'local cafe', 'sweet shop', 'food market', 'dhaba',
-      ]
-    : [
-        'beach', 'fort', 'palace', 'temple', 'mosque', 'church',
-        'museum', 'park', 'botanical garden', 'zoo', 'aquarium',
-        'waterfall', 'viewpoint', 'lighthouse', 'monument',
-        'archaeological site', 'heritage site', 'cave',
-        'lake', 'island', 'ghat', 'reservoir',
-        'famous restaurant', 'street food', 'seafood restaurant',
-      ];
+    ? ['famous restaurant', 'street food', 'local cafe', 'dhaba']
+    : ['tourist attraction', 'historical', 'temple', 'museum', 'viewpoint', 'park', 'famous restaurant'];
 
   const seen = new Set();
   const out  = [];
