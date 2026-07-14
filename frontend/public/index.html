@@ -3350,6 +3350,20 @@ function stopTimeScore(stop, arriveMin, temp, priorityIndex=0){
   const part = dayPartForMinutes(arriveMin);
   const climate = climateMode(temp);
   let score = Math.max(0, 12 - priorityIndex) + Math.min(20, Number(stop.importanceScore||0) / 5);
+
+  if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) score += 15;
+  if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) score += 15;
+  if (stop.has_nightlife && arriveMin >= 19*60) score += 8;
+  if (stop.indoor_outdoor === 'indoor' && climate === 'hot' && arriveMin >= 12*60 && arriveMin <= 16*60) score += 5;
+  if (stop.best_visiting_hours) {
+    const parts = stop.best_visiting_hours.split('-');
+    if (parts.length === 2) {
+      const sMin = t2m(parts[0].trim());
+      const eMin = t2m(parts[1].trim());
+      if (arriveMin >= sMin && arriveMin <= eMin) score += 10;
+    }
+  }
+
   if(stop.cat === 'food'){
     if(arriveMin >= 12*60 && arriveMin <= 15*60) score += 14;
     else if(arriveMin >= 18*60 && arriveMin <= 22*60) score += 16;
@@ -3390,6 +3404,12 @@ function stopTimeScore(stop, arriveMin, temp, priorityIndex=0){
 function stopClimateNote(stop, arriveMin, temp){
   const part = dayPartForMinutes(arriveMin);
   const climate = climateMode(temp);
+  
+  if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) return '🌅 Sunrise View';
+  if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) return '🌇 Sunset View';
+  if (stop.has_nightlife && arriveMin >= 19*60) return '🍹 Nightlife';
+  if (stop.indoor_outdoor === 'indoor' && climate === 'hot' && part === 'Afternoon') return '🏛️ Indoor Heat Escape';
+
   if(stop.cat === 'food'){
     if(part === 'Afternoon') return 'Lunch Stop';
     if(part === 'Evening') return 'Sunset Snack';
