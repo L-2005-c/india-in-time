@@ -90,7 +90,7 @@
   --tag-bg:     rgba(168,85,247,0.06);
   --tag-border: rgba(168,85,247,0.15);
 
-  --map-filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(85%);
+  --map-filter: none; /* Dark tiles provided by CartoDB — no CSS filter needed */
 
   font-family: 'DM Sans', sans-serif;
   color-scheme: dark;
@@ -220,27 +220,30 @@ body::before {
 ═══════════════════════════════════════════ */
 #content{flex:1;overflow:hidden;position:relative;}
 @keyframes viewFadeIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .view{display:none;height:100%;flex-direction:column;overflow:hidden;}
 .view.active{
   display:flex;
-  animation: viewFadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: viewFadeIn 0.25s ease forwards;
 }
 
 /* ═══════════════════════════════════════════
    MAP VIEW
 ═══════════════════════════════════════════ */
 #map-view{position:relative;}
-#map{width:100%;height:100%;}
-[data-theme="dark"] .leaflet-layer,
+#map{width:100%;height:100%;z-index:0;}
+/* Custom marker class — remove Leaflet's default white-square div-icon background */
+.iit-marker{background:none !important;border:none !important;box-shadow:none !important;}
+/* Dark map tiles are now served by CartoDB — no CSS filter needed.
+   CSS filters on .leaflet-layer break GPU tile compositing during zoom. */
 [data-theme="dark"] .leaflet-control-zoom-in,
-[data-theme="dark"] .leaflet-control-zoom-out{filter:var(--map-filter);}
+[data-theme="dark"] .leaflet-control-zoom-out{background:#1a1a2e;color:#e0e0e0;border-color:#333;}
 
 #street-quest{
   position:absolute; top:14px; left:12px; right:12px; z-index:520;
-  background:rgba(8,14,26,0.9); backdrop-filter:blur(18px);
+  background:rgba(8,14,26,0.96);
   border:1px solid rgba(0,229,160,.18); border-radius:18px; padding:12px 14px;
   box-shadow:0 8px 24px rgba(0,0,0,.35);
 }
@@ -259,9 +262,7 @@ body::before {
 /* Floating nav card */
 #nav-card {
   position:absolute; bottom:16px; left:12px; right:12px; z-index:500;
-  background:var(--bg-card);
-  backdrop-filter:blur(20px) saturate(160%);
-  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  background:rgba(10,5,20,0.97);
   border:1px solid var(--border-mid);
   border-radius:20px; padding:14px 16px;
   box-shadow:var(--shadow-card);
@@ -2001,6 +2002,15 @@ body::after{
     <!-- ═══ MAP VIEW ═══ -->
     <div id="map-view" class="view active">
       <div id="map"></div>
+      
+      <!-- TIME SLIDER UI -->
+      <div id="time-slider-container" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:9000;width:90%;max-width:400px;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:12px 20px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:8px;pointer-events:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-family:'Playfair Display',serif;font-size:14px;color:var(--gold);font-weight:700;">Time Simulator</span>
+          <span id="time-slider-val" style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text-primary);">--:--</span>
+        </div>
+        <input type="range" id="time-slider" min="0" max="1439" step="15" value="540" style="width:100%;accent-color:var(--gold);cursor:pointer;" oninput="onTimeSliderChange(this.value)">
+      </div>
       <div id="street-quest" style="display:none">
         <div class="sq-top">
           <div class="sq-title">Street Quest</div>
@@ -2876,6 +2886,122 @@ function getCurrentLocalMin() {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+window.globalSimulationTime = getCurrentLocalMin();
+
+function onTimeSliderChange(val) {
+  window.globalSimulationTime = parseInt(val, 10);
+  const hh = String(Math.floor(window.globalSimulationTime / 60)).padStart(2, '0');
+  const mm = String(window.globalSimulationTime % 60).padStart(2, '0');
+  
+  const h = parseInt(hh, 10);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  const timeStr = `${h12}:${mm} ${ap}`;
+  
+  const valEl = document.getElementById('time-slider-val');
+  if (valEl) valEl.textContent = timeStr;
+  
+  if (window.itin && window.itin.length > 0) {
+    if (typeof renderRoute === 'function') renderRoute();
+  } else {
+    // If no route is generated yet but markers are on map (e.g. preview)
+    if (typeof renderMapMarkers === 'function') renderMapMarkers();
+  }
+}
+
+// Initialize slider display on load
+setTimeout(() => {
+  const sld = document.getElementById('time-slider');
+  if(sld) {
+    sld.value = window.globalSimulationTime;
+    onTimeSliderChange(window.globalSimulationTime);
+  }
+}, 1000);
+
+function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
+  let score = 50;
+  const reasons = [];
+  let state = "Normal";
+
+  const status = getPlaceDynamicStatus(loc, simTime);
+  const crowd = getCrowdPrediction(loc, simTime);
+
+  if (status.status === 'closed') {
+    return { score: 0, state: 'Closed', reasons: ['🔴 Currently Closed', 'Check opening hours before visiting.'] };
+  }
+
+  // Base score boost for being open
+  score += 15;
+  reasons.push('🟢 Currently Open');
+
+  // Time of Day
+  if (simTime >= 300 && simTime <= 450) { // 5:00 AM - 7:30 AM
+    if (loc.is_sunrise_spot) {
+      score += 35;
+      state = "Sunrise Mode";
+      reasons.push('🌅 Perfect time for Sunrise View');
+      reasons.push('📸 Golden lighting for photography');
+    } else {
+      score += 10;
+      state = "Morning Mode";
+      reasons.push('🌤️ Peaceful morning atmosphere');
+    }
+  } else if (simTime >= 1020 && simTime <= 1140) { // 5:00 PM - 7:00 PM
+    if (loc.is_sunset_spot) {
+      score += 35;
+      state = "Golden Hour";
+      reasons.push('🌇 Perfect time for Sunset View');
+      reasons.push('📸 Excellent Golden Hour lighting');
+    } else {
+      score += 10;
+      state = "Evening Mode";
+      reasons.push('🌆 Pleasant evening vibe');
+    }
+  } else if (simTime >= 1140) { // After 7:00 PM
+    if (loc.has_nightlife) {
+      score += 25;
+      state = "Night Mode";
+      reasons.push('🍹 Vibrant Nightlife is active');
+    } else if (loc.indoor_outdoor === 'outdoor' && loc.cat !== 'food') {
+      score -= 20;
+      reasons.push('🌙 Outdoor attraction at night (Limited visibility)');
+    }
+  }
+
+  // Heat Alert & Weather
+  if (window.realTemp && window.realTemp > 35 && simTime >= 720 && simTime <= 960) {
+    if (loc.indoor_outdoor === 'indoor') {
+      score += 20;
+      state = "Heat Escape";
+      reasons.push('❄️ Great AC/Indoor escape from extreme heat');
+    } else if (loc.indoor_outdoor === 'outdoor') {
+      score -= 30;
+      state = "Heat Alert";
+      reasons.push('⚠️ Extreme Heat warning for outdoor activity');
+    }
+  }
+
+  // Crowd Analysis
+  if (crowd === 'Very High') {
+    score -= 15;
+    reasons.push('👥 Very High Crowd expected');
+  } else if (crowd === 'High') {
+    score -= 5;
+    reasons.push('👥 High Crowd expected');
+  } else {
+    score += 10;
+    reasons.push('🚶 Low/Moderate Crowd expected');
+  }
+  
+  if (status.status === 'closing_soon') {
+    score -= 15;
+    reasons.push('🟡 Closing soon (Hurry!)');
+  }
+
+  score = Math.max(1, Math.min(100, score));
+  return { score, state: state !== "Normal" ? state : "Recommended", reasons };
+}
+
 function getPlaceDynamicStatus(loc, evalTime) {
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const ot = t2m(loc.ot || '06:00');
@@ -3592,7 +3718,7 @@ function interpolatePathPoint(path, ratio){
 function createQuestMarker(coords, emoji, color){
   return L.marker(coords,{
     icon:L.divIcon({
-      className:'',
+      className:'iit-marker',
       html:`<div style="width:26px;height:26px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 0 12px ${color}88;font-size:14px">${emoji}</div>`,
       iconSize:[26,26],
       iconAnchor:[13,13],
@@ -4447,13 +4573,59 @@ function switchToView(viewId,idx){
   viewIds.forEach(v=>{const el=document.getElementById(v);el.classList.remove('active');el.style.display='none';});
   const target=document.getElementById(viewId);target.classList.add('active');target.style.display=viewId==='tools-view'?'block':'flex';
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===idx||i===3&&idx>=3));
-  if(viewId==='map-view'&&map)setTimeout(()=>map.invalidateSize(),100);
+  if(viewId==='map-view'&&map){setTimeout(()=>map.invalidateSize(),50);setTimeout(()=>map.invalidateSize(),300);}
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
   else if(idx===3||viewId==='tools-view') renderToolsHome();
 }
 
 // ── Route rendering ───────────────────────────────────────────────────────────
+let allPlacesMkrs = [];
+function renderMapMarkers() {
+  if (tripActive || (window.itin && window.itin.length > 0)) {
+    allPlacesMkrs.forEach(mk => map.removeLayer(mk));
+    allPlacesMkrs = [];
+    return;
+  }
+  
+  allPlacesMkrs.forEach(mk => map.removeLayer(mk));
+  allPlacesMkrs = [];
+  
+  if (!window.LOCS || !window.LOCS.length) return;
+  
+  window.LOCS.forEach(l => {
+    if (!l.coords || l.coords.length < 2) return;
+    
+    const exp = calculateExperienceScore(l, window.globalSimulationTime);
+    let expCol = '#6b7280';
+    if(exp.score > 79) expCol = '#10b981';
+    else if(exp.score > 59) expCol = '#f59e0b';
+    else if(exp.score > 39) expCol = '#f97316';
+    else if(exp.score > 0) expCol = '#ef4444';
+    
+    const size = 14;
+    const shadow = 'rgba(0,0,0,0.3)';
+    const ic=L.divIcon({className:'iit-marker',html:`<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;background:${expCol};border:2px solid #fff;box-shadow:0 0 8px ${shadow};"></div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
+    
+    const popupHtml = `
+      <div style="min-width:180px;">
+        <b>${l.name}</b><br>
+        <small>${(l.cat||'').toUpperCase()}</small>
+        <hr style="margin:8px 0;border-color:rgba(255,255,255,0.1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <strong style="color:${expCol};font-size:16px;">Score: ${exp.score}/100</strong>
+          <span style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:10px;">${exp.state}</span>
+        </div>
+        <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
+          ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+    const mkr = L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml);
+    allPlacesMkrs.push(mkr);
+  });
+}
+
 async function renderRoute(){
   mkrs.forEach(mk=>map.removeLayer(mk));if(rLine)map.removeLayer(rLine);mkrs=[];
   let routeStops=getRouteStopsForDay(itin);
@@ -4478,12 +4650,36 @@ async function renderRoute(){
   visibleStops.forEach((l,visibleIndex)=>{
     const i = routeStops.findIndex(stop => stop.id === l.id);
     const isCurrent = i===0;
-    const col = isCurrent ? '#00e5a0' : (tripActive ? 'rgba(255,255,255,0.55)' : accent);
+    
+    // EXPERIENCE SCORE COLORS
+    const exp = calculateExperienceScore(l, window.globalSimulationTime);
+    let expCol = '#6b7280'; // Gray (Closed)
+    if(exp.score > 79) expCol = '#10b981'; // Green
+    else if(exp.score > 59) expCol = '#f59e0b'; // Yellow
+    else if(exp.score > 39) expCol = '#f97316'; // Orange
+    else if(exp.score > 0) expCol = '#ef4444'; // Red
+
+    const col = tripActive && isCurrent ? '#00e5a0' : expCol;
     const size = isCurrent ? 18 : (tripActive ? 12 : 16);
     const shadow = isCurrent ? `${col}88` : 'rgba(255,255,255,0.18)';
     const label = tripActive && !isCurrent ? `<div style="position:absolute;top:-10px;right:-8px;min-width:16px;height:16px;border-radius:999px;background:rgba(8,14,26,.92);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px">${i+1}</div>` : '';
-    const ic=L.divIcon({className:'',html:`<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 0 10px ${shadow};opacity:${tripActive && !isCurrent ? 0.75 : 1}">${label}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
-    mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(`<b>${l.name}</b><br><small>${isCurrent && tripActive ? 'Next stop' : `Visit: ${fmtM(l.vt)}`}</small>`));
+    const ic=L.divIcon({className:'iit-marker',html:`<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 0 10px ${shadow};opacity:${tripActive && !isCurrent ? 0.75 : 1}">${label}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
+    
+    const popupHtml = `
+      <div style="min-width:180px;">
+        <b>${l.name}</b><br>
+        <small>${isCurrent && tripActive ? 'Next stop' : `Visit: ${fmtM(l.vt)}`}</small>
+        <hr style="margin:8px 0;border-color:rgba(255,255,255,0.1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <strong style="color:${expCol};font-size:16px;">Score: ${exp.score}/100</strong>
+          <span style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:10px;">${exp.state}</span>
+        </div>
+        <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
+          ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+    mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml));
   });
   if(raw.length>=2){
     rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);
@@ -4645,7 +4841,7 @@ function initGPS(){
     lastHeading=deriveHeading(pos);
     lastHeadingSample=[cLat,cLon];
     if(liveMkr)liveMkr.setLatLng([cLat,cLon]);
-    else liveMkr=L.marker([cLat,cLon],{icon:L.divIcon({className:'',html:'<div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #2563eb;filter:drop-shadow(0 0 8px rgba(37,99,235,.8));transform-origin:50% 70%"></div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map);
+    else liveMkr=L.marker([cLat,cLon],{icon:L.divIcon({className:'iit-marker',html:'<div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #2563eb;filter:drop-shadow(0 0 8px rgba(37,99,235,.8));transform-origin:50% 70%"></div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map);
     updateLiveMarkerHeading();
     document.getElementById('gps-txt').textContent=cLat.toFixed(3);
     if(tripActive) followLivePosition(isF);
@@ -5254,9 +5450,16 @@ window.onload=()=>{
   setTimeout(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',300);},500);
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
-  map=L.map('map',{zoomControl:false}).setView([20.5937,78.9629],5);
+  map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120}).setView([20.5937,78.9629],5);
   L.control.zoom({position:'bottomright'}).addTo(map);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19}).addTo(map);
+  // Use CartoDB dark tiles for dark theme, standard OSM for light
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  window._tileLayer = L.tileLayer(
+    isDark
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd'}
+  ).addTo(map);
   window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
   map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
   map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
