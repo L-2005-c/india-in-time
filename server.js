@@ -69,6 +69,7 @@ const weatherAlertRoutes = require('./routes/weather-alerts');
 const aiRoutes           = require('./routes/ai');
 const tripsRoutes        = require('./routes/trips');
 const favoritesRoutes    = require('./routes/favorites');
+const timeIntelRoutes    = require('./routes/time-intelligence');
 const { router: analyticsRoutes } = require('./routes/analytics');
 
 const app  = express();
@@ -133,6 +134,9 @@ app.use('/api/trips', generalLimiter, tripsRoutes);
 
 // Favorites
 app.use('/api/favorites', generalLimiter, favoritesRoutes);
+
+// GeoAI Time Intelligence Engine (open/closed status, crowd, badges, personalization)
+app.use('/api/time-intelligence', generalLimiter, timeIntelRoutes);
 
 // Analytics
 app.use('/api/analytics', analyticsRoutes);

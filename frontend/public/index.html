@@ -236,8 +236,18 @@ body::before {
 #map{width:100%;height:100%;z-index:0;}
 /* Custom marker class — remove Leaflet's default white-square div-icon background */
 .iit-marker{background:none !important;border:none !important;box-shadow:none !important;}
-/* Dark map tiles are now served by CartoDB — no CSS filter needed.
-   CSS filters on .leaflet-layer break GPU tile compositing during zoom. */
+/* CartoDB's dark_all tiles are very low-contrast by design — roads and
+   labels are barely visible. Brighten each tile image individually (not
+   the whole .leaflet-tile-pane container) so contrast is legible without
+   re-introducing the tile-seam-during-zoom artifact: applying a filter to
+   a *transformed parent* is what causes seams, applying it per-tile does
+   not. backface-visibility:hidden is the standard fix for any residual
+   sub-pixel seam during the zoom animation. */
+[data-theme="dark"] #map .leaflet-tile-pane .leaflet-tile{
+  filter:brightness(1.55) contrast(1.25) saturate(1.05);
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+}
 [data-theme="dark"] .leaflet-control-zoom-in,
 [data-theme="dark"] .leaflet-control-zoom-out{background:#1a1a2e;color:#e0e0e0;border-color:#333;}
 
@@ -1902,7 +1912,7 @@ body::after{
 <div id="login-screen">
   <div class="login-card">
     <div class="login-ornament"></div>
-    <img class="login-flag" src="/logo-mark.png" fetchpriority="high" alt="India In-Time logo">
+    <img class="login-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo" width="240" height="105" decoding="sync">
     <h1 class="login-title">India <span>In-Time</span></h1>
     <p class="login-sub">AI Travel Companion</p>
     <button class="btn-google" onclick="signInWithGoogle()">
@@ -1944,7 +1954,7 @@ body::after{
 
 <!-- SPLASH -->
 <div id="splash">
-  <img class="splash-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo">
+  <img class="splash-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo" width="280" height="122" decoding="sync">
   <h1 class="splash-title">India <span>In-Time</span></h1>
   <p class="splash-sub">Your Intelligent Travel Companion</p>
   <div class="splash-line"></div>
@@ -1978,7 +1988,7 @@ body::after{
   <header id="header">
     <div class="header-inner">
       <div class="logo">
-        <img class="header-logo-mark" src="/logo-mark.png?v=20260603-logo" alt="">
+        <img class="header-logo-mark" src="/logo-mark.png?v=20260603-logo" alt="" width="62" height="27" decoding="sync">
         <span id="hdr-city" style="color:var(--text-primary)">India</span>
         <span class="logo-accent">In-Time</span>
       </div>
@@ -3034,6 +3044,7 @@ function getTimeBadgesHtml(loc, evalTime) {
   const status = getPlaceDynamicStatus(loc, evalTime);
   const crowd = getCrowdPrediction(loc, evalTime);
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
+  const scoreInfo = calculateExperienceScore(loc, now);
   
   let html = `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${status.color}; color:#fff; display:inline-block; margin-top:4px; margin-right:4px;">${status.label}</span>`;
   
@@ -3054,9 +3065,51 @@ function getTimeBadgesHtml(loc, evalTime) {
   if (realWeatherMain && /rain|storm|drizzle/i.test(realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(0,100,255,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌧 Rain Alert</span>`;
   }
+  if (status.status === 'open' && scoreInfo.score >= 80) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(168,85,247,0.25); display:inline-block; margin-top:4px; margin-right:4px;">✨ Best Time Now</span>`;
+  }
   
   return html;
 }
+
+// ── Real-time notifications (spec §7): "closes in 45 minutes", "golden
+// hour starts in 25 minutes", "heavy crowd expected after 6 PM" — checked
+// once a minute against whatever is currently on the plan/route, and only
+// surfaced once per stop so the chat isn't spammed on every tick.
+window._tiNotified = window._tiNotified || new Set();
+function checkTimeIntelNotifications(){
+  try{
+    const stops = (typeof itin !== 'undefined' && itin && itin.length) ? itin.filter(s=>!s.isBreak) : [];
+    if(!stops.length || typeof addMsg !== 'function') return;
+    const now = getCurrentLocalMin();
+    stops.forEach(loc=>{
+      const ct = t2m(loc.ct || '23:00');
+      const minsToClose = ct - now;
+      const closeKey = `close-${loc.id}`;
+      if(minsToClose > 0 && minsToClose <= 45 && !window._tiNotified.has(closeKey)){
+        window._tiNotified.add(closeKey);
+        addMsg(`🟡 <strong>${loc.name}</strong> closes in ${minsToClose} minutes.`);
+      }
+      if(loc.is_sunset_spot){
+        const sunsetMin = 18*60; // approx local sunset; refined by realSunsetMin when available
+        const target = (typeof realSunsetMin === 'number') ? realSunsetMin : sunsetMin;
+        const minsToSunset = target - now;
+        const goldenKey = `golden-${loc.id}`;
+        if(minsToSunset > 0 && minsToSunset <= 25 && !window._tiNotified.has(goldenKey)){
+          window._tiNotified.add(goldenKey);
+          addMsg(`🌇 Golden hour starts in ${minsToSunset} minutes near <strong>${loc.name}</strong>.`);
+        }
+      }
+      const crowd = getCrowdPrediction(loc, now);
+      const crowdKey = `crowd-${loc.id}`;
+      if((crowd === 'High' || crowd === 'Very High') && !window._tiNotified.has(crowdKey)){
+        window._tiNotified.add(crowdKey);
+        addMsg(`👥 Heavy crowd expected at <strong>${loc.name}</strong> right now.`);
+      }
+    });
+  }catch(_e){}
+}
+setInterval(checkTimeIntelNotifications, 60000);
 
 function getTripMinutes(){return Math.max(30,parseInt(document.getElementById('t-time')?.value,10)||600);}
 function getBreakEveryMinutes(){return Math.max(0,parseInt(document.getElementById('break-every')?.value,10)||0);}
@@ -3558,6 +3611,40 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
   const remaining = [...(stops || [])];
   const day = [];
 
+  // Places available for this trip but not in the user's category filter —
+  // used as a fallback pool so the day doesn't end early just because the
+  // preferred categories closed for the day (e.g. temples/forts closing
+  // 17:00-17:30). Night-friendly categories are prioritized once the sun
+  // sets. This directly implements "recommend night attractions after
+  // sunset" / "skip closed places" from the Time Intelligence spec.
+  const usedIds = new Set();
+  const supplementalPool = (typeof LOCS !== 'undefined' ? LOCS : [])
+    .filter(l => !(stops || []).some(s => s.id === l.id));
+
+  function tryFillFromPool(pool){
+    let best = null;
+    for(let i=0;i<pool.length;i++){
+      const loc = pool[i];
+      if(usedIds.has(loc.id) || day.some(d=>d.id===loc.id)) continue;
+      const travel = getSmartTravelTime(prevCoords, loc.coords, currentCityId, currentMin, day.length===0);
+      const visit = getSmartVisitTime(loc, currentMin + travel, new Date().getDay());
+      const arrive = currentMin + travel;
+      let actualVisit = visit;
+      if(used + travel + actualVisit > maxT) actualVisit = maxT - (used + travel);
+      if(actualVisit < 15) continue;
+      const depart = arrive + actualVisit;
+      const openMin = t2m(loc.ot || '06:00');
+      const closeMin = t2m(loc.ct || '23:00');
+      const nightFriendly = loc.cat==='food' || loc.cat==='market' || loc.night_availability || loc.is_sunset_spot;
+      const isOpen = arrive >= openMin && arrive < closeMin;
+      if(!isOpen && !(nightFriendly && arrive >= closeMin && arrive < 23*60)) continue; // truly closed
+      const km = hvKm(prevCoords[0], prevCoords[1], loc.coords[0], loc.coords[1]);
+      let score = -(km * 10000) + (nightFriendly && arrive >= 18*60 ? 200000 : 0);
+      if(!best || score > best.score) best = { loc, travel, visit: actualVisit, arrive, depart, score };
+    }
+    return best;
+  }
+
   while(remaining.length){
     let best = null;
     for(let i=0;i<remaining.length;i++){
@@ -3571,11 +3658,11 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       if(used + breakLead + travel + actualVisit > maxT) {
         actualVisit = maxT - (used + breakLead + travel);
       }
-      if(actualVisit < 30) continue;
+      if(actualVisit < 15) continue;
       
       const depart = arrive + actualVisit;
       const openMin = t2m(loc.ot || '06:00');
-      const closeMin = Math.max(t2m(loc.ct || '23:00'), 19.5 * 60);
+      const closeMin = t2m(loc.ct || '23:00'); // respect the place's real closing time — no fake floor
       if(arrive < openMin || arrive >= closeMin) continue; // Hard reject if closed
       
       // Nearest Neighbor Base Score
@@ -3652,6 +3739,30 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
     currentMin = best.depart;
     prevCoords = picked.coords;
     activeSinceBreak += best.travel + (picked.vt || 60);
+  }
+
+  // ── Backfill: if the preferred-category places ran out or closed but the
+  //    user's requested end time hasn't been reached yet, pull in open /
+  //    night-friendly places from the wider city pool instead of ending the
+  //    day early. Repeats until the time budget is used up or nothing else
+  //    is open.
+  let backfillGuard = 0;
+  while(used < maxT - 15 && backfillGuard < 12){
+    const fill = tryFillFromPool(supplementalPool);
+    if(!fill) break;
+    const picked = {
+      ...fill.loc,
+      tt: fill.travel,
+      vt: fill.visit,
+      slotLabel: dayPartForMinutes(fill.arrive),
+      climateNote: stopClimateNote(fill.loc, fill.arrive, temp),
+    };
+    day.push(picked);
+    usedIds.add(fill.loc.id);
+    used += fill.travel + (picked.vt || 30);
+    currentMin = fill.depart;
+    prevCoords = picked.coords;
+    backfillGuard++;
   }
 
   return { day, remaining };
@@ -5458,8 +5569,21 @@ window.onload=()=>{
     isDark
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd'}
+    {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd',keepBuffer:4}
   ).addTo(map);
+  // Leaflet computes its tile grid from the container's size at creation
+  // time. If #map-view is still display:none (its default state on load),
+  // the container has zero width/height and the map renders as gray/blank
+  // tiles until something forces a resize — this is the "map is glitching"
+  // bug. Force several invalidateSize() passes and watch the container with
+  // a ResizeObserver so the map always repaints correctly once it becomes
+  // visible, on any screen size, without relying on a specific view switch.
+  [0,150,400,900].forEach(delay=>setTimeout(()=>{ if(map) map.invalidateSize(false); }, delay));
+  const mapEl = document.getElementById('map');
+  if(mapEl && 'ResizeObserver' in window){
+    new ResizeObserver(()=>{ if(map) map.invalidateSize(false); }).observe(mapEl);
+  }
+  window._tileLayer.on('tileerror', (e)=>{ try{ e.tile.style.display='none'; }catch(_e){} });
   window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
   map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
   map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});

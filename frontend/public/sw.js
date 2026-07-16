@@ -3,7 +3,7 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v11-deploy-fix';
+const CACHE_NAME = 'india-in-time-v12-map-contrast-fix';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
