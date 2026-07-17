@@ -1,6 +1,6 @@
 .vercel
 .env
 node_modules
-data/
+# data/
 package-lock.json
 backups/
