@@ -800,7 +800,7 @@ body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--text-prim
   color:var(--gold); font-weight:600;
   box-shadow:0 0 16px rgba(168,85,247,.08);
 }
-.exp-chip:active{transform:scale(.97);}
+.exp-chip:active{opacity:.8;}
 
 /* Vibe textarea */
 .vibe-section{margin-bottom:14px;}
@@ -5771,7 +5771,10 @@ window.onload=()=>{
   function syncSelectedPersonas(){
     window.selectedPersonas = Array.from(document.querySelectorAll('.persona-pref:checked')).map(c=>c.value);
   }
-  document.querySelectorAll('.persona-pref').forEach(el=>el.addEventListener('change', syncSelectedPersonas));
+  document.querySelectorAll('.persona-pref').forEach(el=>el.addEventListener('change', (e) => {
+    syncSelectedPersonas();
+    updatePlannerShowcase();
+  }));
   syncSelectedPersonas();
   updateFollowButton();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────
