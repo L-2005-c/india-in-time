@@ -615,6 +615,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
         // Block pure numeric names and single-word generic fillers
         if (/^\d+$/.test(name)) continue;
         if (/^(india|karnataka|andhra|telangana|tamil|kerala|goa|mumbai|delhi|kolkata)$/i.test(name)) continue;
+        if (name.toLowerCase() === cityName.toLowerCase()) continue;
 
         const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
         if (seen.has(key)) continue;
@@ -847,8 +848,17 @@ router.post('/', async (req, res) => {
     addPlaces(aiRanked);
     addPlaces(staticPlaces);
     addPlaces(filterPlacesByPrefs(curatedCity, prefs));
-    addPlaces(filterPlacesByPrefs(wiki,        prefs));
-    addPlaces(filterPlacesByPrefs(nominatimRaw, prefs));
+    
+    // Only pull from Wikipedia if we have fewer than 30 places
+    if (merged.length < 30) {
+      addPlaces(filterPlacesByPrefs(wiki, prefs).slice(0, 30 - merged.length));
+    }
+    
+    // Only pull from raw Nominatim search if we STILL have fewer than 20 places 
+    // (Nominatim raw searches return very low quality data in India like random nodes/roads)
+    if (merged.length < 20) {
+      addPlaces(filterPlacesByPrefs(nominatimRaw, prefs).slice(0, 25 - merged.length));
+    }
 
     // If food-only, also add curated food seeds
     if (wantFoodOnly) {
@@ -856,10 +866,13 @@ router.post('/', async (req, res) => {
       addPlaces(curatedFood);
     }
 
-    console.log(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
+    // Hard limit the total places sent to the frontend to prevent map clutter with bad data
+    const finalPlaces = merged.slice(0, Math.min(50, Math.max(30, Math.ceil((totalMinutes || 600) / 600) * 12)));
 
-    if (merged.length >= 3) {
-      const payload = { places: merged, source: 'ranked_sources', count: merged.length };
+    console.log(`[places] Final merged pool: ${finalPlaces.length} places (prefs: ${prefs.join(',') || 'all'})`);
+
+    if (finalPlaces.length >= 3) {
+      const payload = { places: finalPlaces, source: 'ranked_sources', count: finalPlaces.length };
       setCachedPlaces(key, payload);
       return res.json(payload);
     }
@@ -868,8 +881,8 @@ router.post('/', async (req, res) => {
     const anything = filterPlacesByPrefs(
       [...aiRanked, ...staticPlaces, ...curatedCity, ...wiki, ...nominatimRaw].filter((p, i, arr) =>
         p?.coords?.length >= 2 &&
-        arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
-      ),
+      arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
+      ).slice(0, 30),
       prefs
     );
     const payload = { places: anything, source: 'last_resort', count: anything.length };
@@ -886,7 +899,7 @@ router.post('/', async (req, res) => {
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&
           arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
-        ),
+        ).slice(0, 30),
         prefs
       );
       const payload = { places: all, source: 'error_fallback', count: all.length };
