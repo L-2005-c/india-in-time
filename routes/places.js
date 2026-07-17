@@ -55,7 +55,7 @@ function staticCityPlaces(cityName) {
       ['Victory at Sea War Memorial','scenic',17.7160,83.3275,35,'06:00','21:00'],
       ['Sri Kanaka Mahalakshmi Temple','temple',17.7040,83.3002,45,'05:00','21:00'],
       ['ISKCON Temple Visakhapatnam','temple',17.7795,83.3850,50,'07:30','20:30'],
-      ['VMRDA City Central Park','scenic',17.7245,83.3126,45,'05:00','21:00'],
+      ['VMRDA City Central Park','scenic',17.7171,83.3039,45,'05:00','21:00'],
       ['Sagar Nagar Beach','beach',17.7638,83.3664,60,'06:00','20:00'],
       ['Mangamaripeta Beach','beach',17.8269,83.4022,75,'06:00','19:30'],
       ['Lawsons Bay Beach','beach',17.7362,83.3506,60,'06:00','20:00'],
