@@ -136,12 +136,7 @@ body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--text-prim
 ::-webkit-scrollbar-thumb{background:var(--border-mid);border-radius:2px;}
 ::-webkit-scrollbar-track{background:transparent;}
 
-/* Subtle grain overlay for premium feel */
-body::before {
-  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-  opacity:0.4;
-}
+/* Removed SVG grain overlay for performance reasons */
 
 /* ═══════════════════════════════════════════
    APP SHELL
