@@ -12,9 +12,7 @@ const cluster = require('cluster');
 const os      = require('os');
 
 // ── Clustering (10k User Concurrency) ────────────────────────────────────────
-const isVercel = !!process.env.VERCEL;
-
-if (!isVercel && cluster.isPrimary) {
+if (cluster.isPrimary) {
   const numCPUs = os.cpus().length;
   console.log(`\n🚀 India In-Time API v2.0 Primary (${process.pid}) is running`);
   console.log(`   Forking ${numCPUs} workers for high concurrency...`);
@@ -223,57 +221,51 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ── Start Server ─────────────────────────────────────────────────────────────
-if (isVercel) {
-  // In serverless environments, initialize the DB asynchronously and export the Express app
-  initDatabase().catch(err => console.error('💥 Failed to start database:', err));
-  module.exports = app;
-} else {
-  initDatabase().then(() => {
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`   ✅ Worker ${process.pid} started and listening on port ${PORT}`);
-    });
-
-    // ── Graceful Shutdown ────────────────────────────────────────────────────────
-    function gracefulShutdown(signal) {
-      console.log(`\n🛑  ${signal} received — shutting down gracefully...`);
-
-      // Stop accepting new connections
-      server.close(async () => {
-        console.log('   ✅ HTTP server closed');
-
-        // Close database
-        await closeDatabase();
-
-        // Purge expired cache
-        try {
-          const { purgeExpiredCache } = require('./db/queries');
-          await purgeExpiredCache();
-        } catch (_e) {}
-
-        console.log('   ✅ Cleanup complete. Goodbye!\n');
-        process.exit(0);
-      });
-
-      // Force exit after timeout
-      setTimeout(() => {
-        console.error('   ⚠️  Forced shutdown after timeout');
-        process.exit(1);
-      }, config.server.shutdownTimeoutMs);
-    }
-
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
-    process.on('uncaughtException', (err) => {
-      console.error('💥  Uncaught exception:', err);
-      gracefulShutdown('uncaughtException');
-    });
-    process.on('unhandledRejection', (reason) => {
-      console.error('💥  Unhandled rejection:', reason);
-    });
-  }).catch(err => {
-    console.error('💥 Failed to start worker database:', err);
-    process.exit(1);
+initDatabase().then(() => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`   ✅ Worker ${process.pid} started and listening on port ${PORT}`);
   });
-}
 
-} // End of worker/serverless block
+  // ── Graceful Shutdown ────────────────────────────────────────────────────────
+  function gracefulShutdown(signal) {
+    console.log(`\n🛑  ${signal} received — shutting down gracefully...`);
+
+    // Stop accepting new connections
+    server.close(async () => {
+      console.log('   ✅ HTTP server closed');
+
+      // Close database
+      await closeDatabase();
+
+      // Purge expired cache
+      try {
+        const { purgeExpiredCache } = require('./db/queries');
+        await purgeExpiredCache();
+      } catch (_e) {}
+
+      console.log('   ✅ Cleanup complete. Goodbye!\n');
+      process.exit(0);
+    });
+
+    // Force exit after timeout
+    setTimeout(() => {
+      console.error('   ⚠️  Forced shutdown after timeout');
+      process.exit(1);
+    }, config.server.shutdownTimeoutMs);
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+  process.on('uncaughtException', (err) => {
+    console.error('💥  Uncaught exception:', err);
+    gracefulShutdown('uncaughtException');
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('💥  Unhandled rejection:', reason);
+  });
+}).catch(err => {
+  console.error('💥 Failed to start worker database:', err);
+  process.exit(1);
+});
+
+} // End of cluster worker block

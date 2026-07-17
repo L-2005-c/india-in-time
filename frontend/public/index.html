@@ -1903,6 +1903,68 @@ body::after{
 /* Selection color */
 ::selection{background:rgba(168,85,247,.2);color:var(--text-primary);}
 ::-moz-selection{background:rgba(168,85,247,.2);color:var(--text-primary);}
+/* ═══════════════════════════════════════════
+   GLASSMORPHISM DESIGN PASS
+   Apple + Google Maps inspired: translucent blurred surfaces, soft
+   gradient borders, gentle depth. Deliberately only touches background /
+   border / shadow / backdrop-filter — never padding, radius or layout —
+   so it layers safely on top of every rule above instead of replacing them.
+═══════════════════════════════════════════ */
+.stop-card, .tool-card, .planner-config-card, .lingo-card, .emer-card,
+.budget-card, .passport-stamp, .login-card, .insight-card{
+  background:linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015)), var(--bg-layer1);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  backdrop-filter:blur(18px) saturate(150%);
+  border:1px solid rgba(255,255,255,0.09);
+  box-shadow:0 8px 28px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.stop-card{border-left:3px solid var(--gold);}
+.stop-card.is-next{
+  border-left-color:var(--teal);
+  background:linear-gradient(160deg, rgba(0,212,184,0.09), rgba(0,212,184,0.02)), var(--bg-layer1);
+  box-shadow:0 8px 28px rgba(0,212,184,.14), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.tool-card:hover, .tool-card:active{
+  border-color:var(--gold-border);
+  box-shadow:0 10px 32px rgba(168,85,247,.16), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.bubble{
+  background:linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)), var(--bg-layer1);
+  -webkit-backdrop-filter:blur(14px) saturate(140%);
+  backdrop-filter:blur(14px) saturate(140%);
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 4px 16px rgba(0,0,0,.2);
+}
+.bubble.user-b{
+  background:linear-gradient(160deg, rgba(168,85,247,.14), rgba(168,85,247,.03));
+  border-color:var(--gold-border);
+}
+#header, .chat-input-bar{
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  backdrop-filter:blur(20px) saturate(160%);
+  background:linear-gradient(180deg, rgba(16,9,29,.85), rgba(16,9,29,.72));
+}
+#time-slider-container{
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
+  backdrop-filter:blur(22px) saturate(160%);
+}
+/* Subtle animated gradient shimmer for the primary CTA, in place of a flat fill */
+.btn-gen{
+  background:linear-gradient(120deg, var(--gold), var(--ocean), var(--gold-light), var(--gold));
+  background-size:300% 100%;
+  animation:gradientShift 6s ease infinite;
+}
+@keyframes gradientShift{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+[data-theme="light"] .stop-card, [data-theme="light"] .tool-card,
+[data-theme="light"] .planner-config-card, [data-theme="light"] .bubble{
+  background:linear-gradient(160deg, rgba(255,255,255,0.7), rgba(255,255,255,0.35));
+  border-color:rgba(0,0,0,0.06);
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
 </style>
 
 </head>
@@ -2228,6 +2290,16 @@ body::after{
           <label class="exp-chip"><input type="checkbox" value="scenic" class="pref" checked>⛰️ Scenic</label>
           <label class="exp-chip"><input type="checkbox" value="temple" class="pref">🛕 Temples</label>
           <label class="exp-chip"><input type="checkbox" value="food" class="pref">🍛 Local Food</label>
+        </div>
+
+        <div class="sec-label">Traveler Style <span style="font-weight:400;color:var(--text-muted);font-size:11px">— personalizes stop scoring &amp; ordering</span></div>
+        <div class="exp-grid" id="persona-grid">
+          <label class="exp-chip"><input type="checkbox" value="photographer" class="persona-pref">📷 Photographer</label>
+          <label class="exp-chip"><input type="checkbox" value="family" class="persona-pref">👨‍👩‍👧 Family</label>
+          <label class="exp-chip"><input type="checkbox" value="adventure" class="persona-pref">🧗 Adventure</label>
+          <label class="exp-chip"><input type="checkbox" value="food_lover" class="persona-pref">🍜 Food Lover</label>
+          <label class="exp-chip"><input type="checkbox" value="history" class="persona-pref">🏛️ History</label>
+          <label class="exp-chip"><input type="checkbox" value="nature" class="persona-pref">🌿 Nature</label>
         </div>
 
         <div class="vibe-section">
@@ -3065,6 +3137,9 @@ function getTimeBadgesHtml(loc, evalTime) {
   if (realWeatherMain && /rain|storm|drizzle/i.test(realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(0,100,255,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌧 Rain Alert</span>`;
   }
+  if (window.realWind >= 30 && (loc.cat === 'beach' || loc.cat === 'scenic' || loc.is_sunset_spot)) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(120,180,255,0.2); display:inline-block; margin-top:4px; margin-right:4px;">💨 Strong Wind</span>`;
+  }
   if (status.status === 'open' && scoreInfo.score >= 80) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(168,85,247,0.25); display:inline-block; margin-top:4px; margin-right:4px;">✨ Best Time Now</span>`;
   }
@@ -3525,10 +3600,47 @@ function estimateTravelMinutes(prevCoords, stop, isFirstStop=false){
   return Math.max(isFirstStop ? 10 : 12, Math.min(35, Math.round(km / 0.42)));
 }
 
-function stopTimeScore(stop, arriveMin, temp, priorityIndex=0){
+// Persona weighting for itinerary personalization (mirrors data/time-intelligence-rules.json
+// on the backend — kept here too so client-side scoring doesn't need a network round trip).
+const PERSONA_WEIGHTS = {
+  photographer: { sunrise: 14, sunset: 14, scenic: 8, monument: 5 },
+  family:       { safety: 10, park: 8, garden: 8, museum: 6 },
+  adventure:    { hill: 10, waterfall: 9, fort: 7 },
+  food_lover:   { food: 12, market: 9 },
+  history:      { monument: 11, fort: 10, museum: 10, temple: 5 },
+  nature:       { park: 9, garden: 8, beach: 6, waterfall: 7 },
+};
+window.selectedPersonas = window.selectedPersonas || [];
+
+function personaBonus(stop, personas){
+  if(!personas || !personas.length) return 0;
+  let bonus = 0;
+  personas.forEach(p=>{
+    const weights = PERSONA_WEIGHTS[p];
+    if(!weights) return;
+    if(weights.sunrise && stop.is_sunrise_spot) bonus += weights.sunrise;
+    if(weights.sunset && stop.is_sunset_spot) bonus += weights.sunset;
+    if(weights.safety && stop.family_friendly) bonus += weights.safety;
+    if(weights[stop.cat]) bonus += weights[stop.cat];
+  });
+  return bonus;
+}
+
+function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null){
   const part = dayPartForMinutes(arriveMin);
   const climate = climateMode(temp);
   let score = Math.max(0, 12 - priorityIndex) + Math.min(20, Number(stop.importanceScore||0) / 5);
+
+  // Extreme heat: push outdoor stops out of the 12-16h window instead of
+  // just favoring indoor ones — a real reroute signal, not just a note.
+  if (stop.indoor_outdoor === 'outdoor' && temp >= 38 && arriveMin >= 12*60 && arriveMin <= 16*60) {
+    score -= 25;
+  }
+  // Strong wind: warn beaches / viewpoints / sunset spots away from that slot.
+  if (wind >= 30 && (stop.cat === 'beach' || stop.cat === 'scenic' || stop.is_sunset_spot)) {
+    score -= 15;
+  }
+  score += personaBonus(stop, personas || window.selectedPersonas);
 
   if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) score += 15;
   if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) score += 15;
@@ -3639,7 +3751,8 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       const isOpen = arrive >= openMin && arrive < closeMin;
       if(!isOpen && !(nightFriendly && arrive >= closeMin && arrive < 23*60)) continue; // truly closed
       const km = hvKm(prevCoords[0], prevCoords[1], loc.coords[0], loc.coords[1]);
-      let score = -(km * 10000) + (nightFriendly && arrive >= 18*60 ? 200000 : 0);
+      let score = -(km * 10000) + stopTimeScore(loc, arrive, temp, 6, window.realWind || 0, window.selectedPersonas)
+        + (nightFriendly && arrive >= 18*60 ? 40 : 0);
       if(!best || score > best.score) best = { loc, travel, visit: actualVisit, arrive, depart, score };
     }
     return best;
@@ -3667,7 +3780,7 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       
       // Nearest Neighbor Base Score
       const km = hvKm(prevCoords[0], prevCoords[1], loc.coords[0], loc.coords[1]);
-      let score = -(km * 10000) + stopTimeScore(loc, arrive, temp, i);
+      let score = -(km * 10000) + stopTimeScore(loc, arrive, temp, i, window.realWind || 0, window.selectedPersonas);
 
       // --- STRICT TIME-BASED FOOD SCHEDULING ---
       if (loc.cat === 'food') {
@@ -4065,14 +4178,65 @@ function renderLoadPanel(){
 function toggleLoadPanel(){switchToView('tools-view',3);renderLoadPanel();}
 
 // ── Weather ───────────────────────────────────────────────────────────────────
+window.realWind = window.realWind || 0;
+window._lastWeatherSnapshot = window._lastWeatherSnapshot || null;
+
 async function fetchWeatherUI(lat,lon){
   try{
+    window._lastKnownLatLon = [lat, lon];
     const d=await API.fetchWeather(lat,lon);
     realTemp=d.temp;
-    realWeatherMain=d.main || 'Clear';
+    realWeatherMain=d.main || (d.weathercode>=51 ? 'Rain' : 'Clear');
+    window.realWind = d.windKph || 0;
     document.getElementById('wx-display').textContent=d.display;
     updatePlannerShowcase();
+    detectWeatherChangeAndReoptimize({ temp: realTemp, main: realWeatherMain, wind: window.realWind });
   }catch(e){}
+}
+
+// Poll weather every 10 minutes while a plan is active so conditions that
+// change mid-trip (rain starting, a heat spike, wind picking up) can trigger
+// a live re-optimization instead of the user being stuck with a stale plan.
+setInterval(()=>{
+  if(typeof mdPlan!=='undefined' && mdPlan && mdPlan.flat && mdPlan.flat().length && window._lastKnownLatLon){
+    fetchWeatherUI(window._lastKnownLatLon[0], window._lastKnownLatLon[1]);
+  }
+}, 10*60*1000);
+
+function detectWeatherChangeAndReoptimize(snap){
+  const prev = window._lastWeatherSnapshot;
+  window._lastWeatherSnapshot = snap;
+  if(!prev) return; // first reading of the session — nothing to compare against
+  const rainStarted = !/rain|storm|drizzle/i.test(prev.main||'') && /rain|storm|drizzle/i.test(snap.main||'');
+  const heatSpike = (snap.temp - prev.temp) >= 5 && snap.temp >= 36;
+  const windPickedUp = snap.wind >= 30 && prev.wind < 30;
+  if(rainStarted || heatSpike || windPickedUp){
+    const reason = rainStarted ? 'rain has started' : heatSpike ? 'temperature has spiked' : 'winds have picked up';
+    reoptimizeRemainingPlan(reason);
+  }
+}
+
+// Rebuilds only the *not-yet-visited* stops for today using the latest
+// weather (skips closed places, avoids outdoor stops in extreme heat,
+// deprioritizes beaches/viewpoints in strong wind — all via stopTimeScore).
+function reoptimizeRemainingPlan(reason, nowOverride){
+  try{
+    if(typeof itin==='undefined' || !itin || !itin.length) return;
+    const now = typeof nowOverride === 'number' ? nowOverride : getCurrentLocalMin();
+    const upcoming = itin.filter(s=>!s.isBreak && t2m(s.ct||'23:00') > now && !s._visited);
+    if(upcoming.length < 2) return; // not enough left in the day to meaningfully reorder
+    const startCoords = upcoming[0].coords;
+    const dayEndMin = t2m(document.getElementById('e-time')?.value || '19:00');
+    const budget = Math.max(30, dayEndMin - now);
+    const { day: replanned } = buildTimeAwareDay(upcoming, now, budget, startCoords, realTemp || 28, 0, 0);
+    if(replanned && replanned.length){
+      // Splice the replanned stretch back into today's plan, keeping anything already visited untouched.
+      const visitedPrefix = itin.filter(s=>s.isBreak || t2m(s.ct||'23:00') <= now || s._visited);
+      itin = [...visitedPrefix, ...replanned];
+      if(typeof updateItinUI === 'function') updateItinUI();
+      if(typeof addMsg === 'function') addMsg(`🔄 <strong>Plan updated</strong> — ${reason}, so I reordered your remaining stops for better conditions.`);
+    }
+  }catch(_e){}
 }
 
 function getSelectedPrefs(){
@@ -5154,6 +5318,12 @@ async function runReplanner(lateStr) {
   const completed = mdPlan.flat().filter(s => s.etd && new Date(s.etd) < new Date());
   const remaining = itin.map(s => ({ name: s.name, vt: s.vt }));
 
+  // Actually recompute the schedule (not just advisory text): treat "now" as
+  // pushed forward by the delay, so closed/no-longer-feasible stops get
+  // dropped and the rest reflow automatically.
+  const delayedNowMin = getCurrentLocalMin() + minutesLate;
+  reoptimizeRemainingPlan(`you're running ${minutesLate} minutes late`, delayedNowMin);
+
   try {
     const text = await API.aiReplanner(currentCityName, completed.map(s => s.name), remaining, minutesLate, now);
     typing.remove();
@@ -5603,6 +5773,11 @@ window.onload=()=>{
   document.getElementById('t-minutes')?.addEventListener('input', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();});
   document.getElementById('t-minutes')?.addEventListener('change', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();});
   document.querySelectorAll('.pref').forEach(el=>el.addEventListener('change', updatePlannerShowcase));
+  function syncSelectedPersonas(){
+    window.selectedPersonas = Array.from(document.querySelectorAll('.persona-pref:checked')).map(c=>c.value);
+  }
+  document.querySelectorAll('.persona-pref').forEach(el=>el.addEventListener('change', syncSelectedPersonas));
+  syncSelectedPersonas();
   updateFollowButton();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────
   (function detectAndLoadCity() {

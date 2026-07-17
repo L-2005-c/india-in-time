@@ -242,6 +242,7 @@ function getPlaceState(place, now = new Date(), weather = null) {
   if (weather && weather.tempC >= 38) badges.push('🔥 Hot Weather');
   if (weather && /rain/i.test(weather.condition || '')) badges.push('🌧 Rain Alert');
   if (crowdLevel === 'High' || crowdLevel === 'Very High') badges.push('👥 Peak Crowd');
+  if (weather && weather.windKph != null && weather.windKph >= 30 && (cat === 'beach' || cat === 'scenic' || place.is_sunset_spot)) badges.push('💨 Strong Wind');
   if (isBestTimeNow && isOpenNow) badges.push('✨ Best Time Now');
 
   // ── Notifications ────────────────────────────────────────────────────────

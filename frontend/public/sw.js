@@ -3,7 +3,7 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v12-map-contrast-fix';
+const CACHE_NAME = 'india-in-time-v13-weather-reopt-persona-glass';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [

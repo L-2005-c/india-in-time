@@ -30,8 +30,10 @@ router.get('/', async (req, res) => {
     if (!cw) return res.status(502).json({ error: 'No weather data in response' });
 
     const temp = Math.round(cw.temperature);
+    const windKph = Math.round(cw.windspeed || 0);
     res.json({
       temp,
+      windKph,
       weathercode: cw.weathercode,
       emoji:       weatherEmoji(cw.weathercode),
       display:     `${weatherEmoji(cw.weathercode)} ${temp}°C`,
