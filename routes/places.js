@@ -31,114 +31,194 @@ function staticCityPlaces(cityName) {
   const key = String(cityName || '').trim().toLowerCase();
   const staticSeedsByCity = {
     visakhapatnam: [
-      ['Ramakrishna Beach','beach',17.7140,83.3237,90,'05:30','21:00'],
-      ['INS Kursura Submarine Museum','scenic',17.7177,83.3300,60,'10:00','20:00'],
-      ['Kailasagiri','scenic',17.7492,83.3424,75,'06:00','20:00'],
-      ['Rushikonda Beach','beach',17.7828,83.3853,90,'05:30','21:00'],
-      ['Tenneti Park','scenic',17.7438,83.3493,45,'06:00','20:00'],
-      ['Simhachalam Temple','temple',17.7668,83.2500,75,'06:00','20:30'],
+      ['Ramakrishna Beach','beach',17.7142,83.3237,90,'05:30','21:00'],
+      ['INS Kursura Submarine Museum','scenic',17.7172,83.3301,60,'10:00','20:00'],
+      ['Kailasagiri','scenic',17.7492,83.3418,75,'06:00','20:00'],
+      ['Rushikonda Beach','beach',17.7825,83.3851,90,'05:30','21:00'],
+      ['Tenneti Park','scenic',17.7484,83.3495,45,'06:00','20:00'],
+      ['Simhachalam Temple','temple',17.7666,83.2501,75,'06:00','20:30'],
       ['Yarada Beach','beach',17.6549,83.2691,90,'06:00','19:00'],
-      ['Venkatadri Vantillu','food',17.7234,83.3075,45,'11:00','23:00'],
-      ['TU 142 Aircraft Museum','scenic',17.7165,83.3291,50,'10:00','20:00'],
-      ['Matsyadarshini Aquarium','scenic',17.7148,83.3248,45,'09:00','20:30'],
-      ['VUDA Park','scenic',17.7216,83.3365,45,'08:30','20:30'],
-      ['Ross Hill Church','temple',17.6885,83.2960,45,'06:00','19:00'],
-      ['Dolphins Nose Lighthouse','scenic',17.6868,83.2892,60,'10:00','17:00'],
-      ['Bheemili Beach','beach',17.8907,83.4523,90,'06:00','20:00'],
-      ['Thotlakonda Buddhist Complex','scenic',17.8286,83.4081,60,'09:00','18:00'],
-      ['Bavikonda Buddhist Complex','scenic',17.8200,83.3615,60,'09:00','18:00'],
-      ['Bojjana Konda','scenic',17.6862,82.9998,75,'09:00','18:00'],
-      ['Indira Gandhi Zoological Park','scenic',17.7678,83.3465,120,'09:00','17:00'],
-      ['Kambalakonda Wildlife Sanctuary','scenic',17.8076,83.3068,90,'09:00','17:30'],
-      ['Appikonda Beach','beach',17.5800,83.1806,75,'06:00','19:00'],
-      ['Gangavaram Beach','beach',17.6262,83.2339,75,'06:00','19:00'],
-      ['Victory at Sea War Memorial','scenic',17.7160,83.3275,35,'06:00','21:00'],
-      ['Sri Kanaka Mahalakshmi Temple','temple',17.7040,83.3002,45,'05:00','21:00'],
-      ['ISKCON Temple Visakhapatnam','temple',17.7795,83.3850,50,'07:30','20:30'],
-      ['VMRDA City Central Park','scenic',17.7171,83.3039,45,'05:00','21:00'],
-      ['Sagar Nagar Beach','beach',17.7638,83.3664,60,'06:00','20:00'],
-      ['Mangamaripeta Beach','beach',17.8269,83.4022,75,'06:00','19:30'],
-      ['Lawsons Bay Beach','beach',17.7362,83.3506,60,'06:00','20:00'],
-      ['Daspalla Restaurant','food',17.7195,83.3069,45,'11:00','23:00'],
+      ['Venkatadri Vantillu','food',17.7251,83.3205,45,'11:00','23:00'],
+      ['TU 142 Aircraft Museum','scenic',17.718,83.3299,50,'10:00','20:00'],
+      ['Matsyadarshini Aquarium','scenic',17.7127,83.3199,45,'09:00','20:30'],
+      ['VUDA Park','scenic',17.7241,83.3395,45,'08:30','20:30'],
+      ['Ross Hill Church','temple',17.6904,83.2871,45,'06:00','19:00'],
+      ['Dolphins Nose Lighthouse','scenic',17.6765,83.2926,60,'10:00','17:00'],
+      ['Bheemili Beach','beach',17.8903,83.4559,90,'06:00','20:00'],
+      ['Thotlakonda Buddhist Complex','scenic',17.8285,83.4092,60,'09:00','18:00'],
+      ['Bavikonda Buddhist Complex','scenic',17.8177,83.3910,60,'09:00','18:00'],
+      ['Bojjana Konda','scenic',17.7103,83.016,75,'09:00','18:00'],
+      ['Indira Gandhi Zoological Park','scenic',17.7657,83.3488,120,'09:00','17:00'],
+      ['Kambalakonda Wildlife Sanctuary','scenic',17.7784,83.3349,90,'09:00','17:30'],
+      ['Appikonda Beach','beach',17.5681,83.1714,75,'06:00','19:00'],
+      ['Gangavaram Beach','beach',17.6192,83.2329,75,'06:00','19:00'],
+      ['Victory at Sea War Memorial','scenic',17.7187,83.3322,35,'06:00','21:00'],
+      ['Sri Kanaka Mahalakshmi Temple','temple',17.6998,83.2971,45,'05:00','21:00'],
+      ['ISKCON Temple Visakhapatnam','temple',17.7678,83.3667,50,'07:30','20:30'],
+      ['VMRDA City Central Park','scenic',17.7218,83.3055,45,'05:00','21:00'],
+      ['Sagar Nagar Beach','beach',17.7618,83.3604,60,'06:00','20:00'],
+      ['Mangamaripeta Beach','beach',17.8252,83.4163,75,'06:00','19:30'],
+      ['Lawsons Bay Beach','beach',17.7338,83.3424,60,'06:00','20:00'],
+      ['Daspalla Restaurant','food',17.7106,83.3003,45,'11:00','23:00'],
       ['Ramakrishna Beach Food Court','food',17.7142,83.3224,45,'11:00','22:30'],
-      ['Sea Inn Raju Gari Dhaba','food',17.7521,83.3567,50,'11:00','23:00'],
-      ['Sai Priya Beach Restaurant','food',17.7838,83.3867,50,'11:00','23:00'],
-      ['Alpha Hotel Vizag','food',17.7268,83.3054,40,'07:00','22:30'],
+      ['Sea Inn Raju Gari Dhaba','food',17.7839,83.383,50,'11:00','23:00'],
+      ['Sai Priya Beach Restaurant','food',17.7858,83.3845,50,'11:00','23:00'],
+      ['Alpha Hotel Vizag','food',17.7122,83.3018,40,'07:00','22:30'],
     ],
     vizag: [
-      ['Ramakrishna Beach','beach',17.7140,83.3237,90,'05:30','21:00'],
-      ['INS Kursura Submarine Museum','scenic',17.7177,83.3300,60,'10:00','20:00'],
-      ['Kailasagiri','scenic',17.7492,83.3424,75,'06:00','20:00'],
-      ['Rushikonda Beach','beach',17.7828,83.3853,90,'05:30','21:00'],
-      ['Tenneti Park','scenic',17.7438,83.3493,45,'06:00','20:00'],
-      ['Simhachalam Temple','temple',17.7668,83.2500,75,'06:00','20:30'],
+      ['Ramakrishna Beach','beach',17.7142,83.3237,90,'05:30','21:00'],
+      ['INS Kursura Submarine Museum','scenic',17.7172,83.3301,60,'10:00','20:00'],
+      ['Kailasagiri','scenic',17.7492,83.3418,75,'06:00','20:00'],
+      ['Rushikonda Beach','beach',17.7825,83.3851,90,'05:30','21:00'],
+      ['Tenneti Park','scenic',17.7484,83.3495,45,'06:00','20:00'],
+      ['Simhachalam Temple','temple',17.7666,83.2501,75,'06:00','20:30'],
       ['Yarada Beach','beach',17.6549,83.2691,90,'06:00','19:00'],
-      ['Venkatadri Vantillu','food',17.7234,83.3075,45,'11:00','23:00'],
-      ['TU 142 Aircraft Museum','scenic',17.7165,83.3291,50,'10:00','20:00'],
-      ['Matsyadarshini Aquarium','scenic',17.7148,83.3248,45,'09:00','20:30'],
-      ['VUDA Park','scenic',17.7216,83.3365,45,'08:30','20:30'],
-      ['Ross Hill Church','temple',17.6885,83.2960,45,'06:00','19:00'],
-      ['Dolphins Nose Lighthouse','scenic',17.6868,83.2892,60,'10:00','17:00'],
-      ['Bheemili Beach','beach',17.8907,83.4523,90,'06:00','20:00'],
-      ['Thotlakonda Buddhist Complex','scenic',17.8286,83.4081,60,'09:00','18:00'],
-      ['Bavikonda Buddhist Complex','scenic',17.8200,83.3615,60,'09:00','18:00'],
-      ['Bojjana Konda','scenic',17.6862,82.9998,75,'09:00','18:00'],
-      ['Indira Gandhi Zoological Park','scenic',17.7678,83.3465,120,'09:00','17:00'],
-      ['Kambalakonda Wildlife Sanctuary','scenic',17.8076,83.3068,90,'09:00','17:30'],
-      ['Appikonda Beach','beach',17.5800,83.1806,75,'06:00','19:00'],
-      ['Gangavaram Beach','beach',17.6262,83.2339,75,'06:00','19:00'],
-      ['Victory at Sea War Memorial','scenic',17.7160,83.3275,35,'06:00','21:00'],
-      ['Sri Kanaka Mahalakshmi Temple','temple',17.7040,83.3002,45,'05:00','21:00'],
-      ['ISKCON Temple Visakhapatnam','temple',17.7795,83.3850,50,'07:30','20:30'],
-      ['VMRDA City Central Park','scenic',17.7245,83.3126,45,'05:00','21:00'],
-      ['Sagar Nagar Beach','beach',17.7638,83.3664,60,'06:00','20:00'],
-      ['Mangamaripeta Beach','beach',17.8269,83.4022,75,'06:00','19:30'],
-      ['Lawsons Bay Beach','beach',17.7362,83.3506,60,'06:00','20:00'],
-      ['Daspalla Restaurant','food',17.7195,83.3069,45,'11:00','23:00'],
+      ['Venkatadri Vantillu','food',17.7251,83.3205,45,'11:00','23:00'],
+      ['TU 142 Aircraft Museum','scenic',17.718,83.3299,50,'10:00','20:00'],
+      ['Matsyadarshini Aquarium','scenic',17.7127,83.3199,45,'09:00','20:30'],
+      ['VUDA Park','scenic',17.7241,83.3395,45,'08:30','20:30'],
+      ['Ross Hill Church','temple',17.6904,83.2871,45,'06:00','19:00'],
+      ['Dolphins Nose Lighthouse','scenic',17.6765,83.2926,60,'10:00','17:00'],
+      ['Bheemili Beach','beach',17.8903,83.4559,90,'06:00','20:00'],
+      ['Thotlakonda Buddhist Complex','scenic',17.8285,83.4092,60,'09:00','18:00'],
+      ['Bavikonda Buddhist Complex','scenic',17.8177,83.3910,60,'09:00','18:00'],
+      ['Bojjana Konda','scenic',17.7103,83.016,75,'09:00','18:00'],
+      ['Indira Gandhi Zoological Park','scenic',17.7657,83.3488,120,'09:00','17:00'],
+      ['Kambalakonda Wildlife Sanctuary','scenic',17.7784,83.3349,90,'09:00','17:30'],
+      ['Appikonda Beach','beach',17.5681,83.1714,75,'06:00','19:00'],
+      ['Gangavaram Beach','beach',17.6192,83.2329,75,'06:00','19:00'],
+      ['Victory at Sea War Memorial','scenic',17.7187,83.3322,35,'06:00','21:00'],
+      ['Sri Kanaka Mahalakshmi Temple','temple',17.6998,83.2971,45,'05:00','21:00'],
+      ['ISKCON Temple Visakhapatnam','temple',17.7678,83.3667,50,'07:30','20:30'],
+      ['VMRDA City Central Park','scenic',17.7218,83.3055,45,'05:00','21:00'],
+      ['Sagar Nagar Beach','beach',17.7618,83.3604,60,'06:00','20:00'],
+      ['Mangamaripeta Beach','beach',17.8252,83.4163,75,'06:00','19:30'],
+      ['Lawsons Bay Beach','beach',17.7338,83.3424,60,'06:00','20:00'],
+      ['Daspalla Restaurant','food',17.7106,83.3003,45,'11:00','23:00'],
       ['Ramakrishna Beach Food Court','food',17.7142,83.3224,45,'11:00','22:30'],
-      ['Sea Inn Raju Gari Dhaba','food',17.7521,83.3567,50,'11:00','23:00'],
-      ['Sai Priya Beach Restaurant','food',17.7838,83.3867,50,'11:00','23:00'],
-      ['Alpha Hotel Vizag','food',17.7268,83.3054,40,'07:00','22:30'],
+      ['Sea Inn Raju Gari Dhaba','food',17.7839,83.383,50,'11:00','23:00'],
+      ['Sai Priya Beach Restaurant','food',17.7858,83.3845,50,'11:00','23:00'],
+      ['Alpha Hotel Vizag','food',17.7122,83.3018,40,'07:00','22:30'],
     ],
     hyderabad: [
-      ['Charminar','scenic',17.3616,78.4747,60,'09:00','17:30'],
-      ['Golconda Fort','scenic',17.3833,78.4011,90,'09:00','17:30'],
-      ['Salar Jung Museum','scenic',17.3713,78.4804,90,'10:00','17:00'],
-      ['Birla Mandir','temple',17.4062,78.4691,60,'07:00','21:00'],
-      ['Chowmahalla Palace','scenic',17.3578,78.4717,75,'10:00','17:00'],
-      ['Paradise Biryani','food',17.4416,78.4870,45,'11:00','23:00'],
+    ['Charminar','scenic',17.3616,78.4747,60,'09:00','17:30'],
+    ['Golconda Fort','scenic',17.3833,78.4011,90,'09:00','17:30'],
+    ['Salar Jung Museum','scenic',17.3713,78.4804,90,'10:00','17:00'],
+    ['Hussain Sagar Lake','scenic',17.4239,78.4738,60,'06:00','21:00'],
+    ['Birla Mandir','temple',17.4062,78.4691,60,'07:00','21:00'],
+    ['Chowmahalla Palace','scenic',17.3578,78.4717,75,'10:00','17:00'],
+    ['Paradise Biryani','food',17.4416,78.4870,45,'11:00','23:00'],
+    ['Cafe Niloufer','food',17.3991,78.4624,40,'07:00','23:00'],
     ],
     goa: [
-      ['Baga Beach','beach',15.5553,73.7517,90,'06:00','22:00'],
-      ['Calangute Beach','beach',15.5439,73.7553,90,'06:00','22:00'],
-      ['Fort Aguada','scenic',15.4922,73.7730,75,'09:30','18:00'],
-      ['Basilica of Bom Jesus','temple',15.5009,73.9116,60,'09:00','18:30'],
-      ['Miramar Beach','beach',15.4744,73.8076,60,'06:00','21:00'],
-      ['Ritz Classic Panaji','food',15.4989,73.8278,45,'11:00','23:00'],
+    ['Baga Beach','beach',15.5553,73.7517,90,'06:00','22:00'],
+    ['Calangute Beach','beach',15.5494,73.7535,90,'06:00','22:00'],
+    ['Fort Aguada','scenic',15.4922,73.7730,75,'09:30','18:00'],
+    ['Basilica of Bom Jesus','temple',15.5009,73.9116,60,'09:00','18:30'],
+    ['Dona Paula View Point','scenic',15.4527,73.8036,45,'06:00','20:00'],
+    ['Miramar Beach','beach',15.4827,73.8074,60,'06:00','21:00'],
+    ['Thalassa','food',15.6164,73.7555,60,'12:00','23:30'],
+    ['Ritz Classic Panaji','food',15.4989,73.8278,45,'11:00','23:00'],
     ],
     jaipur: [
-      ['Amber Fort','scenic',26.9855,75.8513,90,'08:00','18:00'],
-      ['Hawa Mahal','scenic',26.9239,75.8267,45,'09:00','16:30'],
-      ['City Palace Jaipur','scenic',26.9258,75.8237,75,'09:30','17:00'],
-      ['Jantar Mantar Jaipur','scenic',26.9248,75.8246,60,'09:00','16:30'],
-      ['Birla Mandir Jaipur','temple',26.8923,75.8155,45,'06:00','21:00'],
-      ['Rawat Mishthan Bhandar','food',26.9207,75.8007,45,'08:00','22:30'],
+    ['Amber Fort','scenic',26.9855,75.8513,90,'08:00','18:00'],
+    ['Hawa Mahal','scenic',26.9239,75.8267,45,'09:00','16:30'],
+    ['City Palace Jaipur','scenic',26.9258,75.8237,75,'09:30','17:00'],
+    ['Jantar Mantar Jaipur','scenic',26.9248,75.8246,60,'09:00','16:30'],
+    ['Nahargarh Fort','scenic',26.9402,75.8170,75,'10:00','18:00'],
+    ['Birla Mandir Jaipur','temple',26.8923,75.8155,45,'06:00','21:00'],
+    ['Lassiwala','food',26.9166,75.8102,35,'08:00','16:00'],
+    ['Rawat Mishthan Bhandar','food',26.9213,75.7967,45,'08:00','22:30'],
     ],
-    'new delhi': [
-      ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
-      ['Red Fort','scenic',28.6562,77.2410,90,'09:30','16:30'],
-      ['Qutub Minar','scenic',28.5245,77.1855,75,'07:00','17:00'],
-      ['Humayun Tomb','scenic',28.5933,77.2507,75,'06:00','18:00'],
-      ['Lotus Temple','temple',28.5535,77.2588,60,'09:00','17:30'],
-      ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
+    udaipur: [
+    ['City Palace Udaipur','scenic',24.5764,73.6835,90,'09:30','17:30'],
+    ['Lake Pichola','scenic',24.5720,73.6790,75,'06:00','20:00'],
+    ['Jag Mandir','scenic',24.5675,73.6775,75,'10:00','18:00'],
+    ['Saheliyon Ki Bari','scenic',24.6032,73.6868,45,'09:00','19:00'],
+    ['Fateh Sagar Lake','scenic',24.6015,73.6748,60,'06:00','20:00'],
+    ['Jagdish Temple','temple',24.5799,73.6823,45,'05:00','22:00'],
+    ['Ambrai Restaurant','food',24.5781,73.6814,60,'11:00','23:00'],
+    ['Natraj Dining Hall','food',24.5724,73.6997,45,'11:00','22:30'],
     ],
     delhi: [
-      ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
-      ['Red Fort','scenic',28.6562,77.2410,90,'09:30','16:30'],
-      ['Qutub Minar','scenic',28.5245,77.1855,75,'07:00','17:00'],
-      ['Humayun Tomb','scenic',28.5933,77.2507,75,'06:00','18:00'],
-      ['Lotus Temple','temple',28.5535,77.2588,60,'09:00','17:30'],
-      ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
+    ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
+    ['Red Fort','scenic',28.6562,77.2410,90,'09:30','16:30'],
+    ['Qutub Minar','scenic',28.5245,77.1855,75,'07:00','17:00'],
+    ['Humayun Tomb','scenic',28.5933,77.2507,75,'06:00','18:00'],
+    ['Lotus Temple','temple',28.5535,77.2588,60,'09:00','17:30'],
+    ['Akshardham Temple','temple',28.6127,77.2773,90,'10:00','20:00'],
+    ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
+    ['Paranthe Wali Gali','food',28.6560,77.2307,45,'09:00','22:00'],
+    ],
+    'new delhi': [
+    ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
+    ['Red Fort','scenic',28.6562,77.2410,90,'09:30','16:30'],
+    ['Qutub Minar','scenic',28.5245,77.1855,75,'07:00','17:00'],
+    ['Humayun Tomb','scenic',28.5933,77.2507,75,'06:00','18:00'],
+    ['Lotus Temple','temple',28.5535,77.2588,60,'09:00','17:30'],
+    ['Akshardham Temple','temple',28.6127,77.2773,90,'10:00','20:00'],
+    ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
+    ['Paranthe Wali Gali','food',28.6560,77.2307,45,'09:00','22:00'],
+    ],
+    mumbai: [
+    ['Gateway of India','scenic',18.9220,72.8347,45,'06:00','22:00'],
+    ['Marine Drive','scenic',18.9430,72.8238,60,'06:00','23:00'],
+    ['Chhatrapati Shivaji Maharaj Vastu Sangrahalaya','scenic',18.9269,72.8326,75,'10:15','18:00'],
+    ['Siddhivinayak Temple','temple',19.0169,72.8305,60,'05:30','21:50'],
+    ['Haji Ali Dargah','temple',18.9827,72.8089,60,'05:30','22:00'],
+    ['Juhu Beach','beach',19.0988,72.8267,75,'06:00','22:00'],
+    ['Leopold Cafe','food',18.9220,72.8317,45,'07:30','23:30'],
+    ['Bademiya','food',18.9217,72.8324,45,'12:00','23:30'],
+    ],
+    bengaluru: [
+    ['Bangalore Palace','scenic',13.0035,77.5891,75,'10:00','17:30'],
+    ['Lalbagh Botanical Garden','scenic',12.9507,77.5848,75,'06:00','19:00'],
+    ['Cubbon Park','scenic',12.9763,77.5929,60,'06:00','18:00'],
+    ['ISKCON Temple Bangalore','temple',13.0098,77.5511,60,'07:15','20:30'],
+    ['Tipu Sultan Summer Palace','scenic',12.9596,77.5736,60,'08:30','17:30'],
+    ['Ulsoor Lake','scenic',12.9824,77.6199,45,'06:00','20:00'],
+    ['Vidyarthi Bhavan','food',12.9450,77.5714,40,'06:30','20:00'],
+    ['MTR Lalbagh','food',12.9551,77.5856,45,'06:30','21:30'],
+    ],
+    kochi: [
+    ['Fort Kochi Beach','beach',9.9637,76.2375,75,'06:00','21:00'],
+    ['Chinese Fishing Nets','scenic',9.9667,76.2420,45,'06:00','18:30'],
+    ['Mattancherry Palace','scenic',9.9576,76.2592,60,'10:00','17:00'],
+    ['Paradesi Synagogue','temple',9.9570,76.2596,45,'10:00','18:00'],
+    ['St Francis Church','temple',9.9653,76.2417,45,'09:00','17:00'],
+    ['Marine Drive Kochi','scenic',9.9772,76.2773,60,'06:00','22:00'],
+    ['Kashi Art Cafe','food',9.9650,76.2425,45,'08:30','22:00'],
+    ['Kayees Rahmathulla Cafe','food',9.9627,76.2547,45,'11:00','22:00'],
+    ],
+    agra: [
+    ['Taj Mahal','scenic',27.1751,78.0421,120,'06:00','18:30'],
+    ['Agra Fort','scenic',27.1795,78.0211,90,'06:00','18:00'],
+    ['Mehtab Bagh','scenic',27.1797,78.0419,60,'06:00','18:00'],
+    ['Itmad-ud-Daulah','scenic',27.1929,78.0310,60,'06:00','18:00'],
+    ['Akbar Tomb Sikandra','scenic',27.2207,77.9506,75,'06:00','18:00'],
+    ['Jama Masjid Agra','temple',27.1837,78.0179,45,'06:00','20:00'],
+    ['Pinch of Spice','food',27.1596,78.0432,45,'11:00','23:00'],
+    ['Deviram Sweets','food',27.1667,78.0087,35,'08:00','22:00'],
+    ],
+    varanasi: [
+    ['Dashashwamedh Ghat','scenic',25.3062,83.0107,75,'05:00','22:00'],
+    ['Kashi Vishwanath Temple','temple',25.3109,83.0107,75,'04:00','23:00'],
+    ['Assi Ghat','scenic',25.2887,83.0061,60,'05:00','22:00'],
+    ['Sarnath','scenic',25.3716,83.0252,90,'09:00','17:00'],
+    ['Ramnagar Fort','scenic',25.2694,83.0292,75,'10:00','17:00'],
+    ['Manikarnika Ghat','scenic',25.3102,83.0140,45,'05:00','22:00'],
+    ['Kashi Chaat Bhandar','food',25.3094,83.0061,40,'16:00','22:30'],
+    ['Blue Lassi','food',25.3095,83.0088,35,'08:00','22:00'],
+    ],
+    kolkata: [
+    ['Victoria Memorial','scenic',22.5448,88.3426,90,'10:00','17:00'],
+    ['Howrah Bridge','scenic',22.5851,88.3468,45,'06:00','22:00'],
+    ['Indian Museum','scenic',22.5580,88.3507,75,'10:00','17:00'],
+    ['Dakshineswar Kali Temple','temple',22.6550,88.3570,75,'06:00','21:00'],
+    ['Kalighat Kali Temple','temple',22.5204,88.3425,60,'05:00','22:30'],
+    ['Prinsep Ghat','scenic',22.5552,88.3317,60,'06:00','21:00'],
+    ['Peter Cat','food',22.5524,88.3526,45,'11:00','23:00'],
+    ['Arsalan Park Circus','food',22.5415,88.3657,45,'11:00','23:30'],
     ],
   };
   const seeds = staticSeedsByCity[key] || [];
@@ -615,7 +695,6 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
         // Block pure numeric names and single-word generic fillers
         if (/^\d+$/.test(name)) continue;
         if (/^(india|karnataka|andhra|telangana|tamil|kerala|goa|mumbai|delhi|kolkata)$/i.test(name)) continue;
-        if (name.toLowerCase() === cityName.toLowerCase()) continue;
 
         const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
         if (seen.has(key)) continue;
@@ -848,17 +927,8 @@ router.post('/', async (req, res) => {
     addPlaces(aiRanked);
     addPlaces(staticPlaces);
     addPlaces(filterPlacesByPrefs(curatedCity, prefs));
-    
-    // Only pull from Wikipedia if we have fewer than 30 places
-    if (merged.length < 30) {
-      addPlaces(filterPlacesByPrefs(wiki, prefs).slice(0, 30 - merged.length));
-    }
-    
-    // Only pull from raw Nominatim search if we STILL have fewer than 20 places 
-    // (Nominatim raw searches return very low quality data in India like random nodes/roads)
-    if (merged.length < 20) {
-      addPlaces(filterPlacesByPrefs(nominatimRaw, prefs).slice(0, 25 - merged.length));
-    }
+    addPlaces(filterPlacesByPrefs(wiki,        prefs));
+    addPlaces(filterPlacesByPrefs(nominatimRaw, prefs));
 
     // If food-only, also add curated food seeds
     if (wantFoodOnly) {
@@ -866,13 +936,10 @@ router.post('/', async (req, res) => {
       addPlaces(curatedFood);
     }
 
-    // Hard limit the total places sent to the frontend to prevent map clutter with bad data
-    const finalPlaces = merged.slice(0, Math.min(50, Math.max(30, Math.ceil((totalMinutes || 600) / 600) * 12)));
+    console.log(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
-    console.log(`[places] Final merged pool: ${finalPlaces.length} places (prefs: ${prefs.join(',') || 'all'})`);
-
-    if (finalPlaces.length >= 3) {
-      const payload = { places: finalPlaces, source: 'ranked_sources', count: finalPlaces.length };
+    if (merged.length >= 3) {
+      const payload = { places: merged, source: 'ranked_sources', count: merged.length };
       setCachedPlaces(key, payload);
       return res.json(payload);
     }
@@ -881,8 +948,8 @@ router.post('/', async (req, res) => {
     const anything = filterPlacesByPrefs(
       [...aiRanked, ...staticPlaces, ...curatedCity, ...wiki, ...nominatimRaw].filter((p, i, arr) =>
         p?.coords?.length >= 2 &&
-      arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
-      ).slice(0, 30),
+        arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
+      ),
       prefs
     );
     const payload = { places: anything, source: 'last_resort', count: anything.length };
@@ -899,7 +966,7 @@ router.post('/', async (req, res) => {
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&
           arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
-        ).slice(0, 30),
+        ),
         prefs
       );
       const payload = { places: all, source: 'error_fallback', count: all.length };

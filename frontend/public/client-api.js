@@ -50,6 +50,15 @@
     return post('/api/weather-alerts', { lat, lon, stops }, 15000);
   }
 
+  // ── GeoAI Time Intelligence Engine ──────────────────────────────────────────
+  // Deterministic "when should I visit this place for the best possible
+  // experience?" engine — open/closed, best-time badges, crowd level,
+  // sunrise/sunset, seasonal notes. Grounded in real rules, not an LLM guess.
+
+  async function timeIntelligenceStatus(places = [], weather = null, at = null) {
+    return post('/api/time-intelligence/status', { places, weather, at }, 12000);
+  }
+
   // ── AI endpoints ─────────────────────────────────────────────────────────────
 
   async function aiChat(message, city, plan = [], currentTime = null) {
@@ -223,7 +232,7 @@
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
-    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts,
+    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,
     aiTripRating, aiReplanner, aiFoodRecommend, aiVoiceChat,
