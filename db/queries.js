@@ -236,15 +236,70 @@ async function setCachedAiResponse(promptHash, responseTxt) {
   `, [promptHash, responseTxt]);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  FEEDBACK — per-place rating + overall app experience
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function submitPlaceFeedback({ userId, placeName, city, rating, accurate, comment }) {
+  const pool = getDb();
+  await pool.query(`
+    INSERT INTO place_feedback (user_id, place_name, city, rating, accurate, comment)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [userId || null, placeName, city, rating, accurate === undefined ? null : accurate, comment || null]);
+}
+
+async function getPlaceFeedbackSummary(placeName, city) {
+  const pool = getDb();
+  const { rows } = await pool.query(`
+    SELECT COUNT(*)::int AS count, ROUND(AVG(rating)::numeric, 2) AS avg_rating,
+           SUM(CASE WHEN accurate = true THEN 1 ELSE 0 END)::int AS accurate_count,
+           SUM(CASE WHEN accurate = false THEN 1 ELSE 0 END)::int AS inaccurate_count
+    FROM place_feedback WHERE place_name = $1 AND city = $2
+  `, [placeName, city]);
+  return rows[0] || { count: 0, avg_rating: null, accurate_count: 0, inaccurate_count: 0 };
+}
+
+async function getAllPlaceFeedback(limit = 200) {
+  const pool = getDb();
+  const { rows } = await pool.query(`
+    SELECT id, place_name, city, rating, accurate, comment, created_at
+    FROM place_feedback ORDER BY created_at DESC LIMIT $1
+  `, [limit]);
+  return rows;
+}
+
+async function submitAppFeedback({ userId, rating, category, message, context, userAgent }) {
+  const pool = getDb();
+  await pool.query(`
+    INSERT INTO app_feedback (user_id, rating, category, message, context, user_agent)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [userId || null, rating, category || 'general', message || null, context || null, userAgent || null]);
+}
+
+async function getAppFeedbackSummary(limit = 50) {
+  const pool = getDb();
+  const { rows: summary } = await pool.query(`
+    SELECT COUNT(*)::int AS count, ROUND(AVG(rating)::numeric, 2) AS avg_rating
+    FROM app_feedback
+  `);
+  const { rows: recent } = await pool.query(`
+    SELECT rating, category, message, context, created_at
+    FROM app_feedback ORDER BY created_at DESC LIMIT $1
+  `, [limit]);
+  return { ...(summary[0] || { count: 0, avg_rating: null }), recent };
+}
+
 module.exports = {
   // Trips
   saveTrip, getUserTrips, getTripById, getTripByShareToken, updateTripShareToken, deleteTrip,
   // Favorites
   addFavorite, getUserFavorites, removeFavorite, isFavorite,
   // Analytics
-  logApiUsage, getApiUsageSummary,
+  logApiUsage, getApiUsageSummary, flushAnalyticsBuffer,
   // Place cache
   getCachedPlaces, setCachedPlaces, deleteCachedPlaces, purgeExpiredCache,
   // AI cache
   getCachedAiResponse, setCachedAiResponse,
+  // Feedback
+  submitPlaceFeedback, getPlaceFeedbackSummary, getAllPlaceFeedback, submitAppFeedback, getAppFeedbackSummary,
 };

@@ -4,22 +4,38 @@
 (function () {
   const BASE = ''; // empty = same origin
 
+  // ── Auth helper ──────────────────────────────────────────────────────────────
+  // Fetches a fresh Firebase ID token for the signed-in user (Firebase caches
+  // and auto-refreshes this, so this is cheap to call every request). Routes
+  // that touch a specific user's data (trips, favorites) require this.
+  async function authHeader() {
+    if (!window.currentUser) return {};
+    try {
+      const token = await window.currentUser.getIdToken();
+      return { Authorization: `Bearer ${token}` };
+    } catch (_e) {
+      return {};
+    }
+  }
+
   // ── Low-level helpers ──────────────────────────────────────────────────────
 
-  async function get(path, params = {}) {
+  async function get(path, params = {}, { auth = false } = {}) {
     const url = new URL(BASE + path, window.location.href);
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined) url.searchParams.set(k, v);
     });
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+    const headers = auth ? await authHeader() : {};
+    const res = await fetch(url.toString(), { headers, signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
     return res.json();
   }
 
-  async function post(path, body = {}, timeoutMs = 20000) {
+  async function post(path, body = {}, timeoutMs = 20000, { auth = false } = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(auth ? await authHeader() : {}) };
     const res = await fetch(BASE + path, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body:    JSON.stringify(body),
       signal:  AbortSignal.timeout(timeoutMs),
     });
@@ -57,6 +73,14 @@
 
   async function timeIntelligenceStatus(places = [], weather = null, at = null) {
     return post('/api/time-intelligence/status', { places, weather, at }, 12000);
+  }
+
+  // ── Feedback ─────────────────────────────────────────────────────────────────
+  async function submitPlaceFeedback(placeName, city, rating, accurate, comment) {
+    return post('/api/feedback/place', { userId: (window.currentUser && window.currentUser.uid) || null, placeName, city, rating, accurate, comment });
+  }
+  async function submitAppFeedback(rating, category, message, context) {
+    return post('/api/feedback/app', { userId: (window.currentUser && window.currentUser.uid) || null, rating, category, message, context });
   }
 
   // ── AI endpoints ─────────────────────────────────────────────────────────────
@@ -168,21 +192,26 @@
 
   // ── Trips API (save/load/share) ─────────────────────────────────────────────
 
-  async function saveTrip(city, cityLat, cityLon, tripConfig, stops, userId) {
-    return post('/api/trips', { city, cityLat, cityLon, config: tripConfig, stops, userId });
+  // Note: these now require the user to be signed in (window.currentUser set
+  // by the Firebase onAuthStateChanged handler). The server derives the user
+  // from the verified ID token — it no longer trusts a client-supplied userId.
+  async function saveTrip(city, cityLat, cityLon, tripConfig, stops) {
+    return post('/api/trips', { city, cityLat, cityLon, config: tripConfig, stops }, 20000, { auth: true });
   }
 
-  async function listTrips(userId) {
-    return get('/api/trips', { userId });
+  async function listTrips() {
+    return get('/api/trips', {}, { auth: true });
   }
 
   async function loadTrip(tripId) {
-    return get(`/api/trips/${tripId}`);
+    return get(`/api/trips/${tripId}`, {}, { auth: true });
   }
 
-  async function deleteTrip(tripId, userId) {
-    const res = await fetch(BASE + `/api/trips/${tripId}?userId=${encodeURIComponent(userId)}`, {
+  async function deleteTrip(tripId) {
+    const headers = await authHeader();
+    const res = await fetch(BASE + `/api/trips/${tripId}`, {
       method: 'DELETE',
+      headers,
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) throw new Error(`DELETE /api/trips/${tripId} → ${res.status}`);
@@ -190,7 +219,7 @@
   }
 
   async function shareTrip(tripId) {
-    return post(`/api/trips/${tripId}/share`, {});
+    return post(`/api/trips/${tripId}/share`, {}, 20000, { auth: true });
   }
 
   async function loadSharedTrip(shareToken) {
@@ -199,19 +228,20 @@
 
   // ── Favorites API (bookmarks) ───────────────────────────────────────────────
 
-  async function addFavorite(userId, placeName, city, lat, lon, category) {
-    return post('/api/favorites', { userId, placeName, city, lat, lon, category });
+  async function addFavorite(placeName, city, lat, lon, category) {
+    return post('/api/favorites', { placeName, city, lat, lon, category }, 20000, { auth: true });
   }
 
-  async function listFavorites(userId, city) {
-    const params = { userId };
-    if (city) params.city = city;
-    return get('/api/favorites', params);
+  async function listFavorites(city) {
+    const params = city ? { city } : {};
+    return get('/api/favorites', params, { auth: true });
   }
 
-  async function removeFavorite(favoriteId, userId) {
-    const res = await fetch(BASE + `/api/favorites/${favoriteId}?userId=${encodeURIComponent(userId)}`, {
+  async function removeFavorite(favoriteId) {
+    const headers = await authHeader();
+    const res = await fetch(BASE + `/api/favorites/${favoriteId}`, {
       method: 'DELETE',
+      headers,
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) throw new Error(`DELETE /api/favorites/${favoriteId} → ${res.status}`);
@@ -233,6 +263,7 @@
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus,
+    submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,
     aiTripRating, aiReplanner, aiFoodRecommend, aiVoiceChat,

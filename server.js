@@ -9,13 +9,22 @@ require('express-async-errors');
 const cors    = require('cors');
 const path    = require('path');
 const cluster = require('cluster');
-const os      = require('os');
 
 // ── Clustering (10k User Concurrency) ────────────────────────────────────────
+// IMPORTANT: the rate limiter (middleware/rateLimiter.js) and the Gemini
+// circuit breaker (services/gemini.js) both keep their counters in plain
+// in-memory variables. Each cluster worker is a SEPARATE OS process with its
+// own memory, so forking N workers silently creates N independent rate-limit
+// buckets per IP — e.g. with 4 CPUs your "15 req/min" AI limit actually
+// allows up to ~60 req/min, split across whichever worker each request lands
+// on. Until that state moves to a shared store (Redis/Upstash or Postgres),
+// we cap workers to 1 so the limiter and circuit breaker behave correctly.
+// Set CLUSTER_WORKERS in the environment to override once you've fixed that.
+const numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10) || 1;
+
 if (cluster.isPrimary) {
-  const numCPUs = os.cpus().length;
   console.log(`\n🚀 India In-Time API v2.0 Primary (${process.pid}) is running`);
-  console.log(`   Forking ${numCPUs} workers for high concurrency...`);
+  console.log(`   Forking ${numCPUs} worker${numCPUs === 1 ? '' : 's'}...`);
   
   const { initDatabase, closeDatabase } = require('./db/init');
   
@@ -70,6 +79,7 @@ const aiRoutes           = require('./routes/ai');
 const tripsRoutes        = require('./routes/trips');
 const favoritesRoutes    = require('./routes/favorites');
 const timeIntelRoutes    = require('./routes/time-intelligence');
+const feedbackRoutes     = require('./routes/feedback');
 const { router: analyticsRoutes } = require('./routes/analytics');
 
 const app  = express();
@@ -86,6 +96,9 @@ if (config.server.trustProxy) {
 app.use(requestLogger);
 
 // 2. CORS
+if (config.isProd && config.corsOrigin === '*') {
+  console.warn('⚠️  CORS_ORIGIN is not set — allowing requests from ANY origin in production. Set CORS_ORIGIN to your real domain (e.g. https://indiaintime.com) in Render env vars.');
+}
 app.use(cors({ origin: config.corsOrigin }));
 
 // 3. Body parsing
@@ -137,6 +150,9 @@ app.use('/api/favorites', generalLimiter, favoritesRoutes);
 
 // GeoAI Time Intelligence Engine (open/closed status, crowd, badges, personalization)
 app.use('/api/time-intelligence', generalLimiter, timeIntelRoutes);
+
+// Feedback (per-place ratings + overall app experience)
+app.use('/api/feedback', generalLimiter, feedbackRoutes);
 
 // Analytics
 app.use('/api/analytics', analyticsRoutes);
@@ -234,14 +250,19 @@ initDatabase().then(() => {
     server.close(async () => {
       console.log('   ✅ HTTP server closed');
 
-      // Close database
-      await closeDatabase();
-
-      // Purge expired cache
+      // Flush any buffered analytics rows and purge expired cache entries
+      // BEFORE closing the pool — both need a live connection. (Previously
+      // purgeExpiredCache ran after closeDatabase() and silently failed
+      // every time; flushAnalyticsBuffer wasn't called at all, so up to
+      // ~2s of usage logs were lost on every deploy.)
       try {
-        const { purgeExpiredCache } = require('./db/queries');
+        const { purgeExpiredCache, flushAnalyticsBuffer } = require('./db/queries');
+        await flushAnalyticsBuffer();
         await purgeExpiredCache();
       } catch (_e) {}
+
+      // Close database
+      await closeDatabase();
 
       console.log('   ✅ Cleanup complete. Goodbye!\n');
       process.exit(0);

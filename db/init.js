@@ -83,6 +83,30 @@ async function initDatabase() {
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Per-place feedback (rating on a specific stop after visiting)
+      CREATE TABLE IF NOT EXISTS place_feedback (
+        id          SERIAL PRIMARY KEY,
+        user_id     VARCHAR(255),
+        place_name  VARCHAR(255) NOT NULL,
+        city        VARCHAR(255) NOT NULL,
+        rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        accurate    BOOLEAN,
+        comment     TEXT,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Overall app experience feedback
+      CREATE TABLE IF NOT EXISTS app_feedback (
+        id          SERIAL PRIMARY KEY,
+        user_id     VARCHAR(255),
+        rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        category    VARCHAR(50),
+        message     TEXT,
+        context     VARCHAR(50),
+        user_agent  TEXT,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Indexes for common queries
       CREATE INDEX IF NOT EXISTS idx_trips_user    ON trips(user_id);
       CREATE INDEX IF NOT EXISTS idx_trips_share   ON trips(share_token);
@@ -90,6 +114,8 @@ async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_usage_time    ON api_usage(created_at);
       CREATE INDEX IF NOT EXISTS idx_usage_ep      ON api_usage(endpoint);
       CREATE INDEX IF NOT EXISTS idx_cache_expires ON place_cache(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_place_fb_place ON place_feedback(place_name, city);
+      CREATE INDEX IF NOT EXISTS idx_app_fb_time    ON app_feedback(created_at);
     `);
     
     console.log('📦  PostgreSQL Database initialized');

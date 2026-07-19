@@ -1,20 +1,21 @@
 // routes/trips.js — Save, load, share trips API
-// POST /api/trips       — Save trip
-// GET  /api/trips       — List user's trips
-// GET  /api/trips/:id   — Load specific trip
-// DELETE /api/trips/:id — Delete trip
-// POST /api/trips/:id/share      — Generate share link
-// GET  /api/trips/shared/:token  — Load shared trip (public)
+// POST /api/trips       — Save trip                         (auth required)
+// GET  /api/trips       — List MY trips                      (auth required)
+// GET  /api/trips/:id   — Load a trip I own                  (auth required)
+// DELETE /api/trips/:id — Delete a trip I own                (auth required)
+// POST /api/trips/:id/share      — Generate share link for a trip I own (auth required)
+// GET  /api/trips/shared/:token  — Load shared trip           (public, by design)
 
 const express = require('express');
 const crypto  = require('crypto');
 const router  = express.Router();
 const { saveTrip, getUserTrips, getTripById, getTripByShareToken, updateTripShareToken, deleteTrip } = require('../db/queries');
+const { requireAuth } = require('../middleware/auth');
 
 // ── Save a trip ──────────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const { city, cityLat, cityLon, config: tripConfig, stops, userId } = req.body;
+    const { city, cityLat, cityLon, config: tripConfig, stops } = req.body;
 
     if (!city || !stops || !Array.isArray(stops) || stops.length === 0) {
       return res.status(400).json({ error: 'Missing required fields: city, stops[]' });
@@ -23,7 +24,7 @@ router.post('/', async (req, res) => {
     const id = crypto.randomUUID();
     await saveTrip({
       id,
-      userId:     userId || null,
+      userId:     req.uid, // trusted, from verified token — never from the client body
       city,
       cityLat:    cityLat || null,
       cityLon:    cityLon || null,
@@ -38,15 +39,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ── List user's trips ────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+// ── List my trips ────────────────────────────────────────────────────────────
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const userId = req.query.userId;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId query param' });
-    }
-
-    const trips = await getUserTrips(userId, 50);
+    const trips = await getUserTrips(req.uid, 50);
     const formatted = trips.map(t => ({
       id:         t.id,
       city:       t.city,
@@ -65,7 +61,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ── Load a specific trip ─────────────────────────────────────────────────────
+// ── Load a shared trip (intentionally public — this IS the sharing feature) ──
 router.get('/shared/:token', async (req, res) => {
   try {
     const trip = await getTripByShareToken(req.params.token);
@@ -81,6 +77,8 @@ router.get('/shared/:token', async (req, res) => {
       config:   JSON.parse(trip.config_json || '{}'),
       stops:    JSON.parse(trip.stops_json || '[]'),
       createdAt: trip.created_at,
+      // Note: no share_token/user_id echoed back here — a share link should
+      // only ever reveal the trip content, not other internal identifiers.
     });
   } catch (err) {
     console.error('[trips:shared]', err.message);
@@ -88,10 +86,16 @@ router.get('/shared/:token', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+// ── Load a specific trip (must be the owner) ─────────────────────────────────
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const trip = await getTripById(req.params.id);
     if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.user_id !== req.uid) {
+      // 404 instead of 403 so this endpoint can't be used to fingerprint
+      // which trip IDs exist for other users.
       return res.status(404).json({ error: 'Trip not found' });
     }
 
@@ -112,15 +116,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ── Delete a trip ────────────────────────────────────────────────────────────
-router.delete('/:id', async (req, res) => {
+// ── Delete a trip (must be the owner) ────────────────────────────────────────
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const userId = req.query.userId || req.body?.userId;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
-
-    await deleteTrip(req.params.id, userId);
+    // deleteTrip's SQL already scopes DELETE ... WHERE id = $1 AND user_id = $2,
+    // so passing the verified req.uid here means this can never touch another
+    // user's row, even if the id is guessed.
+    await deleteTrip(req.params.id, req.uid);
 
     res.json({ message: 'Trip deleted' });
   } catch (err) {
@@ -129,11 +131,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// ── Generate shareable link ──────────────────────────────────────────────────
-router.post('/:id/share', async (req, res) => {
+// ── Generate shareable link (must be the owner) ──────────────────────────────
+router.post('/:id/share', requireAuth, async (req, res) => {
   try {
     const trip = await getTripById(req.params.id);
-    if (!trip) {
+    if (!trip || trip.user_id !== req.uid) {
       return res.status(404).json({ error: 'Trip not found' });
     }
 

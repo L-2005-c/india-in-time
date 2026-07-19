@@ -1,27 +1,28 @@
 // routes/favorites.js — Bookmark / favorite places API
-// POST   /api/favorites       — Add favorite
-// GET    /api/favorites       — List favorites (optional ?city= filter)
-// DELETE /api/favorites/:id   — Remove favorite
+// POST   /api/favorites       — Add favorite            (auth required)
+// GET    /api/favorites       — List MY favorites (optional ?city= filter)  (auth required)
+// DELETE /api/favorites/:id   — Remove a favorite I own  (auth required)
 
 const express = require('express');
 const router  = express.Router();
 const { addFavorite, getUserFavorites, removeFavorite, isFavorite } = require('../db/queries');
+const { requireAuth } = require('../middleware/auth');
 
 // ── Add favorite ─────────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const { userId, placeName, city, lat, lon, category, notes } = req.body;
+    const { placeName, city, lat, lon, category, notes } = req.body;
 
-    if (!userId || !placeName || !city) {
-      return res.status(400).json({ error: 'Missing required fields: userId, placeName, city' });
+    if (!placeName || !city) {
+      return res.status(400).json({ error: 'Missing required fields: placeName, city' });
     }
 
     // Check if already favorited
-    if (await isFavorite(userId, placeName, city)) {
+    if (await isFavorite(req.uid, placeName, city)) {
       return res.status(409).json({ error: 'Already in favorites', alreadyFavorited: true });
     }
 
-    await addFavorite({ userId, placeName, city, lat, lon, category, notes });
+    await addFavorite({ userId: req.uid, placeName, city, lat, lon, category, notes });
     res.status(201).json({ message: 'Added to favorites', placeName, city });
   } catch (err) {
     console.error('[favorites:add]', err.message);
@@ -29,16 +30,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ── List favorites ───────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+// ── List my favorites ────────────────────────────────────────────────────────
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const userId = req.query.userId;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId query param' });
-    }
-
     const city = req.query.city || null;
-    const favorites = await getUserFavorites(userId, city);
+    const favorites = await getUserFavorites(req.uid, city);
 
     res.json({ favorites, count: favorites.length });
   } catch (err) {
@@ -47,15 +43,13 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ── Remove favorite ──────────────────────────────────────────────────────────
-router.delete('/:id', async (req, res) => {
+// ── Remove favorite (must be the owner) ──────────────────────────────────────
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const userId = req.query.userId || req.body?.userId;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId' });
-    }
-
-    await removeFavorite(parseInt(req.params.id, 10), userId);
+    // removeFavorite's SQL scopes DELETE ... WHERE id = $1 AND user_id = $2,
+    // so this can never remove another user's favorite even if the numeric
+    // id is guessed.
+    await removeFavorite(parseInt(req.params.id, 10), req.uid);
 
     res.json({ message: 'Removed from favorites' });
   } catch (err) {

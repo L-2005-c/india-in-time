@@ -6,6 +6,7 @@ const router  = express.Router();
 const { getApiUsageSummary } = require('../db/queries');
 const { placesCache, geminiCache, weatherCache, geocodeCache } = require('../services/cache');
 const geminiService = require('../services/gemini');
+const { requireAdminKey } = require('../middleware/adminAuth');
 
 // ── Analytics middleware — log all API requests ──────────────────────────────
 function analyticsMiddleware(req, res, next) {
@@ -37,7 +38,9 @@ function analyticsMiddleware(req, res, next) {
 }
 
 // ── Summary endpoint ─────────────────────────────────────────────────────────
-router.get('/summary', async (req, res) => {
+// Was previously public — exposed server memory, node version, Gemini
+// success rate and cache internals to anyone. Now gated like /api/feedback.
+router.get('/summary', requireAdminKey, async (req, res) => {
   try {
     const hours = parseInt(req.query.hours, 10) || 24;
     const usage = await getApiUsageSummary(Math.min(hours, 168)); // max 7 days

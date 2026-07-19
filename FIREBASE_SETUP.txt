@@ -66,3 +66,30 @@ STEP 6 — Add your domain to Firebase Auth
    (it may already be there — if so, you're good!)
 
 DONE! Restart your server and the login screen will appear.
+
+
+STEP 7 — Backend auth (REQUIRED for Trips / Favorites to work)
+------------------------------------------------------------------
+Everything above sets up the FRONTEND login screen. The backend also needs
+to be able to check "is this really the person they claim to be?" before it
+lets someone read, save, or delete trips/favorites. Without this step,
+those endpoints will respond with 503 "AUTH_NOT_CONFIGURED".
+
+1. Firebase Console → the gear icon ⚙️ → Project settings
+2. Click the "Service accounts" tab
+3. Click "Generate new private key" → confirm → a .json file downloads
+   ⚠️ This file can fully impersonate your Firebase project. Never commit
+   it to git, never put it in frontend/public, never share it.
+4. Open the downloaded .json file in a text editor, select ALL of it, copy it
+5. On Render: your service → "Environment" tab → "Add Environment Variable"
+     Key:   FIREBASE_SERVICE_ACCOUNT
+     Value: paste the entire JSON contents
+6. Also set (in the same Environment tab, if not already there):
+     ADMIN_FEEDBACK_KEY = <make up a long random string — this protects the
+                            /admin-feedback.html dashboard and /api/analytics>
+     CORS_ORIGIN        = https://your-app-name.onrender.com  (your real URL —
+                            leaving this unset allows requests from any site)
+7. Save → Render will redeploy automatically. Check the deploy logs for:
+     🔐  Firebase Admin initialized — auth verification is active
+   If instead you see "FIREBASE_SERVICE_ACCOUNT env var is not set", the
+   variable wasn't saved correctly — re-check step 5.

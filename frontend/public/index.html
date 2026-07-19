@@ -213,6 +213,7 @@ body::before {
 }
 .gps-dot{width:5px;height:5px;border-radius:50%;background:var(--teal);animation:blink 1.5s ease infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
+@keyframes gempulse{0%,100%{box-shadow:0 0 10px rgba(168,85,247,.7);}50%{box-shadow:0 0 20px rgba(168,85,247,1),0 0 6px rgba(255,255,255,.6);}}
 .user-avatar{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--gold-border);object-fit:cover;cursor:pointer;flex-shrink:0;box-shadow:0 0 12px var(--gold-glow);}
 
 /* ═══════════════════════════════════════════
@@ -1431,11 +1432,13 @@ body::before {
   box-shadow:var(--shadow-card);white-space:nowrap;
 }
 #notif-toast{
-  position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:9997;
+  position:fixed;top:72px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:9997;
   background:var(--bg-card);border:1px solid var(--border-strong);
   border-radius:18px;padding:13px 16px;box-shadow:var(--shadow-card);
-  display:none;min-width:270px;max-width:330px;
+  display:none;min-width:270px;max-width:330px;opacity:0;
+  transition:transform .28s cubic-bezier(.34,1.56,.64,1),opacity .22s ease;
 }
+#notif-toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 .notif-inner{display:flex;align-items:flex-start;gap:10px;}
 .notif-icon{font-size:24px;flex-shrink:0;}
 .notif-body{flex:1;}
@@ -2092,7 +2095,7 @@ body::after{
         <div class="nav-dest" id="nav-next">Select a city to begin</div>
         <div class="nav-instruction-box">
           <span class="nav-turn-icon" id="nav-turn-icon">⤴️</span>
-          <span class="nav-turn-txt" id="nav-turn">Head to the Plan tab to build your trip.</span>
+          <span class="nav-turn-txt" id="nav-turn">Pick a city, then ask "when's the best time to visit..." — or tap 💎 Hidden Gems.</span>
         </div>
         <div class="nav-stop-legend">
           <div class="nav-legend-chip"><span class="nav-legend-dot nav-legend-next"></span><span>Next Stop</span></div>
@@ -2111,9 +2114,9 @@ body::after{
         <section class="plan-hero">
           <div class="hero-grid">
             <div class="hero-content">
-              <div class="hero-kicker">Smart travel planning</div>
-              <h1 class="hero-title">Turn city chaos into a <em>beautifully planned</em> journey.</h1>
-              <p class="hero-copy">India In-Time combines AI itinerary generation, live navigation, and local travel intelligence into one polished travel companion that feels simple, smart, and ready for everyday use.</p>
+              <div class="hero-kicker">🧠 GeoAI Time Intelligence Engine</div>
+              <h1 class="hero-title">Know <em>exactly when</em> to visit — before you go.</h1>
+              <p class="hero-copy">The question every trip should start with: <strong>"When should I visit this place for the best possible experience?"</strong> India In-Time answers it with live crowd, weather, sunrise/sunset and seasonal data — then builds the itinerary around the answer.</p>
               <div class="hero-actions">
                 <button class="hero-btn hero-btn-primary" onclick="document.getElementById('city-select').focus()">Build a standout plan</button>
                 <button class="hero-btn hero-btn-secondary" onclick="switchToView('map-view',0)">Preview live map</button>
@@ -3322,6 +3325,38 @@ function getLocalPlaces(cityId, cityName){
   });
 }
 
+// Catch the SAME physical place listed under different name variants
+// (e.g. "Sri Kanaka Mahalakshmi Temple" vs "...Ammavari Temple", or
+// "Fort Kochi Beach" vs "Fort Kochi Beach Park"). If two places sit within
+// ~180m of each other AND share a significant name word, they're almost
+// certainly the same spot — keep only the stronger one (by importanceScore).
+const DEDUPE_STOPWORDS = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
+function significantWords(n){
+  return String(n||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>=4 && !DEDUPE_STOPWORDS.has(w));
+}
+function dedupePlacesByProximity(list){
+  const all = [...list].sort((a,b)=>(b.importanceScore||0)-(a.importanceScore||0));
+  const kept = [];
+  for(const place of all){
+    if (!place?.coords?.length) continue;
+    const words = significantWords(place.name);
+    const dup = kept.find(k => {
+      if (!k.coords?.length) return false;
+      const d = hvKm(k.coords[0],k.coords[1],place.coords[0],place.coords[1]);
+      if (d > 0.18) return false;
+      const kWords = significantWords(k.name);
+      return words.some(w => kWords.includes(w));
+    });
+    if (dup) {
+      dup.importanceScore = Math.max(dup.importanceScore||0, place.importanceScore||0);
+      dup.isHiddenGem = dup.isHiddenGem || place.isHiddenGem;
+      continue;
+    }
+    kept.push(place);
+  }
+  return kept;
+}
+
 function mergePlacePools(...pools){
   const byName=new Map();
   for(const place of pools.flat()){
@@ -3342,7 +3377,7 @@ function mergePlacePools(...pools){
       importance:(existing.importanceScore||0)>=(place.importanceScore||0)?existing.importance:place.importance,
     });
   }
-  return [...byName.values()];
+  return dedupePlacesByProximity([...byName.values()]);
 }
 
 function sortNearestNeighbor(arr,sLat,sLon){
@@ -4103,6 +4138,7 @@ function toggleTheme(){isDark=!isDark;applyTheme();}
 onAuthStateChanged(auth,async user=>{
   if(user){
     currentUser=user;
+    window.currentUser=user; // client-api.js reads this to attach auth headers — was missing before, so it was always undefined
     document.getElementById('login-screen').style.display='none';
     const av=document.getElementById('user-avatar');
     if(user.photoURL){av.src=user.photoURL;av.style.display='block';}
@@ -4114,6 +4150,7 @@ onAuthStateChanged(auth,async user=>{
     addMsg(`👋 Welcome, <strong>${firstName}</strong>! Your data is synced ☁️ — pick a city and tap Generate to start!`);
   } else {
     currentUser=null;
+    window.currentUser=null;
     document.getElementById('login-screen').style.display='flex';
     document.getElementById('user-avatar').style.display='none';
   }
@@ -4215,7 +4252,14 @@ async function fetchWeatherUI(lat,lon){
     document.getElementById('wx-display').textContent=d.display;
     updatePlannerShowcase();
     detectWeatherChangeAndReoptimize({ temp: realTemp, main: realWeatherMain, wind: window.realWind });
-  }catch(e){}
+  }catch(e){
+    const el=document.getElementById('wx-display');
+    if(el && (!el.textContent || el.textContent.includes('--'))) el.textContent='⚠️ Weather unavailable';
+    if(!window._weatherFailToastShown){
+      window._weatherFailToastShown=true;
+      showToast('⚠️','Weather offline','Couldn\'t reach the weather service — everything else still works fine.',4000);
+    }
+  }
 }
 
 // Poll weather every 10 minutes while a plan is active so conditions that
@@ -4337,13 +4381,16 @@ function switchCity(cityId, silent=false){
   document.getElementById('city-input').value=city.name;
   LOCS=getLocalPlaces(cityId, city.name);
   document.getElementById('hdr-city').textContent=currentCityName;
-  if(map){map.setView([city.lat,city.lon],12);setTimeout(()=>map.invalidateSize(),100);}
+  if(map){map.flyTo([city.lat,city.lon],12,{duration:1.1}); setTimeout(()=>map.invalidateSize(),100);}
   fetchWeatherUI(city.lat,city.lon);
   resetPlanUI();
   updatePlannerShowcase();
   if(!silent){
     switchToView('plan-view',1);
-    if(LOCS.length) addMsg(`✅ Loaded <strong>${LOCS.length} ready-to-plan places</strong> for ${city.name}. You can generate now while I refresh more options in the background.`);
+    if(LOCS.length){
+      addMsg(`✅ Loaded <strong>${LOCS.length} ready-to-plan places</strong> for ${city.name}. You can generate now while I refresh more options in the background.`);
+      showToast(city.emoji||'📍',`${city.name} loaded`,`${LOCS.length} places ready — build your plan whenever you like.`,3500);
+    }
     // Fetch richer places dynamically in the background.
     loadCityPlaces(city.lat, city.lon, city.name);
   }
@@ -4368,7 +4415,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
 
   if(!force && placeLoadPromises.has(cacheKey)){
     const pending = await placeLoadPromises.get(cacheKey);
-    LOCS = (pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') }));
+    LOCS = dedupePlacesByProximity((pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
     return pending;
   }
 
@@ -4403,7 +4450,10 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   } catch(e) {
     placeLoadPromises.delete(cacheKey);
     console.error('loadCityPlaces error:', e);
-    if(!silent) addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`);
+    if(!silent){
+      addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`);
+      showToast('⚠️','Couldn\'t refresh places',`Showing what we have for ${cityName} — will retry automatically.`,4500);
+    }
     throw e;
   }
 }
@@ -4419,7 +4469,7 @@ async function ensureCityPlaces(city, minCount=1){
   if(placeLoadPromises.has(cacheKey)){
     try{
       const pending = await placeLoadPromises.get(cacheKey);
-      LOCS = (pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') }));
+      LOCS = dedupePlacesByProximity((pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
     }catch(_e){}
   }
   if(LOCS.length>=minCount) return true;
@@ -4455,7 +4505,7 @@ async function searchCity(q){
     const typing2=addTypingIndicator();
     const tTime=parseInt(document.getElementById('t-time')?.value)||600;
     const result=await API.fetchPlaces(lat,lon,currentCityName,tTime);
-    LOCS=(result.places||[]).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
+    LOCS=dedupePlacesByProximity((result.places||[]).map(p => ({ ...p, coords: normalizeLatLon(p.coords) })));
     typing2.remove();
     if(LOCS.length>=3){
       updatePlannerShowcase();
@@ -4742,6 +4792,11 @@ async function bestTimeToVisit(query){
 async function handleChat(){
   const inp=document.getElementById('chat-in');const val=inp.value.trim();if(!val)return;
   addMsg(val,false);inp.value='';const lq=val.toLowerCase();const typing=addTypingIndicator();
+  if(window._pendingAppFeedback?.awaitingMessage){
+    typing.remove();
+    await finishAppFeedback(val);
+    return;
+  }
   if(lq.match(/\b(best|good|right|ideal|perfect)\s+time\b|\bwhen\s+(should|to|can|is)\b.*\b(visit|go|see|explore)\b|\bwhen('s| is)?\s+the\s+best\b/)){
     const rep=await bestTimeToVisit(val);
     typing.remove();
@@ -4816,7 +4871,7 @@ async function generateTripPDF(){
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-function showToast(icon,title,msg,duration=5000){document.getElementById('notif-icon').textContent=icon;document.getElementById('notif-title').textContent=title;document.getElementById('notif-msg').innerHTML=msg;const t=document.getElementById('notif-toast');t.style.display='block';setTimeout(()=>t.style.display='none',duration);}
+function showToast(icon,title,msg,duration=5000){document.getElementById('notif-icon').textContent=icon;document.getElementById('notif-title').textContent=title;document.getElementById('notif-msg').innerHTML=msg;const t=document.getElementById('notif-toast');t.style.display='block';requestAnimationFrame(()=>t.classList.add('show'));clearTimeout(window._toastHideTid);window._toastHideTid=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.style.display='none',280);},duration);}
 async function setupNotifications(){
   if(!itin.length){addMsg('Generate a plan first!');return;}
   let permGranted=false;if('Notification' in window){const p=await Notification.requestPermission();permGranted=p==='granted';}
@@ -4985,7 +5040,7 @@ function renderMapMarkers() {
     if (l.isHiddenGem) {
       const ic = L.divIcon({
         className:'iit-marker',
-        html:`<div style="position:relative;width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#a855f7,#6d28d9);border-radius:50% 50% 50% 0;transform:rotate(45deg);border:2px solid #fff;box-shadow:0 0 12px rgba(168,85,247,.8);"><span style="transform:rotate(-45deg);font-size:12px;">💎</span></div>`,
+        html:`<div style="position:relative;width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#a855f7,#6d28d9);border-radius:50% 50% 50% 0;transform:rotate(45deg);border:2px solid #fff;animation:gempulse 1.8s ease-in-out infinite;"><span style="transform:rotate(-45deg);font-size:12px;">💎</span></div>`,
         iconSize:[26,26], iconAnchor:[13,20]
       });
       const gemPopup = `
@@ -5261,7 +5316,10 @@ async function chkArrival(){
       if(currentUser){try{await setDoc(doc(db,'users',currentUser.uid,'data','stamps'),{stamps:[...stamps],updatedAt:serverTimestamp()});}catch(e){}}}
     if(streetQuestActive){streetQuestScore+=25;setStreetQuestMessage(`Checkpoint reached: ${n.name}. New target loading...`);updateStreetQuestUI();}
     maybeSpeakNavInstruction(`Arrived at ${n.name}.`,true);
-    addMsg(`🎉 Arrived at <strong>${n.name}</strong>!`);const idx=itin.findIndex(stop=>stop.id===n.id);if(idx!==-1) itin.splice(idx,1);sync();renderRoute();
+    addMsg(`🎉 Arrived at <strong>${n.name}</strong>!`);
+    promptStopFeedback(n);
+    const idx=itin.findIndex(stop=>stop.id===n.id);if(idx!==-1) itin.splice(idx,1);sync();renderRoute();
+    if(!itin.length) setTimeout(()=>{ addMsg(`🏁 That's your trip complete! One last thing — got a minute to rate the overall app experience?`); showAppFeedback(); }, 1400);
   }
 }
 
@@ -5398,6 +5456,68 @@ async function handleTranslate(event) {
 // ═══════════════════════════════════════
 // NEW FEATURE 4 — AI TRIP RATING
 // ═══════════════════════════════════════
+// ═══════════════════════════════════════
+// FEEDBACK SYSTEM — per-place ratings + overall app experience
+// The actual data flywheel: real user opinions, not just AI guesses,
+// feeding back into what the app recommends.
+// ═══════════════════════════════════════
+
+function promptStopFeedback(place){
+  if(!place?.id || !place?.name) return;
+  const safeName = place.name.replace(/'/g,"\\'");
+  addMsg(`⭐ How was <strong>${place.name}</strong>?<br><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap" id="fb-${place.id}">` +
+    [1,2,3,4,5].map(n=>`<button onclick="rateStop('${place.id}','${safeName}',${n})" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:7px 11px;font-size:14px;cursor:pointer">${'⭐'.repeat(n)}</button>`).join('') +
+    `</div>`);
+}
+
+async function rateStop(placeId, placeName, rating){
+  const row=document.getElementById(`fb-${placeId}`);
+  if(row) row.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Thanks for rating ${placeName} — ${'⭐'.repeat(rating)}</div>`;
+  try{
+    await API.submitPlaceFeedback(placeName, currentCityName, rating);
+    showToast('⭐','Thanks for rating it!','Real feedback like this shapes future recommendations.',3000);
+  }catch(e){ console.error('rateStop error', e); }
+}
+
+function showAppFeedback(){
+  switchToView('chat-view', 2);
+  window._pendingAppFeedback = null;
+  addMsg(`💬 <strong>How's India In-Time working for you?</strong><br>Your honest take — good or bad — genuinely shapes what we build next.<br><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap" id="app-fb-stars">` +
+    [1,2,3,4,5].map(n=>`<button onclick="pickAppFeedbackRating(${n})" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px 12px;font-size:16px;cursor:pointer">${'⭐'.repeat(n)}</button>`).join('') +
+    `</div>`);
+}
+
+function pickAppFeedbackRating(rating){
+  window._pendingAppFeedback = { rating };
+  const row = document.getElementById('app-fb-stars');
+  if(row) row.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">You rated: ${'⭐'.repeat(rating)}</div>`;
+  const cats = [['love_it','Loving it 😍'],['bug','Found a bug 🐛'],['feature_request','Missing something 💡'],['confusing','Confusing 🤔'],['general','Just general 💭']];
+  addMsg(`What's it mostly about? <em>(optional — pick one, or skip straight to typing your thoughts below)</em><br><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">` +
+    cats.map(([v,l])=>`<button onclick="pickAppFeedbackCategory('${v}')" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer">${l}</button>`).join('') +
+    `</div>`);
+}
+
+function pickAppFeedbackCategory(cat){
+  if(!window._pendingAppFeedback) return;
+  window._pendingAppFeedback.category = cat;
+  window._pendingAppFeedback.awaitingMessage = true;
+  addMsg(`Got it. Type any details below and hit send — or tap to submit as-is.<br><button onclick="finishAppFeedback()" style="margin-top:6px;background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--ocean);cursor:pointer">Submit without details</button>`);
+}
+
+async function finishAppFeedback(message){
+  const fb = window._pendingAppFeedback;
+  if(!fb){ addMsg('⚠️ Tap "App Feedback" in the tools menu to start again.'); return; }
+  window._pendingAppFeedback = null;
+  try{
+    const activeViewId = viewIds && viewIds.find(v => document.getElementById(v)?.classList.contains('active'));
+    await API.submitAppFeedback(fb.rating, fb.category || 'general', message || null, activeViewId || currentCityId || null);
+    addMsg(`🙏 <strong>Thank you</strong> — feedback like this is exactly what helps us build the right things next.`);
+    showToast('💬','Feedback sent','Thanks for helping us improve India In-Time!',3500);
+  }catch(e){
+    addMsg('⚠️ Could not send feedback right now — please try again in a moment.');
+  }
+}
+
 async function showTripRating() {
   if (!mdPlan.length && stamps.size === 0) { addMsg('Complete some stops first to get your trip rated! 🗺️'); return; }
   switchToView('chat-view', 2);
@@ -5532,6 +5652,7 @@ function renderDrawerContent() {
     drawerBtn('📷','Insta-Spots','Best photo angles at each stop','getInstaSpots()'),
     drawerBtn('🛍️','Souvenir Guide','What to buy locally','getSouvenirGuide()'),
     drawerBtn('⭐','Rate My Trip','AI trip report & score','showTripRating()'),
+    drawerBtn('💬','App Feedback','Tell us what to improve','showAppFeedback()'),
     drawerBtn('🧭','Smart Replanner','Running late? Reschedule now','showReplanner()'),
     drawerBtn('🌦️','Weather Alerts','Per-stop weather forecast','showWeatherAlerts()'),
     drawerBtn('📄','Download PDF','Full trip summary PDF','generateTripPDF()'),
@@ -5638,6 +5759,7 @@ async function showHiddenGems() {
   const newGems = gems.filter(g => !existingNames.has(g.name.toLowerCase()));
   if (newGems.length) { LOCS = [...LOCS, ...newGems]; updatePlannerShowcase(); }
   if (typeof renderMapMarkers === 'function') renderMapMarkers();
+  showToast('💎','Hidden gems unlocked',`${gems.length} verified off-the-radar spot${gems.length>1?'s':''} added to your map.`,4000);
   addMsg(`💎 <strong>Hidden Gem Detector — ${currentCityName}</strong><br>Real places, verified against Google's own review counts — not algorithm guesses. Here's what the big travel apps bury:`);
   gems.forEach(g => {
     addMsg(`💎 <strong>${g.name}</strong><br>${g.why}<br><em>${g.reviewGap}</em><br>✨ Best for: ${g.bestFor}`);

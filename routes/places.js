@@ -936,6 +936,31 @@ router.post('/', async (req, res) => {
       addPlaces(curatedFood);
     }
 
+    console.log(`[places] Final merged pool before proximity-dedup: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
+
+    // ── Proximity dedup ─────────────────────────────────────────────────────
+    // Exact-name dedup above misses the SAME physical place listed under a
+    // different name variant from another source (e.g. "Sri Kanaka Mahalakshmi
+    // Temple" vs "Sri Kanaka Mahalakshmi Ammavari Temple" — one static seed,
+    // one AI/Nominatim discovery). If two places are within ~180m of each
+    // other AND share a significant name word, they're almost certainly the
+    // same spot — keep only the first (higher-priority source).
+    const PROX_STOP = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
+    const sigWords = n => String(n || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !PROX_STOP.has(w));
+    const dedupedMerged = [];
+    for (const place of merged) {
+      const words = sigWords(place.name);
+      const isDup = dedupedMerged.some(kept => {
+        if (!kept.coords?.length || !place.coords?.length) return false;
+        if (distKm(kept.coords[0], kept.coords[1], place.coords[0], place.coords[1]) > 0.18) return false;
+        const kWords = sigWords(kept.name);
+        return words.some(w => kWords.includes(w));
+      });
+      if (!isDup) dedupedMerged.push(place);
+    }
+    merged.length = 0;
+    merged.push(...dedupedMerged);
+
     console.log(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
     if (merged.length >= 3) {
