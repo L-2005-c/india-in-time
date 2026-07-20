@@ -2066,14 +2066,22 @@ body::after{
     <div id="map-view" class="view active">
       <div id="map"></div>
       
-      <!-- TIME SLIDER UI -->
-      <div id="time-slider-container" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:9000;width:90%;max-width:400px;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:12px 20px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:8px;pointer-events:auto;">
+      <!-- TIME SLIDER UI — draggable + collapsible so it doesn't block the map on mobile -->
+      <div id="time-slider-container" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:9000;width:90%;max-width:400px;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:8px 20px 12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:8px;pointer-events:auto;touch-action:none;">
+        <div id="time-slider-handle" style="width:36px;height:5px;border-radius:3px;background:rgba(255,255,255,0.25);margin:2px auto 4px;cursor:grab;"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span style="font-family:'Playfair Display',serif;font-size:14px;color:var(--gold);font-weight:700;">Time Simulator</span>
-          <span id="time-slider-val" style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text-primary);">--:--</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="time-slider-val" style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text-primary);">--:--</span>
+            <button id="time-slider-collapse-btn" onclick="toggleTimeSliderCollapsed()" aria-label="Minimize time simulator" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
+          </div>
         </div>
-        <input type="range" id="time-slider" min="0" max="1439" step="15" value="540" style="width:100%;accent-color:var(--gold);cursor:pointer;" oninput="onTimeSliderChange(this.value)">
+        <input type="range" id="time-slider" min="0" max="1439" step="15" value="540" style="width:100%;accent-color:var(--gold);cursor:pointer;touch-action:pan-x;" oninput="onTimeSliderChange(this.value)">
       </div>
+      <!-- Collapsed pill shown when the simulator is minimized — tap to bring it back -->
+      <button id="time-slider-pill" onclick="toggleTimeSliderCollapsed()" style="display:none;position:absolute;z-index:9000;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:8px 14px;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--gold);align-items:center;gap:6px;pointer-events:auto;cursor:pointer;">
+        🕐 <span id="time-slider-pill-val">--:--</span>
+      </button>
       <div id="street-quest" style="display:none">
         <div class="sq-top">
           <div class="sq-title">Street Quest</div>
@@ -2120,6 +2128,7 @@ body::after{
               <div class="hero-actions">
                 <button class="hero-btn hero-btn-primary" onclick="document.getElementById('city-select').focus()">Build a standout plan</button>
                 <button class="hero-btn hero-btn-secondary" onclick="switchToView('map-view',0)">Preview live map</button>
+                <button class="hero-btn hero-btn-secondary" onclick="showAppFeedback()">💬 Feedback</button>
               </div>
               <div class="hero-metrics">
                 <div class="hero-metric">
@@ -2704,6 +2713,109 @@ const HIDDEN_GEM_SEEDS = {
       why:'A migratory-bird reservoir feeding Vizag\'s own drinking water, ~55km out — locals call it the "Jewel of Vizianagaram" but it barely shows up in Vizag trip searches.',
       reviewGap:'~2,480 Google reviews, but almost never surfaced for "Vizag" searches', bestFor:'Boating, sunset, day trip' },
   ],
+  hyderabad: [
+    { name:'Paigah Tombs', cat:'scenic', coords:[17.3440,78.5042], vt:45, ot:'09:00', ct:'17:30',
+      why:'Intricately carved marble-and-stucco tombs of the Nizams\' most powerful noble family, in a quiet corner most tourists skip entirely for Charminar.',
+      reviewGap:'Barely any Google reviews vs Charminar\'s 200,000+', bestFor:'Architecture, quiet photography' },
+    { name:'Durgam Cheruvu', cat:'scenic', coords:[17.4300,78.3895], vt:60, ot:'06:00', ct:'21:00',
+      why:'A 400-year-old "Secret Lake" that once fed Golconda Fort — now ringed by granite cliffs and a glass cable bridge, still missing from most first-timer itineraries.',
+      reviewGap:'~4,760 Google reviews vs Golconda Fort\'s 60,000+', bestFor:'Evening boating, cable bridge views' },
+    { name:'Sudha Car Museum', cat:'scenic', coords:[17.3570,78.4543], vt:45, ot:'09:30', ct:'18:00',
+      why:'A Guinness-listed collection of drivable cars shaped like a burger, a lipstick, a cricket bat — the quirkiest 40 minutes in Hyderabad, and almost never on a tour itinerary.',
+      reviewGap:'Rarely appears alongside Charminar/Golconda on standard tours', bestFor:'Families, quirky photography' },
+  ],
+  goa: [
+    { name:'Tambdi Surla Temple', cat:'temple', coords:[15.4390,74.2526], vt:60, ot:'08:30', ct:'17:30',
+      why:'Goa\'s oldest surviving temple (13th-century Kadamba-style basalt), tucked inside the Bhagwan Mahavir Wildlife Sanctuary — most Goa trips never leave the coast to find it.',
+      reviewGap:'~5,680 Google reviews vs Baga Beach\'s 30,000+', bestFor:'Architecture, monsoon greenery, quiet reflection' },
+    { name:'Reis Magos Fort', cat:'scenic', coords:[15.4964,73.8091], vt:60, ot:'09:30', ct:'17:00',
+      why:'A restored 16th-century fort with sweeping Mandovi River views — most tourists drive straight past it on the way to the far more crowded Fort Aguada.',
+      reviewGap:'~11,300 Google reviews vs Fort Aguada\'s 40,000+', bestFor:'Sunset views, history, photography' },
+  ],
+  jaipur: [
+    { name:'Panna Meena ka Kund', cat:'scenic', coords:[26.9912,75.8513], vt:30, ot:'07:00', ct:'18:00',
+      why:'A perfectly symmetrical 16th-century stepwell right near Amber Fort — everyone drives past it straight to the fort gate and misses it.',
+      reviewGap:'~6,380 Google reviews vs Amber Fort\'s 100,000+', bestFor:'Photography, architecture' },
+    { name:'Gaitor Ki Chhatriyan', cat:'scenic', coords:[26.9431,75.8247], vt:45, ot:'09:30', ct:'17:00',
+      why:'The royal cremation ground of Jaipur\'s Kachwaha kings — marble cenotaphs as detailed as the City Palace, but almost silent compared to it.',
+      reviewGap:'~6,170 Google reviews vs City Palace\'s 70,000+', bestFor:'Quiet heritage walks, photography' },
+    { name:'Isarlat Sargasooli', cat:'scenic', coords:[26.9244,75.8208], vt:30, ot:'09:00', ct:'16:30',
+      why:'A 7-storey "Victory Tower" in the old city with a 360° view of the Pink City — most visitors rush to Hawa Mahal a few streets away and never climb it.',
+      reviewGap:'~7,160 Google reviews vs Hawa Mahal\'s 90,000+', bestFor:'Panoramic views, sunset' },
+  ],
+  udaipur: [
+    { name:'Ahar Museum', cat:'scenic', coords:[24.5864,73.7211], vt:45, ot:'10:00', ct:'17:00',
+      why:'A Chalcolithic archaeological site and royal cenotaph complex 2km from the centre — overshadowed completely by City Palace and Lake Pichola.',
+      reviewGap:'~1,900 Google reviews vs City Palace\'s 30,000+', bestFor:'History, quiet exploration' },
+    { name:'Badi Lake', cat:'scenic', coords:[24.6173,73.6227], vt:60, ot:'05:00', ct:'19:00',
+      why:'A still, hill-ringed lake locals call "Tiger Lake" — 12km out, with none of Fateh Sagar\'s crowds and better sunsets.',
+      reviewGap:'Far fewer visitors than Fateh Sagar Lake despite similar views', bestFor:'Sunset, Bahubali Hills trek nearby' },
+  ],
+  delhi: [
+    { name:'Agrasen ki Baoli', cat:'scenic', coords:[28.6261,77.2250], vt:30, ot:'09:00', ct:'17:30',
+      why:'A 108-step stepwell hidden a block from Connaught Place — free entry, eerily photogenic, and still missed by most first-time visitors.',
+      reviewGap:'~46,800 Google reviews vs India Gate\'s 200,000+', bestFor:'Photography, quick heritage stop' },
+    { name:'Mehrauli Archaeological Park', cat:'scenic', coords:[28.5202,77.1877], vt:75, ot:'06:00', ct:'18:30',
+      why:'Over 1,000 years of Delhi\'s history — including the Jamali Kamali tomb — spread through a quiet park right next to Qutub Minar, yet far less crowded.',
+      reviewGap:'~3,900 Google reviews vs Qutub Minar\'s 100,000+', bestFor:'History, peaceful walks, photography' },
+    { name:'Sunder Nursery', cat:'scenic', coords:[28.5956,77.2452], vt:60, ot:'06:00', ct:'21:00',
+      why:'A restored Mughal-era heritage garden right next to Humayun\'s Tomb — locals treat it as their favourite picnic spot; tourists mostly don\'t know it exists.',
+      reviewGap:'~21,900 Google reviews vs Humayun\'s Tomb\'s 60,000+', bestFor:'Picnics, gardens, golden-hour photography' },
+  ],
+  mumbai: [
+    { name:'Banganga Tank', cat:'scenic', coords:[18.9455,72.7936], vt:30, ot:'06:00', ct:'20:00',
+      why:'A 12th-century freshwater tank ringed by temples, tucked into Malabar Hill just steps from the sea — most tourists never leave the Gateway/Marine Drive loop to find it.',
+      reviewGap:'~920 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Photography, quiet heritage walk' },
+    { name:'Gilbert Hill', cat:'scenic', coords:[19.1206,72.8402], vt:30, ot:'06:00', ct:'19:00',
+      why:'A 66-million-year-old volcanic rock column — one of only two like it on Earth — rising straight out of an Andheri neighbourhood, and almost nobody visits it.',
+      reviewGap:'~460 Google reviews for a genuine geological rarity', bestFor:'Sunset views, unique photography' },
+    { name:'Sewri Mud-flats', cat:'scenic', coords:[18.9984,72.8611], vt:60, ot:'06:00', ct:'18:00',
+      why:'Thousands of flamingos gather on these mudflats every winter (Nov–May) and most of Mumbai has no idea it happens inside the city.',
+      reviewGap:'~110 Google reviews for a genuine flamingo migration spot', bestFor:'Flamingo season (Nov-May), check tide timings before visiting' },
+  ],
+  bengaluru: [
+    { name:'Turahalli Forest', cat:'scenic', coords:[12.8832,77.5250], vt:60, ot:'05:30', ct:'18:30',
+      why:'Bengaluru\'s last surviving forest — sunrise treks and cycling trails just past the edge of the city, still missing from most "things to do" lists.',
+      reviewGap:'~10,200 Google reviews vs Lalbagh\'s 90,000+', bestFor:'Sunrise trekking, cycling, birdwatching' },
+    { name:'National Gallery of Modern Art (Bengaluru)', cat:'scenic', coords:[12.9894,77.5881], vt:60, ot:'10:00', ct:'18:00',
+      why:'A colonial mansion turned modern-art gallery on Palace Road — steps from Bangalore Palace, but almost nobody stops in.',
+      reviewGap:'~1,970 Google reviews vs Bangalore Palace\'s 30,000+', bestFor:'Art, quiet indoor escape from the heat' },
+  ],
+  kochi: [
+    { name:'Kumbalangi Village', cat:'scenic', coords:[9.8761,76.2871], vt:90, ot:'07:00', ct:'18:00',
+      why:'Kerala\'s first model eco-tourism village — mangroves, fishing canals, and Chinese-net demonstrations by actual fishermen, 20 minutes from Fort Kochi and still overlooked.',
+      reviewGap:'A fraction of Fort Kochi\'s foot traffic despite being minutes away', bestFor:'Canoeing, village life, Chinese fishing nets' },
+    { name:'Puthenthodu Beach', cat:'beach', coords:[9.8695,76.2629], vt:60, ot:'06:00', ct:'19:00',
+      why:'A quiet crescent beach in Chellanam, past Kumbalangi — clean sand, no beach shacks, and none of Fort Kochi Beach\'s crowds.',
+      reviewGap:'~1,490 Google reviews vs Fort Kochi Beach\'s much heavier footfall', bestFor:'Sunset, peaceful swimming' },
+  ],
+  agra: [
+    { name:'Chini Ka Rauza', cat:'scenic', coords:[27.2008,78.0343], vt:45, ot:'08:00', ct:'17:00',
+      why:'A Persian-tiled Mughal tomb on the Yamuna, glazed in turquoise and green — reviewers call it a "hidden gem" outright, and it sees a fraction of Taj Mahal\'s crowds.',
+      reviewGap:'~1,130 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Photography, riverside quiet, Mughal architecture' },
+    { name:'Soor Sarovar Bird Sanctuary', cat:'scenic', coords:[27.2360,77.8526], vt:90, ot:'08:00', ct:'18:00',
+      why:'A Ramsar-listed wetland (Keetham Lake) 20km from the city with migratory Siberian cranes — most Agra itineraries never make time for it.',
+      reviewGap:'~960 Google reviews for a globally recognised wetland', bestFor:'Birdwatching, winter migratory season' },
+    { name:'Mankameshwar Temple, Agra', cat:'temple', coords:[27.1837,78.0175], vt:30, ot:'05:00', ct:'22:00',
+      why:'One of Agra\'s oldest Shiva temples, tucked in a narrow old-city lane — locals swear by the evening aarti, tourists rarely find it.',
+      reviewGap:'~6,970 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Evening aarti, local culture' },
+  ],
+  varanasi: [
+    { name:'Bharat Kala Bhavan Museum', cat:'scenic', coords:[25.2715,82.9960], vt:60, ot:'10:30', ct:'16:30',
+      why:'A 100,000-artifact museum inside BHU with a world-class Mughal miniature painting collection — reviewers repeatedly call it Varanasi\'s best-kept secret.',
+      reviewGap:'~1,690 Google reviews vs Kashi Vishwanath Temple\'s 40,000+', bestFor:'Art, miniature paintings, quiet indoor culture' },
+    { name:'Panchganga Ghat', cat:'scenic', coords:[25.3150,83.0182], vt:30, ot:'05:00', ct:'20:00',
+      why:'Believed to be the confluence of five sacred rivers, with the same golden-hour ghat views as Dashashwamedh — minus the crowds and touts.',
+      reviewGap:'~1,360 Google reviews vs Dashashwamedh Ghat\'s far heavier footfall', bestFor:'Sunrise boat rides, quiet reflection' },
+  ],
+  kolkata: [
+    { name:'Marble Palace', cat:'scenic', coords:[22.5822,88.3602], vt:60, ot:'10:00', ct:'16:00',
+      why:'A 19th-century mansion crammed with Western sculpture and art, in North Kolkata — barely on any tourist itinerary despite rivaling Victoria Memorial\'s grandeur.',
+      reviewGap:'Rarely appears on Google review counts at all vs Victoria Memorial\'s 100,000+', bestFor:'Art, colonial-era architecture' },
+    { name:'Kumartuli Potter\'s Lane', cat:'scenic', coords:[22.5994,88.3635], vt:60, ot:'08:00', ct:'19:00',
+      why:'The narrow lanes where Kolkata\'s idol-makers hand-craft every Durga Puja idol in the city — most tourists never wander past College Street to find it.',
+      reviewGap:'~310 Google reviews for the artisan heart of the city\'s biggest festival', bestFor:'Craft, photography, especially pre-Durga Puja' },
+  ],
 };
 
 function getHiddenGems(cityId){
@@ -3009,6 +3121,8 @@ function onTimeSliderChange(val) {
   
   const valEl = document.getElementById('time-slider-val');
   if (valEl) valEl.textContent = timeStr;
+  const pillValEl = document.getElementById('time-slider-pill-val');
+  if (pillValEl) pillValEl.textContent = timeStr;
   
   if (window.itin && window.itin.length > 0) {
     if (typeof renderRoute === 'function') renderRoute();
@@ -3026,6 +3140,122 @@ setTimeout(() => {
     onTimeSliderChange(window.globalSimulationTime);
   }
 }, 1000);
+
+// ═══════════════════════════════════════
+// Time Simulator — draggable + collapsible.
+// On mobile this panel used to sit fixed over the map and block the view;
+// now it can be dragged anywhere (via its handle) and minimized to a small
+// tappable pill. Position and collapsed state persist across visits.
+// ═══════════════════════════════════════
+(function initDraggableTimeSlider(){
+  const container = document.getElementById('time-slider-container');
+  const handle = document.getElementById('time-slider-handle');
+  const pill = document.getElementById('time-slider-pill');
+  if (!container || !handle || !pill) return;
+
+  const POS_KEY = 'tt_time_slider_pos';
+  const COLLAPSED_KEY = 'tt_time_slider_collapsed';
+
+  function mapRect(){ return (document.getElementById('map-view') || document.body).getBoundingClientRect(); }
+  function clamp(val, min, max){ return Math.max(min, Math.min(max, val)); }
+
+  function applyPosition(left, top){
+    const r = mapRect();
+    const elW = container.offsetWidth || 320;
+    const elH = container.offsetHeight || 90;
+    left = clamp(left, 8, Math.max(8, r.width - elW - 8));
+    top  = clamp(top, 60, Math.max(60, r.height - elH - 8));
+    container.style.left = left + 'px';
+    container.style.top = top + 'px';
+    container.style.bottom = 'auto';
+    container.style.transform = 'none';
+    return {left, top};
+  }
+
+  function applyPillPosition(left, top){
+    const r = mapRect();
+    left = clamp(left, 8, Math.max(8, r.width - 90));
+    top  = clamp(top, 60, Math.max(60, r.height - 50));
+    pill.style.left = left + 'px';
+    pill.style.top = top + 'px';
+    pill.style.bottom = 'auto';
+    pill.style.transform = 'none';
+  }
+
+  let savedPos = null;
+  try { savedPos = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch(_e) {}
+  if (savedPos && typeof savedPos.left === 'number' && typeof savedPos.top === 'number') {
+    applyPosition(savedPos.left, savedPos.top);
+  }
+
+  let dragging = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+  function onPointerDown(e){
+    dragging = true; moved = false;
+    handle.style.cursor = 'grabbing';
+    const pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX; startY = pt.clientY;
+    const rect = container.getBoundingClientRect();
+    const r = mapRect();
+    startLeft = rect.left - r.left;
+    startTop = rect.top - r.top;
+    e.preventDefault();
+  }
+
+  function onPointerMove(e){
+    if (!dragging) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const dx = pt.clientX - startX;
+    const dy = pt.clientY - startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    applyPosition(startLeft + dx, startTop + dy);
+    e.preventDefault();
+  }
+
+  function onPointerUp(){
+    if (!dragging) return;
+    dragging = false;
+    handle.style.cursor = 'grab';
+    if (moved) {
+      const left = parseFloat(container.style.left) || 0;
+      const top = parseFloat(container.style.top) || 0;
+      try { localStorage.setItem(POS_KEY, JSON.stringify({left, top})); } catch(_e) {}
+    }
+  }
+
+  handle.addEventListener('mousedown', onPointerDown);
+  handle.addEventListener('touchstart', onPointerDown, {passive:false});
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('touchmove', onPointerMove, {passive:false});
+  window.addEventListener('mouseup', onPointerUp);
+  window.addEventListener('touchend', onPointerUp);
+
+  window.toggleTimeSliderCollapsed = function(forceState){
+    const collapsing = typeof forceState === 'boolean' ? forceState : container.style.display !== 'none';
+    if (collapsing) {
+      const rect = container.getBoundingClientRect();
+      const r = mapRect();
+      applyPillPosition(rect.left - r.left, rect.top - r.top);
+      container.style.display = 'none';
+      pill.style.display = 'flex';
+    } else {
+      const rect = pill.getBoundingClientRect();
+      const r = mapRect();
+      applyPosition(rect.left - r.left, rect.top - r.top);
+      container.style.display = 'flex';
+      pill.style.display = 'none';
+    }
+    try { localStorage.setItem(COLLAPSED_KEY, collapsing ? '1' : '0'); } catch(_e) {}
+  };
+
+  let wasCollapsed = false;
+  try { wasCollapsed = localStorage.getItem(COLLAPSED_KEY) === '1'; } catch(_e) {}
+  if (wasCollapsed) {
+    container.style.display = 'none';
+    pill.style.display = 'flex';
+    applyPillPosition(savedPos ? savedPos.left : 16, savedPos ? savedPos.top : (window.innerHeight - 200));
+  }
+})();
 
 function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
   let score = 50;

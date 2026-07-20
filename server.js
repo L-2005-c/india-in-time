@@ -9,18 +9,24 @@ require('express-async-errors');
 const cors    = require('cors');
 const path    = require('path');
 const cluster = require('cluster');
+const os      = require('os');
 
 // ── Clustering (10k User Concurrency) ────────────────────────────────────────
-// IMPORTANT: the rate limiter (middleware/rateLimiter.js) and the Gemini
-// circuit breaker (services/gemini.js) both keep their counters in plain
-// in-memory variables. Each cluster worker is a SEPARATE OS process with its
-// own memory, so forking N workers silently creates N independent rate-limit
-// buckets per IP — e.g. with 4 CPUs your "15 req/min" AI limit actually
-// allows up to ~60 req/min, split across whichever worker each request lands
-// on. Until that state moves to a shared store (Redis/Upstash or Postgres),
-// we cap workers to 1 so the limiter and circuit breaker behave correctly.
-// Set CLUSTER_WORKERS in the environment to override once you've fixed that.
-const numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10) || 1;
+// IMPORTANT: the rate limiter (middleware/rateLimiter.js) keeps its counters
+// in a plain in-memory Map by default. Each cluster worker is a SEPARATE OS
+// process with its own memory, so forking N workers silently creates N
+// independent rate-limit buckets per IP — e.g. with 4 CPUs your "15 req/min"
+// AI limit actually allows up to ~60 req/min, split across whichever worker
+// each request lands on. middleware/rateLimiter.js now supports an optional
+// Redis-backed shared counter (set REDIS_URL) that fixes this — so once
+// Redis is configured it's safe to use every CPU core; until then we cap
+// workers to 1 so the limiter behaves correctly. (The Gemini circuit
+// breaker in services/gemini.js is also per-worker, but that's fine left
+// as-is — each worker independently guarding itself against Gemini failures
+// is a reasonable resilience pattern, not a correctness bug like the rate
+// limiter split was.) Set CLUSTER_WORKERS to override either way.
+const numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10)
+  || (process.env.REDIS_URL ? os.cpus().length : 1);
 
 if (cluster.isPrimary) {
   console.log(`\n🚀 India In-Time API v2.0 Primary (${process.pid}) is running`);
@@ -241,6 +247,15 @@ initDatabase().then(() => {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`   ✅ Worker ${process.pid} started and listening on port ${PORT}`);
   });
+
+  // ── Connection tuning for high concurrency ──────────────────────────────────
+  // keepAliveTimeout should exceed most load balancers' idle timeout (commonly
+  // 60s on AWS ALB / Render / Railway) so the LB doesn't race the server to
+  // close a socket it's about to reuse. headersTimeout must stay a few
+  // seconds above keepAliveTimeout (Node requirement) and shields the process
+  // from slow/stalled clients holding sockets open under load.
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout   = 66000;
 
   // ── Graceful Shutdown ────────────────────────────────────────────────────────
   function gracefulShutdown(signal) {
