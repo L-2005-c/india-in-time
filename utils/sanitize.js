@@ -75,6 +75,26 @@ function sanitizeStringArray(arr, maxItems = 50, maxItemLen = 200) {
 }
 
 /**
+ * Sanitize an array of small objects (e.g. expenses: [{n, c}], remainingStops:
+ * [{name, vt}]) that get interpolated into AI prompts. Without this, these
+ * fields had no length cap at all — a big payload here goes straight into a
+ * Gemini prompt at whatever size the client sends (up to the 5mb body
+ * limit), which is both a prompt-injection surface and an unbounded per-
+ * request cost. `stringFields` are truncated/stripped like any other prompt
+ * text; `numberFields` are clamped to a sane range.
+ */
+function sanitizeObjectArray(arr, maxItems, stringFields = [], numberFields = []) {
+  if (!Array.isArray(arr)) return [];
+  return arr.slice(0, maxItems).map(item => {
+    if (!item || typeof item !== 'object') return {};
+    const out = {};
+    for (const f of stringFields) out[f] = sanitizeMessage(String(item[f] ?? ''), 80);
+    for (const f of numberFields) out[f] = sanitizeNumber(item[f], 0, 1000000, 0);
+    return out;
+  });
+}
+
+/**
  * Sanitize a number within a range.
  */
 function sanitizeNumber(val, min, max, defaultVal) {
@@ -91,5 +111,6 @@ module.exports = {
   sanitizePlaceName,
   validateBase64Image,
   sanitizeStringArray,
+  sanitizeObjectArray,
   sanitizeNumber,
 };

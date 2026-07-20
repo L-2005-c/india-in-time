@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('[geocode]', err.message);
-    res.status(500).json({ error: 'Geocode request failed', detail: err.message });
+    res.status(500).json({ error: 'Geocode request failed' });
   }
 });
 

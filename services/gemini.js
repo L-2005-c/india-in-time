@@ -106,6 +106,18 @@ async function _callGeminiOnce(parts, opts = {}) {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
     signal:  AbortSignal.timeout(timeoutMs),
+  }).catch(err => {
+    // node-fetch v2 embeds the FULL request URL — including our API key
+    // querystring — into its error message on any network-level failure
+    // (DNS error, connection refused, TLS error, or an AbortSignal timeout):
+    //   FetchError: request to https://...?key=AIzaSy... failed, reason: ...
+    // That raw message used to propagate straight out through routes/ai.js
+    // and back to the browser as JSON, i.e. any Gemini network hiccup could
+    // leak the live API key to whoever's request happened to trigger it.
+    // Strip the key before this error goes anywhere else.
+    const safe = new Error(`Gemini request failed: ${String(err.message || err).replace(/key=[^&\s]+/i, 'key=***REDACTED***')}`);
+    safe.retryable = true; // network failures are always worth retrying
+    throw safe;
   });
 
   if (!res.ok) {

@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('[weather]', err.message);
-    res.status(500).json({ error: 'Weather fetch failed', detail: err.message });
+    res.status(500).json({ error: 'Weather fetch failed' });
   }
 });
 

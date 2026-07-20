@@ -1,7 +1,7 @@
 // middleware/validator.js — Input validation middleware
 // Validates and sanitizes request bodies for specific route groups.
 
-const { sanitizeMessage, sanitizeCityName, sanitizePlaceName, validateBase64Image, sanitizeStringArray, sanitizeNumber } = require('../utils/sanitize');
+const { sanitizeMessage, sanitizeCityName, sanitizePlaceName, validateBase64Image, sanitizeStringArray, sanitizeObjectArray, sanitizeNumber } = require('../utils/sanitize');
 const { isValidCoords, isInIndia } = require('../utils/geo');
 
 /**
@@ -21,12 +21,35 @@ function validateAiRequest(req, res, next) {
   if (body.toPlace !== undefined)     body.toPlace     = sanitizePlaceName(body.toPlace);
   if (body.userName !== undefined)    body.userName    = sanitizeMessage(body.userName, 50);
 
+  // These used to reach the Gemini prompt completely unsanitized — no
+  // length cap, no type check. A large/crafted value here was both a
+  // prompt-injection vector and an unbounded-cost risk (nothing stopped a
+  // multi-MB string from becoming a multi-MB Gemini request).
+  if (body.currentTime !== undefined)  body.currentTime  = sanitizeMessage(body.currentTime, 60);
+  if (body.context !== undefined)      body.context      = sanitizeMessage(body.context, 200);
+  if (body.duration !== undefined)     body.duration     = sanitizeMessage(String(body.duration), 40);
+  if (body.date !== undefined)         body.date         = sanitizeMessage(String(body.date), 40);
+  if (body.month !== undefined)        body.month        = sanitizeMessage(String(body.month), 30);
+  if (body.dayOfWeek !== undefined)    body.dayOfWeek    = sanitizeMessage(String(body.dayOfWeek), 20);
+  if (body.cat !== undefined)          body.cat          = sanitizeMessage(String(body.cat), 40);
+  if (body.timeOfDay !== undefined)    body.timeOfDay    = sanitizeMessage(String(body.timeOfDay), 20);
+  if (body.vehicleType !== undefined)  body.vehicleType  = sanitizeMessage(String(body.vehicleType), 30);
+  if (body.travelStyle !== undefined)  body.travelStyle  = sanitizeMessage(String(body.travelStyle), 60);
+  if (body.dates !== undefined)        body.dates        = sanitizeMessage(String(body.dates), 60);
+  if (body.currentHour !== undefined)  body.currentHour  = sanitizeNumber(body.currentHour, 0, 23, new Date().getHours());
+
   // Sanitize arrays
   if (body.plan)      body.plan      = sanitizeStringArray(body.plan, 30, 100);
   if (body.stops)     body.stops     = sanitizeStringArray(body.stops, 30, 100);
   if (body.locations) body.locations = sanitizeStringArray(body.locations, 50, 100);
   if (body.interests) body.interests = sanitizeStringArray(body.interests, 10, 50);
   if (body.prefs)     body.prefs     = sanitizeStringArray(body.prefs, 10, 30);
+  if (body.completedStops) body.completedStops = sanitizeStringArray(body.completedStops, 30, 100);
+  if (body.stamps && Array.isArray(body.stamps)) body.stamps = body.stamps.slice(0, 200); // only .length is ever used
+
+  // Arrays of small objects — these also had zero sanitization before.
+  if (body.expenses)       body.expenses       = sanitizeObjectArray(body.expenses, 100, ['n'], ['c']);
+  if (body.remainingStops) body.remainingStops = sanitizeObjectArray(body.remainingStops, 30, ['name'], ['vt']);
 
   // Validate image data if present
   if (body.imageBase64) {

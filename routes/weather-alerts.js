@@ -40,7 +40,13 @@ function bestTimeForCat(cat, weatherCode) {
 }
 
 router.post('/', async (req, res) => {
-  const { lat, lon, stops = [] } = req.body;
+  const { lat, lon } = req.body;
+  // Cap + shape-check stops: unbounded, unvalidated arrays here let a
+  // single request force arbitrarily large work (unlike routes/ai.js,
+  // which runs every array through sanitizeStringArray/sanitizeObjectArray).
+  const stops = Array.isArray(req.body.stops)
+    ? req.body.stops.slice(0, 50).filter(s => s && typeof s === 'object')
+    : [];
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat/lon' });
 
   try {
@@ -51,7 +57,11 @@ router.post('/', async (req, res) => {
 
     const data = await upstream.json();
     const cw   = data.current_weather;
-    const hourly = data.hourly;
+    // Guarded: every other upstream call in this app defensively handles a
+    // malformed/partial response — this one previously assumed `hourly`
+    // would always be present and would throw a 500 if it wasn't.
+    const hourly = data.hourly || {};
+    if (!cw) return res.status(502).json({ error: 'No weather data in response' });
 
     const currentTemp = Math.round(cw.temperature);
     const currentCode = cw.weathercode;
@@ -95,7 +105,7 @@ router.post('/', async (req, res) => {
     });
   } catch (err) {
     console.error('[weather-alerts]', err.message);
-    res.status(500).json({ error: 'Weather alerts fetch failed', detail: err.message });
+    res.status(500).json({ error: 'Weather alerts fetch failed' });
   }
 });
 

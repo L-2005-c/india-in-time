@@ -137,7 +137,7 @@ app.use('/api/places', placesLimiter, validatePlacesRequest, placesRoutes);
 
 // Weather
 app.use('/api/weather', weatherLimiter, validateWeatherRequest, weatherRoutes);
-app.use('/api/weather-alerts', weatherLimiter, weatherAlertRoutes);
+app.use('/api/weather-alerts', weatherLimiter, validateWeatherRequest, weatherAlertRoutes);
 
 // AI (most expensive — strictest rate limiting)
 app.use('/api/ai', aiLimiter, validateAiRequest, aiRoutes);

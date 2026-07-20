@@ -21,6 +21,18 @@ const router  = express.Router();
 const { callGeminiText, callGeminiVision } = require('../services/gemini');
 
 // ── Generic wrapper to handle errors uniformly ───────────────────────────────
+// IMPORTANT: this used to send err.message straight to the client on every
+// failure (`res.json({ error: err.message })`). That's how a Gemini network
+// hiccup could leak the API key (see services/gemini.js for the underlying
+// fix) — but even with that patched, raw internal error text (Gemini's own
+// API error bodies, stack-trace fragments, etc.) still has no business going
+// to the browser. middleware/errorHandler.js already hides this correctly
+// for every other route in the app; this wrapper caught errors itself and
+// skipped right past it. Only a small allow-list of messages we wrote
+// ourselves (meant to be user-facing) are passed through as-is.
+const USER_SAFE_MESSAGES = [
+  'Gemini service temporarily unavailable (circuit breaker open). Try again shortly.',
+];
 
 function handler(fn) {
   return async (req, res) => {
@@ -29,7 +41,11 @@ function handler(fn) {
       res.json({ text: result });
     } catch (err) {
       console.error(`[ai:${req.path}]`, err.message);
-      res.status(err.statusCode || 500).json({ error: err.message });
+      const statusCode = err.statusCode && err.statusCode < 500 ? err.statusCode : 503;
+      const clientMessage = USER_SAFE_MESSAGES.includes(err.message)
+        ? err.message
+        : 'The AI assistant is temporarily unavailable. Please try again in a moment.';
+      res.status(statusCode).json({ error: clientMessage });
     }
   };
 }

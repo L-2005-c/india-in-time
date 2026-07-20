@@ -235,6 +235,28 @@ function deleteCachedPlaces(key) {
   placesCache.delete(key);
 }
 
+// ── Refresh throttle ─────────────────────────────────────────────────────────
+// Tracks the last time each cache key was force-refreshed, independent of
+// the per-IP rate limiter, so a real cost cap exists per city/query even
+// across many different IPs.
+const REFRESH_COOLDOWN_MS = 60 * 1000;
+const lastRefreshAt = new Map();
+
+function canRefresh(key) {
+  const now = Date.now();
+  const last = lastRefreshAt.get(key) || 0;
+  if (now - last < REFRESH_COOLDOWN_MS) return false;
+  lastRefreshAt.set(key, now);
+  // Bound memory — this Map only needs to hold recent activity.
+  if (lastRefreshAt.size > 2000) {
+    const cutoff = now - REFRESH_COOLDOWN_MS;
+    for (const [k, t] of lastRefreshAt) {
+      if (t < cutoff) lastRefreshAt.delete(k);
+    }
+  }
+  return true;
+}
+
 async function callGemini(prompt) {
   const text = await callGeminiText(prompt, {
     timeoutMs: 45000,
@@ -384,7 +406,10 @@ async function fetchWiki(lat, lon, cityName) {
   // Wikipedia coords are ground-truth accurate — use them directly.
   // Query up to 500 entries (Wikipedia max) within 30 km.
   const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gsradius=30000&gscoord=${lat}|${lon}&gslimit=500&format=json&origin=*`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
+    signal: AbortSignal.timeout(12000),
+  });
   if (!res.ok) return [];
   const data = await res.json();
   const SKIP    = /\b(nagar|colony|peta|palle|village|layout|block|phase|mandal|taluk|district|ward|station|bypass|road|street|highway|slum|mohalla|chowk|circle|junction|sector|zone|area|suburb|locality|division|tehsil|residency|apartment|towers?|store|stores|shop|shops|supermarket|mart|boutique)\b/i;
@@ -860,12 +885,29 @@ router.post('/', async (req, res) => {
   if (lat==null||lon==null) return res.status(400).json({ error:'Missing lat/lon' });
   console.log(`\n[places] ${cityName} (${lat},${lon})`);
   const key = cacheKey(cityName, lat, lon, totalMinutes, prefs);
-  if (refresh) {
+
+  // `refresh: true` is meant for "my data looks stale, force a re-fetch" —
+  // it bypasses the cache and triggers Gemini + Wikipedia + Nominatim all at
+  // once. Since it's caller-controlled with no ownership check, anyone could
+  // otherwise force that expensive multi-source fetch on every request just
+  // by always sending refresh:true (the per-IP rate limiter still applies,
+  // but that alone still allows a steady drip of full-cost fetches, and
+  // multiple IPs can target the same popular city). Cap actual bypasses to
+  // once per cache key per minute — everyone past the first refresher in
+  // that window still gets a fast, fresh-enough cached response.
+  const requestedRefresh = !!refresh;
+  const effectiveRefresh = requestedRefresh && canRefresh(key);
+  if (requestedRefresh && !effectiveRefresh) {
+    console.log(`[places] Refresh requested for ${cityName} but throttled (already refreshed recently) — serving cache instead`);
+  }
+  const refreshNow = effectiveRefresh;
+
+  if (refreshNow) {
     console.log(`[places] Refresh requested for ${cityName}; bypassing cache`);
     deleteCachedPlaces(key);
   }
-  const cached = refresh ? null : getCachedPlaces(key);
-  if (!refresh && cached) {
+  const cached = refreshNow ? null : getCachedPlaces(key);
+  if (!refreshNow && cached) {
     console.log(`[places] Cache hit for ${cityName}`);
     return res.json(cached);
   }
