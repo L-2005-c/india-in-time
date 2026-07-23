@@ -11,11 +11,19 @@ const {
   submitAppFeedback, getAppFeedbackSummary,
 } = require('../db/queries');
 const { requireAdminKey } = require('../middleware/adminAuth');
+const { optionalAuth } = require('../middleware/auth');
 
 // ── Per-place feedback ───────────────────────────────────────────────────────
-router.post('/place', async (req, res) => {
+// optionalAuth: feedback is allowed from signed-out users (no requireAuth),
+// but if a userId gets attached at all it must be the verified req.uid from
+// a real token — never the client-supplied body.userId. Previously this
+// route trusted body.userId outright, so anyone could submit feedback that
+// permanently attributes to someone else's account (same bug class that
+// routes/trips.js and routes/favorites.js already fixed for their data).
+router.post('/place', optionalAuth, async (req, res) => {
   try {
-    const { userId, placeName, city, rating, accurate, comment } = req.body;
+    const { placeName, city, rating, accurate, comment } = req.body;
+    const userId = req.uid || null;
 
     if (!placeName || !city || !rating) {
       return res.status(400).json({ error: 'Missing required fields: placeName, city, rating' });
@@ -61,9 +69,10 @@ router.get('/place/all', requireAdminKey, async (req, res) => {
 });
 
 // ── Overall app experience feedback ─────────────────────────────────────────
-router.post('/app', async (req, res) => {
+router.post('/app', optionalAuth, async (req, res) => {
   try {
-    const { userId, rating, category, message, context } = req.body;
+    const { rating, category, message, context } = req.body;
+    const userId = req.uid || null;
 
     if (!rating) return res.status(400).json({ error: 'Missing required field: rating' });
     const r = Number(rating);
