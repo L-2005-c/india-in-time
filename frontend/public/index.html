@@ -2520,6 +2520,8 @@ Object.assign(window, {
   handleFoodSafety, showCrowdPredictor, showFareNegotiator, showTripTribe,
   // AI Tools Drawer
   openAiDrawer, closeAiDrawer, renderAiToolsGrid,
+  // Feedback system
+  showAppFeedback, pickAppFeedbackRating, pickAppFeedbackCategory, finishAppFeedback, rateStop,
 });
 
 // ══════════════════════════════════════════════════
@@ -2712,6 +2714,27 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Thatipudi Reservoir', cat:'scenic', coords:[18.1722,83.1914],  vt:90, ot:'09:00', ct:'17:30',
       why:'A migratory-bird reservoir feeding Vizag\'s own drinking water, ~55km out — locals call it the "Jewel of Vizianagaram" but it barely shows up in Vizag trip searches.',
       reviewGap:'~2,480 Google reviews, but almost never surfaced for "Vizag" searches', bestFor:'Boating, sunset, day trip' },
+    { name:'Gambheeram Gadda Reservoir', cat:'scenic', coords:[17.8761,83.3475], vt:90, ot:'06:00', ct:'18:00',
+      why:'A forest-ringed reservoir just past the city limits, reachable only by unpaved road — reviewers literally say the drive "feels like hell but the view feels like heaven."',
+      reviewGap:'~170 Google reviews for a genuinely camera-worthy reservoir', bestFor:'Camping, fishing, quiet picnic' },
+    { name:'Lambasingi', cat:'scenic', coords:[17.8186,82.4922], vt:180, ot:'05:00', ct:'18:00',
+      why:'Andhra Pradesh\'s only frost-prone village, nicknamed "Kashmir of Andhra Pradesh" — a ~3hr drive out, so most Vizag trip itineraries skip it entirely despite the coffee plantations and misty sunrise views.',
+      reviewGap:'Rarely appears in standard Vizag itineraries despite its unique climate', bestFor:'Winter frost/fog (Dec-Jan), sunrise, coffee plantations — full-day trip' },
+    { name:'Meghadri Gedda Reservoir', cat:'scenic', coords:[17.7812,83.1810], vt:60, ot:'06:00', ct:'18:30',
+      why:'A working drinking-water reservoir on the west side of the city with floating solar panels and a small Durga temple nearby — locals use it as their evening-walk spot, tourists don\'t know it exists.',
+      reviewGap:'~480 Google reviews for a reservoir that\'s actually inside city limits', bestFor:'Evening walks, birdwatching (Jan-Feb migratory season)' },
+    { name:'Konam Dam', cat:'scenic', coords:[17.9663,82.8545], vt:90, ot:'07:00', ct:'18:00',
+      why:'A hill-ringed reservoir with cheap boating and waterfalls nearby — reviewers say it just needs better roads to become a proper tourist spot, which is exactly why it\'s still peaceful.',
+      reviewGap:'~270 Google reviews for a genuinely scenic reservoir', bestFor:'Boating, picnics, photography' },
+    { name:'Seethapalem Beach', cat:'beach', coords:[17.4751,82.9938], vt:120, ot:'06:00', ct:'18:00',
+      why:'One of Vizag\'s highest-rated beaches (4.7★) and almost nobody has heard of it — you reach it via a backwater boat ride through muddy access roads, which is exactly what keeps it pristine.',
+      reviewGap:'4.7★ rating with only ~670 Google reviews vs RK Beach\'s 60,000+', bestFor:'Backwater boat ride, sunrise, genuinely uncrowded sand' },
+    { name:'Katiki Waterfalls', cat:'scenic', coords:[18.2792,82.9988], vt:150, ot:'08:00', ct:'17:00',
+      why:'A multi-stage waterfall near Araku you can walk right up to and stand under — most Vizag-to-Araku day trips stop at Borra Caves and never make the short detour here.',
+      reviewGap:'~1,180 Google reviews for a genuinely stand-under-it waterfall', bestFor:'Waterfall trekking, photography — pair with Araku Valley day trip' },
+    { name:'Araku Anantagiri Coffee Plantations', cat:'scenic', coords:[18.2577,82.9893], vt:90, ot:'06:00', ct:'18:00',
+      why:'Misty, working coffee estates planted by the British in the 1920s — reviewers call the early-morning walk "magical," and it\'s a five-minute stop most Araku day-trippers drive straight past.',
+      reviewGap:'~2,260 Google reviews for a working plantation most itineraries skip', bestFor:'Early morning mist, coffee-harvest season (Dec-Jan), photography' },
   ],
   hyderabad: [
     { name:'Paigah Tombs', cat:'scenic', coords:[17.3440,78.5042], vt:45, ot:'09:00', ct:'17:30',
@@ -2723,6 +2746,9 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Sudha Car Museum', cat:'scenic', coords:[17.3570,78.4543], vt:45, ot:'09:30', ct:'18:00',
       why:'A Guinness-listed collection of drivable cars shaped like a burger, a lipstick, a cricket bat — the quirkiest 40 minutes in Hyderabad, and almost never on a tour itinerary.',
       reviewGap:'Rarely appears alongside Charminar/Golconda on standard tours', bestFor:'Families, quirky photography' },
+    { name:'Ameenpur Lake', cat:'scenic', coords:[17.5225,78.3344], vt:60, ot:'06:00', ct:'19:00',
+      why:'An officially notified Biodiversity Heritage Site — over 170 bird species on a lake most Hyderabad first-timers have never heard of.',
+      reviewGap:'~1,270 Google reviews vs Hussain Sagar\'s far heavier footfall', bestFor:'Sunrise/sunset birdwatching, photography' },
   ],
   goa: [
     { name:'Tambdi Surla Temple', cat:'temple', coords:[15.4390,74.2526], vt:60, ot:'08:30', ct:'17:30',
@@ -2731,6 +2757,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Reis Magos Fort', cat:'scenic', coords:[15.4964,73.8091], vt:60, ot:'09:30', ct:'17:00',
       why:'A restored 16th-century fort with sweeping Mandovi River views — most tourists drive straight past it on the way to the far more crowded Fort Aguada.',
       reviewGap:'~11,300 Google reviews vs Fort Aguada\'s 40,000+', bestFor:'Sunset views, history, photography' },
+    { name:'Divar Island', cat:'scenic', coords:[15.5277,73.9066], vt:120, ot:'07:00', ct:'18:00',
+      why:'A ferry-only island of paddy fields and Portuguese-era villages on the Mandovi River — reviewers call it "still not ruined by the invasion of tourists."',
+      reviewGap:'~870 Google reviews vs Baga Beach\'s 30,000+', bestFor:'Cycling, village life, ferry ride' },
+    { name:'Cabo de Rama Fort', cat:'scenic', coords:[15.0888,73.9216], vt:60, ot:'09:30', ct:'17:30',
+      why:'Clifftop ruins with a still-active chapel and panoramic Arabian Sea views — far quieter than the North Goa forts most itineraries default to.',
+      reviewGap:'Considerably less crowded than Fort Aguada despite similar sea views', bestFor:'Sunset, cliffside photography, quiet ruins' },
   ],
   jaipur: [
     { name:'Panna Meena ka Kund', cat:'scenic', coords:[26.9912,75.8513], vt:30, ot:'07:00', ct:'18:00',
@@ -2742,6 +2774,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Isarlat Sargasooli', cat:'scenic', coords:[26.9244,75.8208], vt:30, ot:'09:00', ct:'16:30',
       why:'A 7-storey "Victory Tower" in the old city with a 360° view of the Pink City — most visitors rush to Hawa Mahal a few streets away and never climb it.',
       reviewGap:'~7,160 Google reviews vs Hawa Mahal\'s 90,000+', bestFor:'Panoramic views, sunset' },
+    { name:'Sisodia Rani ka Bagh', cat:'scenic', coords:[26.8994,75.8587], vt:60, ot:'08:00', ct:'20:00',
+      why:'A terraced 1728 royal garden built as a gift for Jaipur\'s queen — multi-level fountains and Krishna-Radha murals that most visitors never make time for.',
+      reviewGap:'~6,500 Google reviews vs City Palace\'s 70,000+', bestFor:'Evening walks, Mughal-style gardens, peacocks' },
+    { name:'Vidyadhar Bagh', cat:'scenic', coords:[26.8998,75.8536], vt:60, ot:'08:00', ct:'20:00',
+      why:'A cascading terraced garden honoring Jaipur\'s chief architect, right next to Sisodia Rani ka Bagh — reviewers describe having it entirely to themselves even in peak season.',
+      reviewGap:'~1,060 Google reviews for an Italianate garden most tourists never find', bestFor:'Quiet evenings, photography, architecture' },
   ],
   udaipur: [
     { name:'Ahar Museum', cat:'scenic', coords:[24.5864,73.7211], vt:45, ot:'10:00', ct:'17:00',
@@ -2750,6 +2788,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Badi Lake', cat:'scenic', coords:[24.6173,73.6227], vt:60, ot:'05:00', ct:'19:00',
       why:'A still, hill-ringed lake locals call "Tiger Lake" — 12km out, with none of Fateh Sagar\'s crowds and better sunsets.',
       reviewGap:'Far fewer visitors than Fateh Sagar Lake despite similar views', bestFor:'Sunset, Bahubali Hills trek nearby' },
+    { name:'Nehru Garden', cat:'scenic', coords:[24.5963,73.6734], vt:75, ot:'09:00', ct:'18:00',
+      why:'A boat-only island garden in the middle of Fateh Sagar Lake — reaching it is half the experience, and it stays far less crowded than the lakeside itself.',
+      reviewGap:'~1,860 Google reviews vs Lake Pichola\'s far heavier footfall', bestFor:'Boat ride, sunset, musical fountain (evenings)' },
+    { name:'Neemach Mata Mandir', cat:'temple', coords:[24.6132,73.6758], vt:60, ot:'05:00', ct:'21:00',
+      why:'A hilltop temple with a ropeway and 360° views over Fateh Sagar Lake — reviewers repeatedly say it\'s "much less crowded than Karni Mata" for the same views.',
+      reviewGap:'~1,790 Google reviews for a temple most itineraries skip for the more famous Karni Mata', bestFor:'Sunrise, ropeway views, quiet darshan' },
   ],
   delhi: [
     { name:'Agrasen ki Baoli', cat:'scenic', coords:[28.6261,77.2250], vt:30, ot:'09:00', ct:'17:30',
@@ -2761,6 +2805,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Sunder Nursery', cat:'scenic', coords:[28.5956,77.2452], vt:60, ot:'06:00', ct:'21:00',
       why:'A restored Mughal-era heritage garden right next to Humayun\'s Tomb — locals treat it as their favourite picnic spot; tourists mostly don\'t know it exists.',
       reviewGap:'~21,900 Google reviews vs Humayun\'s Tomb\'s 60,000+', bestFor:'Picnics, gardens, golden-hour photography' },
+    { name:'Rajon Ki Baoli', cat:'scenic', coords:[28.5203,77.1834], vt:30, ot:'10:00', ct:'17:30',
+      why:'A 1506 Lodi-era stepwell inside Mehrauli Archaeological Park — reviewers call it "far less crowded" than the famous Agrasen ki Baoli, with the same dramatic symmetry.',
+      reviewGap:'~690 Google reviews vs Agrasen ki Baoli\'s 46,800', bestFor:'Photography, quiet architecture' },
+    { name:'Sanjay Van', cat:'scenic', coords:[28.5329,77.1813], vt:75, ot:'05:00', ct:'19:00',
+      why:'A genuine forest inside Delhi, with hidden ruins scattered through the trails — reviewers say it has "the healthiest air in Delhi."',
+      reviewGap:'~2,170 Google reviews for a forest most tourists never realize exists', bestFor:'Morning walks, birdwatching, jogging' },
   ],
   mumbai: [
     { name:'Banganga Tank', cat:'scenic', coords:[18.9455,72.7936], vt:30, ot:'06:00', ct:'20:00',
@@ -2772,6 +2822,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Sewri Mud-flats', cat:'scenic', coords:[18.9984,72.8611], vt:60, ot:'06:00', ct:'18:00',
       why:'Thousands of flamingos gather on these mudflats every winter (Nov–May) and most of Mumbai has no idea it happens inside the city.',
       reviewGap:'~110 Google reviews for a genuine flamingo migration spot', bestFor:'Flamingo season (Nov-May), check tide timings before visiting' },
+    { name:'Bandra Fort', cat:'scenic', coords:[19.0419,72.8184], vt:60, ot:'06:00', ct:'18:30',
+      why:'A ruined 17th-century fort with the best view of the Bandra-Worli Sea Link in the city — most itineraries stop at Marine Drive and never make it here.',
+      reviewGap:'~28,400 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Sunset, sea-link views, Bollywood filming spot' },
+    { name:'Global Vipassana Pagoda', cat:'scenic', coords:[19.2282,72.8059], vt:90, ot:'09:00', ct:'19:00',
+      why:'The world\'s largest stone dome built without a single supporting pillar — reached by ferry from Borivali, and almost never on a first-timer\'s Mumbai list.',
+      reviewGap:'~21,600 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Architecture, meditation, ferry ride' },
   ],
   bengaluru: [
     { name:'Turahalli Forest', cat:'scenic', coords:[12.8832,77.5250], vt:60, ot:'05:30', ct:'18:30',
@@ -2780,6 +2836,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'National Gallery of Modern Art (Bengaluru)', cat:'scenic', coords:[12.9894,77.5881], vt:60, ot:'10:00', ct:'18:00',
       why:'A colonial mansion turned modern-art gallery on Palace Road — steps from Bangalore Palace, but almost nobody stops in.',
       reviewGap:'~1,970 Google reviews vs Bangalore Palace\'s 30,000+', bestFor:'Art, quiet indoor escape from the heat' },
+    { name:'Manchanabele Dam', cat:'scenic', coords:[12.8749,77.3361], vt:120, ot:'06:00', ct:'18:00',
+      why:'A rock-and-forest-ringed dam on the Arkavathi River ~40km out — reviewers call the sunset here "magical" and the crowd nonexistent compared to Nandi Hills.',
+      reviewGap:'~2,720 Google reviews for a genuinely scenic dam most day-trippers overlook', bestFor:'Sunset, picnics, kayaking' },
+    { name:'Hesaraghatta Lake', cat:'scenic', coords:[13.1500,77.4900], vt:75, ot:'06:00', ct:'18:00',
+      why:'A birdwatcher\'s paradise on Bengaluru\'s edge — raptors, migratory flocks, and open grassland skies that most city visitors never realize exist this close.',
+      reviewGap:'~2,120 Google reviews vs Lalbagh\'s 90,000+', bestFor:'Birdwatching, scenic drives, sunrise' },
   ],
   kochi: [
     { name:'Kumbalangi Village', cat:'scenic', coords:[9.8761,76.2871], vt:90, ot:'07:00', ct:'18:00',
@@ -2799,6 +2861,9 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Mankameshwar Temple, Agra', cat:'temple', coords:[27.1837,78.0175], vt:30, ot:'05:00', ct:'22:00',
       why:'One of Agra\'s oldest Shiva temples, tucked in a narrow old-city lane — locals swear by the evening aarti, tourists rarely find it.',
       reviewGap:'~6,970 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Evening aarti, local culture' },
+    { name:'Wildlife SOS Elephant Conservation and Care Center', cat:'scenic', coords:[27.3000,77.7940], vt:120, ot:'10:00', ct:'17:00',
+      why:'A real rescue sanctuary for elephants retired from decades of abuse — no riding, no touching, just watching them roam free. Reviewers call it one of the most moving experiences in Agra, and most Taj-focused itineraries never hear about it.',
+      reviewGap:'~710 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Ethical wildlife experience, families, a genuinely emotional stop' },
   ],
   varanasi: [
     { name:'Bharat Kala Bhavan Museum', cat:'scenic', coords:[25.2715,82.9960], vt:60, ot:'10:30', ct:'16:30',
@@ -2815,6 +2880,12 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Kumartuli Potter\'s Lane', cat:'scenic', coords:[22.5994,88.3635], vt:60, ot:'08:00', ct:'19:00',
       why:'The narrow lanes where Kolkata\'s idol-makers hand-craft every Durga Puja idol in the city — most tourists never wander past College Street to find it.',
       reviewGap:'~310 Google reviews for the artisan heart of the city\'s biggest festival', bestFor:'Craft, photography, especially pre-Durga Puja' },
+    { name:'South Park Street Cemetery', cat:'scenic', coords:[22.5466,88.3602], vt:60, ot:'10:00', ct:'17:00',
+      why:'One of the world\'s oldest non-church cemeteries (1767) — moss-covered obelisks and colonial mausoleums that reviewers describe as "stepping into a quiet conversation with history."',
+      reviewGap:'~1,720 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'History, colonial architecture, quiet reflection' },
+    { name:'Rabindra Sarovar Lake', cat:'scenic', coords:[22.5110,88.3561], vt:60, ot:'05:00', ct:'19:00',
+      why:'South Kolkata\'s favourite lake for a morning walk — locals call it "the lungs of Kolkata," and it barely registers with visiting tourists.',
+      reviewGap:'~4,710 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'Morning walks, birdwatching, jogging' },
   ],
 };
 
@@ -3585,6 +3656,14 @@ function dedupePlacesByProximity(list){
     kept.push(place);
   }
   return kept;
+}
+
+// Folds a city's verified Hidden Gems into the place pool automatically, so
+// they're part of every itinerary's candidate list by default — not only
+// when someone manually opens the Hidden Gems tool in chat.
+function withHiddenGems(cityId, list){
+  const gems = getHiddenGems(cityId);
+  return dedupePlacesByProximity(gems.length ? [...list, ...gems] : list);
 }
 
 function mergePlacePools(...pools){
@@ -4645,7 +4724,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
 
   if(!force && placeLoadPromises.has(cacheKey)){
     const pending = await placeLoadPromises.get(cacheKey);
-    LOCS = dedupePlacesByProximity((pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
+    LOCS = withHiddenGems(currentCityId, (pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
     return pending;
   }
 
@@ -4661,7 +4740,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
     const result = await request;
     placeLoadPromises.delete(cacheKey);
     const fetchedPlaces=(result.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
-    LOCS = mergePlacePools(localPlaces,fetchedPlaces);
+    LOCS = withHiddenGems(currentCityId, mergePlacePools(localPlaces,fetchedPlaces));
     if(LOCS.length){
       placeCache.set(cacheKey, LOCS.map(p => ({ ...p, coords: [...p.coords] })));
     } else {
@@ -4699,7 +4778,7 @@ async function ensureCityPlaces(city, minCount=1){
   if(placeLoadPromises.has(cacheKey)){
     try{
       const pending = await placeLoadPromises.get(cacheKey);
-      LOCS = dedupePlacesByProximity((pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
+      LOCS = withHiddenGems(currentCityId, (pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
     }catch(_e){}
   }
   if(LOCS.length>=minCount) return true;
@@ -4735,7 +4814,7 @@ async function searchCity(q){
     const typing2=addTypingIndicator();
     const tTime=parseInt(document.getElementById('t-time')?.value)||600;
     const result=await API.fetchPlaces(lat,lon,currentCityName,tTime);
-    LOCS=dedupePlacesByProximity((result.places||[]).map(p => ({ ...p, coords: normalizeLatLon(p.coords) })));
+    LOCS=withHiddenGems(currentCityId, (result.places||[]).map(p => ({ ...p, coords: normalizeLatLon(p.coords) })));
     typing2.remove();
     if(LOCS.length>=3){
       updatePlannerShowcase();
@@ -4817,7 +4896,7 @@ async function generatePlan(){
   const breakDuration=getBreakDurationMinutes();
   const totalTripMinutes = maxT * nDays; // tell backend how many total minutes needed
   mdPlan=[];itin=[];dayIdx=0;
-  let avail=LOCS.filter(l=>prefs.includes(l.cat));
+  let avail=LOCS.filter(l=>prefs.includes(l.cat) || l.isHiddenGem);
   
   if (window.customSelectedPlaces && window.customSelectedPlaces.length > 0) {
     avail = LOCS.filter(l => window.customSelectedPlaces.includes(String(l.id)));
