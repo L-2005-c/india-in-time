@@ -3,14 +3,12 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v14-modular-frontend-split';
+const CACHE_NAME = 'india-in-time-v13-weather-reopt-persona-glass';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/app.js?v=20260603-vercel-fix',
-  '/styles.css?v=20260603-vercel-fix',
   '/client-api.js?v=20260603-vercel-fix',
   '/logo-mark.png?v=20260603-logo',
   '/favicon-32.png?v=20260603-logo',
@@ -70,7 +68,6 @@ self.addEventListener('fetch', event => {
 
   // For the app shell and branding assets, always prefer the latest version.
   if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/client-api.js'
-      || url.pathname === '/app.js' || url.pathname === '/styles.css'
       || url.pathname === '/logo-mark.png' || url.pathname === '/favicon-32.png'
       || url.pathname === '/apple-touch-icon.png' || url.pathname === '/icon-192.png'
       || url.pathname === '/icon-512.png' || url.pathname === '/manifest.json') {

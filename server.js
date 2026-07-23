@@ -220,8 +220,6 @@ app.use(express.static(config.publicDir, {
       filePath.endsWith('sw.js') ||
       filePath.endsWith('client-api.js') ||
       filePath.endsWith('api.js') ||
-      filePath.endsWith('app.js') ||
-      filePath.endsWith('styles.css') ||
       filePath.endsWith('manifest.json') ||
       filePath.endsWith('index.html') ||
       filePath.endsWith('logo-mark.png') ||

@@ -86,31 +86,4 @@ async function requireAuth(req, res, next) {
   }
 }
 
-/**
- * Like requireAuth, but never blocks the request. If a valid Firebase ID
- * token is present, sets req.uid/req.userEmail from it (trusted). If the
- * token is missing, invalid, or auth isn't configured, the request simply
- * continues with req.uid left unset — callers must treat that as anonymous
- * and MUST NOT fall back to a client-supplied userId, or this defeats the
- * point (see routes/feedback.js for the bug this was written to fix: it
- * used to store whatever userId the request body claimed, letting anyone
- * attribute feedback to someone else's account).
- */
-async function optionalAuth(req, res, next) {
-  ensureInitialized();
-  const header = req.headers.authorization || '';
-  const match = header.match(/^Bearer (.+)$/i);
-  if (!initialized || !match) {
-    return next();
-  }
-  try {
-    const decoded = await admin.auth().verifyIdToken(match[1]);
-    req.uid = decoded.uid;
-    req.userEmail = decoded.email || null;
-  } catch (err) {
-    console.warn('[auth] optional token verification failed (continuing as anonymous):', err.message);
-  }
-  next();
-}
-
-module.exports = { requireAuth, optionalAuth };
+module.exports = { requireAuth };
