@@ -8,6 +8,17 @@ const { placesCache } = require('../services/cache');
 const { distKm } = require('../utils/geo');
 const PLACE_CACHE_TTL_MS = config.cache.placesTtlMs;
 
+// ── City name aliases ───────────────────────────────────────────────────────
+// Common short/alternate names map to the canonical key used in every seed
+// table below (staticSeedsByCity, CITY_FOOD_SEEDS, CITY_SEEDS). Add new
+// aliases here only — never duplicate a city's data under a second key.
+const CITY_ALIASES = { vizag: 'visakhapatnam' };
+
+function resolveCityKey(cityName) {
+  const key = String(cityName || '').trim().toLowerCase();
+  return CITY_ALIASES[key] || key;
+}
+
 function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
   return [
     String(cityName || '').trim().toLowerCase(),
@@ -28,7 +39,7 @@ function setCachedPlaces(key, payload) {
 }
 
 function staticCityPlaces(cityName) {
-  const key = String(cityName || '').trim().toLowerCase();
+  const key = resolveCityKey(cityName);
   const staticSeedsByCity = {
     visakhapatnam: [
       ['Ramakrishna Beach','beach',17.7142,83.3237,90,'05:30','21:00'],
@@ -186,8 +197,7 @@ function staticCityPlaces(cityName) {
     ['Arsalan Park Circus','food',22.5415,88.3657,45,'11:00','23:30'],
     ],
   };
-  const CITY_ALIASES = { vizag: 'visakhapatnam' };
-  const seeds = staticSeedsByCity[key] || staticSeedsByCity[CITY_ALIASES[key]] || [];
+  const seeds = staticSeedsByCity[key] || [];
   return seeds.map((s, i) => ({
     id: `static_${key.replace(/[^a-z0-9]/g, '_')}_${i}`,
     name: s[0], cat: s[1], coords: [s[2], s[3]], vt: s[4], ot: s[5], ct: s[6],
@@ -481,11 +491,10 @@ async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
 async function fetchCuratedFoodFallback(lat, lon, cityName) {
   const CITY_FOOD_SEEDS = {
     visakhapatnam: ['Venkatadri Vantillu', 'Daspalla Restaurant', 'Ramakrishna Beach Food Court', 'Sea Inn Raju Gari Dhaba', 'Sai Priya Beach Restaurant'],
-    vizag: ['Venkatadri Vantillu', 'Daspalla Restaurant', 'Ramakrishna Beach Food Court', 'Sea Inn Raju Gari Dhaba', 'Sai Priya Beach Restaurant'],
     vijayawada: ['Babai Hotel', 'RR Durbar', 'Minerva Coffee Shop', 'Southern Spice Restaurant', 'Brindavan Restaurant'],
     hyderabad: ['Bawarchi Restaurant', 'Paradise Biryani', 'Shah Ghouse', 'Cafe Niloufer', 'Pista House'],
   };
-  const key = String(cityName || '').trim().toLowerCase();
+  const key = resolveCityKey(cityName);
   const seeds = CITY_FOOD_SEEDS[key] || [];
   const out = [];
   const seen = new Set();
@@ -531,18 +540,6 @@ async function fetchCuratedCityFallback(lat, lon, cityName) {
       { name: 'Simhachalam Temple', cat: 'temple', vt: 60 },
       { name: 'Yarada Beach', cat: 'beach', vt: 90 },
     ],
-    vizag: [
-      { name: 'Ramakrishna Beach', cat: 'beach', vt: 90 },
-      { name: 'Rushikonda Beach', cat: 'beach', vt: 90 },
-      { name: 'Kailasagiri', cat: 'scenic', vt: 75 },
-      { name: 'Tenneti Park', cat: 'scenic', vt: 60 },
-      { name: 'INS Kursura Submarine Museum', cat: 'scenic', vt: 60 },
-      { name: 'TU 142 Aircraft Museum', cat: 'scenic', vt: 50 },
-      { name: 'Matsyadarshini Aquarium', cat: 'scenic', vt: 45 },
-      { name: 'VUDA Park', cat: 'scenic', vt: 45 },
-      { name: 'Simhachalam Temple', cat: 'temple', vt: 60 },
-      { name: 'Yarada Beach', cat: 'beach', vt: 90 },
-    ],
     vijayawada: [
       { name: 'Kanaka Durga Temple', cat: 'temple', vt: 60 },
       { name: 'Prakasam Barrage', cat: 'scenic', vt: 45 },
@@ -552,7 +549,7 @@ async function fetchCuratedCityFallback(lat, lon, cityName) {
       { name: 'Gandhi Hill', cat: 'scenic', vt: 45 },
     ],
   };
-  const key = String(cityName || '').trim().toLowerCase();
+  const key = resolveCityKey(cityName);
   const seeds = CITY_SEEDS[key] || [];
   const out = [];
   const seen = new Set();

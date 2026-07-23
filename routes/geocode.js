@@ -2,17 +2,18 @@
 // Proxies Nominatim city-search so the frontend never hits third-party APIs directly.
 // GET /api/geocode?q=Kurnool
 //
-// Two things this route used to get wrong (both fixed here):
-//   1. services/cache.js already defines a `geocodeCache` (1000 entries,
-//      1hr TTL) for exactly this purpose, but this file never imported it —
-//      every keystroke-search hit Nominatim fresh, even for a query someone
-//      else had already searched seconds earlier.
-//   2. Nominatim's usage policy caps the WHOLE APP at ~1 request/second,
-//      globally — not per user. routes/places.js already respects this
-//      (see its sequential, delayed calls), but this route fired requests
-//      with no throttle at all. Under any real concurrent traffic this is
-//      the single most likely way to get the app's server IP banned from
-//      Nominatim, breaking city search for every user at once.
+// This route has two responsibilities that both matter under real traffic:
+//   1. Cache hits: geocodeCache (services/cache.js) avoids re-hitting Nominatim
+//      for repeat searches — city names repeat constantly across users, and a
+//      city's coordinates don't change, so a 1hr TTL cache has a high hit rate.
+//      Only non-empty results are cached; an empty [] is often a transient typo
+//      and isn't worth locking in for an hour.
+//   2. Global throttle: Nominatim's usage policy caps the WHOLE APP at ~1
+//      request/second, globally — not per user. routes/places.js already
+//      respects this with sequential, delayed calls; this route must too, or
+//      concurrent searches from different users can burst past that shared
+//      limit and get the app's server IP rate-limited or banned, breaking
+//      city search for everyone at once.
 
 const express = require('express');
 const fetch   = require('node-fetch');
@@ -36,11 +37,9 @@ router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'Missing query param: q' });
 
-  const cacheKey = q.toLowerCase();
-  const cached = geocodeCache.get(cacheKey);
-  if (cached !== undefined) {
-    return res.json(cached);
-  }
+  const key = q.toLowerCase();
+  const cached = geocodeCache.get(key);
+  if (cached) return res.json(cached);
 
   try {
     const data = await throttledNominatimCall(async () => {
@@ -62,8 +61,12 @@ router.get('/', async (req, res) => {
       return upstream.json();
     });
 
+    // Only cache non-empty results — an empty [] is often a transient typo,
+    // not worth locking in for an hour.
     // Shape: [{ lat, lon, name, display_name, ... }]
-    geocodeCache.set(cacheKey, data);
+    if (Array.isArray(data) && data.length > 0) {
+      geocodeCache.set(key, data);
+    }
     res.json(data);
   } catch (err) {
     console.error('[geocode]', err.message);
