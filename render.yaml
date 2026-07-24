@@ -1,0 +1,30 @@
+# Render deployment blueprint.
+# The codebase's own comments (middleware/auth.js, scripts/backup-db.js)
+# confirm Render as the actual deployment target, so this uses Render's
+# native Node runtime rather than assuming the Dockerfile is the deploy
+# path — both are available; pick whichever this service is actually
+# configured to use in the Render dashboard.
+services:
+  - type: web
+    name: india-in-time-api
+    runtime: node
+    plan: starter
+    region: singapore # closest Render region to India as of writing; change if a closer one exists by the time you deploy
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # set manually — Neon connection string, use the pooled one
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false # set to your real frontend origin in production; defaults to * otherwise
+      - key: ADMIN_FEEDBACK_KEY
+        sync: false
+      # REDIS_URL: only add this (and a Redis instance) if you actually
+      # raise CLUSTER_WORKERS above 1 — see the comment in server.js.

@@ -1,0 +1,41 @@
+name: CI
+
+# No test suite exists in this repo yet (see package.json — there's no
+# "test" script). This workflow intentionally only does what's actually
+# true: installs real dependencies and syntax-checks every backend JS file
+# plus the extracted frontend app.js. Add a real `npm test` step here once
+# there's a test suite to run — don't just add `npm test` to this file
+# without one, or CI will pass by having nothing to fail.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax-check backend JS
+        run: |
+          find . -name "*.js" \
+            -not -path "./node_modules/*" \
+            -not -path "./frontend/public/*" \
+            -print0 | xargs -0 -n1 node --check
+
+      - name: Syntax-check frontend app.js
+        run: node --check frontend/public/app.js
+
+      - name: npm audit (non-blocking)
+        run: npm audit --omit=dev || true

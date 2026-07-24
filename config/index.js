@@ -57,24 +57,11 @@ const config = {
     geminiTtlMs:    parseInt(process.env.CACHE_GEMINI_TTL_MS, 10)  || 10 * 60 * 1000,
   },
 
-  // Database
-  db: {
-    path: process.env.DB_PATH || require('path').join(__dirname, '..', 'data', 'india-in-time.db'),
-  },
-
   // Server
   server: {
     bodyLimit:          process.env.BODY_LIMIT || '5mb',
     shutdownTimeoutMs:  10000,
     trustProxy:         isProd,
-  },
-
-  // Nominatim
-  nominatim: {
-    userAgent:  'IndiaInTime/2.0 (travel-planner-app)',
-    timeoutMs:  9000,
-    delayMs:    200,  // polite delay between batched requests
-    maxDistKm:  40,   // max distance from city center
   },
 
   // Paths
