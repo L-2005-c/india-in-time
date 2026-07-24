@@ -1352,6 +1352,9 @@ function followLivePosition(force=false){
     const shifted=L.point(pt.x,pt.y+110);
     target=map.unproject(shifted,zoom);
   }
+  const tLat=Array.isArray(target)?target[0]:target.lat;
+  const tLon=Array.isArray(target)?target[1]:target.lng;
+  if(!Number.isFinite(tLat)||!Number.isFinite(tLon)) return;
   map.flyTo(target,zoom,{
     animate:true,
     duration:0.8,
@@ -2867,7 +2870,7 @@ function switchToView(viewId,idx){
   viewIds.forEach(v=>{const el=document.getElementById(v);el.classList.remove('active');el.style.display='none';});
   const target=document.getElementById(viewId);target.classList.add('active');target.style.display=viewId==='tools-view'?'block':'flex';
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===idx||i===3&&idx>=3));
-  if(viewId==='map-view'&&map){setTimeout(()=>map.invalidateSize(),50);setTimeout(()=>map.invalidateSize(),300);}
+  if(viewId==='map-view'&&map){map.invalidateSize();setTimeout(()=>map.invalidateSize(),50);setTimeout(()=>map.invalidateSize(),300);}
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
   else if(idx===3||viewId==='tools-view') renderToolsHome();
