@@ -1343,24 +1343,14 @@ function updateFollowButton(){
 }
 
 function followLivePosition(force=false){
-  // NOTE: `cLat==null` does NOT catch NaN (NaN==null is false in JS), so a
-  // malformed GPS reading could slip past this guard and reach map.flyTo(),
-  // which throws "Invalid LatLng object: (NaN, NaN)" and crashes live
-  // tracking. Number.isFinite() correctly rejects null/undefined/NaN/Infinity.
-  if(!map||!Number.isFinite(cLat)||!Number.isFinite(cLon)) return;
+  if(!map||cLat==null||cLon==null) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
   const zoom=Math.max(map.getZoom()||14,15);
   let target=[cLat,cLon];
   if(tripActive){
     const pt=map.project(target,zoom);
     const shifted=L.point(pt.x,pt.y+110);
-    const unprojected=map.unproject(shifted,zoom);
-    // Defensive: only use the pixel-shifted target if it came back valid.
-    // If projection ever produces NaN (bad zoom, detached map container,
-    // etc.), fall back to the raw GPS position rather than crashing.
-    if(Number.isFinite(unprojected.lat)&&Number.isFinite(unprojected.lng)){
-      target=unprojected;
-    }
+    target=map.unproject(shifted,zoom);
   }
   map.flyTo(target,zoom,{
     animate:true,
@@ -1920,7 +1910,7 @@ function toggleStreetQuest(forceState){
 }
 
 function updateStreetQuestProgress(){
-  if(!streetQuestActive || !Number.isFinite(cLat) || !Number.isFinite(cLon)) return;
+  if(!streetQuestActive || cLat==null || cLon==null) return;
 
   for(const item of streetQuestItems){
     if(item.collected) continue;
@@ -3135,7 +3125,7 @@ function updateItinUI(){
 }
 
 // ── Trip Controls ─────────────────────────────────────────────────────────────
-function startTrip(){if(!Number.isFinite(cLat)||!Number.isFinite(cLon)){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
+function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
 function skipStop(){const routeStops=getRouteStopsForDay(itin);if(!routeStops.length)return;const sk=routeStops[0];itin=applyBreakPlanToCurrentItinerary(routeStops.slice(1));sync();addMsg(`⏭️ Skipped <strong>${sk.name}</strong>`);renderRoute();}
 function optimizeRoute(silent=false){
   if(!itin.length){renderRoute();return;}
@@ -3154,7 +3144,7 @@ function waShare(){if(!mdPlan.length){addMsg('Generate a plan first!');return;}l
 function shareEmergency(){if(!cLat||!cLon){alert('GPS not available.');return;}const t=`🚨 EMERGENCY: https://maps.google.com/?q=${cLat},${cLon}`;if(navigator.share)navigator.share({title:'Emergency',text:t}).catch(()=>navigator.clipboard?.writeText(t));else navigator.clipboard?.writeText(t);}
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
-function resetGPS(){cLat=null;cLon=null;document.getElementById('gps-txt').textContent='GPS';initGPS();}
+function resetGPS(){cLat=null;document.getElementById('gps-txt').textContent='GPS';initGPS();}
 function initGPS(){
   if(!('geolocation' in navigator))return;if(wid!==null)navigator.geolocation.clearWatch(wid);
   wid=navigator.geolocation.watchPosition(pos=>{

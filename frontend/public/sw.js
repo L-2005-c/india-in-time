@@ -3,15 +3,15 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v15-livefix-20260724';
+const CACHE_NAME = 'india-in-time-v14-modular-frontend-split';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/app.js?v=20260724-livefix',
-  '/styles.css?v=20260724-livefix',
-  '/client-api.js?v=20260724-livefix',
+  '/app.js?v=20260603-vercel-fix',
+  '/styles.css?v=20260603-vercel-fix',
+  '/client-api.js?v=20260603-vercel-fix',
   '/logo-mark.png?v=20260603-logo',
   '/favicon-32.png?v=20260603-logo',
   '/apple-touch-icon.png?v=20260603-logo',
