@@ -66,6 +66,13 @@ const config = {
 
   // Paths
   publicDir: require('path').join(__dirname, '..', 'frontend', 'public'),
+
+  // Nominatim (used by routes/geocode.js's throttled outbound calls)
+  nominatim: {
+    userAgent: process.env.NOMINATIM_USER_AGENT || 'IndiaInTime/2.0 (travel-planner-app)',
+    timeoutMs: parseInt(process.env.NOMINATIM_TIMEOUT_MS, 10) || 9000,
+    delayMs:   parseInt(process.env.NOMINATIM_DELAY_MS, 10)   || 1100, // Nominatim's usage policy caps the whole app at ~1 req/sec, globally
+  },
 };
 
 module.exports = config;

@@ -3148,6 +3148,7 @@ function resetGPS(){cLat=null;document.getElementById('gps-txt').textContent='GP
 function initGPS(){
   if(!('geolocation' in navigator))return;if(wid!==null)navigator.geolocation.clearWatch(wid);
   wid=navigator.geolocation.watchPosition(pos=>{
+    if(!Number.isFinite(pos.coords.latitude) || !Number.isFinite(pos.coords.longitude)) return; // reject a malformed fix instead of corrupting cLat/cLon with NaN
     const isF=cLat===null;cLat=pos.coords.latitude;cLon=pos.coords.longitude;
     lastHeading=deriveHeading(pos);
     lastHeadingSample=[cLat,cLon];
