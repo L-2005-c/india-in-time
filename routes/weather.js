@@ -14,19 +14,42 @@ function weatherEmoji(code) {
   return '🌧️';
 }
 
+async function fetchOpenMeteo(lat, lon, timeoutMs = 8000) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+  const upstream = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!upstream.ok) {
+    const body = await upstream.text().catch(() => '');
+    const err = new Error(`Open-Meteo responded ${upstream.status}: ${body.slice(0, 200)}`);
+    err.status = upstream.status;
+    throw err;
+  }
+  return upstream.json();
+}
+
 router.get('/', async (req, res) => {
   const { lat, lon } = req.query;
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat / lon params' });
 
+  let data;
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    data = await fetchOpenMeteo(lat, lon);
+  } catch (firstErr) {
+    // One retry — most Open-Meteo failures on Render are a single transient
+    // blip (cold outbound connection, brief upstream hiccup), not a real outage.
+    console.warn('[weather] first attempt failed, retrying:', firstErr.message);
+    try {
+      data = await fetchOpenMeteo(lat, lon);
+    } catch (secondErr) {
+      // Log the real reason so it's actually diagnosable in Render logs,
+      // instead of a generic "Weather upstream error" every time.
+      console.error('[weather] upstream failed after retry:', secondErr.message);
+      const status = secondErr.name === 'TimeoutError' || secondErr.name === 'AbortError' ? 504 : 502;
+      return res.status(status).json({ error: 'Weather upstream error', detail: secondErr.message });
+    }
+  }
 
-    if (!upstream.ok) return res.status(502).json({ error: 'Weather upstream error' });
-
-    const data = await upstream.json();
-    const cw   = data?.current_weather;
-
+  try {
+    const cw = data?.current_weather;
     if (!cw) return res.status(502).json({ error: 'No weather data in response' });
 
     const temp = Math.round(cw.temperature);
@@ -39,7 +62,7 @@ router.get('/', async (req, res) => {
       display:     `${weatherEmoji(cw.weathercode)} ${temp}°C`,
     });
   } catch (err) {
-    console.error('[weather]', err.message);
+    console.error('[weather] parse error:', err.message);
     res.status(500).json({ error: 'Weather fetch failed' });
   }
 });
