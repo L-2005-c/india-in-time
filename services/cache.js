@@ -157,7 +157,7 @@ const geminiCache = new LRUCache({
 
 const weatherCache = new LRUCache({
   name:        'weather',
-  maxEntries:  50,
+  maxEntries:  150, // stores a hot + stale-fallback entry per location (routes/weather.js)
   defaultTtlMs: config.cache.weatherTtlMs,
 });
 
