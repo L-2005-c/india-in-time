@@ -2081,10 +2081,11 @@ function toggleLoadPanel(){switchToView('tools-view',3);renderLoadPanel();}
 window.realWind = window.realWind || 0;
 window._lastWeatherSnapshot = window._lastWeatherSnapshot || null;
 
-async function fetchWeatherUI(lat,lon){
+async function fetchWeatherUI(lat,lon,attempt=0){
   try{
     window._lastKnownLatLon = [lat, lon];
     const d=await API.fetchWeather(lat,lon);
+    window._weatherFailToastShown=false; // reset so a later real failure can toast again
     realTemp=d.temp;
     realWeatherMain=d.main || (d.weathercode>=51 ? 'Rain' : 'Clear');
     window.realWind = d.windKph || 0;
@@ -2092,6 +2093,16 @@ async function fetchWeatherUI(lat,lon){
     updatePlannerShowcase();
     detectWeatherChangeAndReoptimize({ temp: realTemp, main: realWeatherMain, wind: window.realWind });
   }catch(e){
+    // Free-tier hosting can be cold-starting (502/503 for the first ~20-30s
+    // after being idle). Back off and retry a few times before treating it
+    // as a genuine failure, instead of showing "offline" for a server that's
+    // simply still waking up.
+    const status=parseInt(String(e.message).match(/(\d{3})$/)?.[1]||'0',10);
+    const looksLikeColdStart = status===502||status===503||status===0;
+    if(looksLikeColdStart && attempt<3){
+      setTimeout(()=>fetchWeatherUI(lat,lon,attempt+1), 5000*(attempt+1));
+      return;
+    }
     const el=document.getElementById('wx-display');
     if(el && (!el.textContent || el.textContent.includes('--'))) el.textContent='⚠️ Weather unavailable';
     if(!window._weatherFailToastShown){
