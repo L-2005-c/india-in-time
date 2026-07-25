@@ -9,7 +9,19 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "backup": "node scripts/backup-db.js"
+    "backup": "node scripts/backup-db.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage --runInBand",
+    "lint": "eslint . --ext .js --ignore-pattern node_modules --ignore-pattern frontend/public",
+    "lint:fix": "eslint . --ext .js --ignore-pattern node_modules --ignore-pattern frontend/public --fix"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/frontend/"
+    ]
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -17,8 +29,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
-    "firebase-admin": "^12.7.0",
     "express-async-errors": "^3.1.1",
+    "firebase-admin": "^12.7.0",
     "helmet": "^8.0.0",
     "ioredis": "^5.4.1",
     "node-fetch": "^2.7.0",
@@ -26,6 +38,10 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "eslint": "^10.8.0",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.0",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2"
   }
 }

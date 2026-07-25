@@ -2073,7 +2073,7 @@ function renderLoadPanel(){
   const cloud=window._fbPlans||[];
   const seen=new Set();
   const all=[...cloud,...local].filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return true;}).sort((a,b)=>b.ts-a.ts);
-  document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">📂 My Saved Plans ${currentUser?'☁️':''}</div></div>${all.length===0?'<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:24px;font-style:italic">No saved plans yet.</p>':all.map(d=>`<div class="saved-plan-item"><div><div class="sp-name">${d.name}</div><div class="sp-date">${new Date(d.ts).toLocaleString()} ${cloud.find(c=>c.id===d.id)?'☁️':''}</div></div><div class="sp-btns"><button class="sp-load" onclick="loadPlan('${encodeURIComponent(JSON.stringify(d))}')">Load</button><button class="sp-del" onclick="delPlan('${d.id}')">×</button></div></div>`).join('')}`;
+  document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">📂 My Saved Plans ${currentUser?'☁️':''}</div></div>${all.length===0?'<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:24px;font-style:italic">No saved plans yet.</p>':all.map(d=>`<div class="saved-plan-item"><div><div class="sp-name">${escapeHtml(d.name)}</div><div class="sp-date">${new Date(d.ts).toLocaleString()} ${cloud.find(c=>c.id===d.id)?'☁️':''}</div></div><div class="sp-btns"><button class="sp-load" onclick="loadPlan('${encodeURIComponent(JSON.stringify(d))}')">Load</button><button class="sp-del" onclick="delPlan('${d.id}')">×</button></div></div>`).join('')}`;
 }
 function toggleLoadPanel(){switchToView('tools-view',3);renderLoadPanel();}
 
@@ -2528,10 +2528,38 @@ function chatAbout(name){switchToView('chat-view',2);setTimeout(()=>{document.ge
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// ── Chat/toast HTML sanitizer ────────────────────────────────────────────
+// addMsg()/showToast() render fragments built by template-literal-interpolating
+// place names, search box text, and error messages directly into HTML —
+// several of those call sites were NOT escaping their dynamic parts (the
+// search box query in searchCity() being the clearest case: typing
+// "<img src=x onerror=...>" into city search rendered it unescaped). Rather
+// than auditing and hand-fixing every one of the ~60 call sites (risky to do
+// without a frontend test suite), addMsg()/showToast() now run everything
+// through this allowlist sanitizer, so unescaped interpolation anywhere
+// upstream can't reach innerHTML as executable markup.
+//
+// Uses DOMPurify (loaded in index.html) when available. If that script
+// failed to load (CDN outage, ad-blocker, offline), this fails SAFE by
+// stripping all HTML rather than falling back to raw innerHTML.
+const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div'];
+function sanitizeChatHtml(html){
+  const str = String(html ?? '');
+  if (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+    return window.DOMPurify.sanitize(str, {
+      ALLOWED_TAGS: CHAT_ALLOWED_TAGS,
+      ALLOWED_ATTR: ['style','class'],
+      ALLOW_DATA_ATTR: false,
+    });
+  }
+  console.warn('[security] DOMPurify unavailable \u2014 falling back to plain-text rendering for chat messages.');
+  return escapeHtml(str);
+}
 function formatAiText(str){
   return escapeHtml(str).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
 }
-function addMsg(html,isBot=true){const box=document.getElementById('chat-messages');const row=document.createElement('div');row.className='msg-row'+(isBot?'':' from-user')+' fade-in';row.innerHTML=isBot?`<div class="msg-avatar av-ai">AI</div><div class="bubble">${html}</div>`:`<div class="bubble user-b">${html}</div><div class="msg-avatar av-me">ME</div>`;box.appendChild(row);box.scrollTop=box.scrollHeight;return row;}
+function addMsg(html,isBot=true){const box=document.getElementById('chat-messages');const row=document.createElement('div');row.className='msg-row'+(isBot?'':' from-user')+' fade-in';const safe=sanitizeChatHtml(html);row.innerHTML=isBot?`<div class="msg-avatar av-ai">AI</div><div class="bubble">${safe}</div>`:`<div class="bubble user-b">${safe}</div><div class="msg-avatar av-me">ME</div>`;box.appendChild(row);box.scrollTop=box.scrollHeight;return row;}
 function addTypingIndicator(){return addMsg('<span style="display:flex;gap:4px;align-items:center"><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .2s infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .4s infinite"></span></span>');}
 function getRecentBotText(){const rows=[...document.querySelectorAll('#chat-messages .msg-row')].reverse();for(const row of rows){if(row.classList.contains('from-user')) continue;const bubble=row.querySelector('.bubble');const text=String(bubble?.textContent||'').trim();if(text) return text.toLowerCase();}return '';}
 
@@ -2738,7 +2766,7 @@ async function generateTripPDF(){
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-function showToast(icon,title,msg,duration=5000){document.getElementById('notif-icon').textContent=icon;document.getElementById('notif-title').textContent=title;document.getElementById('notif-msg').innerHTML=msg;const t=document.getElementById('notif-toast');t.style.display='block';requestAnimationFrame(()=>t.classList.add('show'));clearTimeout(window._toastHideTid);window._toastHideTid=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.style.display='none',280);},duration);}
+function showToast(icon,title,msg,duration=5000){document.getElementById('notif-icon').textContent=icon;document.getElementById('notif-title').textContent=title;document.getElementById('notif-msg').innerHTML=sanitizeChatHtml(msg);const t=document.getElementById('notif-toast');t.style.display='block';requestAnimationFrame(()=>t.classList.add('show'));clearTimeout(window._toastHideTid);window._toastHideTid=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.style.display='none',280);},duration);}
 async function setupNotifications(){
   if(!itin.length){addMsg('Generate a plan first!');return;}
   let permGranted=false;if('Notification' in window){const p=await Notification.requestPermission();permGranted=p==='granted';}

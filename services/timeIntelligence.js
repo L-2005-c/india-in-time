@@ -173,7 +173,7 @@ function getPlaceState(place, now = new Date(), weather = null) {
   const isPeakHourNow = inWindow(nowMin, peakHours);
 
   let statusLabel = 'Good time to visit';
-  let recommendations = [];
+  const recommendations = [];
 
   if (!isOpenNow) {
     statusLabel = isHolidayToday ? `Closed today (weekly holiday: ${weeklyHoliday})` : 'Currently Closed';

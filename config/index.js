@@ -18,13 +18,29 @@ function requireEnv(key) {
 }
 
 // ── Config object ───────────────────────────────────────────────────────────
+// CORS_ORIGIN='*' in production means ANY website can call this API with
+// credentials-adjacent requests. server.js used to only console.warn about
+// this; that's easy to miss in deploy logs. Fail fast instead, the same way
+// requireEnv() does for other critical vars, unless explicitly opted out
+// via CORS_ALLOW_WILDCARD=true (e.g. for a short-lived preview deploy).
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+if (isProd && corsOrigin === '*' && process.env.CORS_ALLOW_WILDCARD !== 'true') {
+  console.error(
+    '❌  CORS_ORIGIN is not set (or is "*") in production. This allows any website ' +
+    'to call this API. Set CORS_ORIGIN to your real frontend origin (e.g. ' +
+    'https://indiaintime.com), or explicitly set CORS_ALLOW_WILDCARD=true if this ' +
+    'is intentional (e.g. a public read-only API).'
+  );
+  process.exit(1);
+}
+
 const config = {
   env:  NODE_ENV,
   port: parseInt(process.env.PORT, 10) || 3000,
   isProd,
 
   // CORS
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+  corsOrigin,
 
   // Gemini AI
   gemini: {

@@ -102,9 +102,8 @@ if (config.server.trustProxy) {
 app.use(requestLogger);
 
 // 2. CORS
-if (config.isProd && config.corsOrigin === '*') {
-  console.warn('⚠️  CORS_ORIGIN is not set — allowing requests from ANY origin in production. Set CORS_ORIGIN to your real domain (e.g. https://indiaintime.com) in Render env vars.');
-}
+// (config/index.js already fails fast at boot if CORS_ORIGIN='*' in
+// production and CORS_ALLOW_WILDCARD isn't explicitly set — see there.)
 app.use(cors({ origin: config.corsOrigin }));
 
 // 3. Body parsing
