@@ -7,6 +7,7 @@ const config = require('../config');
 const { geminiCache } = require('./cache');
 const crypto = require('crypto');
 const { getCachedAiResponse, setCachedAiResponse } = require('../db/queries');
+const logger = require('../lib/logger');
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ function checkCircuit() {
   const elapsed = Date.now() - circuitOpenedAt;
   if (elapsed >= config.gemini.circuitBreaker.resetTimeMs) {
     circuitState = 'HALF_OPEN';
-    console.log('[gemini] Circuit breaker → HALF_OPEN (trying one request)');
+    logger.info({ module: 'gemini', circuitState: 'HALF_OPEN' }, 'Circuit breaker → HALF_OPEN (trying one request)');
     return true;
   }
 
@@ -47,7 +48,7 @@ function recordSuccess() {
   consecutiveFailures = 0;
   if (circuitState === 'HALF_OPEN') {
     circuitState = 'CLOSED';
-    console.log('[gemini] Circuit breaker → CLOSED (recovered)');
+    logger.info({ module: 'gemini', circuitState: 'CLOSED' }, 'Circuit breaker → CLOSED (recovered)');
   }
 }
 
@@ -57,14 +58,14 @@ function recordFailure() {
     // Failed during half-open test → reopen
     circuitState = 'OPEN';
     circuitOpenedAt = Date.now();
-    console.log('[gemini] Circuit breaker → OPEN (half-open test failed)');
+    logger.warn({ module: 'gemini', circuitState: 'OPEN' }, 'Circuit breaker → OPEN (half-open test failed)');
     return;
   }
   if (consecutiveFailures >= config.gemini.circuitBreaker.failureThreshold) {
     circuitState = 'OPEN';
     circuitOpenedAt = Date.now();
     stats.circuitTrips++;
-    console.log(`[gemini] ⚡ Circuit breaker TRIPPED after ${consecutiveFailures} consecutive failures. Cooling down for ${config.gemini.circuitBreaker.resetTimeMs / 1000}s`);
+    logger.warn({ module: 'gemini', circuitState: 'OPEN', consecutiveFailures, cooldownSec: config.gemini.circuitBreaker.resetTimeMs / 1000 }, '⚡ Circuit breaker TRIPPED');
   }
 }
 
@@ -168,7 +169,7 @@ async function callGemini(parts, opts = {}) {
       return dbCached;
     }
   } catch (err) {
-    console.warn('[gemini] DB Cache read error:', err.message);
+    logger.warn({ module: 'gemini', err: err.message }, 'DB cache read error');
   }
 
   // ── Circuit breaker check ──────────────────────────────────────────────
@@ -197,7 +198,7 @@ async function callGemini(parts, opts = {}) {
           try {
             await setCachedAiResponse(cacheKey, result);
           } catch (err) {
-            console.warn('[gemini] DB Cache write error:', err.message);
+            logger.warn({ module: 'gemini', err: err.message }, 'DB cache write error');
           }
         }
 
@@ -216,7 +217,7 @@ async function callGemini(parts, opts = {}) {
         if (attempt < maxRetries) {
           const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
           stats.retries++;
-          console.log(`[gemini] Attempt ${attempt}/${maxRetries} failed: ${err.message}. Retrying in ${delay}ms...`);
+          logger.warn({ module: 'gemini', attempt, maxRetries, err: err.message, retryInMs: delay }, 'Attempt failed, retrying');
           await sleep(delay);
         }
       }
@@ -271,7 +272,7 @@ function resetCircuit() {
   circuitState = 'CLOSED';
   consecutiveFailures = 0;
   circuitOpenedAt = 0;
-  console.log('[gemini] Circuit breaker manually reset → CLOSED');
+  logger.info({ module: 'gemini', circuitState: 'CLOSED' }, 'Circuit breaker manually reset → CLOSED');
 }
 
 module.exports = {
