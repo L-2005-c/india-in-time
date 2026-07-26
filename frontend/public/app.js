@@ -47,8 +47,11 @@ Object.assign(window, {
   handleFoodSafety, showCrowdPredictor, showFareNegotiator, showTripTribe,
   // AI Tools Drawer
   openAiDrawer, closeAiDrawer, renderAiToolsGrid,
-  // Feedback system
-  showAppFeedback, pickAppFeedbackRating, pickAppFeedbackCategory, finishAppFeedback, rateStop,
+  // Feedback system — showAppFeedback is still invoked via the drawer's
+  // onclick=; the rating/tag/submit buttons inside the feedback card itself
+  // use delegated data-action handlers (see initChatActionDelegation) so
+  // they don't need to be on window.
+  showAppFeedback,
 });
 
 // ══════════════════════════════════════════════════
@@ -2543,13 +2546,22 @@ function escapeHtml(str){
 // Uses DOMPurify (loaded in index.html) when available. If that script
 // failed to load (CDN outage, ad-blocker, offline), this fails SAFE by
 // stripping all HTML rather than falling back to raw innerHTML.
-const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div'];
+// 'button' and 'textarea' were added for the in-chat feedback/replanner
+// widgets below — those rely on data-action delegation (see
+// initChatActionDelegation()) rather than onclick=, since inline event
+// handler attributes are exactly what this sanitizer strips. Do NOT add
+// 'onclick' (or any on*) to ALLOWED_ATTR — that would reopen the XSS holes
+// this allowlist was built to close. New data-* attributes are fine to add
+// here as long as the code reading them only ever uses them for lookups/
+// comparisons, never feeds them into innerHTML or eval.
+const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div','button','textarea'];
+const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','type','maxlength','rows','placeholder','aria-label','disabled'];
 function sanitizeChatHtml(html){
   const str = String(html ?? '');
   if (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
     return window.DOMPurify.sanitize(str, {
       ALLOWED_TAGS: CHAT_ALLOWED_TAGS,
-      ALLOWED_ATTR: ['style','class'],
+      ALLOWED_ATTR: CHAT_ALLOWED_ATTR,
       ALLOW_DATA_ATTR: false,
     });
   }
@@ -2560,6 +2572,27 @@ function formatAiText(str){
   return escapeHtml(str).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
 }
 function addMsg(html,isBot=true){const box=document.getElementById('chat-messages');const row=document.createElement('div');row.className='msg-row'+(isBot?'':' from-user')+' fade-in';const safe=sanitizeChatHtml(html);row.innerHTML=isBot?`<div class="msg-avatar av-ai">AI</div><div class="bubble">${safe}</div>`:`<div class="bubble user-b">${safe}</div><div class="msg-avatar av-me">ME</div>`;box.appendChild(row);box.scrollTop=box.scrollHeight;return row;}
+
+// ── Delegated action handling for in-chat widget buttons ────────────────────
+// Buttons rendered through addMsg() go through sanitizeChatHtml(), which
+// strips onclick= (see comment above CHAT_ALLOWED_TAGS). So instead of
+// onclick="fn(...)", these buttons carry data-action="fn" (+ data-n/data-cat
+// as needed) and get picked up here via one delegated listener, attached
+// once at module load — this works for buttons added to the DOM at any
+// point later, no per-button wiring needed.
+const CHAT_ACTIONS = {
+  fbSetStar, fbSetCat, fbSubmit, fbSkip,
+  rateStopClick, runReplannerClick,
+};
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const fn = CHAT_ACTIONS[btn.dataset.action];
+  if (fn) fn(btn);
+});
+document.addEventListener('input', (e) => {
+  if (e.target.matches('[data-role="fb-comment"]')) updateFbCounter(e.target);
+});
 function addTypingIndicator(){return addMsg('<span style="display:flex;gap:4px;align-items:center"><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .2s infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .4s infinite"></span></span>');}
 function getRecentBotText(){const rows=[...document.querySelectorAll('#chat-messages .msg-row')].reverse();for(const row of rows){if(row.classList.contains('from-user')) continue;const bubble=row.querySelector('.bubble');const text=String(bubble?.textContent||'').trim();if(text) return text.toLowerCase();}return '';}
 
@@ -2687,11 +2720,6 @@ async function bestTimeToVisit(query){
 async function handleChat(){
   const inp=document.getElementById('chat-in');const val=inp.value.trim();if(!val)return;
   addMsg(escapeHtml(val),false);inp.value='';const lq=val.toLowerCase();const typing=addTypingIndicator();
-  if(window._pendingAppFeedback?.awaitingMessage){
-    typing.remove();
-    await finishAppFeedback(val);
-    return;
-  }
   if(lq.match(/\b(best|good|right|ideal|perfect)\s+time\b|\bwhen\s+(should|to|can|is)\b.*\b(visit|go|see|explore)\b|\bwhen('s| is)?\s+the\s+best\b/)){
     const rep=await bestTimeToVisit(val);
     typing.remove();
@@ -3360,56 +3388,113 @@ async function handleTranslate(event) {
 
 function promptStopFeedback(place){
   if(!place?.id || !place?.name) return;
-  const safeName = place.name.replace(/'/g,"\\'");
-  addMsg(`⭐ How was <strong>${place.name}</strong>?<br><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap" id="fb-${place.id}">` +
-    [1,2,3,4,5].map(n=>`<button onclick="rateStop('${place.id}','${safeName}',${n})" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:7px 11px;font-size:14px;cursor:pointer">${'⭐'.repeat(n)}</button>`).join('') +
+  addMsg(`⭐ How was <strong>${escapeHtml(place.name)}</strong>?<br><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap" data-role="place-fb" data-place-id="${escapeHtml(String(place.id))}" data-place-name="${escapeHtml(place.name)}">` +
+    [1,2,3,4,5].map(n=>`<button type="button" data-action="rateStopClick" data-n="${n}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:7px 11px;font-size:14px;cursor:pointer">${'⭐'.repeat(n)}</button>`).join('') +
     `</div>`);
 }
 
-async function rateStop(placeId, placeName, rating){
-  const row=document.getElementById(`fb-${placeId}`);
-  if(row) row.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Thanks for rating ${placeName} — ${'⭐'.repeat(rating)}</div>`;
+function rateStopClick(btn){
+  const row = btn.closest('[data-role="place-fb"]');
+  if(!row) return;
+  const placeId = row.dataset.placeId;
+  const placeName = row.dataset.placeName;
+  const rating = parseInt(btn.dataset.n, 10);
+  rateStop(placeId, placeName, rating, row);
+}
+
+async function rateStop(placeId, placeName, rating, row){
+  row = row || document.querySelector(`[data-role="place-fb"][data-place-id="${CSS.escape(String(placeId))}"]`);
+  if(row) row.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Thanks for rating ${escapeHtml(placeName)} — ${'⭐'.repeat(rating)}</div>`;
   try{
     await API.submitPlaceFeedback(placeName, currentCityName, rating);
     showToast('⭐','Thanks for rating it!','Real feedback like this shapes future recommendations.',3000);
   }catch(e){ console.error('rateStop error', e); }
 }
 
+const APP_FEEDBACK_CATS = [['love_it','Loving it 😍'],['bug','Found a bug 🐛'],['feature_request','Missing something 💡'],['confusing','Confusing 🤔'],['general','Just general 💭']];
+
 function showAppFeedback(){
   switchToView('chat-view', 2);
-  window._pendingAppFeedback = null;
-  addMsg(`💬 <strong>How's India In-Time working for you?</strong><br>Your honest take — good or bad — genuinely shapes what we build next.<br><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap" id="app-fb-stars">` +
-    [1,2,3,4,5].map(n=>`<button onclick="pickAppFeedbackRating(${n})" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px 12px;font-size:16px;cursor:pointer">${'⭐'.repeat(n)}</button>`).join('') +
+  addMsg(`💬 <strong>How's India In-Time working for you?</strong><br>Your honest take — good or bad — genuinely shapes what we build next.` +
+    `<div class="fb-card" data-role="fb-card" data-rating="0" data-cat="" style="margin-top:10px">` +
+      `<div data-role="fb-stars" style="display:flex;gap:6px;flex-wrap:wrap">` +
+        [1,2,3,4,5].map(n=>`<button type="button" data-action="fbSetStar" data-n="${n}" aria-label="Rate ${n} star${n>1?'s':''}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px 12px;font-size:16px;cursor:pointer;line-height:1">☆</button>`).join('') +
+      `</div>` +
+      `<div data-role="fb-tags" style="display:none;gap:6px;flex-wrap:wrap;margin-top:10px">` +
+        APP_FEEDBACK_CATS.map(([v,l])=>`<button type="button" data-action="fbSetCat" data-cat="${v}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer">${l}</button>`).join('') +
+      `</div>` +
+      `<div data-role="fb-comment-wrap" style="display:none;margin-top:10px">` +
+        `<textarea data-role="fb-comment" maxlength="2000" rows="2" placeholder="Anything specific? Totally optional." style="width:100%;box-sizing:border-box;background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px;font:inherit;color:inherit;resize:vertical"></textarea>` +
+        `<div data-role="fb-counter" style="font-size:10px;color:var(--text-muted);text-align:right;margin-top:2px">0/2000</div>` +
+      `</div>` +
+      `<div data-role="fb-actions" style="display:none;gap:8px;margin-top:8px">` +
+        `<button type="button" data-action="fbSubmit" style="background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--ocean);cursor:pointer">Send feedback</button>` +
+        `<button type="button" data-action="fbSkip" style="background:transparent;border:1px solid var(--border-default);border-radius:8px;padding:7px 14px;font-size:12px;color:var(--text-muted);cursor:pointer">Not now</button>` +
+      `</div>` +
     `</div>`);
 }
 
-function pickAppFeedbackRating(rating){
-  window._pendingAppFeedback = { rating };
-  const row = document.getElementById('app-fb-stars');
-  if(row) row.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">You rated: ${'⭐'.repeat(rating)}</div>`;
-  const cats = [['love_it','Loving it 😍'],['bug','Found a bug 🐛'],['feature_request','Missing something 💡'],['confusing','Confusing 🤔'],['general','Just general 💭']];
-  addMsg(`What's it mostly about? <em>(optional — pick one, or skip straight to typing your thoughts below)</em><br><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">` +
-    cats.map(([v,l])=>`<button onclick="pickAppFeedbackCategory('${v}')" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer">${l}</button>`).join('') +
-    `</div>`);
+function fbSetStar(btn){
+  const card = btn.closest('[data-role="fb-card"]');
+  if(!card) return;
+  const n = parseInt(btn.dataset.n, 10);
+  card.dataset.rating = String(n);
+  card.querySelectorAll('[data-action="fbSetStar"]').forEach(s=>{
+    const sn = parseInt(s.dataset.n, 10);
+    s.textContent = sn <= n ? '★' : '☆';
+  });
+  const tags = card.querySelector('[data-role="fb-tags"]');
+  const commentWrap = card.querySelector('[data-role="fb-comment-wrap"]');
+  const actions = card.querySelector('[data-role="fb-actions"]');
+  if(tags) tags.style.display = 'flex';
+  if(commentWrap) commentWrap.style.display = 'block';
+  if(actions) actions.style.display = 'flex';
 }
 
-function pickAppFeedbackCategory(cat){
-  if(!window._pendingAppFeedback) return;
-  window._pendingAppFeedback.category = cat;
-  window._pendingAppFeedback.awaitingMessage = true;
-  addMsg(`Got it. Type any details below and hit send — or tap to submit as-is.<br><button onclick="finishAppFeedback()" style="margin-top:6px;background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--ocean);cursor:pointer">Submit without details</button>`);
+function fbSetCat(btn){
+  const card = btn.closest('[data-role="fb-card"]');
+  if(!card) return;
+  const cat = btn.dataset.cat;
+  const already = card.dataset.cat === cat;
+  card.dataset.cat = already ? '' : cat;
+  card.querySelectorAll('[data-action="fbSetCat"]').forEach(t=>{
+    const on = !already && t.dataset.cat === cat;
+    t.style.background = on ? 'var(--ocean-glow)' : 'var(--bg-glass)';
+    t.style.borderColor = on ? 'var(--ocean)' : 'var(--border-default)';
+  });
 }
 
-async function finishAppFeedback(message){
-  const fb = window._pendingAppFeedback;
-  if(!fb){ addMsg('⚠️ Tap "App Feedback" in the tools menu to start again.'); return; }
-  window._pendingAppFeedback = null;
+function updateFbCounter(el){
+  const card = el.closest('[data-role="fb-card"]');
+  if(!card) return;
+  const counter = card.querySelector('[data-role="fb-counter"]');
+  if(counter) counter.textContent = `${el.value.length}/2000`;
+}
+
+function fbSkip(btn){
+  const card = btn.closest('[data-role="fb-card"]');
+  if(!card) return;
+  card.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">No worries — you can always tap "App Feedback" again later 👋</div>`;
+}
+
+async function fbSubmit(btn){
+  const card = btn.closest('[data-role="fb-card"]');
+  if(!card) return;
+  const rating = parseInt(card.dataset.rating, 10) || 0;
+  if(!rating) return;
+  const cat = card.dataset.cat || 'general';
+  const commentEl = card.querySelector('[data-role="fb-comment"]');
+  const message = commentEl ? commentEl.value.trim() : '';
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
   try{
     const activeViewId = viewIds && viewIds.find(v => document.getElementById(v)?.classList.contains('active'));
-    await API.submitAppFeedback(fb.rating, fb.category || 'general', message || null, activeViewId || currentCityId || null);
-    addMsg(`🙏 <strong>Thank you</strong> — feedback like this is exactly what helps us build the right things next.`);
+    await API.submitAppFeedback(rating, cat, message || null, activeViewId || currentCityId || null);
+    card.outerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">🙏 <strong>Thank you</strong> — feedback like this is exactly what helps us build the right things next.</div>`;
     showToast('💬','Feedback sent','Thanks for helping us improve India In-Time!',3500);
   }catch(e){
+    btn.disabled = false;
+    btn.textContent = 'Send feedback';
     addMsg('⚠️ Could not send feedback right now — please try again in a moment.');
   }
 }
@@ -3447,10 +3532,12 @@ async function showReplanner() {
   // Ask how late they are
   addMsg('🧭 <strong>Smart Replanner</strong> — How many minutes are you running late?<br><br><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' +
     ['15 min', '30 min', '45 min', '1 hour', '2 hours'].map(t =>
-      `<button onclick="runReplanner('${t}')" style="background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--ocean);cursor:pointer">${t}</button>`
+      `<button type="button" data-action="runReplannerClick" data-arg="${t}" style="background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--ocean);cursor:pointer">${t}</button>`
     ).join('') + '</div>'
   );
 }
+
+function runReplannerClick(btn){ runReplanner(btn.dataset.arg); }
 
 async function runReplanner(lateStr) {
   const minutesLate = parseInt(lateStr) || 30;

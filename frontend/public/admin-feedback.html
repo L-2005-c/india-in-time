@@ -51,6 +51,12 @@
   .refresh{float:right;background:var(--bg-card2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;}
   .refresh:hover{border-color:var(--gold);}
   .time{color:var(--text-muted);font-size:11px;white-space:nowrap;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .filters select,.filters input{background:var(--bg-card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px;}
+  .filters input{flex:1;min-width:160px;}
+  .cat-breakdown{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .cat-chip{font-size:11px;padding:4px 10px;border-radius:20px;background:var(--bg-card2);border:1px solid var(--border);color:var(--text-muted);}
+  .cat-chip b{color:var(--text);}
 </style>
 </head>
 <body>
@@ -76,6 +82,26 @@
   </div>
 
   <div class="panel active" id="panel-app">
+    <div class="filters">
+      <select id="f-cat" onchange="renderApp()">
+        <option value="">All categories</option>
+        <option value="love_it">Loving it 😍</option>
+        <option value="bug">Found a bug 🐛</option>
+        <option value="feature_request">Missing something 💡</option>
+        <option value="confusing">Confusing 🤔</option>
+        <option value="general">Just general 💭</option>
+      </select>
+      <select id="f-rating" onchange="renderApp()">
+        <option value="">Any rating</option>
+        <option value="5">★★★★★ only</option>
+        <option value="4">4★ and up</option>
+        <option value="3">3★ and up</option>
+        <option value="2">2★ and below</option>
+        <option value="1">1★ only</option>
+      </select>
+      <input type="text" id="f-search" placeholder="Search message…" oninput="renderApp()">
+    </div>
+    <div class="cat-breakdown" id="cat-breakdown"></div>
     <table id="tbl-app"><thead><tr><th>When</th><th>Rating</th><th>Category</th><th>Message</th><th>Screen</th></tr></thead><tbody></tbody></table>
     <div class="empty" id="empty-app" style="display:none">No app feedback yet — once someone taps "App Feedback" in the drawer, it shows up here.</div>
   </div>
@@ -127,6 +153,9 @@ function showTab(name){
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
 }
 
+let appFbRows = [];
+const CAT_LABELS = {love_it:'Loving it 😍',bug:'Found a bug 🐛',feature_request:'Missing something 💡',confusing:'Confusing 🤔',general:'Just general 💭'};
+
 async function loadAll(){
   try{
     const [appFb, placeFb] = await Promise.all([
@@ -134,11 +163,22 @@ async function loadAll(){
       apiGet('/api/feedback/place/all?limit=300'),
     ]);
     renderStats(appFb, placeFb);
-    renderApp(appFb.recent || []);
+    appFbRows = appFb.recent || [];
+    renderCatBreakdown(appFbRows);
+    renderApp();
     renderPlace(placeFb.rows || []);
   }catch(e){
     alert('Could not load feedback: ' + e.message);
   }
+}
+
+function renderCatBreakdown(rows){
+  const counts = {};
+  rows.forEach(r => { const c = r.category || 'general'; counts[c] = (counts[c]||0) + 1; });
+  document.getElementById('cat-breakdown').innerHTML = Object.entries(counts)
+    .sort((a,b) => b[1]-a[1])
+    .map(([cat,n]) => `<span class="cat-chip"><b>${n}</b> ${esc(CAT_LABELS[cat] || cat)}</span>`)
+    .join('') || '';
 }
 
 function renderStats(appFb, placeFb){
@@ -151,9 +191,25 @@ function renderStats(appFb, placeFb){
   `;
 }
 
-function renderApp(rows){
+function renderApp(){
+  const catF = document.getElementById('f-cat').value;
+  const ratingF = document.getElementById('f-rating').value;
+  const searchF = document.getElementById('f-search').value.trim().toLowerCase();
+  const rows = appFbRows.filter(r => {
+    if(catF && (r.category || 'general') !== catF) return false;
+    if(ratingF){
+      const rf = parseInt(ratingF, 10);
+      if(rf >= 3 ? r.rating < rf : r.rating > rf) return false;
+    }
+    if(searchF && !(r.message || '').toLowerCase().includes(searchF)) return false;
+    return true;
+  });
   const tbody = document.querySelector('#tbl-app tbody');
-  document.getElementById('empty-app').style.display = rows.length ? 'none' : 'block';
+  const emptyEl = document.getElementById('empty-app');
+  emptyEl.style.display = rows.length ? 'none' : 'block';
+  emptyEl.textContent = appFbRows.length
+    ? 'No feedback matches these filters.'
+    : 'No app feedback yet — once someone taps "App Feedback" in the drawer, it shows up here.';
   document.getElementById('tbl-app').style.display = rows.length ? 'table' : 'none';
   tbody.innerHTML = rows.map(r => `
     <tr>
