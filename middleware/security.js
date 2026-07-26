@@ -50,6 +50,7 @@ function buildHelmetOptions() {
           'https://*.google-analytics.com',
           'https://*.basemaps.cartocdn.com',
           'https://cdn.jsdelivr.net',                // DOMPurify's sourcemap fetch (devtools only, but blocked otherwise)
+          'https://routing.openstreetmap.de',        // OSRM road-routing API — draws the actual road-following route line
         ],
         frameSrc: ['https://accounts.google.com'], // Firebase Google sign-in
         objectSrc: ["'none'"],
