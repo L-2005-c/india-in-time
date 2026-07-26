@@ -7,9 +7,9 @@ const config  = require('./config');
 const express = require('express');
 require('express-async-errors');
 const cors    = require('cors');
-const path    = require('path');
 const cluster = require('cluster');
 const os      = require('os');
+const logger  = require('./lib/logger');
 
 // ── Clustering (10k User Concurrency) ────────────────────────────────────────
 // IMPORTANT: the rate limiter (middleware/rateLimiter.js) keeps its counters
@@ -28,9 +28,19 @@ const os      = require('os');
 const numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10)
   || (process.env.REDIS_URL ? os.cpus().length : 1);
 
-if (cluster.isPrimary) {
-  console.log(`\n🚀 India In-Time API v2.0 Primary (${process.pid}) is running`);
-  console.log(`   Forking ${numCPUs} worker${numCPUs === 1 ? '' : 's'}...`);
+// Vercel serverless functions are a fresh process per invocation — there's
+// no meaningful "primary forks workers" relationship there, and spawning
+// child processes via cluster.fork() inside a serverless sandbox is
+// generally unsupported. Without this guard, cluster.isPrimary is always
+// true on a fresh Vercel invocation, so the branch below would try to fork
+// workers instead of ever reaching the Express app setup in the `else`
+// branch — meaning routes were never registered on Vercel at all. VERCEL is
+// set automatically by the Vercel runtime; see README.md's Deployment
+// section for the broader Render-vs-Vercel caveat this is part of.
+const isServerless = !!process.env.VERCEL;
+
+if (!isServerless && cluster.isPrimary) {
+  logger.info({ pid: process.pid, workers: numCPUs }, '🚀 India In-Time API v2.0 Primary is running, forking workers...');
   
   const { initDatabase, closeDatabase } = require('./db/init');
   
@@ -48,18 +58,18 @@ if (cluster.isPrimary) {
         cluster.fork();
       }
     } catch (err) {
-      console.error('Failed to initialize primary database:', err);
+      logger.error({ err }, 'Failed to initialize primary database');
       process.exit(1);
     }
   })();
 
   cluster.on('exit', (worker, code, signal) => {
-    console.warn(`⚠️  Worker ${worker.process.pid} died. Forking a new one...`);
+    logger.warn({ pid: worker.process.pid, code, signal }, '⚠️  Worker died — forking a replacement');
     cluster.fork();
   });
 
   function primaryShutdown(signal) {
-    console.log(`\n🛑 Primary received ${signal} — shutting down...`);
+    logger.info({ signal }, '🛑 Primary received shutdown signal');
     closeDatabase().then(() => process.exit(0));
   }
   process.on('SIGTERM', () => primaryShutdown('SIGTERM'));
@@ -114,20 +124,11 @@ try {
   const compression = require('compression');
   app.use(compression({ threshold: 1024 })); // compress responses > 1KB
 } catch (_e) {
-  console.warn('⚠️  compression package not installed — skipping response compression');
+  logger.warn('⚠️  compression package not installed — skipping response compression');
 }
 
 // 5. Security headers
-try {
-  const helmet = require('helmet');
-  app.use(helmet({
-    contentSecurityPolicy: false, // disable CSP (our inline scripts/styles need it)
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false, // disable COOP so Firebase OAuth popups work on mobile
-  }));
-} catch (_e) {
-  console.warn('⚠️  helmet package not installed — skipping security headers');
-}
+app.use(require('./middleware/security').buildSecurityMiddleware());
 
 // 6. Analytics logging (logs all /api/ requests to DB)
 app.use(analyticsMiddleware);
@@ -244,65 +245,87 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ── Start Server ─────────────────────────────────────────────────────────────
-initDatabase().then(() => {
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`   ✅ Worker ${process.pid} started and listening on port ${PORT}`);
-  });
-
-  // ── Connection tuning for high concurrency ──────────────────────────────────
-  // keepAliveTimeout should exceed most load balancers' idle timeout (commonly
-  // 60s on AWS ALB / Render / Railway) so the LB doesn't race the server to
-  // close a socket it's about to reuse. headersTimeout must stay a few
-  // seconds above keepAliveTimeout (Node requirement) and shields the process
-  // from slow/stalled clients holding sockets open under load.
-  server.keepAliveTimeout = 65000;
-  server.headersTimeout   = 66000;
-
-  // ── Graceful Shutdown ────────────────────────────────────────────────────────
-  function gracefulShutdown(signal) {
-    console.log(`\n🛑  ${signal} received — shutting down gracefully...`);
-
-    // Stop accepting new connections
-    server.close(async () => {
-      console.log('   ✅ HTTP server closed');
-
-      // Flush any buffered analytics rows and purge expired cache entries
-      // BEFORE closing the pool — both need a live connection. (Previously
-      // purgeExpiredCache ran after closeDatabase() and silently failed
-      // every time; flushAnalyticsBuffer wasn't called at all, so up to
-      // ~2s of usage logs were lost on every deploy.)
-      try {
-        const { purgeExpiredCache, flushAnalyticsBuffer } = require('./db/queries');
-        await flushAnalyticsBuffer();
-        await purgeExpiredCache();
-      } catch (_e) {}
-
-      // Close database
-      await closeDatabase();
-
-      console.log('   ✅ Cleanup complete. Goodbye!\n');
-      process.exit(0);
+function startLongRunningServer() {
+  initDatabase().then(() => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      logger.info({ pid: process.pid, port: PORT }, '✅ Worker started and listening');
     });
 
-    // Force exit after timeout
-    setTimeout(() => {
-      console.error('   ⚠️  Forced shutdown after timeout');
-      process.exit(1);
-    }, config.server.shutdownTimeoutMs);
-  }
+    // ── Connection tuning for high concurrency ──────────────────────────────────
+    // keepAliveTimeout should exceed most load balancers' idle timeout (commonly
+    // 60s on AWS ALB / Render / Railway) so the LB doesn't race the server to
+    // close a socket it's about to reuse. headersTimeout must stay a few
+    // seconds above keepAliveTimeout (Node requirement) and shields the process
+    // from slow/stalled clients holding sockets open under load.
+    server.keepAliveTimeout = 65000;
+    server.headersTimeout   = 66000;
 
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
-  process.on('uncaughtException', (err) => {
-    console.error('💥  Uncaught exception:', err);
-    gracefulShutdown('uncaughtException');
-  });
-  process.on('unhandledRejection', (reason) => {
-    console.error('💥  Unhandled rejection:', reason);
-  });
-}).catch(err => {
-  console.error('💥 Failed to start worker database:', err);
-  process.exit(1);
-});
+    // ── Graceful Shutdown ────────────────────────────────────────────────────────
+    function gracefulShutdown(signal) {
+      logger.info({ signal }, '🛑 Received shutdown signal — shutting down gracefully');
 
-} // End of cluster worker block
+      // Stop accepting new connections
+      server.close(async () => {
+        logger.info('✅ HTTP server closed');
+
+        // Flush any buffered analytics rows and purge expired cache entries
+        // BEFORE closing the pool — both need a live connection. (Previously
+        // purgeExpiredCache ran after closeDatabase() and silently failed
+        // every time; flushAnalyticsBuffer wasn't called at all, so up to
+        // ~2s of usage logs were lost on every deploy.)
+        try {
+          const { purgeExpiredCache, flushAnalyticsBuffer } = require('./db/queries');
+          await flushAnalyticsBuffer();
+          await purgeExpiredCache();
+        } catch (_e) {}
+
+        // Close database
+        await closeDatabase();
+
+        logger.info('✅ Cleanup complete. Goodbye!');
+        process.exit(0);
+      });
+
+      // Force exit after timeout
+      setTimeout(() => {
+        logger.error({ timeoutMs: config.server.shutdownTimeoutMs }, '⚠️  Forced shutdown after timeout');
+        process.exit(1);
+      }, config.server.shutdownTimeoutMs);
+    }
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+    process.on('uncaughtException', (err) => {
+      logger.fatal({ err }, '💥 Uncaught exception');
+      gracefulShutdown('uncaughtException');
+    });
+    process.on('unhandledRejection', (reason) => {
+      logger.error({ reason }, '💥 Unhandled rejection');
+    });
+  }).catch(err => {
+    logger.fatal({ err }, '💥 Failed to start worker database');
+    process.exit(1);
+  });
+}
+
+if (isServerless) {
+  // Don't bind a port or wire process-level SIGTERM/SIGINT/uncaughtException
+  // handlers here — Vercel manages the process lifecycle itself, there's no
+  // persistent socket to "gracefully close" in the request-per-invocation
+  // model, and a serverless instance can be frozen/recycled between calls in
+  // ways that make long-lived signal handlers unreliable anyway. Just make
+  // sure the DB pool is initialized so the routes above can use it.
+  initDatabase().catch(err => {
+    logger.fatal({ err }, '💥 Failed to initialize database (serverless)');
+  });
+} else {
+  startLongRunningServer();
+}
+
+// Exported so Vercel's Node builder (see vercel.json) can use this Express
+// app directly as the request handler. Has no effect on Render/Docker/local,
+// which run this file directly via `node server.js` and rely on
+// startLongRunningServer()'s app.listen() above instead.
+module.exports = app;
+
+}
