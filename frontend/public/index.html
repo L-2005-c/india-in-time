@@ -81,7 +81,7 @@
       <div class="notif-title" id="notif-title">Reminder</div>
       <div class="notif-msg" id="notif-msg"></div>
     </div>
-    <button class="notif-close" aria-label="Close notification" onclick="document.getElementById('notif-toast').style.display='none'">×</button>
+    <button class="notif-close" onclick="document.getElementById('notif-toast').style.display='none'">×</button>
   </div>
 </div>
 
@@ -105,7 +105,7 @@
       <div style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--text-primary);">AI Tools</div>
       <div style="font-size:9px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Powered by Gemini AI</div>
     </div>
-    <button onclick="closeAiDrawer()" aria-label="Close AI assistant" style="width:34px;height:34px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border-default);color:var(--text-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+    <button onclick="closeAiDrawer()" style="width:34px;height:34px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border-default);color:var(--text-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
   </div>
   <div id="ai-drawer-content" style="padding:14px;"></div>
 </div>
@@ -489,7 +489,7 @@
       <div class="chat-topbar">
         <div class="chat-topbar-left">
           <button class="back-btn" onclick="goBack()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             Back
           </button>
           <div class="chat-topbar-title">AI Assistant</div>
@@ -510,8 +510,8 @@
       </div>
       <div class="chat-input-bar">
         <input type="text" id="chat-in" placeholder="e.g. When's the best time to visit Kailasagiri?">
-        <button class="send-btn" aria-label="Send message" onclick="handleChat()">
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
+        <button class="send-btn" onclick="handleChat()">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
         </button>
       </div>
     </div>
@@ -520,7 +520,7 @@
     <div id="tools-view" class="view" style="display:none">
       <div style="padding:10px 14px 4px;border-bottom:1px solid var(--border-subtle);background:var(--sidebar-bg);display:flex;align-items:center;gap:10px;flex-shrink:0;">
         <button class="back-btn" onclick="goBack()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
           Back
         </button>
         <span id="tools-view-title" style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--text-primary);">Tools</span>
@@ -533,18 +533,18 @@
   </div>
 
   <!-- BOTTOM NAV -->
-  <nav id="bottom-nav" role="navigation" aria-label="Main navigation">
-    <div class="nav-item active" role="button" tabindex="0" onclick="switchToView('map-view',0)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('map-view',0);}">
-      <span class="nav-ico" aria-hidden="true">🗺️</span><span class="nav-lbl">Map</span>
+  <nav id="bottom-nav">
+    <div class="nav-item active" onclick="switchToView('map-view',0)">
+      <span class="nav-ico">🗺️</span><span class="nav-lbl">Map</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" onclick="switchToView('plan-view',1)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('plan-view',1);}">
-      <span class="nav-ico" aria-hidden="true">📋</span><span class="nav-lbl">Plan</span>
+    <div class="nav-item" onclick="switchToView('plan-view',1)">
+      <span class="nav-ico">📋</span><span class="nav-lbl">Plan</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" onclick="switchToView('chat-view',2)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('chat-view',2);}">
-      <span class="nav-ico" aria-hidden="true">💬</span><span class="nav-lbl">Chat</span>
+    <div class="nav-item" onclick="switchToView('chat-view',2)">
+      <span class="nav-ico">💬</span><span class="nav-lbl">Chat</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" onclick="switchToView('tools-view',3)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('tools-view',3);}">
-      <span class="nav-ico" aria-hidden="true">🧰</span><span class="nav-lbl">Tools</span>
+    <div class="nav-item" onclick="switchToView('tools-view',3)">
+      <span class="nav-ico">🧰</span><span class="nav-lbl">Tools</span>
     </div>
   </nav>
 </div>
@@ -564,7 +564,7 @@
   <div class="modal-content" style="background:var(--bg-layer1);border:1px solid var(--border-strong);border-radius:24px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-card);overflow:hidden;">
     <div style="padding:20px;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
       <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:0;color:var(--text-primary);">Customize Places 🛠️</h3>
-      <button onclick="closeCustomizeModal()" aria-label="Close" style="background:none;border:none;color:var(--text-primary);font-size:28px;line-height:1;cursor:pointer;padding:0;">&times;</button>
+      <button onclick="closeCustomizeModal()" style="background:none;border:none;color:var(--text-primary);font-size:28px;line-height:1;cursor:pointer;padding:0;">&times;</button>
     </div>
     <div style="padding:15px 20px;display:flex;gap:10px;border-bottom:1px solid var(--border-subtle);">
       <button onclick="selectAllCustomPlaces(true)" class="btn-secondary" style="flex:1;padding:8px;font-size:12px;border-radius:12px;">Select All</button>

@@ -113,20 +113,4 @@ async function optionalAuth(req, res, next) {
   next();
 }
 
-/**
- * Low-level: verify a raw Firebase ID token string and return the decoded
- * token (includes uid, email, and any custom claims like `admin`), or null
- * if Firebase Admin isn't configured. Throws if the token itself is
- * invalid/expired — callers should catch that.
- *
- * Exists so other middleware (see middleware/adminAuth.js's requireAdminAuth)
- * can check custom claims without initializing a second, separate Firebase
- * Admin app instance (calling admin.initializeApp() twice throws).
- */
-async function verifyToken(idToken) {
-  ensureInitialized();
-  if (!initialized) return null;
-  return admin.auth().verifyIdToken(idToken);
-}
-
-module.exports = { requireAuth, optionalAuth, verifyToken };
+module.exports = { requireAuth, optionalAuth };

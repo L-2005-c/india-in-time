@@ -68,33 +68,15 @@ Two deployment targets are configured:
   clustering, in-memory/Redis rate limiting, and Gemini circuit breaker are
   actually designed for (see comments in `server.js` and
   `middleware/rateLimiter.js`).
-- **Vercel** (`vercel.json`) — serverless. `server.js` now detects Vercel's
-  `VERCEL` env var and skips clustering/port-binding entirely in that mode
-  (exporting the Express app directly instead) — previously, `cluster.isPrimary`
-  is always `true` on a fresh serverless invocation, so the app's routes were
-  **never actually registered on Vercel at all**; every request would have
-  hit the primary's fork-workers branch instead. That's fixed now, but the
-  rate limiter, clustering, and circuit-breaker state still don't persist
-  between invocations the way they do on Render — set `REDIS_URL` if you need
-  rate limiting to actually hold up on Vercel.
+- **Vercel** (`vercel.json`) — serverless. ⚠️ Note: serverless functions don't
+  persist process state between invocations, so the in-memory rate limiter,
+  clustering, and circuit-breaker state **do not carry the same guarantees**
+  on Vercel as they do on Render. If you're deploying to Vercel, treat those
+  protections as best-effort only, or set `REDIS_URL` so rate limiting is
+  backed by a real shared store instead of in-memory state.
 
 A `Dockerfile` is also provided (multi-stage, non-root user, built-in
 healthcheck) if you'd rather run this anywhere else that speaks Docker.
-
-### Frontend production build (optional, not yet wired in automatically)
-
-```bash
-npm run build:frontend
-```
-
-Minifies `app.js`, `client-api.js`, and `styles.css` into
-`frontend/public/dist/` with content-hashed filenames (verified: ~32%
-smaller JS, ~17% smaller CSS). This is **not yet referenced by
-`index.html`** — wiring it in fully needs a small build step that rewrites
-`index.html`'s script/link tags to point at the hashed output in production,
-which wasn't done here to avoid further changes to `index.html` without a
-way to visually verify the result. Until then this is available tooling,
-not an active part of the deploy.
 
 ### Required environment variables
 
@@ -147,29 +129,12 @@ current state):
 - [x] Dependency vulnerability scanning — `.github/dependabot.yml`
 - [x] Reflected/stored XSS in chat rendering and saved-plan names
 - [x] Production boot no longer silently allows wildcard CORS
-- [x] CSP re-enabled with a real allowlist (was fully disabled before)
-- [x] DB migration tooling (`node-pg-migrate`) — see `migrations/README.md`
-- [x] Structured logging (pino) for server lifecycle + Gemini circuit breaker
-- [x] Admin RBAC via Firebase custom claims, additive to the legacy shared key
-- [x] Vercel serverless clustering bug (routes were never registered on Vercel — see Deployment section)
-- [x] Basic accessibility pass: keyboard-operable bottom nav, aria-labels on
-      icon-only buttons, aria-hidden on decorative icons (bottom nav, close
-      buttons, send button, back-button icons in `index.html`)
-- [x] Frontend minification tooling (`npm run build:frontend`) — not yet
-      wired into `index.html`/deploy automatically, see above
-- [x] Added a `.gitignore` — there wasn't one at all, meaning `node_modules`
-      and any `.env` file placed in this directory would have been committed
-- [ ] Frontend modularization (`app.js` is currently a single large file). This
-      is the one item from the original audit deliberately **not** attempted
-      in an automated pass — safely refactoring ~4,000 lines of DOM-manipulating
-      code with no browser/e2e test coverage in this environment risks
-      silently breaking the live app in ways a syntax check can't catch. Worth
-      doing as a dedicated effort with visual/manual QA, not a blind rewrite.
-- [ ] Single point of failure: one AI provider (Gemini), one geocoding
-      provider (Nominatim), no fallback for either
-- [ ] `npm audit` flags 8 moderate-severity findings in `firebase-admin`'s
-      dependency tree (transitive `uuid` bounds-check issue). A fix is
-      available via `npm audit fix --force`, but it's a breaking major-version
-      bump to `firebase-admin` — not applied here since re-verifying every
-      auth code path against a new major version needs real testing against
-      an actual Firebase project, which isn't possible in this environment.
+- [ ] Frontend modularization (`app.js` is currently a single large file)
+- [ ] Formal DB migration tooling (schema currently applies via
+      `CREATE TABLE IF NOT EXISTS` at boot — fine for additive changes, no
+      safe path for altering/renaming existing columns)
+- [ ] Admin access is a single shared secret (`ADMIN_FEEDBACK_KEY`) rather
+      than per-admin roles/audit trail
+- [ ] Structured logging / error tracking (currently `console.log` only)
+- [ ] Reconcile the Render vs. Vercel deployment story (see Deployment
+      section above)
