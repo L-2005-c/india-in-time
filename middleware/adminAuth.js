@@ -20,29 +20,8 @@
 // Query-string (?key=) support was deliberately never re-added — secrets
 // in URLs get logged (server access logs, browser history, proxies).
 
-const crypto = require('crypto');
 const { verifyToken } = require('./auth');
 const logger = require('../lib/logger');
-
-/**
- * Constant-time string comparison. A plain `a !== b` on a secret returns as
- * soon as it hits the first mismatched byte, which leaks (via response
- * timing, over enough attempts) how many leading characters of a guess were
- * correct — the classic timing side-channel that motivates using this for
- * any secret compared against attacker-controlled input, like the
- * x-admin-key header below.
- */
-function timingSafeStringEqual(a, b) {
-  const bufA = Buffer.from(String(a ?? ''));
-  const bufB = Buffer.from(String(b ?? ''));
-  // timingSafeEqual throws on length mismatch rather than returning false,
-  // and comparing lengths first would itself leak length via timing — so
-  // compare against a fixed-length digest of each side instead of the raw
-  // (variable-length) secret.
-  const hashA = crypto.createHash('sha256').update(bufA).digest();
-  const hashB = crypto.createHash('sha256').update(bufB).digest();
-  return crypto.timingSafeEqual(hashA, hashB);
-}
 
 async function tryFirebaseAdminAuth(req) {
   const header = req.headers.authorization || '';
@@ -70,7 +49,7 @@ function tryLegacyKeyAuth(req) {
   const configured = process.env.ADMIN_FEEDBACK_KEY;
   if (!configured) return false;
   const provided = req.headers['x-admin-key'];
-  if (!provided || !timingSafeStringEqual(provided, configured)) return false;
+  if (provided !== configured) return false;
   req.adminAuthMethod = 'legacy-shared-key';
   return true;
 }

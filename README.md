@@ -142,51 +142,23 @@ This project underwent an external technical audit; the following were
 identified and are being worked through (see CI status and open issues for
 current state):
 
-- [x] Automated test suite (Jest) — `__tests__/` (119 tests, 12 suites)
-- [x] CI pipeline — `.github/workflows/ci.yml` (lint + test on Node 20.x/22.x,
-      dependency audit, Docker build verification, on every push/PR to `main`).
-      **Note:** earlier versions of this README marked this done before the
-      workflow file actually existed in the repo — an internal audit caught
-      the mismatch; this is now genuinely true and was re-verified by
-      actually running the equivalent steps locally before merging.
-- [x] Dependency vulnerability scanning — `.github/dependabot.yml` (weekly,
-      npm + GitHub Actions ecosystems). Same prior-mismatch note as above —
-      this file didn't exist before either; it does now.
+- [x] Automated test suite (Jest) — `__tests__/`
+- [x] CI pipeline — `.github/workflows/ci.yml`
+- [x] Dependency vulnerability scanning — `.github/dependabot.yml`
 - [x] Reflected/stored XSS in chat rendering and saved-plan names
 - [x] Production boot no longer silently allows wildcard CORS
 - [x] CSP re-enabled with a real allowlist (was fully disabled before)
 - [x] DB migration tooling (`node-pg-migrate`) — see `migrations/README.md`
 - [x] Structured logging (pino) for server lifecycle + Gemini circuit breaker
 - [x] Admin RBAC via Firebase custom claims, additive to the legacy shared key
-- [x] Legacy admin shared-key comparison is now constant-time
-      (`crypto.timingSafeEqual` over a fixed-length digest of each side,
-      in `middleware/adminAuth.js`) — previously a plain `!==`, which leaks
-      how many leading characters of a guess matched via response timing
-- [x] `/api/health/ready` (internal cache stats, Gemini circuit-breaker
-      state) is now gated behind the same admin auth as the feedback
-      dashboard — previously fully public. `/api/health` (the one actually
-      used by Render's/Docker's healthchecks) remains intentionally public
-      and minimal
 - [x] Vercel serverless clustering bug (routes were never registered on Vercel — see Deployment section)
 - [x] Basic accessibility pass: keyboard-operable bottom nav, aria-labels on
       icon-only buttons, aria-hidden on decorative icons (bottom nav, close
       buttons, send button, back-button icons in `index.html`)
-- [x] Frontend minification tooling (`npm run build:frontend`) — **now wired
-      in**: the script also generates `frontend/public/dist/index.html`
-      referencing its own content-hashed output, and
-      `config.resolveIndexHtmlPath()` serves it automatically in production
-      when present (falling back to the unminified source file if the build
-      hasn't been run — never a hard failure either way). Source
-      `frontend/public/index.html` itself is never modified by the build.
-- [x] Added a `.gitignore` — there wasn't one at all before, meaning
-      `node_modules` and any `.env` file placed in this directory would have
-      been committed. Same prior-mismatch note as CI/dependabot above.
-- [x] `npm audit` — the 20 *high*-severity findings in the dev-only
-      `jest`/`clean-css-cli` toolchain (transitive `brace-expansion` DoS,
-      not previously called out in this README) are fixed via a
-      `package.json` `overrides` pin to a patched version, with no
-      breaking changes. The 8 *moderate* findings below remain, for the
-      reason described there.
+- [x] Frontend minification tooling (`npm run build:frontend`) — not yet
+      wired into `index.html`/deploy automatically, see above
+- [x] Added a `.gitignore` — there wasn't one at all, meaning `node_modules`
+      and any `.env` file placed in this directory would have been committed
 - [ ] Frontend modularization (`app.js` is currently a single large file). This
       is the one item from the original audit deliberately **not** attempted
       in an automated pass — safely refactoring ~4,000 lines of DOM-manipulating

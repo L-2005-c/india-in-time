@@ -666,59 +666,8 @@ function renderBudgetBreakdown(){
 let currentCityName='India',currentCityId='india',LOCS=[];
 let credits=50,mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
-
-// Guards every map.setView()/flyTo() call against NaN/undefined coordinates
-// reaching Leaflet, which throws an uncaught "Invalid LatLng object" error
-// that crashes that interaction (confirmed live in production — city-switch
-// and geocoded-search flows could both feed bad coordinates straight into
-// Leaflet with no validation). followLivePosition() already had this exact
-// guard inline; this centralizes it so every call site gets the same
-// protection instead of relying on each one remembering to add it.
-function isFiniteLatLon(lat, lon) {
-  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
-}
-
 let cLat=null,cLon=null,tripActive=false,tripStart=null;
-
-// ── Shared GPS-fix coordination ──────────────────────────────────────────────
-// Previously, detectAndLoadCity() (below) issued its own independent
-// getCurrentPosition() call — with a 5-minute maximumAge, so it could
-// legitimately return a stale/cached/lower-accuracy fix — separately from
-// initGPS()'s watchPosition() (maximumAge:0, always fresh), which drives the
-// live location marker. Two independent geolocation requests with different
-// freshness rules could disagree, which is exactly what produced live
-// reports of the city/header defaulting to the wrong city while the live
-// marker separately settled on the user's real location moments later.
-// This makes city-detection wait for and reuse the *same* fix the live
-// marker uses, so the two can never disagree.
-let _gpsFixWaiters = [];
-function notifyGpsFix(lat, lon) {
-  const waiters = _gpsFixWaiters; _gpsFixWaiters = [];
-  waiters.forEach(w => w.resolve({ lat, lon }));
-}
-function notifyGpsError(err) {
-  const waiters = _gpsFixWaiters; _gpsFixWaiters = [];
-  waiters.forEach(w => w.reject(err));
-}
-function waitForFirstGpsFix(timeoutMs) {
-  if (Number.isFinite(cLat) && Number.isFinite(cLon)) return Promise.resolve({ lat: cLat, lon: cLon });
-  return new Promise((resolve, reject) => {
-    const entry = {
-      resolve: (pos) => { clearTimeout(timer); resolve(pos); },
-      reject:  (err) => { clearTimeout(timer); reject(err); },
-    };
-    const timer = setTimeout(() => {
-      _gpsFixWaiters = _gpsFixWaiters.filter(w => w !== entry);
-      reject(new Error('GPS fix timed out'));
-    }, timeoutMs);
-    _gpsFixWaiters.push(entry);
-  });
-}
 let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
-// Tracks where/when the route line was last drawn from, so the live-tracking
-// polyline can be refreshed as the user moves (see initGPS()) instead of
-// staying frozen at the very first GPS fix of the trip.
-let lastRouteRenderPos=null,lastRouteRenderAt=0;
 let expenses=[],stamps=new Set();
 let isDark=true; // forced dark mode
 let notifTimers=[];
@@ -1408,7 +1357,7 @@ function followLivePosition(force=false){
   }
   const tLat=Array.isArray(target)?target[0]:target.lat;
   const tLon=Array.isArray(target)?target[1]:target.lng;
-  if(!isFiniteLatLon(tLat,tLon)) return;
+  if(!Number.isFinite(tLat)||!Number.isFinite(tLon)) return;
   map.flyTo(target,zoom,{
     animate:true,
     duration:0.8,
@@ -2079,24 +2028,14 @@ async function saveUserData(){
 async function loadUserData(){
   if(!currentUser)return;
   const uid=currentUser.uid;
-  // Each read is independent and wrapped separately — previously all three
-  // shared one try/catch, so a permission denial on the *first* read
-  // (stamps) silently prevented expenses/plans from ever being attempted,
-  // and the shared catch gave no way to tell which of the three actually
-  // failed (seen live as an unspecific "[fb load] Missing or insufficient
-  // permissions" warning with no indication of which document).
   try{
     const sd=await getDoc(doc(db,'users',uid,'data','stamps'));
     if(sd.exists())stamps=new Set(sd.data().stamps||[]);
-  }catch(e){console.warn('[fb load] stamps:',e.message);}
-  try{
     const ed=await getDoc(doc(db,'users',uid,'data','expenses'));
     if(ed.exists())expenses=ed.data().expenses||[];
-  }catch(e){console.warn('[fb load] expenses:',e.message);}
-  try{
     const ps=await getDocs(collection(db,'users',uid,'plans'));
     if(!ps.empty)window._fbPlans=ps.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.warn('[fb load] plans:',e.message);}
+  }catch(e){console.warn('[fb load]',e.message);}
 }
 
 async function saveIt(){
@@ -2295,14 +2234,7 @@ function switchCity(cityId, silent=false){
   document.getElementById('city-input').value=city.name;
   LOCS=getLocalPlaces(cityId, city.name);
   document.getElementById('hdr-city').textContent=currentCityName;
-  if(map){
-    if(isFiniteLatLon(city.lat,city.lon)){
-      map.flyTo([city.lat,city.lon],12,{duration:1.1});
-    } else {
-      console.warn('[switchCity] skipped flyTo — invalid coordinates for city:', cityId, city.lat, city.lon);
-    }
-    setTimeout(()=>map.invalidateSize(),100);
-  }
+  if(map){map.flyTo([city.lat,city.lon],12,{duration:1.1}); setTimeout(()=>map.invalidateSize(),100);}
   fetchWeatherUI(city.lat,city.lon);
   resetPlanUI();
   updatePlannerShowcase();
@@ -2412,12 +2344,6 @@ async function searchCity(q){
     const nd=await API.geocode(q);
     if(!nd.length){typing.remove();addMsg(`❌ Could not find "${q}". Check spelling and try again.`);return;}
     const lat=parseFloat(nd[0].lat),lon=parseFloat(nd[0].lon);
-    if(!isFiniteLatLon(lat,lon)){
-      console.warn('[searchCity] geocode result had invalid coordinates for query:', q, nd[0]);
-      typing.remove();
-      addMsg(`❌ Got an unexpected result while looking up "${q}". Try a different spelling or a nearby major city.`);
-      return;
-    }
     currentCityName=nd[0].name?.split(',')[0]||q;
     currentCityId=q.toLowerCase();
     document.getElementById('hdr-city').textContent=currentCityName;
@@ -3269,7 +3195,7 @@ function updateItinUI(){
 }
 
 // ── Trip Controls ─────────────────────────────────────────────────────────────
-function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);if(cLat&&cLon){lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
+function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
 function skipStop(){const routeStops=getRouteStopsForDay(itin);if(!routeStops.length)return;const sk=routeStops[0];itin=applyBreakPlanToCurrentItinerary(routeStops.slice(1));sync();addMsg(`⏭️ Skipped <strong>${sk.name}</strong>`);renderRoute();}
 function optimizeRoute(silent=false){
   if(!itin.length){renderRoute();return;}
@@ -3294,7 +3220,6 @@ function initGPS(){
   wid=navigator.geolocation.watchPosition(pos=>{
     if(!Number.isFinite(pos.coords.latitude) || !Number.isFinite(pos.coords.longitude)) return; // reject a malformed fix instead of corrupting cLat/cLon with NaN
     const isF=cLat===null;cLat=pos.coords.latitude;cLon=pos.coords.longitude;
-    if(isF) notifyGpsFix(cLat,cLon); // wakes up detectAndLoadCity() if it's waiting on the first fix
     lastHeading=deriveHeading(pos);
     lastHeadingSample=[cLat,cLon];
     if(liveMkr)liveMkr.setLatLng([cLat,cLon]);
@@ -3304,24 +3229,8 @@ function initGPS(){
     if(tripActive) followLivePosition(isF);
     if(streetQuestActive) updateStreetQuestProgress();
     applyMapHeadingRotation();
-    if(isF&&itin.length){optimizeRoute(true);lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}
-    else if(tripActive){
-      chkArrival();
-      // The route polyline used to only be drawn from the very first GPS fix
-      // of the trip, so as the user actually moved, the live marker kept
-      // updating (above) but the line stayed put — producing a route that
-      // visibly no longer started at the live location. Redraw it as the
-      // user moves (or periodically), so it keeps anchoring to cLat/cLon.
-      if(itin.length){
-        const movedMeters=lastRouteRenderPos?hvKm(lastRouteRenderPos[0],lastRouteRenderPos[1],cLat,cLon)*1000:Infinity;
-        const staleMs=Date.now()-lastRouteRenderAt;
-        if(movedMeters>25||staleMs>15000){
-          lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();
-          renderRoute();
-        }
-      }
-    }
-  },err=>{document.getElementById('gps-txt').textContent='No GPS';notifyGpsError(err);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+    if(isF&&itin.length)optimizeRoute(true);else if(tripActive)chkArrival();
+  },err=>document.getElementById('gps-txt').textContent='No GPS',{enableHighAccuracy:true,timeout:15000,maximumAge:0});
 }
 async function chkArrival(){
   if(!itin.length||!cLat)return;const n=getRouteStopsForDay(itin)[0];
@@ -4125,27 +4034,27 @@ window.onload=()=>{
   syncSelectedPersonas();
   updateFollowButton();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────
-  initGPS(); // start the live-location watch FIRST — detectAndLoadCity() below waits on its first fix
   (function detectAndLoadCity() {
     function load(id) {
       switchCity(id, true);
       loadCityPlaces(CITIES[id].lat, CITIES[id].lon, CITIES[id].name, { silent: true }).catch(() => {});
     }
     if (!('geolocation' in navigator)) { load('hyderabad'); return; }
-    // Reuses the exact fix initGPS()'s watchPosition() produces (see the
-    // "Shared GPS-fix coordination" block near the cLat/cLon globals)
-    // instead of issuing a second, independent getCurrentPosition() call —
-    // that used to run with a 5-minute maximumAge while the live marker's
-    // watch used maximumAge:0, so the two could legitimately disagree.
-    waitForFirstGpsFix(6000).then(({ lat, lon }) => {
-      let nearestId = 'hyderabad', minDist = Infinity;
-      for (const [id, c] of Object.entries(CITIES)) {
-        const d = (c.lat - lat) ** 2 + (c.lon - lon) ** 2;
-        if (d < minDist) { minDist = d; nearestId = id; }
-      }
-      load(nearestId);
-    }).catch(() => load('hyderabad')); // no fix in time, permission denied, or geolocation error → Hyderabad
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const uLat = pos.coords.latitude, uLon = pos.coords.longitude;
+        let nearestId = 'hyderabad', minDist = Infinity;
+        for (const [id, c] of Object.entries(CITIES)) {
+          const d = (c.lat - uLat) ** 2 + (c.lon - uLon) ** 2;
+          if (d < minDist) { minDist = d; nearestId = id; }
+        }
+        load(nearestId);
+      },
+      () => load('hyderabad'),        // permission denied or error → Hyderabad
+      { timeout: 5000, maximumAge: 300000 }
+    );
   })();
+  initGPS();
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
 };
