@@ -166,8 +166,12 @@ app.use('/api/analytics', analyticsRoutes);
 // ── Health Checks ────────────────────────────────────────────────────────────
 const geminiService = require('./services/gemini');
 const { placesCache, geminiCache, weatherCache, geocodeCache } = require('./services/cache');
+const { requireAdminAuth } = require('./middleware/adminAuth');
 
-// Basic health check
+// Basic health check — this is the one render.yaml's healthCheckPath and the
+// Dockerfile's HEALTHCHECK actually poll, deliberately kept public/minimal
+// (no internal state) so load balancers and uptime monitors can hit it
+// without credentials.
 app.get('/api/health', (_req, res) => {
   res.json({
     status:  'ok',
@@ -177,8 +181,14 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Detailed readiness probe
-app.get('/api/health/ready', (_req, res) => {
+// Detailed readiness probe — exposes cache stats and the Gemini circuit
+// breaker's internal state, which is operationally useful but not something
+// an unauthenticated caller should be able to see (memory footprint and
+// circuit state are minor, but a real diagnostic surface should still not
+// be wide open — see the technical due-diligence notes on this endpoint).
+// Gated with the same admin auth as the feedback dashboard; not wired into
+// any platform healthcheck path, so this doesn't affect deploy healthchecks.
+app.get('/api/health/ready', requireAdminAuth, (_req, res) => {
   const memMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
   const gemini = geminiService.getStats();
 
@@ -207,6 +217,28 @@ app.get('/api/health/live', (_req, res) => {
 });
 
 // ── Serve Frontend (static files) ────────────────────────────────────────────
+
+// Explicit route for the app shell, ahead of express.static's own default-
+// index behavior — this is what actually wires scripts/build-frontend.js's
+// output into real traffic. In production, if `npm run build:frontend` has
+// been run, this serves the minified frontend/public/dist/index.html
+// (which references the content-hashed JS/CSS build-frontend.js also
+// produced) instead of the raw source file. If no dist build exists yet —
+// local dev, or a deploy that hasn't run the build step — this falls back
+// to the ordinary frontend/public/index.html, so nothing breaks either way.
+app.get(['/', '/index.html'], (_req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(config.resolveIndexHtmlPath());
+});
+
+// Minified build output (frontend/public/dist/) has content-hashed
+// filenames (see scripts/build-frontend.js), so it's safe to cache
+// aggressively and immutably — a code change produces a new filename
+// rather than invalidating a cached one.
+app.use('/dist', express.static(require('path').join(config.publicDir, 'dist'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
+}));
+
 app.use(express.static(config.publicDir, {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.json')) {
