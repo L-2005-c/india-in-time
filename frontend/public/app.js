@@ -715,6 +715,10 @@ function waitForFirstGpsFix(timeoutMs) {
   });
 }
 let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
+// Tracks where/when the route line was last drawn from, so the live-tracking
+// polyline can be refreshed as the user moves (see initGPS()) instead of
+// staying frozen at the very first GPS fix of the trip.
+let lastRouteRenderPos=null,lastRouteRenderAt=0;
 let expenses=[],stamps=new Set();
 let isDark=true; // forced dark mode
 let notifTimers=[];
@@ -3265,7 +3269,7 @@ function updateItinUI(){
 }
 
 // ── Trip Controls ─────────────────────────────────────────────────────────────
-function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
+function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);if(cLat&&cLon){lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
 function skipStop(){const routeStops=getRouteStopsForDay(itin);if(!routeStops.length)return;const sk=routeStops[0];itin=applyBreakPlanToCurrentItinerary(routeStops.slice(1));sync();addMsg(`⏭️ Skipped <strong>${sk.name}</strong>`);renderRoute();}
 function optimizeRoute(silent=false){
   if(!itin.length){renderRoute();return;}
@@ -3300,7 +3304,23 @@ function initGPS(){
     if(tripActive) followLivePosition(isF);
     if(streetQuestActive) updateStreetQuestProgress();
     applyMapHeadingRotation();
-    if(isF&&itin.length)optimizeRoute(true);else if(tripActive)chkArrival();
+    if(isF&&itin.length){optimizeRoute(true);lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}
+    else if(tripActive){
+      chkArrival();
+      // The route polyline used to only be drawn from the very first GPS fix
+      // of the trip, so as the user actually moved, the live marker kept
+      // updating (above) but the line stayed put — producing a route that
+      // visibly no longer started at the live location. Redraw it as the
+      // user moves (or periodically), so it keeps anchoring to cLat/cLon.
+      if(itin.length){
+        const movedMeters=lastRouteRenderPos?hvKm(lastRouteRenderPos[0],lastRouteRenderPos[1],cLat,cLon)*1000:Infinity;
+        const staleMs=Date.now()-lastRouteRenderAt;
+        if(movedMeters>25||staleMs>15000){
+          lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();
+          renderRoute();
+        }
+      }
+    }
   },err=>{document.getElementById('gps-txt').textContent='No GPS';notifyGpsError(err);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
 }
 async function chkArrival(){
