@@ -1412,11 +1412,28 @@ function followLivePosition(force=false){
   const tLat=Array.isArray(target)?target[0]:target.lat;
   const tLon=Array.isArray(target)?target[1]:target.lng;
   if(!isFiniteLatLon(tLat,tLon)) return;
-  map.flyTo(target,zoom,{
-    animate:true,
-    duration:0.8,
-    easeLinearity:0.25,
-  });
+  // Leaflet's flyTo() runs its own internal fly-path easing math (separate
+  // from the target we pass in), and that math can independently produce a
+  // NaN LatLng and throw — a known Leaflet 1.9.x edge case that fires when
+  // the current view is already at/near the target (e.g. tapping the
+  // recenter/follow button while already centered on the live position, or
+  // this function firing again in quick succession). Skip the animation
+  // when there's essentially nowhere to fly, and fall back to an instant,
+  // non-animated setView (no easing math to fail) if flyTo throws anyway.
+  const curCenter=map.getCenter();
+  const alreadyThere = curCenter && isFiniteLatLon(curCenter.lat,curCenter.lng)
+    && map.distance(curCenter,[tLat,tLon])<3 && Math.abs((map.getZoom()||zoom)-zoom)<0.01;
+  if(alreadyThere) return;
+  try{
+    map.flyTo([tLat,tLon],zoom,{
+      animate:true,
+      duration:0.8,
+      easeLinearity:0.25,
+    });
+  }catch(e){
+    console.warn('[followLivePosition] flyTo threw, falling back to setView', e);
+    map.setView([tLat,tLon],zoom);
+  }
 }
 
 function toggleLiveFollow(forceState){
