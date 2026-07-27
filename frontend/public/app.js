@@ -679,6 +679,41 @@ function isFiniteLatLon(lat, lon) {
 }
 
 let cLat=null,cLon=null,tripActive=false,tripStart=null;
+
+// ── Shared GPS-fix coordination ──────────────────────────────────────────────
+// Previously, detectAndLoadCity() (below) issued its own independent
+// getCurrentPosition() call — with a 5-minute maximumAge, so it could
+// legitimately return a stale/cached/lower-accuracy fix — separately from
+// initGPS()'s watchPosition() (maximumAge:0, always fresh), which drives the
+// live location marker. Two independent geolocation requests with different
+// freshness rules could disagree, which is exactly what produced live
+// reports of the city/header defaulting to the wrong city while the live
+// marker separately settled on the user's real location moments later.
+// This makes city-detection wait for and reuse the *same* fix the live
+// marker uses, so the two can never disagree.
+let _gpsFixWaiters = [];
+function notifyGpsFix(lat, lon) {
+  const waiters = _gpsFixWaiters; _gpsFixWaiters = [];
+  waiters.forEach(w => w.resolve({ lat, lon }));
+}
+function notifyGpsError(err) {
+  const waiters = _gpsFixWaiters; _gpsFixWaiters = [];
+  waiters.forEach(w => w.reject(err));
+}
+function waitForFirstGpsFix(timeoutMs) {
+  if (Number.isFinite(cLat) && Number.isFinite(cLon)) return Promise.resolve({ lat: cLat, lon: cLon });
+  return new Promise((resolve, reject) => {
+    const entry = {
+      resolve: (pos) => { clearTimeout(timer); resolve(pos); },
+      reject:  (err) => { clearTimeout(timer); reject(err); },
+    };
+    const timer = setTimeout(() => {
+      _gpsFixWaiters = _gpsFixWaiters.filter(w => w !== entry);
+      reject(new Error('GPS fix timed out'));
+    }, timeoutMs);
+    _gpsFixWaiters.push(entry);
+  });
+}
 let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
 let expenses=[],stamps=new Set();
 let isDark=true; // forced dark mode
@@ -3255,6 +3290,7 @@ function initGPS(){
   wid=navigator.geolocation.watchPosition(pos=>{
     if(!Number.isFinite(pos.coords.latitude) || !Number.isFinite(pos.coords.longitude)) return; // reject a malformed fix instead of corrupting cLat/cLon with NaN
     const isF=cLat===null;cLat=pos.coords.latitude;cLon=pos.coords.longitude;
+    if(isF) notifyGpsFix(cLat,cLon); // wakes up detectAndLoadCity() if it's waiting on the first fix
     lastHeading=deriveHeading(pos);
     lastHeadingSample=[cLat,cLon];
     if(liveMkr)liveMkr.setLatLng([cLat,cLon]);
@@ -3265,7 +3301,7 @@ function initGPS(){
     if(streetQuestActive) updateStreetQuestProgress();
     applyMapHeadingRotation();
     if(isF&&itin.length)optimizeRoute(true);else if(tripActive)chkArrival();
-  },err=>document.getElementById('gps-txt').textContent='No GPS',{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  },err=>{document.getElementById('gps-txt').textContent='No GPS';notifyGpsError(err);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
 }
 async function chkArrival(){
   if(!itin.length||!cLat)return;const n=getRouteStopsForDay(itin)[0];
@@ -4069,27 +4105,27 @@ window.onload=()=>{
   syncSelectedPersonas();
   updateFollowButton();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────
+  initGPS(); // start the live-location watch FIRST — detectAndLoadCity() below waits on its first fix
   (function detectAndLoadCity() {
     function load(id) {
       switchCity(id, true);
       loadCityPlaces(CITIES[id].lat, CITIES[id].lon, CITIES[id].name, { silent: true }).catch(() => {});
     }
     if (!('geolocation' in navigator)) { load('hyderabad'); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const uLat = pos.coords.latitude, uLon = pos.coords.longitude;
-        let nearestId = 'hyderabad', minDist = Infinity;
-        for (const [id, c] of Object.entries(CITIES)) {
-          const d = (c.lat - uLat) ** 2 + (c.lon - uLon) ** 2;
-          if (d < minDist) { minDist = d; nearestId = id; }
-        }
-        load(nearestId);
-      },
-      () => load('hyderabad'),        // permission denied or error → Hyderabad
-      { timeout: 5000, maximumAge: 300000 }
-    );
+    // Reuses the exact fix initGPS()'s watchPosition() produces (see the
+    // "Shared GPS-fix coordination" block near the cLat/cLon globals)
+    // instead of issuing a second, independent getCurrentPosition() call —
+    // that used to run with a 5-minute maximumAge while the live marker's
+    // watch used maximumAge:0, so the two could legitimately disagree.
+    waitForFirstGpsFix(6000).then(({ lat, lon }) => {
+      let nearestId = 'hyderabad', minDist = Infinity;
+      for (const [id, c] of Object.entries(CITIES)) {
+        const d = (c.lat - lat) ** 2 + (c.lon - lon) ** 2;
+        if (d < minDist) { minDist = d; nearestId = id; }
+      }
+      load(nearestId);
+    }).catch(() => load('hyderabad')); // no fix in time, permission denied, or geolocation error → Hyderabad
   })();
-  initGPS();
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
 };
