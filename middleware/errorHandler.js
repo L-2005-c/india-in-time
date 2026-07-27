@@ -56,8 +56,12 @@ function errorHandler(err, req, res, _next) {
 function notFoundHandler(req, res) {
   const accept = req.headers.accept || '';
   if (accept.includes('text/html')) {
-    // SPA fallback — serve index.html for navigation requests
-    return res.sendFile(require('path').join(config.publicDir, 'index.html'));
+    // SPA fallback — serve index.html for navigation requests. Uses
+    // config.resolveIndexHtmlPath() so this picks up the minified,
+    // content-hashed build (frontend/public/dist/) in production when one
+    // has been built (see scripts/build-frontend.js), falling back to the
+    // raw source file otherwise.
+    return res.sendFile(config.resolveIndexHtmlPath());
   }
   res.status(404).json({
     error: 'Not found',

@@ -91,4 +91,21 @@ const config = {
   },
 };
 
+// ── Frontend index.html resolution ──────────────────────────────────────────
+// scripts/build-frontend.js produces frontend/public/dist/index.html
+// (referencing the minified, content-hashed JS/CSS it also builds) but does
+// NOT touch the source frontend/public/index.html. This resolves which one
+// to actually serve at request time: the dist build when it exists and
+// we're in production, the source file otherwise (local dev, or a
+// production deploy that simply hasn't run `npm run build:frontend` — this
+// fails back safely rather than 404ing).
+const fs = require('fs');
+const path = require('path');
+
+config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
+  const distIndex = path.join(config.publicDir, 'dist', 'index.html');
+  if (config.isProd && fs.existsSync(distIndex)) return distIndex;
+  return path.join(config.publicDir, 'index.html');
+};
+
 module.exports = config;

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // scripts/build-frontend.js — Minifies the frontend for production.
 //
-// NOT currently wired into the Dockerfile/deploy pipeline automatically —
-// this is deliberately a standalone, opt-in build step for now. Wiring it
-// in fully would mean index.html needs to reference the hashed output
-// filenames conditionally in production (a small HTML templating step this
-// pass didn't take on, to avoid more changes to an already many-times-edited
-// file without a way to visually verify the result in this environment).
+// Wired into the serving path via config.resolveIndexHtmlPath() (see
+// config/index.js and server.js): in production, if this script has been
+// run, the server serves frontend/public/dist/index.html (generated below,
+// referencing the hashed files this script builds) instead of the raw
+// source index.html. If this script hasn't been run, or NODE_ENV isn't
+// production, the server transparently falls back to the source
+// index.html — so running this step is opt-in, but it's no longer inert
+// once it has been run. The source frontend/public/index.html itself is
+// never modified by this script.
 //
 // Usage:
 //   npm run build:frontend
@@ -67,6 +70,53 @@ function minifyCss(srcFile, label) {
   return outFile;
 }
 
+// Rewrites the three asset tags in source index.html to point at the
+// hashed dist/ files, and writes the result to dist/index.html. Source
+// index.html is only ever read, never modified — this is deliberate (see
+// the header comment) since hand-verifying every edit to that file without
+// a browser isn't reliable in this environment. The regexes tolerate the
+// existing "?v=..." cache-busting query strings (or none at all) so this
+// doesn't silently break if that version string changes later; if a tag
+// isn't found at all, this throws rather than shipping a dist/index.html
+// with a dangling reference to a file that no longer exists there.
+function buildProductionIndexHtml(manifest) {
+  const srcPath = path.join(PUBLIC_DIR, 'index.html');
+  let html = fs.readFileSync(srcPath, 'utf8');
+
+  const replacements = [
+    {
+      label: 'styles.css link tag',
+      pattern: /<link rel="stylesheet" href="\.\/styles\.css(?:\?[^"]*)?">/,
+      replacement: `<link rel="stylesheet" href="/dist/${manifest['styles.css']}">`,
+    },
+    {
+      label: 'client-api.js script tag',
+      pattern: /<script src="\.\/client-api\.js(?:\?[^"]*)?"><\/script>/,
+      replacement: `<script src="/dist/${manifest['client-api.js']}"></script>`,
+    },
+    {
+      label: 'app.js module script tag',
+      pattern: /<script type="module" src="\.\/app\.js(?:\?[^"]*)?"><\/script>/,
+      replacement: `<script type="module" src="/dist/${manifest['app.js']}"></script>`,
+    },
+  ];
+
+  for (const { label, pattern, replacement } of replacements) {
+    if (!pattern.test(html)) {
+      throw new Error(
+        `build-frontend.js: could not find the ${label} in frontend/public/index.html — ` +
+        `it may have changed shape since this script was written. Refusing to write a ` +
+        `dist/index.html that might reference a stale/missing asset. Update the pattern ` +
+        `in scripts/build-frontend.js to match the current markup.`
+      );
+    }
+    html = html.replace(pattern, replacement);
+  }
+
+  fs.writeFileSync(path.join(DIST_DIR, 'index.html'), html);
+  return path.relative(PUBLIC_DIR, path.join(DIST_DIR, 'index.html'));
+}
+
 function main() {
   fs.mkdirSync(DIST_DIR, { recursive: true });
   // Clean previous build output so stale hashed files don't accumulate.
@@ -81,8 +131,12 @@ function main() {
   manifest['styles.css'] = minifyCss('styles.css', 'styles.css');
 
   fs.writeFileSync(path.join(DIST_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+  const indexOut = buildProductionIndexHtml(manifest);
+  console.log(`  index.html: rewritten -> ${indexOut}`);
+
   console.log('Done. Output in frontend/public/dist/ (see manifest.json for the hashed filenames).');
-  console.log('Note: this build step is not yet wired into index.html automatically — see README.md.');
+  console.log('This is now served automatically in production — see config.resolveIndexHtmlPath()/server.js.');
 }
 
 main();
