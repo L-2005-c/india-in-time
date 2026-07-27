@@ -666,6 +666,18 @@ function renderBudgetBreakdown(){
 let currentCityName='India',currentCityId='india',LOCS=[];
 let credits=50,mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
+
+// Guards every map.setView()/flyTo() call against NaN/undefined coordinates
+// reaching Leaflet, which throws an uncaught "Invalid LatLng object" error
+// that crashes that interaction (confirmed live in production — city-switch
+// and geocoded-search flows could both feed bad coordinates straight into
+// Leaflet with no validation). followLivePosition() already had this exact
+// guard inline; this centralizes it so every call site gets the same
+// protection instead of relying on each one remembering to add it.
+function isFiniteLatLon(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
+
 let cLat=null,cLon=null,tripActive=false,tripStart=null;
 let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
 let expenses=[],stamps=new Set();
@@ -1357,7 +1369,7 @@ function followLivePosition(force=false){
   }
   const tLat=Array.isArray(target)?target[0]:target.lat;
   const tLon=Array.isArray(target)?target[1]:target.lng;
-  if(!Number.isFinite(tLat)||!Number.isFinite(tLon)) return;
+  if(!isFiniteLatLon(tLat,tLon)) return;
   map.flyTo(target,zoom,{
     animate:true,
     duration:0.8,
@@ -2028,14 +2040,24 @@ async function saveUserData(){
 async function loadUserData(){
   if(!currentUser)return;
   const uid=currentUser.uid;
+  // Each read is independent and wrapped separately — previously all three
+  // shared one try/catch, so a permission denial on the *first* read
+  // (stamps) silently prevented expenses/plans from ever being attempted,
+  // and the shared catch gave no way to tell which of the three actually
+  // failed (seen live as an unspecific "[fb load] Missing or insufficient
+  // permissions" warning with no indication of which document).
   try{
     const sd=await getDoc(doc(db,'users',uid,'data','stamps'));
     if(sd.exists())stamps=new Set(sd.data().stamps||[]);
+  }catch(e){console.warn('[fb load] stamps:',e.message);}
+  try{
     const ed=await getDoc(doc(db,'users',uid,'data','expenses'));
     if(ed.exists())expenses=ed.data().expenses||[];
+  }catch(e){console.warn('[fb load] expenses:',e.message);}
+  try{
     const ps=await getDocs(collection(db,'users',uid,'plans'));
     if(!ps.empty)window._fbPlans=ps.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.warn('[fb load]',e.message);}
+  }catch(e){console.warn('[fb load] plans:',e.message);}
 }
 
 async function saveIt(){
@@ -2234,7 +2256,14 @@ function switchCity(cityId, silent=false){
   document.getElementById('city-input').value=city.name;
   LOCS=getLocalPlaces(cityId, city.name);
   document.getElementById('hdr-city').textContent=currentCityName;
-  if(map){map.flyTo([city.lat,city.lon],12,{duration:1.1}); setTimeout(()=>map.invalidateSize(),100);}
+  if(map){
+    if(isFiniteLatLon(city.lat,city.lon)){
+      map.flyTo([city.lat,city.lon],12,{duration:1.1});
+    } else {
+      console.warn('[switchCity] skipped flyTo — invalid coordinates for city:', cityId, city.lat, city.lon);
+    }
+    setTimeout(()=>map.invalidateSize(),100);
+  }
   fetchWeatherUI(city.lat,city.lon);
   resetPlanUI();
   updatePlannerShowcase();
@@ -2344,6 +2373,12 @@ async function searchCity(q){
     const nd=await API.geocode(q);
     if(!nd.length){typing.remove();addMsg(`❌ Could not find "${q}". Check spelling and try again.`);return;}
     const lat=parseFloat(nd[0].lat),lon=parseFloat(nd[0].lon);
+    if(!isFiniteLatLon(lat,lon)){
+      console.warn('[searchCity] geocode result had invalid coordinates for query:', q, nd[0]);
+      typing.remove();
+      addMsg(`❌ Got an unexpected result while looking up "${q}". Try a different spelling or a nearby major city.`);
+      return;
+    }
     currentCityName=nd[0].name?.split(',')[0]||q;
     currentCityId=q.toLowerCase();
     document.getElementById('hdr-city').textContent=currentCityName;
