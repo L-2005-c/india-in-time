@@ -246,6 +246,15 @@ body::before {
 .nav-stat-label{font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);}
 .nav-stat-val{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--text-primary);margin-top:2px;}
 
+/* Minimized live-nav card — collapses down to just the top badge/weather
+   row so it stops covering most of the map on small mobile screens. */
+#nav-card.collapsed{padding:10px 16px;}
+#nav-card.collapsed .nav-live-row{margin-bottom:0;}
+#nav-card.collapsed .nav-dest,
+#nav-card.collapsed .nav-instruction-box,
+#nav-card.collapsed .nav-stop-legend,
+#nav-card.collapsed .nav-stats{display:none;}
+
 /* ═══════════════════════════════════════════
    PLAN VIEW — Premium redesign
 ═══════════════════════════════════════════ */

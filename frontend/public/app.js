@@ -1399,6 +1399,28 @@ function updateFollowButton(){
   btn.style.opacity=autoFollowLive?'1':'0.85';
 }
 
+// Minimize/expand the floating live-navigation card. On phones it can cover
+// close to half the map, so let the user shrink it down to just the top
+// badge/weather row and bring it back with the same tap.
+const NAV_CARD_COLLAPSED_KEY='iit_nav_card_collapsed';
+window.toggleNavCardCollapsed=function(forceState){
+  const card=document.getElementById('nav-card');
+  const btn=document.getElementById('nav-card-collapse-btn');
+  if(!card) return;
+  const collapsed=typeof forceState==='boolean' ? forceState : !card.classList.contains('collapsed');
+  card.classList.toggle('collapsed',collapsed);
+  if(btn){
+    btn.textContent=collapsed?'▸':'▾';
+    btn.setAttribute('aria-label',collapsed?'Expand live navigation':'Minimize live navigation');
+  }
+  try{ localStorage.setItem(NAV_CARD_COLLAPSED_KEY, collapsed?'1':'0'); }catch(_e){}
+};
+function restoreNavCardCollapsed(){
+  let wasCollapsed=false;
+  try{ wasCollapsed=localStorage.getItem(NAV_CARD_COLLAPSED_KEY)==='1'; }catch(_e){}
+  if(wasCollapsed) toggleNavCardCollapsed(true);
+}
+
 function followLivePosition(force=false){
   if(!map||cLat==null||cLon==null) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
@@ -4145,6 +4167,7 @@ window.onload=()=>{
   document.querySelectorAll('.persona-pref').forEach(el=>el.addEventListener('change', syncSelectedPersonas));
   syncSelectedPersonas();
   updateFollowButton();
+  restoreNavCardCollapsed();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────
   initGPS(); // start the live-location watch FIRST — detectAndLoadCity() below waits on its first fix
   (function detectAndLoadCity() {

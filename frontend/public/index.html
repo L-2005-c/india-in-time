@@ -178,7 +178,10 @@
       <div id="nav-card">
         <div class="nav-live-row">
           <div class="nav-badge"><span class="nav-ping"></span>Live Navigation</div>
-          <div class="nav-wx" id="wx-display">☀️ --°C</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="nav-wx" id="wx-display">☀️ --°C</div>
+            <button id="nav-card-collapse-btn" onclick="toggleNavCardCollapsed()" aria-label="Minimize live navigation" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
+          </div>
         </div>
         <div class="nav-dest" id="nav-next">Select a city to begin</div>
         <div class="nav-instruction-box">
