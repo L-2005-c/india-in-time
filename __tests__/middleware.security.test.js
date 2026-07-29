@@ -78,4 +78,18 @@ describe('security middleware (CSP / helmet headers)', () => {
     const opts = buildHelmetOptions();
     expect(opts.crossOriginOpenerPolicy).toBe(false);
   });
+
+  // Regression test for a real production bug: the Firebase Auth popup flow
+  // loads this app's own authDomain handler page (india-in-time.firebaseapp.com/
+  // __/auth/handler) before it ever talks to accounts.google.com. Allowing
+  // only accounts.google.com in frame-src blocked that handler page from
+  // framing at all, so the popup could never complete — Firebase surfaced
+  // that back to users as "auth/cancelled-popup-request", most visibly on
+  // new devices with no cached auth state to fall back on.
+  test('CSP frame-src allows the Firebase authDomain popup handler, not just accounts.google.com', async () => {
+    const res = await request(app).get('/ping');
+    const csp = res.headers['content-security-policy'];
+    expect(csp).toContain('https://india-in-time.firebaseapp.com');
+    expect(csp).toContain('https://accounts.google.com');
+  });
 });

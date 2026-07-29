@@ -4,7 +4,7 @@ const API = window.API; // ✅ loaded by <script> above
 // FIREBASE CONFIG — PASTE YOUR VALUES BELOW
 // ══════════════════════════════════════════════════
 import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as fbSignOut }
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -666,7 +666,6 @@ function renderBudgetBreakdown(){
 let currentCityName='India',currentCityId='india',LOCS=[];
 let credits=50,mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
-let routeRenderId=0; // bumped on every renderRoute() call; lets an in-flight road-routing fetch tell it's been superseded by a newer GPS update and should discard its result instead of overwriting a fresher line
 
 // Guards every map.setView()/flyTo() call against NaN/undefined coordinates
 // reaching Leaflet, which throws an uncaught "Invalid LatLng object" error
@@ -1454,12 +1453,7 @@ function followLivePosition(force=false){
       easeLinearity:0.25,
     });
   }catch(e){
-    // Known Leaflet 1.9.x quirk: flyTo()'s internal animation math can
-    // throw even when the target coordinates passed in are valid (see the
-    // comment above isFiniteLatLon's check). Already recovered via setView
-    // below — this is not user-facing, so log it quietly rather than as a
-    // console.warn with a full stack trace that looks like a real bug.
-    console.debug('[followLivePosition] flyTo threw (known Leaflet edge case), used setView instead:', e.message);
+    console.warn('[followLivePosition] flyTo threw, falling back to setView', e);
     map.setView([tLat,tLon],zoom);
   }
 }
@@ -2076,17 +2070,6 @@ function applyTheme(){document.documentElement.setAttribute('data-theme','dark')
 function toggleTheme(){isDark=!isDark;applyTheme();}
 
 // ── Firebase Auth ─────────────────────────────────────────────────────────────
-// Picks up the result of signInWithRedirect() (used on mobile browsers, see
-// signInWithGoogle() below) after Google sends the user back to this page.
-// On a normal page load with no pending redirect sign-in, this resolves to
-// null and does nothing. If sign-in itself failed, this is where that
-// error surfaces (there's no synchronous catch block for a redirect, since
-// the page fully navigated away and back).
-getRedirectResult(auth).catch(e=>{
-  console.warn('[fb redirect result]',e.message);
-  alert('Sign-in failed: '+e.message);
-});
-
 onAuthStateChanged(auth,async user=>{
   if(user){
     currentUser=user;
@@ -2108,27 +2091,9 @@ onAuthStateChanged(auth,async user=>{
   }
 });
 
-function isMobileBrowser(){
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-}
-
 async function signInWithGoogle(){
   document.getElementById('login-loading').style.display='block';
-  try{
-    if(isMobileBrowser()){
-      // Popup-based sign-in is unreliable on mobile browsers — small-screen
-      // Chrome/Safari frequently can't complete the popup flow cleanly and
-      // throws a generic "auth/internal-error" with no useful detail
-      // (seen live: sign-in on Android Chrome). Firebase's own guidance is
-      // to use the redirect flow on mobile instead. This navigates away to
-      // Google's sign-in page and back — the result is picked up by
-      // getRedirectResult() above once the page reloads, not here.
-      await signInWithRedirect(auth,gProvider);
-    } else {
-      await signInWithPopup(auth,gProvider);
-      document.getElementById('login-loading').style.display='none';
-    }
-  }
+  try{await signInWithPopup(auth,gProvider);}
   catch(e){document.getElementById('login-loading').style.display='none';alert('Sign-in failed: '+e.message);}
 }
 
@@ -2162,32 +2127,18 @@ async function loadUserData(){
   // and the shared catch gave no way to tell which of the three actually
   // failed (seen live as an unspecific "[fb load] Missing or insufficient
   // permissions" warning with no indication of which document).
-  let permissionDenied=false;
   try{
     const sd=await getDoc(doc(db,'users',uid,'data','stamps'));
     if(sd.exists())stamps=new Set(sd.data().stamps||[]);
-  }catch(e){console.warn('[fb load] stamps:',e.message);if(e.code==='permission-denied')permissionDenied=true;}
+  }catch(e){console.warn('[fb load] stamps:',e.message);}
   try{
     const ed=await getDoc(doc(db,'users',uid,'data','expenses'));
     if(ed.exists())expenses=ed.data().expenses||[];
-  }catch(e){console.warn('[fb load] expenses:',e.message);if(e.code==='permission-denied')permissionDenied=true;}
+  }catch(e){console.warn('[fb load] expenses:',e.message);}
   try{
     const ps=await getDocs(collection(db,'users',uid,'plans'));
     if(!ps.empty)window._fbPlans=ps.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.warn('[fb load] plans:',e.message);if(e.code==='permission-denied')permissionDenied=true;}
-  // "permission-denied" from Firestore almost always means the project's
-  // security rules are blocking every read/write for this user — most
-  // commonly because Firestore's own "test mode" rules (the default when a
-  // project is first created) auto-expire 30 days after creation. This is
-  // a Firebase Console configuration issue, not something a code fix here
-  // can resolve — but it was previously only visible in the devtools
-  // console, which almost no end user ever opens, so cloud sync would just
-  // silently stop working with no visible symptom. Surface it once, in the
-  // chat, so it's actually noticed and reported.
-  if(permissionDenied && !window._fbPermissionWarned){
-    window._fbPermissionWarned=true;
-    addMsg('⚠️ Cloud sync is temporarily unavailable (your data is still saved on this device). If this persists, the app owner needs to check the Firestore security rules in the Firebase Console.');
-  }
+  }catch(e){console.warn('[fb load] plans:',e.message);}
 }
 
 async function saveIt(){
@@ -3174,10 +3125,7 @@ function renderMapMarkers() {
 }
 
 async function renderRoute(){
-  // NOTE: intentionally NOT removing rLine here anymore — see the route-line
-  // drawing block below for why (this used to cause the map to flash back to
-  // a straight line on every single GPS update during live tracking).
-  mkrs.forEach(mk=>map.removeLayer(mk));mkrs=[];
+  mkrs.forEach(mk=>map.removeLayer(mk));if(rLine)map.removeLayer(rLine);mkrs=[];
   let routeStops=getRouteStopsForDay(itin);
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const routeStart=getPreviewRouteStart();
@@ -3231,32 +3179,12 @@ async function renderRoute(){
     `;
     mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml));
   });
-  // ── Route line drawing ──────────────────────────────────────────────────
-  // GLITCH FIX: this function runs on every GPS update during live tracking
-  // (every >25m of movement or every 15s — see initGPS()'s watchPosition
-  // handler). It used to (a) delete whatever route line was already on the
-  // map at the very top of renderRoute(), then (b) synchronously draw a
-  // straight-line polyline through the raw waypoints, then (c) replace that
-  // with the real road-following polyline once the async OSRM fetch
-  // resolved. Steps (a)+(b) ran on *every single call*, so while moving the
-  // map visibly snapped back to a straight line and then re-curved, over and
-  // over. Fix: never remove the line that's currently on screen until its
-  // replacement is actually ready. A straight line is now only ever drawn
-  // as a genuine fallback — on the very first render (nothing on screen
-  // yet) or if road routing has failed outright — never as a default
-  // "placeholder" while a perfectly good curved line already exists.
-  const prevLine = rLine;
-  const myRouteRenderId = ++routeRenderId; // guards against a slower, older request overwriting a newer one
-  if(raw.length>=2 && !prevLine){
+  if(raw.length>=2){
     rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);
     if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});
-  } else if(raw.length<2 && rLine){
-    // No valid path to draw (e.g. no stops left) — clear any stale line
-    // instead of leaving an outdated route sitting on the map.
-    map.removeLayer(rLine);rLine=null;
   }
   document.getElementById('nav-next').textContent=routeStops[0].name;const defaultNavText=`Head towards ${routeStops[0].name} (~${nsDist})`;document.getElementById('nav-turn').textContent=defaultNavText;document.getElementById('nav-turn-icon').textContent=turnArrowForInstruction(defaultNavText);document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;
-  try{const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');const res=await fetch(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});if(myRouteRenderId!==routeRenderId) return; if(res.ok){const d=await res.json();if(myRouteRenderId!==routeRenderId) return; if(d.routes?.[0]?.geometry?.coordinates){const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);const newLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);if(rLine)map.removeLayer(rLine);rLine=newLine;if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});if(d.routes[0].legs){const activeLeg=d.routes[0].legs[0];if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}}const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);if(ns){const road=ns.name?` via ${ns.name}`:'';const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');const navText=`Next: ${action}${road}`.trim();document.getElementById('nav-turn').textContent=navText;maybeSpeakNavInstruction(navText);}document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;applyMapHeadingRotation();}}}catch(e){console.warn('Road routing failed, showing straight-line fallback:',e);if(myRouteRenderId===routeRenderId && !rLine && raw.length>=2){rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});}}
+  try{const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');const res=await fetch(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});if(res.ok){const d=await res.json();if(d.routes?.[0]?.geometry?.coordinates){const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);map.removeLayer(rLine);rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});if(d.routes[0].legs){const activeLeg=d.routes[0].legs[0];if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}}const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);if(ns){const road=ns.name?` via ${ns.name}`:'';const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');const navText=`Next: ${action}${road}`.trim();document.getElementById('nav-turn').textContent=navText;maybeSpeakNavInstruction(navText);}document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;applyMapHeadingRotation();}}}catch(e){console.warn('Road routing failed, showing straight-line fallback:',e);}
   if(recalcTimes({trimToWindow:true})>0){sync();return renderRoute();}
   updateItinUI();
   if(streetQuestActive) setupStreetQuest();
