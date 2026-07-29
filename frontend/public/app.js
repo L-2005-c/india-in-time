@@ -4,7 +4,7 @@ const API = window.API; // ✅ loaded by <script> above
 // FIREBASE CONFIG — PASTE YOUR VALUES BELOW
 // ══════════════════════════════════════════════════
 import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as fbSignOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -1454,7 +1454,12 @@ function followLivePosition(force=false){
       easeLinearity:0.25,
     });
   }catch(e){
-    console.warn('[followLivePosition] flyTo threw, falling back to setView', e);
+    // Known Leaflet 1.9.x quirk: flyTo()'s internal animation math can
+    // throw even when the target coordinates passed in are valid (see the
+    // comment above isFiniteLatLon's check). Already recovered via setView
+    // below — this is not user-facing, so log it quietly rather than as a
+    // console.warn with a full stack trace that looks like a real bug.
+    console.debug('[followLivePosition] flyTo threw (known Leaflet edge case), used setView instead:', e.message);
     map.setView([tLat,tLon],zoom);
   }
 }
@@ -2071,6 +2076,17 @@ function applyTheme(){document.documentElement.setAttribute('data-theme','dark')
 function toggleTheme(){isDark=!isDark;applyTheme();}
 
 // ── Firebase Auth ─────────────────────────────────────────────────────────────
+// Picks up the result of signInWithRedirect() (used on mobile browsers, see
+// signInWithGoogle() below) after Google sends the user back to this page.
+// On a normal page load with no pending redirect sign-in, this resolves to
+// null and does nothing. If sign-in itself failed, this is where that
+// error surfaces (there's no synchronous catch block for a redirect, since
+// the page fully navigated away and back).
+getRedirectResult(auth).catch(e=>{
+  console.warn('[fb redirect result]',e.message);
+  alert('Sign-in failed: '+e.message);
+});
+
 onAuthStateChanged(auth,async user=>{
   if(user){
     currentUser=user;
@@ -2092,9 +2108,27 @@ onAuthStateChanged(auth,async user=>{
   }
 });
 
+function isMobileBrowser(){
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
 async function signInWithGoogle(){
   document.getElementById('login-loading').style.display='block';
-  try{await signInWithPopup(auth,gProvider);}
+  try{
+    if(isMobileBrowser()){
+      // Popup-based sign-in is unreliable on mobile browsers — small-screen
+      // Chrome/Safari frequently can't complete the popup flow cleanly and
+      // throws a generic "auth/internal-error" with no useful detail
+      // (seen live: sign-in on Android Chrome). Firebase's own guidance is
+      // to use the redirect flow on mobile instead. This navigates away to
+      // Google's sign-in page and back — the result is picked up by
+      // getRedirectResult() above once the page reloads, not here.
+      await signInWithRedirect(auth,gProvider);
+    } else {
+      await signInWithPopup(auth,gProvider);
+      document.getElementById('login-loading').style.display='none';
+    }
+  }
   catch(e){document.getElementById('login-loading').style.display='none';alert('Sign-in failed: '+e.message);}
 }
 
@@ -2128,18 +2162,32 @@ async function loadUserData(){
   // and the shared catch gave no way to tell which of the three actually
   // failed (seen live as an unspecific "[fb load] Missing or insufficient
   // permissions" warning with no indication of which document).
+  let permissionDenied=false;
   try{
     const sd=await getDoc(doc(db,'users',uid,'data','stamps'));
     if(sd.exists())stamps=new Set(sd.data().stamps||[]);
-  }catch(e){console.warn('[fb load] stamps:',e.message);}
+  }catch(e){console.warn('[fb load] stamps:',e.message);if(e.code==='permission-denied')permissionDenied=true;}
   try{
     const ed=await getDoc(doc(db,'users',uid,'data','expenses'));
     if(ed.exists())expenses=ed.data().expenses||[];
-  }catch(e){console.warn('[fb load] expenses:',e.message);}
+  }catch(e){console.warn('[fb load] expenses:',e.message);if(e.code==='permission-denied')permissionDenied=true;}
   try{
     const ps=await getDocs(collection(db,'users',uid,'plans'));
     if(!ps.empty)window._fbPlans=ps.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.warn('[fb load] plans:',e.message);}
+  }catch(e){console.warn('[fb load] plans:',e.message);if(e.code==='permission-denied')permissionDenied=true;}
+  // "permission-denied" from Firestore almost always means the project's
+  // security rules are blocking every read/write for this user — most
+  // commonly because Firestore's own "test mode" rules (the default when a
+  // project is first created) auto-expire 30 days after creation. This is
+  // a Firebase Console configuration issue, not something a code fix here
+  // can resolve — but it was previously only visible in the devtools
+  // console, which almost no end user ever opens, so cloud sync would just
+  // silently stop working with no visible symptom. Surface it once, in the
+  // chat, so it's actually noticed and reported.
+  if(permissionDenied && !window._fbPermissionWarned){
+    window._fbPermissionWarned=true;
+    addMsg('⚠️ Cloud sync is temporarily unavailable (your data is still saved on this device). If this persists, the app owner needs to check the Firestore security rules in the Firebase Console.');
+  }
 }
 
 async function saveIt(){
