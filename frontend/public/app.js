@@ -666,6 +666,7 @@ function renderBudgetBreakdown(){
 let currentCityName='India',currentCityId='india',LOCS=[];
 let credits=50,mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
+let routeRenderId=0; // bumped on every renderRoute() call; lets an in-flight road-routing fetch tell it's been superseded by a newer GPS update and should discard its result instead of overwriting a fresher line
 
 // Guards every map.setView()/flyTo() call against NaN/undefined coordinates
 // reaching Leaflet, which throws an uncaught "Invalid LatLng object" error
@@ -3125,7 +3126,10 @@ function renderMapMarkers() {
 }
 
 async function renderRoute(){
-  mkrs.forEach(mk=>map.removeLayer(mk));if(rLine)map.removeLayer(rLine);mkrs=[];
+  // NOTE: intentionally NOT removing rLine here anymore — see the route-line
+  // drawing block below for why (this used to cause the map to flash back to
+  // a straight line on every single GPS update during live tracking).
+  mkrs.forEach(mk=>map.removeLayer(mk));mkrs=[];
   let routeStops=getRouteStopsForDay(itin);
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const routeStart=getPreviewRouteStart();
@@ -3179,12 +3183,32 @@ async function renderRoute(){
     `;
     mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml));
   });
-  if(raw.length>=2){
+  // ── Route line drawing ──────────────────────────────────────────────────
+  // GLITCH FIX: this function runs on every GPS update during live tracking
+  // (every >25m of movement or every 15s — see initGPS()'s watchPosition
+  // handler). It used to (a) delete whatever route line was already on the
+  // map at the very top of renderRoute(), then (b) synchronously draw a
+  // straight-line polyline through the raw waypoints, then (c) replace that
+  // with the real road-following polyline once the async OSRM fetch
+  // resolved. Steps (a)+(b) ran on *every single call*, so while moving the
+  // map visibly snapped back to a straight line and then re-curved, over and
+  // over. Fix: never remove the line that's currently on screen until its
+  // replacement is actually ready. A straight line is now only ever drawn
+  // as a genuine fallback — on the very first render (nothing on screen
+  // yet) or if road routing has failed outright — never as a default
+  // "placeholder" while a perfectly good curved line already exists.
+  const prevLine = rLine;
+  const myRouteRenderId = ++routeRenderId; // guards against a slower, older request overwriting a newer one
+  if(raw.length>=2 && !prevLine){
     rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);
     if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});
+  } else if(raw.length<2 && rLine){
+    // No valid path to draw (e.g. no stops left) — clear any stale line
+    // instead of leaving an outdated route sitting on the map.
+    map.removeLayer(rLine);rLine=null;
   }
   document.getElementById('nav-next').textContent=routeStops[0].name;const defaultNavText=`Head towards ${routeStops[0].name} (~${nsDist})`;document.getElementById('nav-turn').textContent=defaultNavText;document.getElementById('nav-turn-icon').textContent=turnArrowForInstruction(defaultNavText);document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;
-  try{const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');const res=await fetch(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});if(res.ok){const d=await res.json();if(d.routes?.[0]?.geometry?.coordinates){const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);map.removeLayer(rLine);rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});if(d.routes[0].legs){const activeLeg=d.routes[0].legs[0];if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}}const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);if(ns){const road=ns.name?` via ${ns.name}`:'';const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');const navText=`Next: ${action}${road}`.trim();document.getElementById('nav-turn').textContent=navText;maybeSpeakNavInstruction(navText);}document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;applyMapHeadingRotation();}}}catch(e){console.warn('Road routing failed, showing straight-line fallback:',e);}
+  try{const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');const res=await fetch(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});if(myRouteRenderId!==routeRenderId) return; if(res.ok){const d=await res.json();if(myRouteRenderId!==routeRenderId) return; if(d.routes?.[0]?.geometry?.coordinates){const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);const newLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);if(rLine)map.removeLayer(rLine);rLine=newLine;if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});if(d.routes[0].legs){const activeLeg=d.routes[0].legs[0];if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}}const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);if(ns){const road=ns.name?` via ${ns.name}`:'';const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');const navText=`Next: ${action}${road}`.trim();document.getElementById('nav-turn').textContent=navText;maybeSpeakNavInstruction(navText);}document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;applyMapHeadingRotation();}}}catch(e){console.warn('Road routing failed, showing straight-line fallback:',e);if(myRouteRenderId===routeRenderId && !rLine && raw.length>=2){rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});}}
   if(recalcTimes({trimToWindow:true})>0){sync();return renderRoute();}
   updateItinUI();
   if(streetQuestActive) setupStreetQuest();
