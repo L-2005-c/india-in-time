@@ -17,6 +17,7 @@ function buildHelmetOptions() {
           "'self'", "'unsafe-inline'",
           'https://www.googletagmanager.com',
           'https://www.gstatic.com',        // Firebase SDK (ES module imports)
+          'https://apis.google.com',        // Firebase Auth's Google Sign-In popup helper (gapi.load) — was missing, causing every Google sign-in to fail with a generic auth/internal-error since this script never loaded
           'https://unpkg.com',              // Leaflet
           'https://cdn.jsdelivr.net',       // DOMPurify
         ],
@@ -46,13 +47,15 @@ function buildHelmetOptions() {
           'https://identitytoolkit.googleapis.com', // Firebase Auth
           'https://securetoken.googleapis.com',      // Firebase Auth token refresh
           'https://firestore.googleapis.com',        // Firestore
+          'https://apis.google.com',                  // Firebase Auth's Google Sign-In popup helper — was missing alongside the script-src entry above
           'https://www.googletagmanager.com',
           'https://*.google-analytics.com',
           'https://*.basemaps.cartocdn.com',
           'https://cdn.jsdelivr.net',                // DOMPurify's sourcemap fetch (devtools only, but blocked otherwise)
+          'https://unpkg.com',                        // Leaflet's own sourcemap fetch (devtools only, same reason)
           'https://routing.openstreetmap.de',        // OSRM road-routing API — draws the actual road-following route line
         ],
-        frameSrc: ['https://accounts.google.com'], // Firebase Google sign-in
+        frameSrc: ['https://accounts.google.com', 'https://apis.google.com'], // Firebase Google sign-in popup + its helper iframe
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameAncestors: ["'self'"], // clickjacking protection
