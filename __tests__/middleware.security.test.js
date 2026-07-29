@@ -92,4 +92,15 @@ describe('security middleware (CSP / helmet headers)', () => {
     expect(csp).toContain('https://india-in-time.firebaseapp.com');
     expect(csp).toContain('https://accounts.google.com');
   });
+
+  // Regression test: Firebase Auth's Google sign-in dynamically loads
+  // apis.google.com/js/api.js (the gapi loader). Missing it from script-src
+  // blocked that script entirely and surfaced to users as a generic
+  // "Firebase: Error (auth/internal-error)" with no indication it was a CSP
+  // problem.
+  test('CSP script-src and connect-src allow apis.google.com (Firebase gapi loader)', async () => {
+    const res = await request(app).get('/ping');
+    const csp = res.headers['content-security-policy'];
+    expect(csp).toContain('https://apis.google.com');
+  });
 });

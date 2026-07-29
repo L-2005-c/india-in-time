@@ -17,6 +17,7 @@ function buildHelmetOptions() {
           "'self'", "'unsafe-inline'",
           'https://www.googletagmanager.com',
           'https://www.gstatic.com',        // Firebase SDK (ES module imports)
+          'https://apis.google.com',        // Firebase Auth's Google sign-in loads apis.google.com/js/api.js
           'https://unpkg.com',              // Leaflet
           'https://cdn.jsdelivr.net',       // DOMPurify
         ],
@@ -46,6 +47,7 @@ function buildHelmetOptions() {
           'https://identitytoolkit.googleapis.com', // Firebase Auth
           'https://securetoken.googleapis.com',      // Firebase Auth token refresh
           'https://firestore.googleapis.com',        // Firestore
+          'https://apis.google.com',                 // Firebase Auth's gapi loader (loaded via script-src above) calls back to this
           'https://www.googletagmanager.com',
           'https://*.google-analytics.com',
           'https://*.basemaps.cartocdn.com',
