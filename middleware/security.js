@@ -39,7 +39,9 @@ function buildHelmetOptions() {
         imgSrc: [
           "'self'", 'data:', 'blob:',
           'https://images.unsplash.com',
-          'https://*.basemaps.cartocdn.com', // Leaflet map tiles
+          'https://*.basemaps.cartocdn.com', // Leaflet map tiles (fallback #1)
+          'https://*.tile.openstreetmap.org', // Leaflet map tiles (fallback #2)
+          'https://api.maptiler.com',        // Leaflet map tiles (primary, when MAPTILER_KEY is set)
           'https://*.googleusercontent.com', // Google/Firebase Auth profile photos (lh3/lh4/lh5...)
         ],
         connectSrc: [
@@ -51,9 +53,12 @@ function buildHelmetOptions() {
           'https://www.googletagmanager.com',
           'https://*.google-analytics.com',
           'https://*.basemaps.cartocdn.com',
+          'https://*.tile.openstreetmap.org',        // OSM fallback tile source
+          'https://api.maptiler.com',                // MapTiler tile/config metadata calls, if any
           'https://cdn.jsdelivr.net',                // DOMPurify's sourcemap fetch (devtools only, but blocked otherwise)
           'https://www.gstatic.com',                 // Firebase SDK's sourcemap fetch (devtools only, but blocked otherwise)
-          'https://routing.openstreetmap.de',        // OSRM road-routing API — draws the actual road-following route line
+          'https://routing.openstreetmap.de',        // OSRM road-routing API (primary mirror) — draws the actual road-following route line
+          'https://router.project-osrm.org',         // OSRM road-routing API (fallback mirror)
         ],
         frameSrc: [
           'https://accounts.google.com',
