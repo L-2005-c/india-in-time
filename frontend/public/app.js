@@ -38,7 +38,7 @@ Object.assign(window, {
   switchCity, searchCity, generatePlan, startTrip, skipStop, optimizeRoute,
   smartExtend, addNearby, aiSuggestAlternative, prepGuide, postcard,
   handleAiLens, getInstaSpots, getSouvenirGuide, switchToView, toggleTheme,
-  installPWA, resetGPS, toggleVoice, handleChat, saveIt, shareIt, waShare,
+  installPWA, resetGPS, locateMe, compassTap, toggleVoice, handleChat, saveIt, shareIt, waShare,
   toggleLoadPanel, loadPlan, delPlan, addExpense, delExp, updateBudget,
   analyzeBudget, renderToolsHome, renderLingo, renderSafety, renderBudget,
   renderPassport, switchDay, chatAbout, shareEmergency, speak,
@@ -1631,9 +1631,12 @@ function applyMapHeadingRotation(){
 function updateLiveMarkerHeading(){
   if(!liveMkr || lastHeading==null) return;
   const icon=liveMkr.getElement()?.firstElementChild;
-  if(!icon) return;
-  icon.style.transform=`rotate(${lastHeading}deg)`;
-  icon.style.transition='transform .35s ease';
+  if(icon){
+    icon.style.transform=`rotate(${lastHeading}deg)`;
+    icon.style.transition='transform .35s ease';
+  }
+  const needle=document.getElementById('compass-needle');
+  if(needle) needle.style.transform=`rotate(${lastHeading}deg)`;
 }
 
 function deriveHeading(pos){
@@ -3587,7 +3590,51 @@ function waShare(){if(!mdPlan.length){addMsg('Generate a plan first!');return;}l
 function shareEmergency(){if(!cLat||!cLon){alert('GPS not available.');return;}const t=`🚨 EMERGENCY: https://maps.google.com/?q=${cLat},${cLon}`;if(navigator.share)navigator.share({title:'Emergency',text:t}).catch(()=>navigator.clipboard?.writeText(t));else navigator.clipboard?.writeText(t);}
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
+// ── Compass button ───────────────────────────────────────────────────────────
+// Shows the live heading (same lastHeading value the marker icon rotates
+// with, computed continuously by initGPS()'s watchPosition — see
+// deriveHeading()). This intentionally does not rotate the map itself:
+// applyMapHeadingRotation() above documents why that breaks Leaflet's tile
+// positioning, so this stays a read-only indicator + info action instead.
+const COMPASS_DIRS = ['North','North-East','East','South-East','South','South-West','West','North-West'];
+function degToCompassLabel(deg){
+  return COMPASS_DIRS[Math.round(((deg%360)+360)%360/45)%8];
+}
+function compassTap(){
+  if(lastHeading==null){
+    showToast('🧭','Direction','Start moving, or begin live navigation, to detect your heading.');
+    return;
+  }
+  const deg=Math.round(((lastHeading%360)+360)%360);
+  showToast('🧭','Heading',`${degToCompassLabel(lastHeading)} (${deg}°)`);
+}
+
 function resetGPS(){cLat=null;document.getElementById('gps-txt').textContent='GPS';initGPS();}
+
+// ── "Locate me" map button ──────────────────────────────────────────────────
+// Recenters the map on the user's live position — the same blue-dot-style
+// button Google Maps has bottom-right. Reuses waitForFirstGpsFix() (the
+// same shared fix that already drives the live marker/city-detect, see the
+// comment above it) instead of firing an independent getCurrentPosition()
+// call, so this can never disagree with what the live marker is showing.
+let isLocating = false;
+async function locateMe(){
+  if (isLocating) return; // ignore rapid repeat taps while a request is in flight
+  isLocating = true;
+  const btn = document.getElementById('locate-me-btn');
+  if (btn) { btn.disabled = true; btn.classList.add('locating'); }
+  try {
+    const { lat, lon } = await waitForFirstGpsFix(10000);
+    map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { animate: true, duration: 0.8 });
+  } catch (e) {
+    console.warn('[locateMe] GPS fix unavailable:', e);
+    alert('Could not get your location. Please check that location access is allowed for this site and try again.');
+  } finally {
+    isLocating = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('locating'); }
+  }
+}
+
 function initGPS(){
   if(!('geolocation' in navigator))return;if(wid!==null)navigator.geolocation.clearWatch(wid);
   wid=navigator.geolocation.watchPosition(pos=>{

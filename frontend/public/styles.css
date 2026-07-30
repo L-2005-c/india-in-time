@@ -201,6 +201,33 @@ body::before {
 [data-theme="dark"] .leaflet-control-zoom-in,
 [data-theme="dark"] .leaflet-control-zoom-out{background:#1a1a2e;color:#e0e0e0;border-color:#333;}
 
+#locate-me-btn{
+  position:absolute; top:16px; right:12px; z-index:600;
+  width:42px; height:42px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-glass); border:1px solid var(--border-default);
+  color:var(--teal); box-shadow:var(--shadow-card); cursor:pointer;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  transition:transform .15s ease, background .15s ease;
+}
+#locate-me-btn:hover{background:var(--bg-glass-hover, var(--bg-glass)); transform:scale(1.06);}
+#locate-me-btn:active{transform:scale(0.94);}
+#locate-me-btn:disabled{cursor:default;}
+#locate-me-btn.locating svg{animation:locateSpin .9s linear infinite;}
+@keyframes locateSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+#compass-btn{
+  position:absolute; top:66px; right:12px; z-index:600;
+  width:42px; height:42px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-glass); border:1px solid var(--border-default);
+  color:var(--text-secondary); box-shadow:var(--shadow-card); cursor:pointer;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  transition:transform .15s ease, background .15s ease;
+}
+#compass-btn:hover{background:var(--bg-glass-hover, var(--bg-glass)); transform:scale(1.06);}
+#compass-btn:active{transform:scale(0.94);}
+
 #street-quest{
   position:absolute; top:14px; left:12px; right:12px; z-index:520;
   background:rgba(8,14,26,0.96);

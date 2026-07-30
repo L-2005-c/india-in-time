@@ -145,6 +145,23 @@
     <!-- ═══ MAP VIEW ═══ -->
     <div id="map-view" class="view active">
       <div id="map"></div>
+
+      <button id="locate-me-btn" onclick="locateMe()" aria-label="Find my location" title="Find my location">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          <path d="M12 2v3M12 19v3M22 12h-3M5 12H2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <button id="compass-btn" onclick="compassTap()" aria-label="Show current direction" title="Show current direction">
+        <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10.5" stroke="currentColor" stroke-width="1.2" fill="none" opacity="0.35"/>
+          <g id="compass-needle" style="transform-origin:12px 12px;transition:transform .35s ease;">
+            <path d="M12 3 L15 12 L12 12 Z" fill="#ff4d4f"/>
+            <path d="M12 21 L9 12 L12 12 Z" fill="currentColor" opacity="0.55"/>
+          </g>
+        </svg>
+      </button>
       
       <!-- TIME SLIDER UI — draggable + collapsible so it doesn't block the map on mobile -->
       <div id="time-slider-container" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:9000;width:90%;max-width:400px;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:8px 20px 12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:8px;pointer-events:auto;touch-action:none;">
