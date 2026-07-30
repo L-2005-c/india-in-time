@@ -762,6 +762,61 @@ function getCurrentLocalMin() {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+// Real sunrise/sunset for a place's coordinates + date, so "best at
+// sunrise/sunset" badges/scoring track the actual sun rather than a fixed
+// 5–7 AM / 5–7 PM clock window (which drifts by well over an hour across
+// India's geography and through the year). Same approximation as the
+// backend's services/timeIntelligence.js computeSunTimes(), ported client-
+// side so the route optimizer can call it synchronously per candidate stop
+// order without a network round trip. Results are cached per
+// coords+day since they don't change within a session.
+const _sunTimesCache = new Map();
+function getSunTimesClient(lat, lon, date = new Date()) {
+  const dayKey = `${lat.toFixed(2)},${lon.toFixed(2)},${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  if (_sunTimesCache.has(dayKey)) return _sunTimesCache.get(dayKey);
+  let result;
+  try {
+    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
+    const lngHour = lon / 15;
+    const zenith = 90.833;
+    const calc = (isRise) => {
+      const t = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24;
+      const M = 0.9856 * t - 3.289;
+      let L = M + 1.916 * Math.sin((M * Math.PI) / 180) + 0.020 * Math.sin((2 * M * Math.PI) / 180) + 282.634;
+      L = ((L % 360) + 360) % 360;
+      let RA = (180 / Math.PI) * Math.atan(0.91764 * Math.tan((L * Math.PI) / 180));
+      RA = ((RA % 360) + 360) % 360;
+      const Lquadrant = Math.floor(L / 90) * 90;
+      const RAquadrant = Math.floor(RA / 90) * 90;
+      RA = RA + (Lquadrant - RAquadrant);
+      RA /= 15;
+      const sinDec = 0.39782 * Math.sin((L * Math.PI) / 180);
+      const cosDec = Math.cos(Math.asin(sinDec));
+      const cosH = (Math.cos((zenith * Math.PI) / 180) - sinDec * Math.sin((lat * Math.PI) / 180)) / (cosDec * Math.cos((lat * Math.PI) / 180));
+      if (cosH > 1 || cosH < -1) return null;
+      let H = isRise ? 360 - (180 / Math.PI) * Math.acos(cosH) : (180 / Math.PI) * Math.acos(cosH);
+      H /= 15;
+      const T = H + RA - 0.06571 * t - 6.622;
+      let UT = T - lngHour;
+      UT = ((UT % 24) + 24) % 24;
+      let localT = UT + 5.5; // IST
+      localT = ((localT % 24) + 24) % 24;
+      return Math.round(localT * 60);
+    };
+    const sunriseMin = calc(true);
+    const sunsetMin = calc(false);
+    result = { sunriseMin: sunriseMin ?? 6 * 60, sunsetMin: sunsetMin ?? 18 * 60 + 30 };
+  } catch (_e) {
+    result = { sunriseMin: 6 * 60, sunsetMin: 18 * 60 + 30 };
+  }
+  _sunTimesCache.set(dayKey, result);
+  return result;
+}
+function placeSunTimes(loc, date = new Date()) {
+  const [lat, lon] = loc.coords || [20.5937, 78.9629];
+  return getSunTimesClient(lat, lon, date);
+}
+
 window.globalSimulationTime = getCurrentLocalMin();
 
 function onTimeSliderChange(val) {
@@ -919,6 +974,7 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
 
   const status = getPlaceDynamicStatus(loc, simTime);
   const crowd = getCrowdPrediction(loc, simTime);
+  const { sunriseMin, sunsetMin } = placeSunTimes(loc);
 
   if (status.status === 'closed') {
     return { score: 0, state: 'Closed', reasons: ['🔴 Currently Closed', 'Check opening hours before visiting.'] };
@@ -928,8 +984,10 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
   score += 15;
   reasons.push('🟢 Currently Open');
 
-  // Time of Day
-  if (simTime >= 300 && simTime <= 450) { // 5:00 AM - 7:30 AM
+  // Time of Day — windows are now the place's real sunrise/sunset (±75 min)
+  // rather than a fixed 5:00-7:30 AM / 5:00-7:00 PM clock window, which used
+  // to be off by well over an hour depending on the city and time of year.
+  if (simTime >= sunriseMin - 30 && simTime <= sunriseMin + 90) {
     if (loc.is_sunrise_spot) {
       score += 35;
       state = "Sunrise Mode";
@@ -940,7 +998,7 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
       state = "Morning Mode";
       reasons.push('🌤️ Peaceful morning atmosphere');
     }
-  } else if (simTime >= 1020 && simTime <= 1140) { // 5:00 PM - 7:00 PM
+  } else if (simTime >= sunsetMin - 90 && simTime <= sunsetMin + 30) {
     if (loc.is_sunset_spot) {
       score += 35;
       state = "Golden Hour";
@@ -951,7 +1009,7 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
       state = "Evening Mode";
       reasons.push('🌆 Pleasant evening vibe');
     }
-  } else if (simTime >= 1140) { // After 7:00 PM
+  } else if (simTime >= sunsetMin + 30) {
     if (loc.has_nightlife) {
       score += 25;
       state = "Night Mode";
@@ -973,6 +1031,18 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
       state = "Heat Alert";
       reasons.push('⚠️ Extreme Heat warning for outdoor activity');
     }
+  }
+  // Rain and strong wind used to only show up as badges elsewhere
+  // (getTimeBadgesHtml) without ever touching the score itself, so a
+  // rain-soaked outdoor spot or a wind-battered viewpoint could still rank
+  // as a top recommendation. Now they actually move the score.
+  if (window.realWeatherMain && /rain|storm|drizzle/i.test(window.realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
+    score -= 20;
+    reasons.push('🌧 Rain expected — outdoor visit may be uncomfortable');
+  }
+  if (window.realWind >= 30 && (loc.cat === 'beach' || loc.cat === 'scenic' || loc.is_sunset_spot)) {
+    score -= 10;
+    reasons.push('💨 Strong winds at this open viewpoint/beach');
   }
 
   // Crowd Analysis
@@ -999,29 +1069,63 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
 function getPlaceDynamicStatus(loc, evalTime) {
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const ot = t2m(loc.ot || '06:00');
-  const ct = t2m(loc.ct || '23:00');
-  
-  if (now < ot || now >= ct) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
-  if (ct - now <= 60 && ct - now > 0) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
+  const ct = t2m(loc.ct || '23:00', 23 * 60);
+  // Some places (night markets, bars, 24hr spots) close after midnight, e.g.
+  // 18:00–02:00. A plain `now < ot || now >= ct` check always reported these
+  // as closed during their actual overnight open hours.
+  const overnight = ct <= ot;
+  const isOpen = overnight ? (now >= ot || now < ct) : (now >= ot && now < ct);
+  if (!isOpen) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
+  const minsToClose = overnight ? (now < ct ? ct - now : (1440 - now) + ct) : ct - now;
+  if (minsToClose <= 60 && minsToClose > 0) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
   return { status: 'open', label: '🟢 Open', color: 'var(--success-color)' };
 }
 
+// Daypart baseline crowd weights — kept in sync with
+// data/time-intelligence-rules.json's crowdWeights so the frontend's
+// "quick" score and the backend's authoritative Time Intelligence Engine
+// (services/timeIntelligence.js) agree with each other.
+const CROWD_BASE_BY_DAYPART = { earlyMorning: 0.3, morning: 0.6, lateMorning: 0.8, afternoon: 0.9, evening: 1.1, night: 0.5 };
+const CROWD_WEEKEND_MULT = 1.4;
+const CROWD_PEAK_MULT = 1.5;
+function getDaypartClient(nowMin, sunsetMin) {
+  if (nowMin >= 5 * 60 && nowMin < 9 * 60) return 'earlyMorning';
+  if (nowMin >= 9 * 60 && nowMin < 12 * 60) return 'lateMorning';
+  if (nowMin >= 12 * 60 && nowMin < 16 * 60) return 'afternoon';
+  if (nowMin >= 16 * 60 && nowMin < sunsetMin) return 'evening';
+  if (nowMin >= sunsetMin || nowMin < 5 * 60) return 'night';
+  return 'morning';
+}
 function getCrowdPrediction(loc, evalTime) {
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const isWeekend = [0, 6].includes(new Date().getDay());
-  let level = isWeekend ? 'Moderate' : 'Low';
-  
+  const { sunsetMin } = placeSunTimes(loc);
+  const daypart = getDaypartClient(now, sunsetMin);
+
+  let isPeakNow = false;
   if (loc.peak_hours) {
     const parts = loc.peak_hours.split('-');
     if (parts.length === 2) {
       const pStart = t2m(parts[0].trim());
       const pEnd = t2m(parts[1].trim());
-      if (now >= pStart && now <= pEnd) {
-        level = isWeekend ? 'Very High' : 'High';
-      }
+      isPeakNow = now >= pStart && now <= pEnd;
     }
   }
-  return level;
+
+  // Previously this only varied by weekday/weekend and otherwise ignored
+  // time of day completely — a 2 AM stop showed the exact same crowd level
+  // as an 11 AM one. Now it starts from a per-daypart baseline (same shape
+  // as the backend engine) and layers weekend/peak-hour multipliers on top.
+  let score = CROWD_BASE_BY_DAYPART[daypart] ?? 0.6;
+  if (isWeekend) score *= CROWD_WEEKEND_MULT;
+  if (isPeakNow) score *= CROWD_PEAK_MULT;
+  if (loc.cat === 'market' || loc.cat === 'food') score *= 1.15;
+
+  if (score < 0.35) return 'Very Low';
+  if (score < 0.6) return 'Low';
+  if (score < 0.95) return 'Moderate';
+  if (score < 1.4) return 'High';
+  return 'Very High';
 }
 
 function getTimeBadgesHtml(loc, evalTime) {
@@ -1036,10 +1140,11 @@ function getTimeBadgesHtml(loc, evalTime) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,100,100,0.2); display:inline-block; margin-top:4px; margin-right:4px;">👥 Peak Crowd</span>`;
   }
   
-  if (loc.is_sunrise_spot && now >= 300 && now <= 420) {
+  const { sunriseMin, sunsetMin } = placeSunTimes(loc);
+  if (loc.is_sunrise_spot && now >= sunriseMin - 30 && now <= sunriseMin + 90) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,200,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌅 Best at Sunrise</span>`;
   }
-  if (loc.is_sunset_spot && now >= 1020 && now <= 1140) {
+  if (loc.is_sunset_spot && now >= sunsetMin - 90 && now <= sunsetMin + 30) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,100,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌇 Best at Sunset</span>`;
   }
   
@@ -1364,8 +1469,43 @@ function orderStopsAreaWise(stops,start){
   return ordered;
 }
 
+// How much one "unit" of bad time-fit (a stop landing at a rough time —
+// closed, peak crowd, missed golden hour, heat/rain) counts against, in
+// the same km units as travel distance, when the optimizer below weighs
+// order changes. Tuned so time-fit meaningfully influences order without
+// completely overriding geography (e.g. never route someone 20km out of
+// the way just to shave a few crowd-score points).
+const TIME_FIT_KM_WEIGHT = 2.2;
+// Simulates a candidate stop order's projected arrival time at each stop
+// (same 0.45 km/min travel estimate used later to compute the real
+// schedule — see the s.tt assignment in the sync/recalc block) and scores
+// each arrival via calculateExperienceScore — the same function driving
+// map-marker colors and place badges — so open/closed, crowd, sunrise/
+// sunset, and weather all factor into which order is "better", not just
+// distance.
+function estimateTimeFitPenaltyKm(stops, start) {
+  if (!Array.isArray(stops) || !stops.length) return 0;
+  let clock = t2m(document.getElementById('s-time')?.value || '09:00', 9 * 60);
+  let prev = start;
+  let penalty = 0;
+  for (const stop of stops) {
+    if (prev) clock += Math.max(5, Math.round(hvKm(prev[0], prev[1], stop.coords[0], stop.coords[1]) / 0.45));
+    const { score } = calculateExperienceScore(stop, clock % 1440);
+    penalty += (1 - score / 100) * TIME_FIT_KM_WEIGHT; // 0 = perfect fit, full weight = worst
+    clock += stop.vt || 60;
+    prev = stop.coords;
+  }
+  return penalty;
+}
+
 function optimizeStopOrder(stops,start){
   if(!Array.isArray(stops)||stops.length<=2) return [...(stops||[])];
+
+  // Combined cost = travel distance + time-of-day fitness penalty, so the
+  // 2-opt search below can trade a slightly longer drive for a much better-
+  // timed visit (e.g. hitting a sunset spot near sunset, or dodging a
+  // stop's peak-crowd window) instead of purely chasing the shortest route.
+  const routeCost=(candidate)=>routeDistanceKm(candidate,start)+estimateTimeFitPenaltyKm(candidate,start);
 
   let ordered=orderStopsAreaWise(stops,start);
   let improved=true;
@@ -1381,7 +1521,7 @@ function optimizeStopOrder(stops,start){
           ...ordered.slice(i,j+1).reverse(),
           ...ordered.slice(j+1),
         ];
-        if(routeDistanceKm(candidate,start)+0.05<routeDistanceKm(ordered,start)){
+        if(routeCost(candidate)+0.05<routeCost(ordered)){
           ordered=candidate;
           improved=true;
         }
@@ -3124,6 +3264,54 @@ function renderMapMarkers() {
   });
 }
 
+// Public OSRM demo mirrors used for turn-by-turn road routing during live
+// navigation. Neither requires an API key, which is fine at low volume but
+// means both are shared, rate-limited infrastructure — under real user load
+// (or a flaky connection) a request can fail or time out. Try the primary
+// twice (quick retry), then fall back to a second mirror, before giving up
+// and leaving the straight-line polyline in place for this render pass.
+const ROAD_ROUTE_MIRRORS = [
+  'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
+  'https://router.project-osrm.org/route/v1/driving/'
+];
+async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
+  const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');
+  for(let mirrorIdx=0; mirrorIdx<ROAD_ROUTE_MIRRORS.length; mirrorIdx++){
+    const attemptsForThisMirror = mirrorIdx===0 ? 2 : 1;
+    for(let attempt=0; attempt<attemptsForThisMirror; attempt++){
+      try{
+        const res=await fetch(`${ROAD_ROUTE_MIRRORS[mirrorIdx]}${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d=await res.json();
+        if(!d.routes?.[0]?.geometry?.coordinates) throw new Error('No route geometry');
+        const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+        map.removeLayer(rLine);
+        rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);
+        if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});
+        if(d.routes[0].legs){
+          const activeLeg=d.routes[0].legs[0];
+          if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}
+        }
+        const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);
+        if(ns){
+          const road=ns.name?` via ${ns.name}`:'';
+          const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');
+          const navText=`Next: ${action}${road}`.trim();
+          document.getElementById('nav-turn').textContent=navText;
+          maybeSpeakNavInstruction(navText);
+        }
+        document.getElementById('nav-dist').textContent=nsDist;
+        document.getElementById('nav-eta').textContent=nsEta;
+        applyMapHeadingRotation();
+        return true;
+      }catch(e){
+        console.warn(`Road routing failed (mirror ${mirrorIdx}, attempt ${attempt+1}):`,e);
+      }
+    }
+  }
+  return false;
+}
+
 async function renderRoute(){
   mkrs.forEach(mk=>map.removeLayer(mk));if(rLine)map.removeLayer(rLine);mkrs=[];
   let routeStops=getRouteStopsForDay(itin);
@@ -3184,7 +3372,20 @@ async function renderRoute(){
     if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});
   }
   document.getElementById('nav-next').textContent=routeStops[0].name;const defaultNavText=`Head towards ${routeStops[0].name} (~${nsDist})`;document.getElementById('nav-turn').textContent=defaultNavText;document.getElementById('nav-turn-icon').textContent=turnArrowForInstruction(defaultNavText);document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;
-  try{const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');const res=await fetch(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});if(res.ok){const d=await res.json();if(d.routes?.[0]?.geometry?.coordinates){const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);map.removeLayer(rLine);rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});if(d.routes[0].legs){const activeLeg=d.routes[0].legs[0];if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}}const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);if(ns){const road=ns.name?` via ${ns.name}`:'';const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');const navText=`Next: ${action}${road}`.trim();document.getElementById('nav-turn').textContent=navText;maybeSpeakNavInstruction(navText);}document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;applyMapHeadingRotation();}}}catch(e){console.warn('Road routing failed, showing straight-line fallback:',e);}
+  const roadRouteApplied = await fetchRoadRoute(raw, {accent, tripActive, routeStops});
+  if(!roadRouteApplied && tripActive){
+    // The public OSRM demo mirror(s) are rate-limited/shared and this
+    // call runs on every GPS-driven renderRoute() during live tracking
+    // (every ~15s or 25m of movement — see initGPS()'s watchPosition
+    // callback). A single failed/timed-out request used to leave the
+    // straight-line fallback on screen until that next natural trigger,
+    // which on a flaky connection or a busy shared mirror could be a
+    // while — this is the "route goes straight, then fixes itself
+    // later" behavior. Schedule one quick extra retry instead of
+    // waiting out the full interval.
+    clearTimeout(window._roadRouteRetryTimer);
+    window._roadRouteRetryTimer = setTimeout(()=>{ if(tripActive) renderRoute(); }, 4000);
+  }
   if(recalcTimes({trimToWindow:true})>0){sync();return renderRoute();}
   updateItinUI();
   if(streetQuestActive) setupStreetQuest();
@@ -4125,10 +4326,76 @@ window.onload=()=>{
   // The app chrome is always dark, but the map itself always uses the
   // warm, legible CARTO Voyager basemap (cream land, labeled roads,
   // blue water) regardless of the UI theme toggle.
-  window._tileLayer = L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd',keepBuffer:4}
-  ).addTo(map);
+  // Primary + fallback basemap sources. The CARTO Voyager rastertiles
+  // endpoint used here has no API key — it's CARTO's free public/demo
+  // tile server, which is fine at low volume but starts throttling
+  // (403/429) once enough concurrent users push total tile requests up.
+  // Under the old code a throttled tile was hidden forever (see the
+  // tileerror handler below, previously `display:none` with no retry),
+  // so a brief rate-limit window left permanent grey holes in the map —
+  // that's the "crash" users were seeing. We now retry failed tiles
+  // with backoff, and if the primary source keeps failing we swap the
+  // whole layer to a fallback source instead of leaving it broken.
+  // For real production traffic, get a free-tier API key from a
+  // provider meant for that (MapTiler, Stadia Maps, Thunderforest, or
+  // a CARTO account) — anonymous demo endpoints will always eventually
+  // throttle as usage grows; retry/fallback only masks that, it doesn't
+  // remove the underlying limit.
+  const TILE_SOURCES = [
+    {
+      url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      opts:{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd',keepBuffer:4}
+    },
+    {
+      url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      opts:{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,subdomains:'abc',keepBuffer:4}
+    }
+  ];
+  let tileSourceIdx = 0;
+  let tileErrorCount = 0;
+  let tileErrorWindowStart = Date.now();
+
+  function buildTileLayer(idx){
+    const src = TILE_SOURCES[idx];
+    return L.tileLayer(src.url, src.opts);
+  }
+
+  function attachTileErrorHandling(layer){
+    layer.on('tileerror', (e)=>{
+      // Retry the same tile with backoff instead of hiding it forever —
+      // most failures are transient (momentary throttling), not permanent.
+      const tile = e.tile;
+      const originalSrc = e.tile.src;
+      let attempts = tile._iitRetryCount || 0;
+      if(attempts < 3){
+        tile._iitRetryCount = attempts + 1;
+        setTimeout(()=>{ try{ tile.src = originalSrc; }catch(_e){} }, 800 * (attempts + 1));
+      } else {
+        try{ tile.style.visibility='hidden'; }catch(_e){}
+      }
+
+      // Track error rate; if the current source is failing hard within
+      // a short window, switch the whole layer to the next fallback
+      // source rather than leaving the map broken.
+      const now = Date.now();
+      if(now - tileErrorWindowStart > 15000){ tileErrorCount = 0; tileErrorWindowStart = now; }
+      tileErrorCount++;
+      if(tileErrorCount > 20 && tileSourceIdx < TILE_SOURCES.length - 1){
+        tileErrorCount = 0;
+        tileSourceIdx++;
+        const newLayer = buildTileLayer(tileSourceIdx);
+        attachTileErrorHandling(newLayer);
+        newLayer.addTo(map);
+        if(window._tileLayer) map.removeLayer(window._tileLayer);
+        window._tileLayer = newLayer;
+        console.warn('[map] Primary tile source struggling, switched to fallback basemap.');
+      }
+    });
+  }
+
+  window._tileLayer = buildTileLayer(tileSourceIdx);
+  attachTileErrorHandling(window._tileLayer);
+  window._tileLayer.addTo(map);
   // Leaflet computes its tile grid from the container's size at creation
   // time. If #map-view is still display:none (its default state on load),
   // the container has zero width/height and the map renders as gray/blank
@@ -4141,7 +4408,6 @@ window.onload=()=>{
   if(mapEl && 'ResizeObserver' in window){
     new ResizeObserver(()=>{ if(map) map.invalidateSize(false); }).observe(mapEl);
   }
-  window._tileLayer.on('tileerror', (e)=>{ try{ e.tile.style.display='none'; }catch(_e){} });
   window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
   map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
   map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
