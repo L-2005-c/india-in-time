@@ -216,6 +216,18 @@ app.get('/api/health/live', (_req, res) => {
   res.json({ status: 'alive', ts: Date.now() });
 });
 
+// Public, minimal client config. Only ever add values here that are safe to
+// hand to any visitor's browser (this endpoint has no auth). maptilerKey is
+// fine to expose this way — it's going straight into a tile <img> URL either
+// way, and it's meant to be restricted by domain in the MapTiler dashboard,
+// not kept secret. Do NOT add GEMINI_API_KEY, FIREBASE_SERVICE_ACCOUNT, or
+// ADMIN_FEEDBACK_KEY here.
+app.get('/api/config', (_req, res) => {
+  res.json({
+    maptilerKey: config.maptilerKey || null,
+  });
+});
+
 // ── Serve Frontend (static files) ────────────────────────────────────────────
 
 // Explicit route for the app shell, ahead of express.static's own default-

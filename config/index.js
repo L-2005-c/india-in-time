@@ -89,6 +89,15 @@ const config = {
     timeoutMs: parseInt(process.env.NOMINATIM_TIMEOUT_MS, 10) || 9000,
     delayMs:   parseInt(process.env.NOMINATIM_DELAY_MS, 10)   || 1100, // Nominatim's usage policy caps the whole app at ~1 req/sec, globally
   },
+
+  // MapTiler (map tiles). Optional — deliberately NOT requireEnv()'d, since
+  // the frontend already has a CARTO/OSM fallback chain (see TILE_SOURCES
+  // in app.js) and should keep working without this. When set, the /api/config
+  // endpoint exposes it to the frontend so it's tried first. This key is
+  // inherently public once served to the browser (it goes straight into an
+  // <img>/tile request URL) — the actual protection is restricting it to
+  // your domain in the MapTiler dashboard, not keeping it out of app.js.
+  maptilerKey: (process.env.MAPTILER_KEY || '').trim(),
 };
 
 // ── Frontend index.html resolution ──────────────────────────────────────────

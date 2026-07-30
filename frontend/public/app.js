@@ -2231,10 +2231,56 @@ onAuthStateChanged(auth,async user=>{
   }
 });
 
-async function signInWithGoogle(){
-  document.getElementById('login-loading').style.display='block';
-  try{await signInWithPopup(auth,gProvider);}
-  catch(e){document.getElementById('login-loading').style.display='none';alert('Sign-in failed: '+e.message);}
+// Module-level guard — lives outside signInWithGoogle() so it persists
+// across calls. This is what actually stops auth/cancelled-popup-request:
+// that error fires when a second signInWithPopup() call cancels the first
+// one still in flight, so the fix is to never make that second call at all.
+let isSigningIn = false;
+
+async function signInWithGoogle(event){
+  // Ignore any click that arrives while a sign-in is already in progress —
+  // this must be the very first thing that runs, before any DOM changes or
+  // Firebase calls, so a rapid second click is a true no-op.
+  if (isSigningIn) return;
+  isSigningIn = true;
+
+  // Locate the actual button so it can be disabled, not just the loading
+  // indicator. event.currentTarget is the <button> itself (see the
+  // onclick="signInWithGoogle(event)" wiring in index.html); fall back to
+  // a selector in case this is ever invoked without an event.
+  const btn = event?.currentTarget || document.querySelector('.btn-google');
+  const loadingEl = document.getElementById('login-loading');
+
+  if (btn) btn.disabled = true;
+  if (loadingEl) loadingEl.style.display = 'block';
+
+  try {
+    // Unchanged — same call, same provider, same auth instance as before.
+    await signInWithPopup(auth, gProvider);
+    // No success-path UI here by design: onAuthStateChanged (registered
+    // elsewhere in this file) already handles the post-login UI update,
+    // so this stays untouched to avoid duplicating that flow.
+  } catch (e) {
+    // These two codes are expected, user-driven outcomes, not real
+    // failures — a double-click racing two popups, or the user closing
+    // the Google popup themselves. Don't alert for either.
+    const expected = e?.code === 'auth/cancelled-popup-request'
+                   || e?.code === 'auth/popup-closed-by-user';
+    if (!expected) {
+      console.error('[signInWithGoogle] Unexpected auth error:', e);
+      alert('Sign-in failed: ' + e.message);
+    } else {
+      console.warn('[signInWithGoogle] Expected popup race, ignored:', e.code);
+    }
+  } finally {
+    // Guaranteed to run on success, expected-error, or unexpected-error
+    // (including network failures, which surface here as a caught
+    // exception too) — so the button and loading state can never get
+    // stuck, and the guard flag always releases for the next click.
+    isSigningIn = false;
+    if (btn) btn.disabled = false;
+    if (loadingEl) loadingEl.style.display = 'none';
+  }
 }
 
 async function doSignOut(){
@@ -4360,6 +4406,15 @@ window.onload=()=>{
     return L.tileLayer(src.url, src.opts);
   }
 
+  function switchTileLayer(idx){
+    tileSourceIdx = idx;
+    const newLayer = buildTileLayer(tileSourceIdx);
+    attachTileErrorHandling(newLayer);
+    newLayer.addTo(map);
+    if(window._tileLayer) map.removeLayer(window._tileLayer);
+    window._tileLayer = newLayer;
+  }
+
   function attachTileErrorHandling(layer){
     layer.on('tileerror', (e)=>{
       // Retry the same tile with backoff instead of hiding it forever —
@@ -4382,12 +4437,7 @@ window.onload=()=>{
       tileErrorCount++;
       if(tileErrorCount > 20 && tileSourceIdx < TILE_SOURCES.length - 1){
         tileErrorCount = 0;
-        tileSourceIdx++;
-        const newLayer = buildTileLayer(tileSourceIdx);
-        attachTileErrorHandling(newLayer);
-        newLayer.addTo(map);
-        if(window._tileLayer) map.removeLayer(window._tileLayer);
-        window._tileLayer = newLayer;
+        switchTileLayer(tileSourceIdx + 1);
         console.warn('[map] Primary tile source struggling, switched to fallback basemap.');
       }
     });
@@ -4396,6 +4446,22 @@ window.onload=()=>{
   window._tileLayer = buildTileLayer(tileSourceIdx);
   attachTileErrorHandling(window._tileLayer);
   window._tileLayer.addTo(map);
+
+  // If a MapTiler key is configured server-side (MAPTILER_KEY env var),
+  // prepend it as the primary source — it's a real per-account key with a
+  // 100k-loads/month free tier meant for production traffic, unlike the
+  // CARTO/OSM entries above which are shared anonymous demo endpoints kept
+  // here purely as a fallback chain. This fetch is fire-and-forget so the
+  // map isn't blocked from rendering while it resolves.
+  fetch('/api/config').then(r=>r.json()).then(cfg=>{
+    if(cfg && cfg.maptilerKey && tileSourceIdx===0){
+      TILE_SOURCES.unshift({
+        url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${cfg.maptilerKey}`,
+        opts:{attribution:'&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19,keepBuffer:4}
+      });
+      switchTileLayer(0);
+    }
+  }).catch(e=>console.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
   // Leaflet computes its tile grid from the container's size at creation
   // time. If #map-view is still display:none (its default state on load),
   // the container has zero width/height and the map renders as gray/blank
