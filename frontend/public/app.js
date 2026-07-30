@@ -25,6 +25,14 @@ const db        = getFirestore(fbApp);
 const gProvider = new GoogleAuthProvider();
 let currentUser = null;
 
+// Resolves once Firebase's first onAuthStateChanged callback has fired —
+// i.e. once we actually know whether the visitor is logged in or not.
+// The splash screen (see window.onload below) waits on this instead of a
+// fixed timer, so a logged-in user never sees the login screen flash while
+// that check is still in flight.
+let resolveAuthChecked;
+const authCheckedPromise = new Promise(res => { resolveAuthChecked = res; });
+
 // ── Expose functions to HTML onclick ─────────────────────────────────────────
 Object.assign(window, {
   switchCity, searchCity, generatePlan, startTrip, skipStop, optimizeRoute,
@@ -2211,6 +2219,7 @@ function toggleTheme(){isDark=!isDark;applyTheme();}
 
 // ── Firebase Auth ─────────────────────────────────────────────────────────────
 onAuthStateChanged(auth,async user=>{
+  resolveAuthChecked();
   if(user){
     currentUser=user;
     window.currentUser=user; // client-api.js reads this to attach auth headers — was missing before, so it was always undefined
@@ -4364,7 +4373,15 @@ Object.assign(window, { openCustomizeModal, closeCustomizeModal, selectAllCustom
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.onload=()=>{
   applyTheme();
-  setTimeout(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',300);},500);
+  // Wait for the real auth check (not a blind timer) before revealing
+  // whatever's underneath the splash — this is what stops the login card
+  // from flashing on screen for users who are actually already logged in.
+  // Capped at 4s so a stalled network can't leave the splash up forever;
+  // the extra 500ms after that mirrors the original fixed delay so the
+  // splash doesn't feel like it vanishes instantly when auth resolves fast.
+  Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4000))])
+    .then(()=>new Promise(res=>setTimeout(res,500)))
+    .then(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',300);});
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
   map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120}).setView([20.5937,78.9629],5);

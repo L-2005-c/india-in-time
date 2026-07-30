@@ -1342,7 +1342,7 @@ body::before {
 ═══════════════════════════════════════════ */
 #login-screen{
   position:fixed; inset:0; z-index:99999;
-  background:var(--bg-base); display:flex; flex-direction:column;
+  background:var(--bg-base); display:none; flex-direction:column;
   align-items:center; justify-content:center; padding:24px;
 }
 #login-screen::before{
