@@ -4432,7 +4432,7 @@ window.onload=()=>{
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
   map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120}).setView([20.5937,78.9629],5);
-  L.control.zoom({position:'bottomright'}).addTo(map);
+  L.control.zoom({position:'topleft'}).addTo(map);
   // The app chrome is always dark, but the map itself always uses the
   // warm, legible CARTO Voyager basemap (cream land, labeled roads,
   // blue water) regardless of the UI theme toggle.
