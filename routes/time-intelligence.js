@@ -48,7 +48,7 @@ router.post('/status', (req, res) => {
 // ── Personalized scoring for itinerary ranking ──────────────────────────────
 router.post('/score', (req, res) => {
   try {
-    const { personas } = req.body || {};
+    const { personas, tripMode } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) {
       return res.status(400).json({ error: 'places[] is required' });
@@ -56,7 +56,7 @@ router.post('/score', (req, res) => {
     const places = rawPlaces.slice(0, MAX_PLACES);
     const scored = places.map((p) => ({
       name: p.name,
-      score: personalizeScore(p.baseScore ?? 1, p, personas || []),
+      score: personalizeScore(p.baseScore ?? 1, p, personas || [], tripMode || null),
     }));
     res.json({ scored });
   } catch (err) {

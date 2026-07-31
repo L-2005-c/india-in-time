@@ -86,7 +86,7 @@
   // ── AI endpoints ─────────────────────────────────────────────────────────────
 
   async function aiChat(message, city, plan = [], currentTime = null) {
-    const { text } = await post('/api/ai/chat', { message, city, plan, currentTime });
+    const { text } = await post('/api/ai/chat', { message, city, plan, currentTime, tripMode: window.selectedTripMode || null });
     return text;
   }
 
@@ -116,7 +116,7 @@
   }
 
   async function aiBudgetAnalysis(city, limit, spent, expenses = []) {
-    const { text } = await post('/api/ai/budget', { city, limit, spent, expenses });
+    const { text } = await post('/api/ai/budget', { city, limit, spent, expenses, tripMode: window.selectedTripMode || null });
     return text;
   }
 
@@ -146,7 +146,7 @@
   }
 
   async function aiFoodRecommend(city, stopName, cat, timeOfDay) {
-    const { text } = await post('/api/ai/foodrecommend', { city, stopName, cat, timeOfDay });
+    const { text } = await post('/api/ai/foodrecommend', { city, stopName, cat, timeOfDay, tripMode: window.selectedTripMode || null });
     return text;
   }
 
@@ -162,7 +162,7 @@
     return text;
   }
   async function aiHiddenGem(city, prefs) {
-    const { text } = await post('/api/ai/hiddenGem', { city, prefs });
+    const { text } = await post('/api/ai/hiddenGem', { city, prefs, tripMode: window.selectedTripMode || null });
     return text;
   }
   async function aiArOverlay(imageBase64, imageType, city) {

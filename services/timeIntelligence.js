@@ -303,21 +303,43 @@ function predictCrowd({ daypart, isWeekend, isPeakHourNow, cat }) {
   return 'Very High';
 }
 
+// Valid trip-mode keys — anything else (typos, stray input) is silently
+// ignored rather than looked up on the rules object, so this doubles as a
+// safe allow-list for what would otherwise be a user-controlled property key.
+const TRIP_MODES = ['solo', 'duo', 'trio', 'family', 'group'];
+
 /**
- * Personalization: adjust a place's base score for a given persona.
- * Multiple personas may be supplied; multipliers stack multiplicatively.
+ * Apply one weight set (a persona's or a trip mode's multipliers) to a score.
+ * Shared by personalizeScore for both dimensions since the matching rules
+ * are identical: sunrise/sunset spot flags, has_nightlife, or a direct
+ * category match all multiply the running score.
  */
-function personalizeScore(baseScore, place, personas = []) {
+function applyWeightSet(score, place, weights) {
+  for (const [key, mult] of Object.entries(weights)) {
+    if (key === 'sunrise' && place.is_sunrise_spot) score *= mult;
+    else if (key === 'sunset' && place.is_sunset_spot) score *= mult;
+    else if (key === 'nightlife' && place.has_nightlife) score *= mult;
+    else if (key === 'safety' && place.family_friendly) score *= mult;
+    else if (key === place.cat) score *= mult;
+  }
+  return score;
+}
+
+/**
+ * Personalization: adjust a place's base score for given personas and/or
+ * a trip mode (who's traveling: solo/duo/trio/family/group). Multiple
+ * personas may be supplied; multipliers stack multiplicatively. tripMode
+ * is a single value (a trip has one composition) applied on top.
+ */
+function personalizeScore(baseScore, place, personas = [], tripMode = null) {
   let score = baseScore;
   for (const persona of personas) {
     const weights = rules.personas[persona];
-    if (!weights) continue;
-    for (const [key, mult] of Object.entries(weights)) {
-      if (key === 'sunrise' && place.is_sunrise_spot) score *= mult;
-      if (key === 'sunset' && place.is_sunset_spot) score *= mult;
-      if (key === place.cat) score *= mult;
-      if (key === 'safety' && place.family_friendly) score *= mult;
-    }
+    if (weights) score = applyWeightSet(score, place, weights);
+  }
+  if (tripMode && TRIP_MODES.includes(tripMode) && rules.tripModes) {
+    const weights = rules.tripModes[tripMode];
+    if (weights) score = applyWeightSet(score, place, weights);
   }
   return score;
 }
@@ -351,4 +373,5 @@ module.exports = {
   suggestOpenAlternatives,
   t2m,
   m2t,
+  TRIP_MODES,
 };

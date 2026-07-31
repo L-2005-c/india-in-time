@@ -1757,6 +1757,33 @@ const PERSONA_WEIGHTS = {
 };
 window.selectedPersonas = window.selectedPersonas || [];
 
+// Trip-mode weighting (who's traveling: solo/duo/trio/family/group) — mirrors
+// the "tripModes" section of data/time-intelligence-rules.json on the
+// backend. Backend uses multiplicative weights against a 0-100ish score;
+// here we use additive bonuses on the same additive scale as PERSONA_WEIGHTS
+// above, since stopTimeScore's scoring system throughout this file is
+// additive, not multiplicative. A trip has exactly one mode (not a list),
+// unlike personas.
+const TRIP_MODE_WEIGHTS = {
+  solo:   { cafe: 8, museum: 8, market: 6, sunrise: 8, sunset: 8, nightlife: -6 },
+  duo:    { sunset: 14, sunrise: 8, beach: 8, scenic: 10, garden: 6, food: 6 },
+  trio:   { food: 10, market: 8, nightlife: 6, scenic: 6 },
+  family: { park: 10, garden: 10, museum: 8, temple: 4, nightlife: -15 },
+  group:  { market: 8, food: 10, nightlife: 8, monument: 4 },
+};
+window.selectedTripMode = window.selectedTripMode || null;
+
+function tripModeBonus(stop, tripMode){
+  const weights = tripMode && TRIP_MODE_WEIGHTS[tripMode];
+  if(!weights) return 0;
+  let bonus = 0;
+  if(weights.sunrise && stop.is_sunrise_spot) bonus += weights.sunrise;
+  if(weights.sunset && stop.is_sunset_spot) bonus += weights.sunset;
+  if(weights.nightlife && stop.has_nightlife) bonus += weights.nightlife;
+  if(weights[stop.cat]) bonus += weights[stop.cat];
+  return bonus;
+}
+
 function personaBonus(stop, personas){
   if(!personas || !personas.length) return 0;
   let bonus = 0;
@@ -1771,7 +1798,7 @@ function personaBonus(stop, personas){
   return bonus;
 }
 
-function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null){
+function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null, tripMode=null){
   const part = dayPartForMinutes(arriveMin);
   const climate = climateMode(temp);
   let score = Math.max(0, 12 - priorityIndex) + Math.min(20, Number(stop.importanceScore||0) / 5);
@@ -1786,6 +1813,7 @@ function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=
     score -= 15;
   }
   score += personaBonus(stop, personas || window.selectedPersonas);
+  score += tripModeBonus(stop, tripMode || window.selectedTripMode);
 
   if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) score += 15;
   if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) score += 15;
@@ -4577,6 +4605,12 @@ window.onload=()=>{
   }
   document.querySelectorAll('.persona-pref').forEach(el=>el.addEventListener('change', syncSelectedPersonas));
   syncSelectedPersonas();
+  function syncSelectedTripMode(){
+    const checked = document.querySelector('.trip-mode-pref:checked');
+    window.selectedTripMode = checked ? checked.value : null;
+  }
+  document.querySelectorAll('.trip-mode-pref').forEach(el=>el.addEventListener('change', syncSelectedTripMode));
+  syncSelectedTripMode();
   updateFollowButton();
   restoreNavCardCollapsed();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────

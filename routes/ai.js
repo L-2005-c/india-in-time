@@ -34,6 +34,25 @@ const USER_SAFE_MESSAGES = [
   'Gemini service temporarily unavailable (circuit breaker open). Try again shortly.',
 ];
 
+// ── Trip mode → prompt guidance ──────────────────────────────────────────────
+// The frontend lets a traveler pick who they're with (solo/duo/trio/family/
+// group) — see window.selectedTripMode in client-api.js. Rather than plumbing
+// a bespoke prompt branch through every AI endpoint, this one small helper
+// turns that selection into a single guidance line any endpoint can append.
+// Unknown/missing values are silently ignored (returns ''), so this is always
+// safe to call even for older clients that don't send tripMode at all.
+const TRIP_MODE_GUIDANCE = {
+  solo:   'The traveler is going SOLO. Favor safe, self-paced, easy-to-navigate-alone suggestions.',
+  duo:    'The traveler is on a DUO trip (2 people, often a couple). Favor scenic, romantic, or shareable picks.',
+  trio:   'The traveler is in a TRIO (3 friends). Favor fun, social spots with food/seating for a small group.',
+  family: 'The traveler is with FAMILY (likely includes kids or elders). Favor safe, comfortable, kid/elder-friendly picks and avoid nightlife-heavy suggestions.',
+  group:  'The traveler is in a GROUP (4+ people). Favor spots with group seating/capacity, group discounts, and easy group logistics.',
+};
+
+function tripModeLine(tripMode) {
+  return TRIP_MODE_GUIDANCE[tripMode] || '';
+}
+
 function handler(fn) {
   return async (req, res) => {
     try {
@@ -53,7 +72,7 @@ function handler(fn) {
 // ── /api/ai/chat ─────────────────────────────────────────────────────────────
 // General travel Q&A chatbot
 
-router.post('/chat', handler(({ message, city, plan, currentTime }) => {
+router.post('/chat', handler(({ message, city, plan, currentTime, tripMode }) => {
   const planStr = Array.isArray(plan) && plan.length
     ? plan.join(', ')
     : 'none';
@@ -62,6 +81,7 @@ router.post('/chat', handler(({ message, city, plan, currentTime }) => {
 Tourist in ${city || 'India'} asked: "${message}"
 Current itinerary stops: ${planStr}.
 Current Local Time: ${currentTime || 'Unknown'}
+${tripModeLine(tripMode)}
 
 If the user is asking about their current plan or next stop, give real-time time-based advice (e.g. "Golden hour is starting soon!", "That place closes in 45 mins", "It's too hot for an outdoor walk right now").
 Answer in max 3 short lines. Use emojis. Be specific and helpful.`, { cache: true });
@@ -116,10 +136,11 @@ Include fair price ranges and where exactly to buy them. Bullet list with emojis
 // ── /api/ai/budget ───────────────────────────────────────────────────────────
 // Analyse expenses and give budget tips
 
-router.post('/budget', handler(({ city, limit, spent, expenses }) => {
+router.post('/budget', handler(({ city, limit, spent, expenses, tripMode }) => {
   const expStr = (expenses || []).map(e => `${e.n}(₹${e.c})`).join(', ');
   return callGeminiText(`Tourist in ${city}. Total budget ₹${limit}, spent ₹${spent} on: ${expStr}.
-Give 3 concise budget tips. Flag anything that seems overpriced vs local rates.
+${tripModeLine(tripMode)}
+Give 3 concise budget tips. Flag anything that seems overpriced vs local rates. If a trip mode is given, tips should reflect per-person vs total-group cost as appropriate.
 Short bullet list with emojis.`);
 }));
 
@@ -215,10 +236,11 @@ Be practical and specific. Use emojis. Keep each point brief.`);
 // ── /api/ai/foodrecommend ────────────────────────────────────────────────────
 // AI food recommendations for a specific stop/location
 
-router.post('/foodrecommend', handler(({ city, stopName, cat: _cat, timeOfDay }) => {
+router.post('/foodrecommend', handler(({ city, stopName, cat: _cat, timeOfDay, tripMode }) => {
   const time = timeOfDay || 'afternoon';
 
   return callGeminiText(`A tourist is visiting ${stopName} in ${city}, India at ${time}.
+${tripModeLine(tripMode)}
 Give them a mouth-watering food guide:
 
 🍽️ MUST TRY: Top 3 local dishes/foods specific to this area of ${city}
@@ -277,12 +299,13 @@ Use emojis. Be specific and helpful.`, { cache: true, cacheTtlMs: 30 * 60 * 1000
 
 // ── /api/ai/hiddenGem ────────────────────────────────────────────────────────
 // Hidden Gem Detector
-router.post('/hiddenGem', handler(({ city, prefs }) => {
+router.post('/hiddenGem', handler(({ city, prefs, tripMode }) => {
   const prefStr = (prefs || []).join(', ') || 'any';
   return callGeminiText(`You are a local resident of ${city}, India who knows every secret spot.
 Find 5 HIDDEN GEMS that locals love but tourists almost never visit. These should NOT be on typical tourist lists.
 
 Preferences: ${prefStr}
+${tripModeLine(tripMode)}
 
 For each hidden gem:
 💎 NAME: (specific place name)
