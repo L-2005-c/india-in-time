@@ -59,6 +59,22 @@ function buildHelmetOptions() {
           'https://www.gstatic.com',                 // Firebase SDK's sourcemap fetch (devtools only, but blocked otherwise)
           'https://routing.openstreetmap.de',        // OSRM road-routing API (primary mirror) — draws the actual road-following route line
           'https://router.project-osrm.org',         // OSRM road-routing API (fallback mirror)
+          // NOTE: unpkg.com and the two fonts.* domains are already
+          // whitelisted above in scriptSrc/styleSrc/fontSrc for the normal
+          // browser-native <script src>/<link href> load path — that's NOT
+          // what these connectSrc entries are for. sw.js's fetch handler
+          // intercepts every request (including these) and re-issues it via
+          // its own internal fetch() call, and that internal fetch is
+          // governed by connect-src, not script-src/style-src. Without
+          // these here, the service worker's re-fetch of Leaflet/fonts gets
+          // silently CSP-blocked, falls into its offline-fallback catch,
+          // and returns a fake 503 — which left the global `L` undefined
+          // and crashed the entire window.onload startup sequence on
+          // `L.map(...)`, not just the map. Removing any of these three
+          // reopens that failure mode.
+          'https://unpkg.com',
+          'https://fonts.googleapis.com',
+          'https://fonts.gstatic.com',
         ],
         frameSrc: [
           'https://accounts.google.com',

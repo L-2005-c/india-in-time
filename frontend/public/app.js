@@ -4431,116 +4431,131 @@ window.onload=()=>{
     .then(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',300);});
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
-  map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120}).setView([20.5937,78.9629],5);
-  L.control.zoom({position:'topleft'}).addTo(map);
-  // The app chrome is always dark, but the map itself always uses the
-  // warm, legible CARTO Voyager basemap (cream land, labeled roads,
-  // blue water) regardless of the UI theme toggle.
-  // Primary + fallback basemap sources. The CARTO Voyager rastertiles
-  // endpoint used here has no API key — it's CARTO's free public/demo
-  // tile server, which is fine at low volume but starts throttling
-  // (403/429) once enough concurrent users push total tile requests up.
-  // Under the old code a throttled tile was hidden forever (see the
-  // tileerror handler below, previously `display:none` with no retry),
-  // so a brief rate-limit window left permanent grey holes in the map —
-  // that's the "crash" users were seeing. We now retry failed tiles
-  // with backoff, and if the primary source keeps failing we swap the
-  // whole layer to a fallback source instead of leaving it broken.
-  // For real production traffic, get a free-tier API key from a
-  // provider meant for that (MapTiler, Stadia Maps, Thunderforest, or
-  // a CARTO account) — anonymous demo endpoints will always eventually
-  // throttle as usage grows; retry/fallback only masks that, it doesn't
-  // remove the underlying limit.
-  const TILE_SOURCES = [
-    {
-      url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      opts:{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd',keepBuffer:4}
-    },
-    {
-      url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      opts:{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,subdomains:'abc',keepBuffer:4}
+  try {
+    map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120}).setView([20.5937,78.9629],5);
+    L.control.zoom({position:'topleft'}).addTo(map);
+    // The app chrome is always dark, but the map itself always uses the
+    // warm, legible CARTO Voyager basemap (cream land, labeled roads,
+    // blue water) regardless of the UI theme toggle.
+    // Primary + fallback basemap sources. The CARTO Voyager rastertiles
+    // endpoint used here has no API key — it's CARTO's free public/demo
+    // tile server, which is fine at low volume but starts throttling
+    // (403/429) once enough concurrent users push total tile requests up.
+    // Under the old code a throttled tile was hidden forever (see the
+    // tileerror handler below, previously `display:none` with no retry),
+    // so a brief rate-limit window left permanent grey holes in the map —
+    // that's the "crash" users were seeing. We now retry failed tiles
+    // with backoff, and if the primary source keeps failing we swap the
+    // whole layer to a fallback source instead of leaving it broken.
+    // For real production traffic, get a free-tier API key from a
+    // provider meant for that (MapTiler, Stadia Maps, Thunderforest, or
+    // a CARTO account) — anonymous demo endpoints will always eventually
+    // throttle as usage grows; retry/fallback only masks that, it doesn't
+    // remove the underlying limit.
+    const TILE_SOURCES = [
+      {
+        url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        opts:{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',maxZoom:19,subdomains:'abcd',keepBuffer:4}
+      },
+      {
+        url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        opts:{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,subdomains:'abc',keepBuffer:4}
+      }
+    ];
+    let tileSourceIdx = 0;
+    let tileErrorCount = 0;
+    let tileErrorWindowStart = Date.now();
+
+    function buildTileLayer(idx){
+      const src = TILE_SOURCES[idx];
+      return L.tileLayer(src.url, src.opts);
     }
-  ];
-  let tileSourceIdx = 0;
-  let tileErrorCount = 0;
-  let tileErrorWindowStart = Date.now();
 
-  function buildTileLayer(idx){
-    const src = TILE_SOURCES[idx];
-    return L.tileLayer(src.url, src.opts);
-  }
+    function switchTileLayer(idx){
+      tileSourceIdx = idx;
+      const newLayer = buildTileLayer(tileSourceIdx);
+      attachTileErrorHandling(newLayer);
+      newLayer.addTo(map);
+      if(window._tileLayer) map.removeLayer(window._tileLayer);
+      window._tileLayer = newLayer;
+    }
 
-  function switchTileLayer(idx){
-    tileSourceIdx = idx;
-    const newLayer = buildTileLayer(tileSourceIdx);
-    attachTileErrorHandling(newLayer);
-    newLayer.addTo(map);
-    if(window._tileLayer) map.removeLayer(window._tileLayer);
-    window._tileLayer = newLayer;
-  }
+    function attachTileErrorHandling(layer){
+      layer.on('tileerror', (e)=>{
+        // Retry the same tile with backoff instead of hiding it forever —
+        // most failures are transient (momentary throttling), not permanent.
+        const tile = e.tile;
+        const originalSrc = e.tile.src;
+        let attempts = tile._iitRetryCount || 0;
+        if(attempts < 3){
+          tile._iitRetryCount = attempts + 1;
+          setTimeout(()=>{ try{ tile.src = originalSrc; }catch(_e){} }, 800 * (attempts + 1));
+        } else {
+          try{ tile.style.visibility='hidden'; }catch(_e){}
+        }
 
-  function attachTileErrorHandling(layer){
-    layer.on('tileerror', (e)=>{
-      // Retry the same tile with backoff instead of hiding it forever —
-      // most failures are transient (momentary throttling), not permanent.
-      const tile = e.tile;
-      const originalSrc = e.tile.src;
-      let attempts = tile._iitRetryCount || 0;
-      if(attempts < 3){
-        tile._iitRetryCount = attempts + 1;
-        setTimeout(()=>{ try{ tile.src = originalSrc; }catch(_e){} }, 800 * (attempts + 1));
-      } else {
-        try{ tile.style.visibility='hidden'; }catch(_e){}
-      }
-
-      // Track error rate; if the current source is failing hard within
-      // a short window, switch the whole layer to the next fallback
-      // source rather than leaving the map broken.
-      const now = Date.now();
-      if(now - tileErrorWindowStart > 15000){ tileErrorCount = 0; tileErrorWindowStart = now; }
-      tileErrorCount++;
-      if(tileErrorCount > 20 && tileSourceIdx < TILE_SOURCES.length - 1){
-        tileErrorCount = 0;
-        switchTileLayer(tileSourceIdx + 1);
-        console.warn('[map] Primary tile source struggling, switched to fallback basemap.');
-      }
-    });
-  }
-
-  window._tileLayer = buildTileLayer(tileSourceIdx);
-  attachTileErrorHandling(window._tileLayer);
-  window._tileLayer.addTo(map);
-
-  // If a MapTiler key is configured server-side (MAPTILER_KEY env var),
-  // prepend it as the primary source — it's a real per-account key with a
-  // 100k-loads/month free tier meant for production traffic, unlike the
-  // CARTO/OSM entries above which are shared anonymous demo endpoints kept
-  // here purely as a fallback chain. This fetch is fire-and-forget so the
-  // map isn't blocked from rendering while it resolves.
-  fetch('/api/config').then(r=>r.json()).then(cfg=>{
-    if(cfg && cfg.maptilerKey && tileSourceIdx===0){
-      TILE_SOURCES.unshift({
-        url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${cfg.maptilerKey}`,
-        opts:{attribution:'&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19,keepBuffer:4}
+        // Track error rate; if the current source is failing hard within
+        // a short window, switch the whole layer to the next fallback
+        // source rather than leaving the map broken.
+        const now = Date.now();
+        if(now - tileErrorWindowStart > 15000){ tileErrorCount = 0; tileErrorWindowStart = now; }
+        tileErrorCount++;
+        if(tileErrorCount > 20 && tileSourceIdx < TILE_SOURCES.length - 1){
+          tileErrorCount = 0;
+          switchTileLayer(tileSourceIdx + 1);
+          console.warn('[map] Primary tile source struggling, switched to fallback basemap.');
+        }
       });
-      switchTileLayer(0);
     }
-  }).catch(e=>console.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
-  // Leaflet computes its tile grid from the container's size at creation
-  // time. If #map-view is still display:none (its default state on load),
-  // the container has zero width/height and the map renders as gray/blank
-  // tiles until something forces a resize — this is the "map is glitching"
-  // bug. Force several invalidateSize() passes and watch the container with
-  // a ResizeObserver so the map always repaints correctly once it becomes
-  // visible, on any screen size, without relying on a specific view switch.
-  [0,150,400,900].forEach(delay=>setTimeout(()=>{ if(map) map.invalidateSize(false); }, delay));
-  const mapEl = document.getElementById('map');
-  if(mapEl && 'ResizeObserver' in window){
-    new ResizeObserver(()=>{ if(map) map.invalidateSize(false); }).observe(mapEl);
+
+    window._tileLayer = buildTileLayer(tileSourceIdx);
+    attachTileErrorHandling(window._tileLayer);
+    window._tileLayer.addTo(map);
+
+    // If a MapTiler key is configured server-side (MAPTILER_KEY env var),
+    // prepend it as the primary source — it's a real per-account key with a
+    // 100k-loads/month free tier meant for production traffic, unlike the
+    // CARTO/OSM entries above which are shared anonymous demo endpoints kept
+    // here purely as a fallback chain. This fetch is fire-and-forget so the
+    // map isn't blocked from rendering while it resolves.
+    fetch('/api/config').then(r=>r.json()).then(cfg=>{
+      if(cfg && cfg.maptilerKey && tileSourceIdx===0){
+        TILE_SOURCES.unshift({
+          url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${cfg.maptilerKey}`,
+          opts:{attribution:'&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19,keepBuffer:4}
+        });
+        switchTileLayer(0);
+      }
+    }).catch(e=>console.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
+    // Leaflet computes its tile grid from the container's size at creation
+    // time. If #map-view is still display:none (its default state on load),
+    // the container has zero width/height and the map renders as gray/blank
+    // tiles until something forces a resize — this is the "map is glitching"
+    // bug. Force several invalidateSize() passes and watch the container with
+    // a ResizeObserver so the map always repaints correctly once it becomes
+    // visible, on any screen size, without relying on a specific view switch.
+    [0,150,400,900].forEach(delay=>setTimeout(()=>{ if(map) map.invalidateSize(false); }, delay));
+    const mapEl = document.getElementById('map');
+    if(mapEl && 'ResizeObserver' in window){
+      new ResizeObserver(()=>{ if(map) map.invalidateSize(false); }).observe(mapEl);
+    }
+    window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
+    map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
+    map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
+  } catch(mapInitErr) {
+    // Leaflet (or a dependency of it) failed to load or initialize — most
+    // likely `L` was undefined because the CDN request for leaflet.js
+    // failed (CSP block, network issue, CDN outage). Contain the damage
+    // here instead of letting it kill the rest of startup: GPS, city
+    // detection, chat, and the planner below all still need to run.
+    console.error('[map] Failed to initialize — map will be unavailable this session:', mapInitErr);
+    map = null;
+    const mapEl = document.getElementById('map');
+    if(mapEl){
+      mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;color:var(--text-secondary);font-size:14px;">⚠️ The map couldn\'t load. Please refresh the page — if this keeps happening, check your connection.</div>';
+    }
   }
-  window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
-  map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
-  map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
+
   document.getElementById('chat-in').addEventListener('keypress',e=>{if(e.key==='Enter')handleChat();});
   document.getElementById('city-input').addEventListener('keypress',e=>{if(e.key==='Enter')searchCity();});
   syncPlannerTimeFields('duration');
