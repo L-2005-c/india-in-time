@@ -55,6 +55,22 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   if (url.protocol === 'chrome-extension:') return;
 
+  // Let the browser handle these natively — do NOT intercept. These are
+  // CDN hosts the app cannot function without (Leaflet's library/CSS, the
+  // app's fonts, MapTiler's tiles). Intercepting them means re-fetching
+  // via this handler's own fetch(), which the browser subjects to the
+  // page's connect-src CSP directive — a completely separate rule from
+  // the script-src/style-src/font-src/img-src that already, correctly,
+  // govern these as normal <script>/<link>/tile requests. That mismatch
+  // has already caused one full outage (Leaflet failing to load broke
+  // the entire app startup, not just the map) and is exactly the kind of
+  // thing that's easy to reintroduce with any future deploy or config
+  // drift. Bypassing interception for these specific hosts removes the
+  // connect-src dependency for them entirely, permanently — there is no
+  // CSP entry left to accidentally omit.
+  const BYPASS_SW_HOSTS = ['unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'api.maptiler.com'];
+  if (BYPASS_SW_HOSTS.includes(url.hostname)) return;
+
   // Always go to network for API calls
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
