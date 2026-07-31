@@ -215,7 +215,7 @@ Be practical and specific. Use emojis. Keep each point brief.`);
 // ── /api/ai/foodrecommend ────────────────────────────────────────────────────
 // AI food recommendations for a specific stop/location
 
-router.post('/foodrecommend', handler(({ city, stopName, cat, timeOfDay }) => {
+router.post('/foodrecommend', handler(({ city, stopName, cat: _cat, timeOfDay }) => {
   const time = timeOfDay || 'afternoon';
 
   return callGeminiText(`A tourist is visiting ${stopName} in ${city}, India at ${time}.

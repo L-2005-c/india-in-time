@@ -220,7 +220,8 @@ router.post('/', async (req, res) => {
       const payload = { places: all, source: 'error_fallback', count: all.length };
       setCachedPlaces(key, payload);
       return res.json(payload);
-    } catch(e) {
+    } catch (err) {
+      console.error('[places] fetch failed:', err.message);
       return res.status(500).json({ error: 'Places fetch failed' });
     }
   }

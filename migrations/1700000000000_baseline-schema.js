@@ -1,5 +1,3 @@
-/* eslint-disable camelcase */
-
 // 1700000000000_baseline-schema.js — Baseline migration
 //
 // This mirrors the schema that db/init.js has been creating via

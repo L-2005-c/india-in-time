@@ -149,7 +149,6 @@ function getPlaceState(place, now = new Date(), weather = null) {
   const season = getSeason(month);
 
   const sun = computeSunTimes(lat, lon, now);
-  const sunriseMin = t2m(sun.sunrise, 6 * 60);
   const sunsetMin = t2m(sun.sunset, 18 * 60 + 30);
 
   const weeklyHoliday = place.weeklyHoliday !== undefined ? place.weeklyHoliday : catRule.weeklyHoliday;

@@ -91,7 +91,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
 
   try {
     parsed = JSON.parse(clean);
-  } catch(e) {
+  } catch (_e) {
     // Try to extract complete JSON array even if outer object is truncated
     const arrMatch = clean.match(/\[[\s\S]*\]/);
     if (arrMatch) {
@@ -101,7 +101,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
       const lastClose = arrStr.lastIndexOf('}');
       if (lastClose > -1) {
         arrStr = arrStr.substring(0, lastClose + 1) + ']';
-        try { parsed = { places: JSON.parse(arrStr) }; } catch(e2) {}
+        try { parsed = { places: JSON.parse(arrStr) }; } catch (_e2) {}
       }
     }
 
@@ -114,7 +114,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
         try {
           const obj = JSON.parse(match[0]);
           if (obj.name) objects.push(obj);
-        } catch(e) {}
+        } catch (_e) {}
       }
       if (objects.length > 0) parsed = { places: objects };
     }
@@ -159,7 +159,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   }).filter(Boolean);
 }
 
-async function fetchWiki(lat, lon, cityName) {
+async function fetchWiki(lat, lon, _cityName) {
   // Wikipedia coords are ground-truth accurate — use them directly.
   // Query up to 500 entries (Wikipedia max) within 30 km.
   const url = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gsradius=30000&gscoord=${lat}|${lon}&gslimit=500&format=json&origin=*`;
