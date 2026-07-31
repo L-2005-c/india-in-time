@@ -75,6 +75,16 @@ function buildHelmetOptions() {
           'https://unpkg.com',
           'https://fonts.googleapis.com',
           'https://fonts.gstatic.com',
+          // Google/Firebase Auth profile photos (lh3/lh4/lh5.googleusercontent.com).
+          // Already whitelisted in imgSrc for the normal <img src> load path,
+          // but sw.js's fetch handler treats any hostname containing "google"
+          // as a "Firebase request" and re-fetches it internally (see the
+          // comment on that branch in sw.js) — that internal fetch is
+          // governed by connect-src, not img-src. Without this, the SW's
+          // re-fetch of the user's profile photo gets CSP-blocked, falls
+          // back to an empty Response(''), and the browser reports that as
+          // a second, img-src-looking failure on top of this one.
+          'https://*.googleusercontent.com',
         ],
         frameSrc: [
           'https://accounts.google.com',
