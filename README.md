@@ -142,13 +142,32 @@ This project underwent an external technical audit; the following were
 identified and are being worked through (see CI status and open issues for
 current state):
 
-- [x] Automated test suite (Jest) — `__tests__/` (119 tests, 12 suites)
+- [x] Automated test suite (Jest) — `__tests__/` (190 tests, 19 suites).
+      Previously the core business logic — `db/queries.js`,
+      `services/gemini.js`, `services/placesDiscovery.js`, and most
+      `routes/` — had effectively 0% coverage even though the suite existed;
+      middleware/utils were well-covered but the AI/places/DB core wasn't.
+      Added targeted coverage for the DB query layer (mocked pool),
+      `services/gemini.js` (circuit breaker, retry, caching, API-key
+      redaction), the Wikipedia/Nominatim filtering logic in
+      `services/placesDiscovery.js`, and the trips/favorites routes
+      (including the ownership-scoping checks that stop one user from
+      reading/deleting another user's data). `services/placesDiscovery.js`
+      is still the largest remaining coverage gap — its curated-fallback
+      functions intentionally weren't covered here (see the test file's own
+      header comment for why).
 - [x] CI pipeline — `.github/workflows/ci.yml` (lint + test on Node 20.x/22.x,
       dependency audit, Docker build verification, on every push/PR to `main`).
       **Note:** earlier versions of this README marked this done before the
       workflow file actually existed in the repo — an internal audit caught
-      the mismatch; this is now genuinely true and was re-verified by
-      actually running the equivalent steps locally before merging.
+      the mismatch a second time (the workflow existed by name but only ran
+      `node --check`, a syntax check, not lint or the test suite). It's now
+      genuinely wired up; the lint and test steps were re-verified by running
+      `npm run lint` / `npm test` locally with the exact commands CI uses,
+      both passing. The Docker build step's syntax matches the existing
+      `Dockerfile` but has **not** been executed end-to-end (no Docker
+      daemon available in the environment this fix was made in) — first CI
+      run on this branch should be watched to confirm it actually builds.
 - [x] Dependency vulnerability scanning — `.github/dependabot.yml` (weekly,
       npm + GitHub Actions ecosystems). Same prior-mismatch note as above —
       this file didn't exist before either; it does now.
@@ -170,7 +189,10 @@ current state):
 - [x] Vercel serverless clustering bug (routes were never registered on Vercel — see Deployment section)
 - [x] Basic accessibility pass: keyboard-operable bottom nav, aria-labels on
       icon-only buttons, aria-hidden on decorative icons (bottom nav, close
-      buttons, send button, back-button icons in `index.html`)
+      buttons, send button, back-button icons in `index.html`). Also removed
+      `maximum-scale=1.0, user-scalable=no` from the viewport meta tag —
+      those blocked pinch-to-zoom entirely, a real problem for low-vision
+      users and a recognized accessibility anti-pattern regardless of intent.
 - [x] Frontend minification tooling (`npm run build:frontend`) — **now wired
       in**: the script also generates `frontend/public/dist/index.html`
       referencing its own content-hashed output, and
@@ -195,9 +217,18 @@ current state):
       doing as a dedicated effort with visual/manual QA, not a blind rewrite.
 - [ ] Single point of failure: one AI provider (Gemini), one geocoding
       provider (Nominatim), no fallback for either
-- [ ] `npm audit` flags 8 moderate-severity findings in `firebase-admin`'s
-      dependency tree (transitive `uuid` bounds-check issue). A fix is
-      available via `npm audit fix --force`, but it's a breaking major-version
-      bump to `firebase-admin` — not applied here since re-verifying every
-      auth code path against a new major version needs real testing against
-      an actual Firebase project, which isn't possible in this environment.
+- [x] `npm audit` — previously flagged 8 moderate-severity findings, all
+      transitively pulled in by `firebase-admin`'s dependency tree (an old
+      `uuid` version with a buffer-bounds-check issue). **Now 0
+      vulnerabilities.** Worth documenting how, because the first attempt
+      was wrong: bumping `firebase-admin` from `^12.7.0` to `^14.2.0` did
+      clear the audit, but a smoke test against the actual API surface
+      caught that v13+ removed `admin.credential.cert()` in favor of a
+      top-level `admin.cert()` — which would have silently broken
+      `middleware/auth.js` and `middleware/adminAuth.js` in production. That
+      bump was reverted. The fix that shipped instead: `firebase-admin`
+      stays on `^12.7.0` (API surface re-verified intact via the same smoke
+      test), and a `"uuid": "^11.1.1"` entry was added to `package.json`'s
+      `overrides` to force every transitive dependency onto a patched `uuid`
+      without touching `firebase-admin`'s major version at all. Full test
+      suite (190/190) re-run and passing after this change.

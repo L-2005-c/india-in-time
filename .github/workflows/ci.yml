@@ -1,11 +1,11 @@
 name: CI
 
-# No test suite exists in this repo yet (see package.json — there's no
-# "test" script). This workflow intentionally only does what's actually
-# true: installs real dependencies and syntax-checks every backend JS file
-# plus the extracted frontend app.js. Add a real `npm test` step here once
-# there's a test suite to run — don't just add `npm test` to this file
-# without one, or CI will pass by having nothing to fail.
+# Runs on every push/PR to main. This gate actually runs lint + the Jest
+# suite + a Docker build against every change — none of these were wired up
+# before (an earlier version of this workflow only ran `node --check`,
+# a syntax check, and explicitly noted no test suite existed even though
+# one did — see git history / audit notes). Anything failing here now
+# blocks the merge; it doesn't just get logged and ignored.
 
 on:
   push:
@@ -14,28 +14,39 @@ on:
     branches: [main]
 
 jobs:
-  syntax-check:
+  lint-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['20.x', '22.x']
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Syntax-check backend JS
-        run: |
-          find . -name "*.js" \
-            -not -path "./node_modules/*" \
-            -not -path "./frontend/public/*" \
-            -print0 | xargs -0 -n1 node --check
+      - name: Lint
+        run: npm run lint
 
       - name: Syntax-check frontend app.js
         run: node --check frontend/public/app.js
 
-      - name: npm audit (non-blocking)
+      - name: Run test suite
+        run: npm test
+
+      - name: npm audit (non-blocking — tracked separately via Dependabot)
         run: npm audit --omit=dev || true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t india-in-time:ci-check .
