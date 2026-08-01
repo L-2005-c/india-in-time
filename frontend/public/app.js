@@ -810,6 +810,43 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
     return origPolyline.call(L, clean, opts);
   };
 })();
+// ── Global Leaflet view-movement safety net ─────────────────────────────────
+// Companion to installLeafletCoordGuard() above. flyTo()/setView() being
+// interrupted by another flyTo()/setView() before their animation finishes
+// corrupts Leaflet's internal easing state and can throw a NaN LatLng error
+// asynchronously, from inside Leaflet's own requestAnimationFrame callback —
+// after the call that triggered it has already returned, so a try/catch
+// around the call site can't catch it. map.stop() before each call (added at
+// every known flyTo/setView call site) prevents the corruption in the first
+// place; this patches flyTo/setView/panTo themselves to call it automatically
+// too, so this can't regress at a call site someone adds later without
+// remembering the pattern.
+(function installLeafletMoveGuard(){
+  if (typeof L === 'undefined' || !L.Map || L.Map.prototype.__moveGuardInstalled) return;
+  L.Map.prototype.__moveGuardInstalled = true;
+  const origSetView = L.Map.prototype.setView; // captured once, used as the shared fallback below
+  ['flyTo','setView','panTo'].forEach(fnName => {
+    const orig = L.Map.prototype[fnName];
+    if (typeof orig !== 'function') return;
+    L.Map.prototype[fnName] = function(target, ...rest){
+      const lat = Array.isArray(target) ? target[0] : target?.lat;
+      const lng = Array.isArray(target) ? target[1] : (target?.lng ?? target?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        console.warn(`[map guard] skipped ${fnName} — invalid target:`, target);
+        return this;
+      }
+      this.stop(); // cancel any in-flight animation so this one starts clean
+      try {
+        return orig.call(this, target, ...rest);
+      } catch (e) {
+        console.warn(`[map guard] ${fnName} threw, falling back to instant setView`, e);
+        this.stop();
+        try { return origSetView.call(this, target, rest[0]); }
+        catch (e2) { console.warn('[map guard] fallback setView also threw', e2); return this; }
+      }
+    };
+  });
+})();
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
 
 // --- TIME BASED BEHAVIOUR HELPERS ---
@@ -1639,18 +1676,24 @@ function followLivePosition(force=false){
   const tLat=Array.isArray(target)?target[0]:target.lat;
   const tLon=Array.isArray(target)?target[1]:target.lng;
   if(!isFiniteLatLon(tLat,tLon)) return;
-  // Leaflet's flyTo() runs its own internal fly-path easing math (separate
-  // from the target we pass in), and that math can independently produce a
-  // NaN LatLng and throw — a known Leaflet 1.9.x edge case that fires when
-  // the current view is already at/near the target (e.g. tapping the
-  // recenter/follow button while already centered on the live position, or
-  // this function firing again in quick succession). Skip the animation
-  // when there's essentially nowhere to fly, and fall back to an instant,
-  // non-animated setView (no easing math to fail) if flyTo throws anyway.
+  // Leaflet's flyTo() runs its own internal fly-path easing math over a
+  // sequence of requestAnimationFrame ticks (separate from the target we
+  // pass in). If a new flyTo()/setView() call interrupts an animation
+  // that's still in flight — e.g. this function firing again for the next
+  // GPS fix before the previous 0.8s flight has finished, which is the
+  // normal case during live tracking — Leaflet's internal easing state gets
+  // corrupted and later animation frames independently compute a NaN LatLng
+  // and throw. That throw happens asynchronously, inside Leaflet's own rAF
+  // callback, well after this function (and its try/catch below) has
+  // already returned, so the try/catch alone can never catch it. The fix is
+  // map.stop() immediately before starting a new flight: it cleanly cancels
+  // any in-progress animation so the next flyTo() always starts from a
+  // clean, uncorrupted state instead of interrupting one mid-flight.
   const curCenter=map.getCenter();
   const alreadyThere = curCenter && isFiniteLatLon(curCenter.lat,curCenter.lng)
     && map.distance(curCenter,[tLat,tLon])<3 && Math.abs((map.getZoom()||zoom)-zoom)<0.01;
   if(alreadyThere) return;
+  map.stop();
   try{
     map.flyTo([tLat,tLon],zoom,{
       animate:true,
@@ -1659,6 +1702,7 @@ function followLivePosition(force=false){
     });
   }catch(e){
     console.warn('[followLivePosition] flyTo threw, falling back to setView', e);
+    map.stop();
     map.setView([tLat,tLon],zoom);
   }
 }
@@ -2623,6 +2667,7 @@ function switchCity(cityId, silent=false){
   document.getElementById('hdr-city').textContent=currentCityName;
   if(map){
     if(isFiniteLatLon(city.lat,city.lon)){
+      map.stop();
       map.flyTo([city.lat,city.lon],12,{duration:1.1});
     } else {
       console.warn('[switchCity] skipped flyTo — invalid coordinates for city:', cityId, city.lat, city.lon);
@@ -3712,6 +3757,7 @@ async function locateMe(){
   if (btn) { btn.disabled = true; btn.classList.add('locating'); }
   try {
     const { lat, lon } = await waitForFirstGpsFix(10000);
+    map.stop();
     map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { animate: true, duration: 0.8 });
   } catch (e) {
     console.warn('[locateMe] GPS fix unavailable:', e);
