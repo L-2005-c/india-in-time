@@ -139,14 +139,6 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
     const rawImportance = String(p.importance || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
     const importance = ['must_see', 'famous', 'local'].includes(rawImportance) ? rawImportance : 'famous';
     const importanceScore = importance === 'must_see' ? 100 : importance === 'famous' ? 75 : 35;
-    // Gemini is asked for 24-hour "HH:MM" but LLM output isn't guaranteed to
-    // match that shape (e.g. "9:00 AM", "Open 24 hours", trailing text).
-    // A malformed-but-truthy string used to sail through `p.open_time || default`
-    // and get silently parsed as 00:00 by the frontend's time-window logic,
-    // which made the place look "closed" for the entire day, every day. Validate
-    // strictly here so a bad value falls back to the sane category default instead.
-    const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
-    const validTime = (v, fallback) => (typeof v === 'string' && TIME_RE.test(v.trim())) ? v.trim() : fallback;
     return {
       id: `ai_${i}`,
       name,
@@ -154,8 +146,8 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
       importance,
       importanceScore,
       vt: Math.min(Math.max(parseInt(p.visit_minutes)||60, 20), 240),
-      ot: validTime(p.open_time,  cat==='food'?'11:00':'06:00'),
-      ct: validTime(p.close_time, cat==='food'?'23:00':'20:00'),
+      ot: p.open_time  || (cat==='food'?'11:00':'06:00'),
+      ct: p.close_time || (cat==='food'?'23:00':'20:00'),
       best_visiting_hours: p.best_visiting_hours || null,
       peak_hours: p.peak_hours || null,
       is_sunrise_spot: !!p.is_sunrise_spot,
