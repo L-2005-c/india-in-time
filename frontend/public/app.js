@@ -759,6 +759,14 @@ const t2m=(s,fallback=0)=>{
   if(!Number.isFinite(h)||!Number.isFinite(m)) return fallback;
   return Math.max(0,Math.min(23,h))*60+Math.max(0,Math.min(59,m));
 };
+// t2m() falls back to 0 (midnight) on anything it can't parse — fine as a raw
+// parser, but dangerous for open/close times: a malformed string (bad data
+// from an AI/Nominatim source, a stale saved plan, etc.) would silently become
+// closeMin=0, and since "arrive" is always >=0 the place reads as closed for
+// the entire day, forever. safeTimeMin validates the shape first and uses the
+// category-appropriate default on anything that doesn't match "HH:MM".
+const TIME_RE=/^([01]?\d|2[0-3]):[0-5]\d$/;
+const safeTimeMin=(s,defaultStr)=>t2m(TIME_RE.test(String(s||'').trim())?s:defaultStr);
 const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
 const sync=()=>{if(mdPlan.length>0)mdPlan[dayIdx]=itin;};
 const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
@@ -1076,8 +1084,8 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
 
 function getPlaceDynamicStatus(loc, evalTime) {
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
-  const ot = t2m(loc.ot || '06:00');
-  const ct = t2m(loc.ct || '23:00', 23 * 60);
+  const ot = safeTimeMin(loc.ot, '06:00');
+  const ct = safeTimeMin(loc.ct, '23:00');
   // Some places (night markets, bars, 24hr spots) close after midnight, e.g.
   // 18:00–02:00. A plain `now < ot || now >= ct` check always reported these
   // as closed during their actual overnight open hours.
@@ -1183,7 +1191,7 @@ function checkTimeIntelNotifications(){
     if(!stops.length || typeof addMsg !== 'function') return;
     const now = getCurrentLocalMin();
     stops.forEach(loc=>{
-      const ct = t2m(loc.ct || '23:00');
+      const ct = safeTimeMin(loc.ct, '23:00');
       const minsToClose = ct - now;
       const closeKey = `close-${loc.id}`;
       if(minsToClose > 0 && minsToClose <= 45 && !window._tiNotified.has(closeKey)){
@@ -1918,8 +1926,8 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       if(used + travel + actualVisit > maxT) actualVisit = maxT - (used + travel);
       if(actualVisit < 15) continue;
       const depart = arrive + actualVisit;
-      const openMin = t2m(loc.ot || '06:00');
-      const closeMin = t2m(loc.ct || '23:00');
+      const openMin = safeTimeMin(loc.ot, '06:00');
+      const closeMin = safeTimeMin(loc.ct, '23:00');
       const nightFriendly = loc.cat==='food' || loc.cat==='market' || loc.night_availability || loc.is_sunset_spot;
       const isOpen = arrive >= openMin && arrive < closeMin;
       if(!isOpen && !(nightFriendly && arrive >= closeMin && arrive < 23*60)) continue; // truly closed
@@ -1947,8 +1955,8 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       if(actualVisit < 15) continue;
       
       const depart = arrive + actualVisit;
-      const openMin = t2m(loc.ot || '06:00');
-      const closeMin = t2m(loc.ct || '23:00'); // respect the place's real closing time — no fake floor
+      const openMin = safeTimeMin(loc.ot, '06:00');
+      const closeMin = safeTimeMin(loc.ct, '23:00'); // respect the place's real closing time — no fake floor
       if(arrive < openMin || arrive >= closeMin) continue; // Hard reject if closed
       
       // Nearest Neighbor Base Score
@@ -1988,7 +1996,7 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
     if(!best){
       let nextOpen = Infinity;
       for(const loc of remaining){
-        const openMin = t2m(loc.ot || '06:00');
+        const openMin = safeTimeMin(loc.ot, '06:00');
         const candidate = Math.max(currentMin + 20, openMin);
         if(candidate < nextOpen) nextOpen = candidate;
       }
@@ -2840,7 +2848,7 @@ async function generatePlan(){
   if(!mdPlan.length){
     mdPlan=[];rem=[...avail];
     for(let d=0;d<nDays;d++){let day=[],cur=startMin,used=0,unv=[];
-      rem.forEach(loc=>{const tr=day.length?20:0,arr=cur+tr,dep=arr+loc.vt;if(used+loc.vt+tr<=maxT&&arr>=t2m(loc.ot)&&dep<=t2m(loc.ct)){day.push({...loc,tt:tr,slotLabel:dayPartForMinutes(arr),climateNote:stopClimateNote(loc,arr,realTemp||28)});used+=loc.vt+tr;cur=dep;}else unv.push(loc);});
+      rem.forEach(loc=>{const tr=day.length?20:0,arr=cur+tr,dep=arr+loc.vt;if(used+loc.vt+tr<=maxT&&arr>=safeTimeMin(loc.ot,'06:00')&&dep<=safeTimeMin(loc.ct,'23:00')){day.push({...loc,tt:tr,slotLabel:dayPartForMinutes(arr),climateNote:stopClimateNote(loc,arr,realTemp||28)});used+=loc.vt+tr;cur=dep;}else unv.push(loc);});
       if(day.length)mdPlan.push(day);rem=unv;
     }
   }
