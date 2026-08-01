@@ -768,6 +768,48 @@ const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1
 // LatLng object" and that throw was reaching production because several
 // call sites only checked `coords.length`, which [NaN, NaN] still passes.
 const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
+
+// ── Global Leaflet safety net ───────────────────────────────────────────────
+// hasValidCoords() above fixed the call sites we could find (renderMapMarkers,
+// renderRoute, the place-merge functions) — but Leaflet throws synchronously
+// and uncaught the instant ANY invalid [lat,lon] pair reaches L.marker()/
+// L.polyline(), which silently aborts whatever loop or function called it.
+// That makes this bug effectively impossible to fully stamp out call-site by
+// call-site — any function we didn't audit (or any future one) can still
+// crash the same way. This patches Leaflet's own factories once, globally,
+// so an invalid pair is skipped (with a console.warn identifying it) instead
+// of throwing. It's a last line of defense, not a fix for the bad data
+// itself — the warnings it logs point at exactly which place/coords are bad.
+(function installLeafletCoordGuard(){
+  if (typeof L === 'undefined' || L.__coordGuardInstalled) return;
+  L.__coordGuardInstalled = true;
+  const isFiniteLatLngPair = v => {
+    if (Array.isArray(v)) return v.length >= 2 && Number.isFinite(+v[0]) && Number.isFinite(+v[1]);
+    if (v && typeof v === 'object') return Number.isFinite(+v.lat) && Number.isFinite(+(v.lng ?? v.lon));
+    return false;
+  };
+  const noopLayer = () => {
+    const stub = {};
+    ['addTo','bindPopup','bindTooltip','setLatLng','setStyle','setIcon','setLatLngs','on','off','remove','removeFrom']
+      .forEach(m => { stub[m] = () => stub; });
+    stub.getBounds = () => L.latLngBounds([[20.5937,78.9629],[20.5937,78.9629]]);
+    stub.getLatLngs = () => [];
+    stub.getElement = () => null;
+    return stub;
+  };
+  const origMarker = L.marker;
+  L.marker = function(coords, opts){
+    if (!isFiniteLatLngPair(coords)) { console.warn('[map guard] skipped L.marker — invalid coords:', coords, opts?.icon?.options?.className || ''); return noopLayer(); }
+    return origMarker.call(L, coords, opts);
+  };
+  const origPolyline = L.polyline;
+  L.polyline = function(latlngs, opts){
+    const clean = (Array.isArray(latlngs) ? latlngs : []).filter(isFiniteLatLngPair);
+    if (clean.length < 2) { console.warn('[map guard] skipped L.polyline — fewer than 2 valid points out of', (latlngs||[]).length); return noopLayer(); }
+    if (clean.length !== latlngs.length) console.warn('[map guard] dropped', latlngs.length - clean.length, 'invalid point(s) from a polyline');
+    return origPolyline.call(L, clean, opts);
+  };
+})();
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
 
 // --- TIME BASED BEHAVIOUR HELPERS ---
