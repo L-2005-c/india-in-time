@@ -825,9 +825,17 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
   if (typeof L === 'undefined' || !L.Map || L.Map.prototype.__moveGuardInstalled) return;
   L.Map.prototype.__moveGuardInstalled = true;
   const origSetView = L.Map.prototype.setView; // captured once, used as the shared fallback below
-  ['flyTo','setView','panTo'].forEach(fnName => {
+  // Only flyTo/panTo run multi-frame animations that can be left mid-flight
+  // and need a pre-emptive stop(). setView must NOT call stop() itself:
+  // Leaflet's own stop() calls setZoom(), and setZoom() calls setView() —
+  // if setView() also called stop() first, that's mutual recursion
+  // (setView -> stop -> setZoom -> setView -> stop -> ...) that overflows
+  // the stack. setView already cancels any in-flight animation internally
+  // via its own private _stop(), so it doesn't need this anyway.
+  ['flyTo','panTo','setView'].forEach(fnName => {
     const orig = L.Map.prototype[fnName];
     if (typeof orig !== 'function') return;
+    const needsStop = fnName !== 'setView';
     L.Map.prototype[fnName] = function(target, ...rest){
       const lat = Array.isArray(target) ? target[0] : target?.lat;
       const lng = Array.isArray(target) ? target[1] : (target?.lng ?? target?.lon);
@@ -835,12 +843,11 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
         console.warn(`[map guard] skipped ${fnName} — invalid target:`, target);
         return this;
       }
-      this.stop(); // cancel any in-flight animation so this one starts clean
+      if (needsStop) this.stop(); // cancel any in-flight animation so this one starts clean
       try {
         return orig.call(this, target, ...rest);
       } catch (e) {
         console.warn(`[map guard] ${fnName} threw, falling back to instant setView`, e);
-        this.stop();
         try { return origSetView.call(this, target, rest[0]); }
         catch (e2) { console.warn('[map guard] fallback setView also threw', e2); return this; }
       }
