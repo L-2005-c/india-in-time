@@ -193,7 +193,7 @@ async function fetchWiki(lat, lon, _cityName) {
     .slice(0, 60);
 }
 
-async function geocodePlaceNominatim(placeName, cityName, cityLat, cityLon, category = 'scenic') {
+async function geocodePlaceViaNominatimOnly(placeName, cityName, cityLat, cityLon, category = 'scenic') {
   // Uses Nominatim to resolve the place name to GPS coords.
   // This is more reliable than trusting AI-provided lat/lon.
   const q = `${placeName}, ${cityName}, India`;
@@ -231,6 +231,72 @@ async function geocodePlaceNominatim(placeName, cityName, cityLat, cityLon, cate
   const maxDistKm = category === 'food' ? 15 : 40;
   if (best.distKm > maxDistKm) { console.warn(`[geocode] "${placeName}" rejected — ${best.distKm.toFixed(1)}km from city (limit ${maxDistKm}km)`); return null; }
   return { lat: best.lat, lon: best.lon };
+}
+
+// ── Photon fallback geocoder ─────────────────────────────────────────────
+// Nominatim's public instance enforces a strict 1 req/sec global limit and
+// actively blocks traffic it doesn't like (generic User-Agents, cloud/
+// datacenter IPs, bursts from many concurrent users sharing one host IP —
+// exactly the shape of traffic a deployed server produces). When that
+// happens it doesn't error loudly — every call above just resolves to []
+// or null, which is indistinguishable from "this place genuinely doesn't
+// exist" from the caller's point of view. Cities with hardcoded seeds in
+// data/city-seeds.js survive that silently because they never depend on
+// geocoding at all; every other city (i.e. anything typed/selected outside
+// that short curated list) has NO other source of coordinates and quietly
+// falls to 0 results.
+// Photon (photon.komoot.io) is a free, keyless geocoder built on the same
+// OSM data with a much more permissive usage policy — used here as a
+// second attempt only when Nominatim comes back empty, not as a replacement.
+async function geocodePlaceViaPhoton(placeName, cityName, cityLat, cityLon, category = 'scenic') {
+  const q = `${placeName}, ${cityName}`;
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lat=${cityLat}&lon=${cityLon}`;
+
+  let data;
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) return null;
+    data = await res.json();
+  } catch (_e) {
+    return null;
+  }
+
+  const features = Array.isArray(data?.features) ? data.features : [];
+  if (!features.length) return null;
+
+  let best = null;
+  const wantedCity = String(cityName || '').toLowerCase().trim();
+  for (const f of features) {
+    const rLon = f?.geometry?.coordinates?.[0];
+    const rLat = f?.geometry?.coordinates?.[1];
+    if (typeof rLat !== 'number' || typeof rLon !== 'number') continue;
+    const d = distKm(cityLat, cityLon, rLat, rLon);
+    const props = f.properties || {};
+    const featCity = String(props.city || props.state || '').toLowerCase();
+    const featName = String(props.name || '').toLowerCase();
+    let score = -d;
+    if (wantedCity && featCity.includes(wantedCity)) score += 100;
+    if (featName && featName === String(placeName || '').toLowerCase()) score += 40;
+    if (!best || score > best.score) best = { lat: rLat, lon: rLon, distKm: d, score };
+  }
+
+  if (!best) return null;
+  const maxDistKm = category === 'food' ? 15 : 40;
+  if (best.distKm > maxDistKm) return null;
+  return { lat: best.lat, lon: best.lon };
+}
+
+async function geocodePlaceNominatim(placeName, cityName, cityLat, cityLon, category = 'scenic') {
+  const viaNominatim = await geocodePlaceViaNominatimOnly(placeName, cityName, cityLat, cityLon, category).catch(() => null);
+  if (viaNominatim) return viaNominatim;
+  // Nominatim came back empty/blocked — try Photon before giving up. This is
+  // what keeps non-curated cities from silently returning 0 places whenever
+  // Nominatim is having a bad day (which, per its own usage policy, is often
+  // for the exact traffic pattern a live server produces).
+  return geocodePlaceViaPhoton(placeName, cityName, cityLat, cityLon, category).catch(() => null);
 }
 
 async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
@@ -478,6 +544,82 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
   }
 
   console.log(`[places] Nominatim fallback produced ${out.length} places`);
+
+  // ── Photon fallback for the broad search too ────────────────────────────
+  // If Nominatim produced little/nothing (blocked/rate-limited — see the
+  // comment above geocodePlaceViaPhoton), repeat the same tourist-category
+  // searches against Photon so non-curated cities aren't left with zero
+  // results just because Nominatim had a bad day.
+  if (out.length < 5) {
+    const PHOTON_OSM_VALUE_ALLOW = new Set([
+      // tourism
+      'attraction','viewpoint','museum','artwork','gallery','theme_park',
+      'zoo','aquarium','picnic_site','information','camp_site',
+      // amenity
+      'restaurant','cafe','fast_food','food_court','marketplace',
+      'place_of_worship','cinema','arts_centre','library',
+      // leisure
+      'park','garden','nature_reserve','beach_resort','marina',
+      'miniature_golf','pitch','sports_centre','stadium','water_park',
+      // historic
+      'monument','memorial','castle','ruins','fort','archaeological_site',
+      'church','mosque','temple','shrine','heritage',
+      // natural
+      'beach','cliff','peak','volcano','valley','bay','cave_entrance',
+      'wetland','hot_spring','waterfall','spring',
+    ]);
+
+    for (const query of queries) {
+      try {
+        const q   = `${query} in ${cityName}`;
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&lat=${lat}&lon=${lon}`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
+          signal: AbortSignal.timeout(9000),
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const features = Array.isArray(data?.features) ? data.features : [];
+
+        for (const f of features) {
+          const rLon = f?.geometry?.coordinates?.[0];
+          const rLat = f?.geometry?.coordinates?.[1];
+          if (typeof rLat !== 'number' || typeof rLon !== 'number') continue;
+
+          const d = distKm(lat, lon, rLat, rLon);
+          if (d > (foodOnly ? 15 : 35)) continue;
+
+          const props = f.properties || {};
+          const osmValue = String(props.osm_value || '').toLowerCase();
+          if (!PHOTON_OSM_VALUE_ALLOW.has(osmValue)) continue;
+
+          const name = String(props.name || '').trim();
+          if (!name || name.length < 3) continue;
+          if (NAME_BLOCK.test(name)) continue;
+          if (/^\d+$/.test(name)) continue;
+
+          const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          const cat = inferFallbackCategory({ class: osmValue, type: osmValue, name }, query);
+          out.push({
+            id:             `photon_${query.replace(/\s+/g,'_')}_${out.length}`,
+            name, cat,
+            coords:         [rLat, rLon],
+            vt:             visitMinutesForCat(cat),
+            ot:             cat === 'food' ? '11:00' : '06:00',
+            ct:             cat === 'food' ? '23:00' : '20:00',
+            fallbackSource: 'photon_search',
+            importance:     'local',
+            importanceScore: 25,
+          });
+        }
+      } catch (_e) {}
+    }
+    console.log(`[places] Photon fallback brought total to ${out.length} places`);
+  }
+
   return out;
 }
 
