@@ -3,7 +3,7 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v15-csp-fix';
+const CACHE_NAME = 'india-in-time-v15-5-fix';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
@@ -68,7 +68,7 @@ self.addEventListener('fetch', event => {
   // drift. Bypassing interception for these specific hosts removes the
   // connect-src dependency for them entirely, permanently — there is no
   // CSP entry left to accidentally omit.
-  const BYPASS_SW_HOSTS = ['unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'api.maptiler.com'];
+  const BYPASS_SW_HOSTS = ['unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'api.maptiler.com', 'images.unsplash.com'];
   if (BYPASS_SW_HOSTS.includes(url.hostname)) return;
 
   // Always go to network for API calls

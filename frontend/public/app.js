@@ -762,6 +762,12 @@ const t2m=(s,fallback=0)=>{
 const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
 const sync=()=>{if(mdPlan.length>0)mdPlan[dayIdx]=itin;};
 const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
+// Shared guard against NaN/undefined/malformed coordinate pairs. Any place
+// with bad coords (missing geocode, failed AI hydration, etc.) must never
+// reach a Leaflet L.marker()/L.polyline() call — Leaflet throws "Invalid
+// LatLng object" and that throw was reaching production because several
+// call sites only checked `coords.length`, which [NaN, NaN] still passes.
+const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
 
 // --- TIME BASED BEHAVIOUR HELPERS ---
@@ -1345,10 +1351,10 @@ function dedupePlacesByProximity(list){
   const all = [...list].sort((a,b)=>(b.importanceScore||0)-(a.importanceScore||0));
   const kept = [];
   for(const place of all){
-    if (!place?.coords?.length) continue;
+    if (!hasValidCoords(place?.coords)) continue;
     const words = significantWords(place.name);
     const dup = kept.find(k => {
-      if (!k.coords?.length) return false;
+      if (!hasValidCoords(k.coords)) return false;
       const d = hvKm(k.coords[0],k.coords[1],place.coords[0],place.coords[1]);
       if (d > 0.18) return false;
       const kWords = significantWords(k.name);
@@ -1375,7 +1381,7 @@ function withHiddenGems(cityId, list){
 function mergePlacePools(...pools){
   const byName=new Map();
   for(const place of pools.flat()){
-    if(!place?.coords?.length) continue;
+    if(!hasValidCoords(place?.coords)) continue;
     const key=String(place.name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     if(!key) continue;
     place.id = place.id || key;
@@ -3310,7 +3316,7 @@ function renderMapMarkers() {
   if (!window.LOCS || !window.LOCS.length) return;
   
   window.LOCS.forEach(l => {
-    if (!l.coords || l.coords.length < 2) return;
+    if (!hasValidCoords(l.coords)) return;
 
     if (l.isHiddenGem) {
       const ic = L.divIcon({
@@ -3418,7 +3424,6 @@ async function renderRoute(){
     routeStops=getRouteStopsForDay(itin);
     if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'No stops fit this time window';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Increase the end time or duration.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   }
-  const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
   routeStops = routeStops.filter(stop => hasValidCoords(stop.coords));
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const visibleStops = tripActive

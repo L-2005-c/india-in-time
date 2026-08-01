@@ -613,7 +613,7 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=20260731-csp-fix', { updateViaCache:'none' })
+    navigator.serviceWorker.register('/sw.js?v=20260801-unsplash-fix', { updateViaCache:'none' })
       .then(reg => console.log('[SW] Registered:', reg.scope))
       .catch(err => console.warn('[SW] Registration failed:', err));
 

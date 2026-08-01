@@ -85,6 +85,17 @@ function buildHelmetOptions() {
           // back to an empty Response(''), and the browser reports that as
           // a second, img-src-looking failure on top of this one.
           'https://*.googleusercontent.com',
+          // Stop photos for stop cards. Already whitelisted in imgSrc for the
+          // normal <img src> load path, but sw.js's fetch handler doesn't
+          // bypass this host (it's not in BYPASS_SW_HOSTS) and isn't a
+          // "firebase"/"google" hostname either, so it falls into the
+          // generic cache-first handler, which re-fetches internally via
+          // fetch(event.request) — governed by connect-src, not img-src.
+          // Without this entry that internal fetch gets CSP-blocked, lands
+          // in the catch block, and the SW returns a fake `503 Service
+          // Unavailable` for every stop photo — indistinguishable from
+          // Unsplash actually being down, but it isn't.
+          'https://images.unsplash.com',
         ],
         frameSrc: [
           'https://accounts.google.com',
