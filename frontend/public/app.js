@@ -843,6 +843,21 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
         console.warn(`[map guard] skipped ${fnName} — invalid target:`, target);
         return this;
       }
+      // flyTo()'s internal easing-path math divides by Math.max(size.x,
+      // size.y) (the container's current pixel size). On a hidden container
+      // (display:none — e.g. the map tab isn't the active one) that's 0,
+      // producing NaN/Infinity that throws synchronously inside flyTo()
+      // itself. setView has no such size-dependent math, so use it directly
+      // instead of even attempting the animation — this still correctly
+      // updates the stored center/zoom for whenever the map becomes visible
+      // and invalidateSize() runs, just without the animation.
+      if (fnName === 'flyTo') {
+        const sz = this.getSize ? this.getSize() : null;
+        if (!sz || !(sz.x > 0) || !(sz.y > 0)) {
+          console.warn('[map guard] flyTo on a hidden/zero-size map — using instant setView instead');
+          return origSetView.call(this, target, rest[0]);
+        }
+      }
       if (needsStop) this.stop(); // cancel any in-flight animation so this one starts clean
       try {
         return orig.call(this, target, ...rest);
