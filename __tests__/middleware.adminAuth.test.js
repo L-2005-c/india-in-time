@@ -1,8 +1,14 @@
 jest.mock('../middleware/auth', () => ({
   verifyToken: jest.fn(),
 }));
+jest.mock('../lib/logger', () => ({
+  warn: jest.fn(),
+  info: jest.fn(),
+  error: jest.fn(),
+}));
 
 const { verifyToken } = require('../middleware/auth');
+const logger = require('../lib/logger');
 const { requireAdminAuth, requireAdminKey } = require('../middleware/adminAuth');
 
 function mockRes() {
@@ -56,6 +62,38 @@ describe('requireAdminAuth — legacy shared-key path', () => {
 
     expect(next).toHaveBeenCalled();
     expect(req.adminAuthMethod).toBe('legacy-shared-key');
+  });
+
+  test('logs a deprecation warning (with the endpoint) every time the legacy key path succeeds, so usage is visible before removal', async () => {
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    const req = {
+      headers: { 'x-admin-key': 'correct-secret' },
+      originalUrl: '/api/analytics/summary?hours=24',
+      method: 'GET',
+    };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/api/analytics/summary?hours=24', method: 'GET' }),
+      expect.stringContaining('DEPRECATED')
+    );
+  });
+
+  test('does NOT log the deprecation warning on a failed legacy-key attempt (nothing succeeded to deprecate)', async () => {
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    const req = { headers: { 'x-admin-key': 'wrong-secret' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('DEPRECATED')
+    );
   });
 
   // Regression test: query-string ?key= support was deliberately removed

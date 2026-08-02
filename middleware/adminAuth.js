@@ -72,6 +72,16 @@ function tryLegacyKeyAuth(req) {
   const provided = req.headers['x-admin-key'];
   if (!provided || !timingSafeStringEqual(provided, configured)) return false;
   req.adminAuthMethod = 'legacy-shared-key';
+  // Deprecation observability: this path is unattributable (anyone with the
+  // key looks identical in logs), and the goal is to eventually retire it in
+  // favor of Firebase admin claims (see the file header comment). Without
+  // visibility into *actual* usage, "eventually" never happens — this gives
+  // operators something to grep for to see which callers still depend on it
+  // before removing it out from under them.
+  logger.warn(
+    { path: req.originalUrl || req.path, method: req.method },
+    '[adminAuth] DEPRECATED: request authenticated via legacy shared key, not a Firebase admin claim — see middleware/adminAuth.js header comment for the migration path'
+  );
   return true;
 }
 

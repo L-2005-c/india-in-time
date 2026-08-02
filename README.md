@@ -52,7 +52,7 @@ npm run lint:fix      # auto-fix what's fixable
 ├── routes/                 # One file per API resource (trips, places, ai, weather, ...)
 ├── middleware/              # auth, adminAuth, rateLimiter, validator, errorHandler, requestLogger
 ├── services/                # gemini.js (AI), placesDiscovery.js, timeIntelligence.js, cache.js
-├── db/                      # init.js (schema/migrations-on-boot), queries.js (all parameterized SQL)
+├── db/                      # schema.js (canonical DDL), init.js (runs it on boot), queries.js (all parameterized SQL)
 ├── utils/                   # sanitize.js, geo.js, placesMerge.js — pure, unit-tested helpers
 ├── data/                    # Static seed data + the time-intelligence rules engine's rule set
 ├── frontend/public/         # Static frontend: index.html, app.js, styles.css, service worker, PWA manifest
@@ -142,20 +142,28 @@ This project underwent an external technical audit; the following were
 identified and are being worked through (see CI status and open issues for
 current state):
 
-- [x] Automated test suite (Jest) — `__tests__/` (190 tests, 19 suites).
-      Previously the core business logic — `db/queries.js`,
+- [x] Automated test suite (Jest) — `__tests__/` (278 tests, 28 suites).
+      Previously the core business logic — `db/queries.js`, `db/init.js`,
       `services/gemini.js`, `services/placesDiscovery.js`, and most
       `routes/` — had effectively 0% coverage even though the suite existed;
       middleware/utils were well-covered but the AI/places/DB core wasn't.
-      Added targeted coverage for the DB query layer (mocked pool),
+      Added coverage for the DB layer (`db/queries.js`, `db/init.js`),
       `services/gemini.js` (circuit breaker, retry, caching, API-key
       redaction), the Wikipedia/Nominatim filtering logic in
-      `services/placesDiscovery.js`, and the trips/favorites routes
-      (including the ownership-scoping checks that stop one user from
-      reading/deleting another user's data). `services/placesDiscovery.js`
-      is still the largest remaining coverage gap — its curated-fallback
-      functions intentionally weren't covered here (see the test file's own
-      header comment for why).
+      `services/placesDiscovery.js`, and every route handler (`ai`, `places`,
+      `trips`, `favorites`, `geocode`, `weather`, `weather-alerts`,
+      `analytics`, `feedback`) — including the ownership-scoping and
+      userId-trust checks that stop one user from reading/acting on another
+      user's data. Writing these tests also surfaced and fixed two real
+      bugs: a Wikipedia place-name filter that would have silently dropped
+      the Taj Mahal itself (only matched "palace", not "mahal"), and a
+      "last resort" fallback in `routes/places.js` that bypassed
+      proximity-dedup and could return near-duplicate places under
+      different names. `services/placesDiscovery.js`'s curated-fallback
+      functions are the one deliberate remaining gap — they loop with a
+      hardcoded 1.1s delay per seed to respect Nominatim's rate limit,
+      which makes them expensive to test meaningfully; see the test file's
+      header comment for the reasoning.
 - [x] CI pipeline — `.github/workflows/ci.yml` (lint + test on Node 20.x/22.x,
       dependency audit, Docker build verification, on every push/PR to `main`).
       **Note:** earlier versions of this README marked this done before the
@@ -174,13 +182,26 @@ current state):
 - [x] Reflected/stored XSS in chat rendering and saved-plan names
 - [x] Production boot no longer silently allows wildcard CORS
 - [x] CSP re-enabled with a real allowlist (was fully disabled before)
-- [x] DB migration tooling (`node-pg-migrate`) — see `migrations/README.md`
+- [x] DB migration tooling (`node-pg-migrate`) — see `migrations/README.md`.
+      **Update:** `db/init.js`'s boot-time bootstrap and the tracked
+      migration used to be two independently-maintained copies of the same
+      SQL (a real drift risk — nothing stopped them from silently
+      diverging). Both now reference one canonical schema definition in
+      `db/schema.js`, and `__tests__/db.init.test.js` asserts they still
+      match, so drift would fail CI rather than go unnoticed.
 - [x] Structured logging (pino) for server lifecycle + Gemini circuit breaker
 - [x] Admin RBAC via Firebase custom claims, additive to the legacy shared key
 - [x] Legacy admin shared-key comparison is now constant-time
       (`crypto.timingSafeEqual` over a fixed-length digest of each side,
       in `middleware/adminAuth.js`) — previously a plain `!==`, which leaks
-      how many leading characters of a guess matched via response timing
+      how many leading characters of a guess matched via response timing.
+      **Not retired** — removing it outright would be a breaking change for
+      any existing caller (e.g. `frontend/public/admin-feedback.html`)
+      without a coordinated migration. Instead, every successful legacy-key
+      auth now logs a `DEPRECATED` warning with the endpoint it hit
+      (`middleware/adminAuth.js`), so there's now actual visibility into
+      whether anything still depends on it before deciding it's safe to
+      remove — previously only *failed* attempts were logged.
 - [x] `/api/health/ready` (internal cache stats, Gemini circuit-breaker
       state) is now gated behind the same admin auth as the feedback
       dashboard — previously fully public. `/api/health` (the one actually
@@ -215,8 +236,27 @@ current state):
       code with no browser/e2e test coverage in this environment risks
       silently breaking the live app in ways a syntax check can't catch. Worth
       doing as a dedicated effort with visual/manual QA, not a blind rewrite.
-- [ ] Single point of failure: one AI provider (Gemini), one geocoding
-      provider (Nominatim), no fallback for either
+- [x] Single point of failure — geocoding: `routes/geocode.js` (the public
+      `/api/geocode` endpoint the frontend's city search actually calls) had
+      no fallback at all; a Nominatim outage meant city search was fully
+      broken for every user. It now falls back to Photon (a free, no-API-key
+      geocoder) when Nominatim errors or returns nothing, converting the
+      response into the same shape so the frontend contract doesn't change.
+      `services/placesDiscovery.js` already had this fallback internally for
+      per-place geocoding — this closes the same gap on the city-search path.
+      **Still open:** AI — Gemini remains a single point of failure with no
+      fallback provider; adding one is a real integration, not a fix, and
+      wasn't attempted here.
+- [ ] Redis-backed rate limiting: `middleware/rateLimiter.js`'s Redis path
+      already existed but had 0% test coverage — added tests against a
+      mocked `ioredis` client (increment/expire/window logic, fail-open
+      behavior on Redis errors, per-tier key scoping). **Still open:** this
+      cannot validate real distributed behavior across multiple
+      worker processes/machines under actual concurrent load — that needs a
+      live Redis instance and real traffic, neither available here.
+      `services/cache.js` (places/gemini/weather/geocode caches) has no
+      Redis-backed mode at all, unlike the rate limiter — remains
+      per-process/in-memory only.
 - [x] `npm audit` — previously flagged 8 moderate-severity findings, all
       transitively pulled in by `firebase-admin`'s dependency tree (an old
       `uuid` version with a buffer-bounds-check issue). **Now 0

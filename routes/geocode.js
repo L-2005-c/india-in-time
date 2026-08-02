@@ -33,6 +33,43 @@ function throttledNominatimCall(fn) {
   return result;
 }
 
+// ── Photon fallback ─────────────────────────────────────────────────────
+// Nominatim's own usage policy admits it can be slow/unavailable under load
+// (the exact traffic pattern a live server produces), and until now this
+// endpoint had no fallback at all — a Nominatim outage meant city search
+// was fully broken for every user. Photon (komoot.io) is a free, public,
+// no-API-key alternative geocoder; converts its GeoJSON response into the
+// same array shape Nominatim returns so the frontend contract (`nd[0].lat`,
+// `nd[0].lon`, `nd[0].name`) doesn't change regardless of which source
+// actually answered.
+async function geocodeViaPhoton(q) {
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q + ' India')}&limit=1`;
+  const upstream = await fetch(url, {
+    headers: { 'User-Agent': config.nominatim.userAgent },
+    signal: AbortSignal.timeout(config.nominatim.timeoutMs),
+  });
+  if (!upstream.ok) {
+    const err = new Error('Photon upstream error');
+    err.upstreamStatus = upstream.status;
+    throw err;
+  }
+  const data = await upstream.json();
+  const features = Array.isArray(data?.features) ? data.features : [];
+  return features
+    .filter(f => typeof f?.geometry?.coordinates?.[0] === 'number' && typeof f?.geometry?.coordinates?.[1] === 'number')
+    .map(f => {
+      const [lon, lat] = f.geometry.coordinates;
+      const props = f.properties || {};
+      const nameParts = [props.name, props.city, props.state, props.country].filter(Boolean);
+      return {
+        lat: String(lat),
+        lon: String(lon),
+        name: props.name || nameParts[0] || '',
+        display_name: nameParts.join(', '),
+      };
+    });
+}
+
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'Missing query param: q' });
@@ -42,24 +79,42 @@ router.get('/', async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    const data = await throttledNominatimCall(async () => {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}+India&format=json&limit=1`;
-      const upstream = await fetch(url, {
-        headers: {
-          'Accept-Language': 'en-US,en',
-          // Nominatim requires a valid, identifying User-Agent in production
-          'User-Agent': config.nominatim.userAgent,
-        },
-        signal: AbortSignal.timeout(config.nominatim.timeoutMs),
-      });
+    let data;
+    try {
+      data = await throttledNominatimCall(async () => {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}+India&format=json&limit=1`;
+        const upstream = await fetch(url, {
+          headers: {
+            'Accept-Language': 'en-US,en',
+            // Nominatim requires a valid, identifying User-Agent in production
+            'User-Agent': config.nominatim.userAgent,
+          },
+          signal: AbortSignal.timeout(config.nominatim.timeoutMs),
+        });
 
-      if (!upstream.ok) {
-        const err = new Error('Nominatim upstream error');
-        err.upstreamStatus = upstream.status;
-        throw err;
+        if (!upstream.ok) {
+          const err = new Error('Nominatim upstream error');
+          err.upstreamStatus = upstream.status;
+          throw err;
+        }
+        return upstream.json();
+      });
+    } catch (nominatimErr) {
+      console.warn('[geocode] Nominatim failed, falling back to Photon:', nominatimErr.message);
+      data = null;
+    }
+
+    // Nominatim errored, or came back with nothing — try Photon before
+    // giving up. This is what keeps city search from being fully broken
+    // whenever Nominatim is having a bad day.
+    if (!Array.isArray(data) || data.length === 0) {
+      try {
+        data = await geocodeViaPhoton(q);
+      } catch (photonErr) {
+        console.warn('[geocode] Photon fallback also failed:', photonErr.message);
+        data = [];
       }
-      return upstream.json();
-    });
+    }
 
     // Only cache non-empty results — an empty [] is often a transient typo,
     // not worth locking in for an hour.

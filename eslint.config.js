@@ -24,6 +24,7 @@ module.exports = [
         Buffer: 'readonly',
         setTimeout: 'readonly',
         setInterval: 'readonly',
+        setImmediate: 'readonly',
         clearTimeout: 'readonly',
         clearInterval: 'readonly',
         AbortSignal: 'readonly',

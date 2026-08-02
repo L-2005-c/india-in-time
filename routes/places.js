@@ -192,14 +192,12 @@ router.post('/', async (req, res) => {
       return res.json(payload);
     }
 
-    // Last resort: return whatever we have unfiltered
-    const anything = filterPlacesByPrefs(
-      [...aiRanked, ...staticPlaces, ...curatedCity, ...wiki, ...nominatimRaw].filter((p, i, arr) =>
-        p?.coords?.length >= 2 &&
-        arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
-      ),
-      prefs
-    );
+    // Last resort: below the 3-result threshold, but `merged` here is
+    // already fully deduped (exact-name + proximity) — just relax the
+    // count requirement rather than rebuilding from raw, non-deduped
+    // sources (that previously reintroduced near-duplicate places that
+    // the proximity-dedup step above had just removed).
+    const anything = merged;
     const payload = { places: anything, source: 'last_resort', count: anything.length };
     setCachedPlaces(key, payload);
     return res.json(payload);
