@@ -57,6 +57,19 @@ const config = {
     // been called for real would be worse than not having it. Set to ''
     // to disable.
     fallbackModel:   process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash',
+    // Optional second Gemini API key, ideally from a SEPARATE Google Cloud
+    // project/billing account than GEMINI_API_KEY. Still the same provider
+    // (generativelanguage.googleapis.com) — a full Gemini/Google outage
+    // takes this down too, same as the primary key. What it DOES cover:
+    // the primary key/project hitting its own quota, getting rate-limited,
+    // or its billing/auth getting suspended independently of Google's
+    // service being up. Tried only after the primary key has exhausted
+    // ALL of its own retries (see callGemini in services/gemini.js) — this
+    // deliberately replaces trying fallbackModel on the primary key; once
+    // we're switching credentials we go straight to the secondary key with
+    // the primary model, then fall back to fallbackModel on the secondary
+    // key only if that also fails. Unset by default — leave '' to disable.
+    secondaryApiKey: process.env.GEMINI_API_KEY_SECONDARY || '',
     maxRetries:      parseInt(process.env.GEMINI_MAX_RETRIES, 10) || 3,
     timeoutMs:       parseInt(process.env.GEMINI_TIMEOUT_MS, 10) || 20000,
     imageTimeoutMs:  parseInt(process.env.GEMINI_IMAGE_TIMEOUT_MS, 10) || 30000,

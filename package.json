@@ -18,7 +18,10 @@
     "migrate:up": "node-pg-migrate up",
     "migrate:down": "node-pg-migrate down",
     "migrate:create": "node-pg-migrate create",
-    "build:frontend": "node scripts/build-frontend.js"
+    "build:frontend": "node scripts/build-frontend.js",
+    "loadtest:redis-ratelimit": "node scripts/redis-loadtest/run.js",
+    "loadtest:redis-failopen": "node scripts/redis-loadtest/fail-open-check.js",
+    "loadtest:redis-cache": "node scripts/redis-loadtest/cache-check.js"
   },
   "jest": {
     "testEnvironment": "node",

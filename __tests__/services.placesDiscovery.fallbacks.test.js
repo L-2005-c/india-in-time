@@ -149,6 +149,60 @@ describe('fetchNominatimFallback — quality gate filtering', () => {
     expect(result).toEqual([]);
   });
 
+  test('falls through to Photon when Nominatim produces fewer than 5 results, adding non-duplicate places', async () => {
+    fetch.mockImplementation(async (url) => {
+      if (String(url).includes('nominatim.openstreetmap.org')) {
+        return { ok: true, json: async () => [] }; // Nominatim: nothing, for every query
+      }
+      // Photon
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            geometry: { coordinates: [83.28, 17.75] },
+            properties: { name: 'Photon Found Place', osm_value: 'attraction' },
+          }],
+        }),
+      };
+    });
+
+    const result = await runWithFakeDelays(() => fetchNominatimFallback(VIZAG.lat, VIZAG.lon, 'Visakhapatnam'));
+    expect(result.some(p => p.name === 'Photon Found Place' && p.fallbackSource === 'photon_search')).toBe(true);
+  });
+
+  test('Photon fallback results are still deduped and quality-gated (rejects a blocklisted name)', async () => {
+    fetch.mockImplementation(async (url) => {
+      if (String(url).includes('nominatim.openstreetmap.org')) return { ok: true, json: async () => [] };
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            geometry: { coordinates: [83.28, 17.75] },
+            properties: { name: 'MG Road Junction', osm_value: 'attraction' },
+          }],
+        }),
+      };
+    });
+    const result = await runWithFakeDelays(() => fetchNominatimFallback(VIZAG.lat, VIZAG.lon, 'Visakhapatnam'));
+    expect(result.some(p => p.name === 'MG Road Junction')).toBe(false);
+  });
+
+  test('does not call Photon when Nominatim already produced 5+ results', async () => {
+    let nominatimCalls = 0;
+    let photonCalls = 0;
+    fetch.mockImplementation(async (url) => {
+      if (String(url).includes('nominatim.openstreetmap.org')) {
+        nominatimCalls++;
+        return { ok: true, json: async () => [osmRow({ name: `Place ${nominatimCalls}` })] };
+      }
+      photonCalls++;
+      return { ok: true, json: async () => ({ features: [] }) };
+    });
+    await runWithFakeDelays(() => fetchNominatimFallback(VIZAG.lat, VIZAG.lon, 'Visakhapatnam'));
+    // 7 non-food queries each return one unique place → 7 >= 5, so Photon should never fire.
+    expect(photonCalls).toBe(0);
+  });
+
   test('a single failed query does not abort the remaining queries', async () => {
     let call = 0;
     fetch.mockImplementation(async () => {

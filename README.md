@@ -281,24 +281,40 @@ current state):
       response into the same shape so the frontend contract doesn't change.
       `services/placesDiscovery.js` already had this fallback internally for
       per-place geocoding — this closes the same gap on the city-search path.
-      **Still open:** true cross-provider AI failover (e.g. Gemini → OpenAI/
-      Anthropic) wasn't attempted — no credentials for a second provider
-      exist in this deployment, and shipping an integration that's never
-      actually been called would be worse than not having it. What *is*
-      now in place: `services/gemini.js` tries a configurable fallback
-      Gemini model (`GEMINI_FALLBACK_MODEL`, default `gemini-2.0-flash`)
-      once, after every retry against the primary model is exhausted, and
-      only for retryable failures (network/429/5xx — never a 4xx, since a
-      different model won't fix a malformed request). Real protection
-      against "this one model is overloaded/rate-limited/deprecated," not
-      against a full outage of the Gemini API itself.
+      **Cross-provider AI failover** (e.g. Gemini → OpenAI/Anthropic) was
+      not attempted — no credentials for a second provider exist in this
+      deployment, and shipping an integration that's never actually been
+      called would be worse than not having it. What *is* in place instead,
+      in `services/gemini.js`:
+      - A configurable fallback Gemini **model** (`GEMINI_FALLBACK_MODEL`,
+        default `gemini-2.0-flash`) — protection against "this one model is
+        overloaded/rate-limited/deprecated."
+      - An optional second Gemini API **key** (`GEMINI_API_KEY_SECONDARY`),
+        ideally from a separate Google Cloud project/billing account —
+        protection against the primary key/project specifically hitting its
+        own quota, rate limit, or billing/auth suspension. Tried after the
+        primary key exhausts its retries, using the primary model first
+        (skipping the fallback model on the primary key), then the fallback
+        model on the secondary key as a last resort if that also fails.
+      - Both only trigger on retryable failures (network/429/5xx — never a
+        4xx). **Still open, and can only be closed with real credentials
+        for an actual different provider:** a full Gemini/Google outage
+        still takes the AI feature down entirely, since both the fallback
+        model and the secondary key call the same underlying service.
 - [x] Redis-backed rate limiting: `middleware/rateLimiter.js`'s Redis path
       already existed but had 0% test coverage — added tests against a
       mocked `ioredis` client (increment/expire/window logic, fail-open
-      behavior on Redis errors, per-tier key scoping). **Still open:** this
-      cannot validate real distributed behavior across multiple
-      worker processes/machines under actual concurrent load — that needs a
-      live Redis instance and real traffic, neither available here.
+      behavior on Redis errors, per-tier key scoping) *and* real,
+      non-mocked validation in `scripts/redis-loadtest/` — 4 genuinely
+      separate worker processes sharing one real Redis instance, hit with
+      300 real concurrent requests simultaneously, confirming the shared
+      counter stays atomic under actual cross-process race conditions (see
+      `scripts/redis-loadtest/README.md` for how to run it and exactly
+      what it does/doesn't prove). **Still open:** that script runs against
+      a local Redis over loopback — validating against the actual
+      production/staging Redis over real network latency and at
+      production traffic volume needs that real infrastructure, which
+      isn't available here.
 - [x] `services/cache.js` had no Redis-backed mode at all, unlike the rate
       limiter — now it does, via a background write-through/warm-on-miss
       layer (active only when `REDIS_URL` is set). Deliberately does **not**

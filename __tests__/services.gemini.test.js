@@ -193,6 +193,115 @@ describe('services/gemini — fallback model', () => {
   });
 });
 
+describe('services/gemini — secondary API key fallback', () => {
+  const ORIGINAL_SECONDARY = process.env.GEMINI_API_KEY_SECONDARY;
+
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY_SECONDARY = 'test-secondary-key';
+  });
+  afterEach(() => {
+    if (ORIGINAL_SECONDARY === undefined) delete process.env.GEMINI_API_KEY_SECONDARY;
+    else process.env.GEMINI_API_KEY_SECONDARY = ORIGINAL_SECONDARY;
+  });
+
+  test('after the primary key exhausts all retries on a retryable error, the secondary key (same model) is tried before the fallback model', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(`key=${config.gemini.secondaryApiKey}`)) {
+        // Secondary key succeeds using the PRIMARY model — proves the
+        // fallback model was skipped, not just that some call succeeded.
+        expect(url).toContain(config.gemini.model);
+        expect(url).not.toContain(config.gemini.fallbackModel);
+        return okResponse('answer from secondary key');
+      }
+      return { ok: false, status: 503, text: async () => 'primary key overloaded' };
+    });
+
+    const result = await gemini.callGeminiText('a prompt only the secondary key can answer');
+    expect(result).toBe('answer from secondary key');
+    expect(gemini.getStats().secondaryKeyUsed).toBe(1);
+    expect(gemini.getStats().fallbackModelUsed).toBe(0); // fallback model was never reached
+  });
+
+  test('if the secondary key (primary model) also fails, falls through to the secondary key with the fallback model', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+
+    mockFetch.mockImplementation(async (url) => {
+      const isSecondaryKey = url.includes(`key=${config.gemini.secondaryApiKey}`);
+      const isFallbackModel = url.includes(config.gemini.fallbackModel);
+      if (isSecondaryKey && isFallbackModel) return okResponse('answer from secondary key + fallback model');
+      return { ok: false, status: 503, text: async () => 'still overloaded' };
+    });
+
+    const result = await gemini.callGeminiText('nothing but the last resort can answer this');
+    expect(result).toBe('answer from secondary key + fallback model');
+    expect(gemini.getStats().secondaryKeyUsed).toBe(1);
+    expect(gemini.getStats().fallbackModelUsed).toBe(1);
+  });
+
+  test('a successful secondary-key response is cached the same as a normal success', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(`key=${config.gemini.secondaryApiKey}`)) return okResponse('secondary key answer');
+      return { ok: false, status: 503, text: async () => 'overloaded' };
+    });
+
+    await gemini.callGeminiText('cache me via secondary key');
+    expect(require('../db/queries').setCachedAiResponse).toHaveBeenCalledWith(expect.any(String), 'secondary key answer');
+
+    const callsBeforeSecond = mockFetch.mock.calls.length;
+    await gemini.callGeminiText('cache me via secondary key');
+    expect(mockFetch.mock.calls.length).toBe(callsBeforeSecond); // second call hit cache, no new fetch
+  });
+
+  test('if BOTH keys and BOTH models fail, the final error is what surfaces (nothing thrown away silently)', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+    mockFetch.mockImplementation(async (url) => {
+      const isSecondaryKey = url.includes(`key=${config.gemini.secondaryApiKey}`);
+      const isFallbackModel = url.includes(config.gemini.fallbackModel);
+      if (isSecondaryKey && isFallbackModel) return { ok: false, status: 500, text: async () => 'total failure — last resort' };
+      return { ok: false, status: 503, text: async () => 'overloaded' };
+    });
+
+    await expect(gemini.callGeminiText('completely unanswerable')).rejects.toThrow(/total failure — last resort/);
+    expect(gemini.getStats().failure).toBe(1);
+  });
+
+  test('a non-retryable (4xx) primary failure never attempts the secondary key at all', async () => {
+    const gemini = freshGeminiModule();
+    const mockFetch = require('node-fetch');
+    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'bad request' });
+
+    await expect(gemini.callGeminiText('malformed request')).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1); // only the primary attempt
+  });
+
+  test('with no GEMINI_API_KEY_SECONDARY configured, behavior is unchanged (goes straight to fallback model on the primary key)', async () => {
+    delete process.env.GEMINI_API_KEY_SECONDARY;
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(config.gemini.fallbackModel)) return okResponse('primary key + fallback model');
+      return { ok: false, status: 503, text: async () => 'overloaded' };
+    });
+
+    const result = await gemini.callGeminiText('no secondary key available');
+    expect(result).toBe('primary key + fallback model');
+    expect(gemini.getStats().secondaryKeyUsed).toBe(0);
+    expect(gemini.getStats().fallbackModelUsed).toBe(1);
+  });
+});
+
 describe('services/gemini — circuit breaker', () => {
   test('trips OPEN after failureThreshold (5) consecutive failures, then fails fast without calling fetch', async () => {
     const gemini = freshGeminiModule();
