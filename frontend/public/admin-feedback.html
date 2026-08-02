@@ -65,20 +65,20 @@
   <h1>🔒 Feedback Admin</h1>
   <p class="sub">India In-Time — internal dashboard</p>
   <input type="password" id="gate-key" placeholder="Admin key" onkeydown="if(event.key==='Enter')unlock()">
-  <button onclick="unlock()">View feedback</button>
+  <button data-action="unlock">View feedback</button>
   <div id="gate-err"></div>
 </div>
 
 <div class="wrap" id="dash">
   <h1>💬 Feedback Dashboard</h1>
   <p class="sub">Real user feedback — the data flywheel behind the GeoAI Time Intelligence Engine.</p>
-  <button class="refresh" onclick="loadAll()">↻ Refresh</button>
+  <button class="refresh" data-action="loadAll">↻ Refresh</button>
 
   <div class="stat-row" id="stats"></div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="app" onclick="showTab('app')">App Experience</div>
-    <div class="tab" data-tab="place" onclick="showTab('place')">Place Ratings</div>
+    <div class="tab active" data-tab="app" data-action="showTab">App Experience</div>
+    <div class="tab" data-tab="place" data-action="showTab">Place Ratings</div>
   </div>
 
   <div class="panel active" id="panel-app">
@@ -236,6 +236,18 @@ function renderPlace(rows){
     </tr>`).join('');
 }
 
+
+// ── Delegated action handling (replaces the onclick attributes above) ───────
+const ADMIN_ACTIONS = {
+  unlock, loadAll,
+  showTab: (el) => showTab(el.dataset.tab),
+};
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const fn = ADMIN_ACTIONS[el.dataset.action];
+  if (fn) fn(el);
+});
 </script>
 </body>
 </html>

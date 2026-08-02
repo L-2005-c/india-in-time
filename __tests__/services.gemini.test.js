@@ -133,6 +133,66 @@ describe('services/gemini — error handling', () => {
   });
 });
 
+describe('services/gemini — fallback model', () => {
+  test('after the primary model exhausts all retries on a retryable error, the fallback model is tried and can still succeed', async () => {
+    const gemini = freshGeminiModule();
+    const mockFetch = require('node-fetch');
+    // Primary model: always 503 (retryable) -> exhausts maxRetries (3).
+    // Fallback model: succeeds. Distinguish by inspecting the URL.
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(require('../config').gemini.fallbackModel)) {
+        return okResponse('answer from fallback model');
+      }
+      return { ok: false, status: 503, text: async () => 'overloaded' };
+    });
+
+    const result = await gemini.callGeminiText('a prompt only the fallback model can answer');
+    expect(result).toBe('answer from fallback model');
+    expect(gemini.getStats().fallbackModelUsed).toBe(1);
+  });
+
+  test('a successful fallback-model response is still cached, same as a normal success', async () => {
+    const gemini = freshGeminiModule();
+    const mockFetch = require('node-fetch');
+    const config = require('../config');
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(config.gemini.fallbackModel)) return okResponse('fallback answer');
+      return { ok: false, status: 503, text: async () => 'overloaded' };
+    });
+
+    await gemini.callGeminiText('cache me via fallback');
+    expect(require('../db/queries').setCachedAiResponse).toHaveBeenCalledWith(expect.any(String), 'fallback answer');
+
+    // Second identical call should now hit the in-memory cache, not fetch again
+    const callsBeforeSecond = mockFetch.mock.calls.length;
+    await gemini.callGeminiText('cache me via fallback');
+    expect(mockFetch.mock.calls.length).toBe(callsBeforeSecond);
+  });
+
+  test('if BOTH the primary and fallback models fail, the error from the fallback attempt is what surfaces', async () => {
+    const gemini = freshGeminiModule();
+    const mockFetch = require('node-fetch');
+    const config = require('../config');
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(config.gemini.fallbackModel)) {
+        return { ok: false, status: 500, text: async () => 'fallback model also down' };
+      }
+      return { ok: false, status: 503, text: async () => 'primary model overloaded' };
+    });
+
+    await expect(gemini.callGeminiText('nothing can answer this')).rejects.toThrow(/fallback model also down/);
+  });
+
+  test('a non-retryable (4xx) primary failure never attempts the fallback model at all', async () => {
+    const gemini = freshGeminiModule();
+    const mockFetch = require('node-fetch');
+    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'bad request' });
+
+    await expect(gemini.callGeminiText('malformed request')).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1); // only the primary attempt — no retries, no fallback
+  });
+});
+
 describe('services/gemini — circuit breaker', () => {
   test('trips OPEN after failureThreshold (5) consecutive failures, then fails fast without calling fetch', async () => {
     const gemini = freshGeminiModule();

@@ -74,7 +74,13 @@ function categoryRules(cat) {
  */
 function computeSunTimes(lat, lon, date) {
   try {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return { sunrise: '06:00', sunset: '18:30' };
+    }
     const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) {
+      return { sunrise: '06:00', sunset: '18:30' };
+    }
     const dayOfYear = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
     const lngHour = lon / 15;
     const zenith = 90.833;

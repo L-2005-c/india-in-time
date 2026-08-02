@@ -46,6 +46,17 @@ const config = {
   gemini: {
     apiKey:          requireEnv('GEMINI_API_KEY'),
     model:           process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    // Tried once, only after every retry against the primary model has
+    // failed, and only for retryable failures (network errors, 429, 5xx —
+    // never for a 4xx that means the request itself was bad, since a
+    // different model won't fix that). Real, same-provider resilience
+    // against "this one model is overloaded/rate-limited/deprecated" —
+    // deliberately NOT a cross-provider fallback (e.g. OpenAI/Anthropic),
+    // since that would need a second provider's API key and account this
+    // deployment doesn't have, and shipping an integration that's never
+    // been called for real would be worse than not having it. Set to ''
+    // to disable.
+    fallbackModel:   process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash',
     maxRetries:      parseInt(process.env.GEMINI_MAX_RETRIES, 10) || 3,
     timeoutMs:       parseInt(process.env.GEMINI_TIMEOUT_MS, 10) || 20000,
     imageTimeoutMs:  parseInt(process.env.GEMINI_IMAGE_TIMEOUT_MS, 10) || 30000,

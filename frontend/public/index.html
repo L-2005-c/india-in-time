@@ -48,7 +48,7 @@
     <img class="login-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo" width="240" height="105" decoding="sync">
     <h1 class="login-title">India <span>In-Time</span></h1>
     <p class="login-sub">AI Travel Companion</p>
-    <button class="btn-google" onclick="signInWithGoogle(event)">
+    <button class="btn-google" data-action="signInWithGoogle">
       <svg class="google-icon" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -66,11 +66,11 @@
 <div id="user-menu" class="user-menu">
   <div class="um-name" id="um-name">Traveller</div>
   <div class="um-email" id="um-email"></div>
-  <div class="um-item" onclick="toggleLoadPanel();toggleUserMenu()">📂 My Saved Plans</div>
-  <div class="um-item" onclick="switchToView('tools-view',3);renderBudget();toggleUserMenu()">💸 My Budget</div>
-  <div class="um-item" onclick="switchToView('tools-view',3);renderPassport();toggleUserMenu()">🛂 My Passport</div>
-  <div class="um-item" id="install-app-btn" onclick="installPWA()" style="display:none; color: var(--accent);">⬇️ Install App</div>
-  <div class="um-item um-signout" onclick="doSignOut()">🚪 Sign Out</div>
+  <div class="um-item" data-action="openLoadPanelFromMenu">📂 My Saved Plans</div>
+  <div class="um-item" data-action="openBudgetFromMenu">💸 My Budget</div>
+  <div class="um-item" data-action="openPassportFromMenu">🛂 My Passport</div>
+  <div class="um-item" id="install-app-btn" data-action="installPWA" style="display:none; color: var(--accent);">⬇️ Install App</div>
+  <div class="um-item um-signout" data-action="doSignOut">🚪 Sign Out</div>
 </div>
 
 <!-- NOTIFICATION TOAST -->
@@ -81,7 +81,7 @@
       <div class="notif-title" id="notif-title">Reminder</div>
       <div class="notif-msg" id="notif-msg"></div>
     </div>
-    <button class="notif-close" aria-label="Close notification" onclick="document.getElementById('notif-toast').style.display='none'">×</button>
+    <button class="notif-close" aria-label="Close notification" data-action="closeNotifToast">×</button>
   </div>
 </div>
 
@@ -97,7 +97,7 @@
 <div id="off-toast">📡 Offline — cached data active</div>
 
 <!-- AI Tools Side Drawer -->
-<div id="ai-drawer-overlay" onclick="closeAiDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
+<div id="ai-drawer-overlay" data-action="closeAiDrawer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
 <div id="ai-drawer" style="position:fixed;bottom:0;left:0;right:0;max-height:85vh;z-index:8001;background:var(--bg-layer1);border-top:1px solid var(--border-mid);border-top-left-radius:24px;border-top-right-radius:24px;box-shadow:0 -8px 40px rgba(0,0,0,.6);overflow-y:auto;transform:translateY(110%);transition:transform .35s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom);">
   <div style="width:36px;height:5px;background:var(--border-strong);border-radius:3px;margin:12px auto 4px;"></div>
   <div style="position:sticky;top:0;z-index:10;background:var(--bg-layer1);border-bottom:1px solid var(--border-subtle);padding:0 16px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);">
@@ -105,13 +105,13 @@
       <div style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--text-primary);">AI Tools</div>
       <div style="font-size:9px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Powered by Gemini AI</div>
     </div>
-    <button onclick="closeAiDrawer()" aria-label="Close AI assistant" style="width:34px;height:34px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border-default);color:var(--text-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+    <button data-action="closeAiDrawer" aria-label="Close AI assistant" style="width:34px;height:34px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border-default);color:var(--text-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
   </div>
   <div id="ai-drawer-content" style="padding:14px;"></div>
 </div>
 
 <!-- Global floating back button -->
-<div id="global-back" onclick="goBack()">
+<div id="global-back" data-action="goBack">
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
   Back
 </div>
@@ -128,14 +128,14 @@
       <div class="header-pills-wrap">
         <!-- <div class="hpill hpill-credits">⚡ <span id="cr-cnt">50</span></div> -->
         <!-- <div class="hpill hpill-jade">💎 Pro</div> -->
-        <!-- <button class="hpill hpill-install" onclick="installPWA()">📲 Install</button> -->
+        <!-- <button class="hpill hpill-install" data-action="installPWA">📲 Install</button> -->
         <button class="hpill hpill-ocean" id="btn-replay" style="display:none">🎬 Replay</button>
         <button class="hpill hpill-live"  id="btn-ls"     style="display:none">🔴 Live</button>
-        <button class="hpill hpill-wa"    id="btn-wa"     style="display:none" onclick="waShare()">💬 WhatsApp</button>
+        <button class="hpill hpill-wa"    id="btn-wa"     style="display:none" data-action="waShare">💬 WhatsApp</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <div class="gps-badge" onclick="resetGPS()" id="gps-badge"><span class="gps-dot"></span><span id="gps-txt">GPS</span></div>
-        <img id="user-avatar" class="user-avatar" src="" alt="Me" style="display:none" onclick="toggleUserMenu()">
+        <div class="gps-badge" data-action="resetGPS" id="gps-badge"><span class="gps-dot"></span><span id="gps-txt">GPS</span></div>
+        <img id="user-avatar" class="user-avatar" src="" alt="Me" style="display:none" data-action="toggleUserMenu">
       </div>
     </div>
   </header>
@@ -146,14 +146,14 @@
     <div id="map-view" class="view active">
       <div id="map"></div>
 
-      <button id="locate-me-btn" onclick="locateMe()" aria-label="Find my location" title="Find my location">
+      <button id="locate-me-btn" data-action="locateMe" aria-label="Find my location" title="Find my location">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="3" fill="currentColor"/>
           <path d="M12 2v3M12 19v3M22 12h-3M5 12H2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>
 
-      <button id="compass-btn" onclick="compassTap()" aria-label="Show current direction" title="Show current direction">
+      <button id="compass-btn" data-action="compassTap" aria-label="Show current direction" title="Show current direction">
         <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10.5" stroke="currentColor" stroke-width="1.2" fill="none" opacity="0.35"/>
           <g id="compass-needle" style="transform-origin:12px 12px;transition:transform .35s ease;">
@@ -170,19 +170,19 @@
           <span style="font-family:'Playfair Display',serif;font-size:14px;color:var(--gold);font-weight:700;">Time Simulator</span>
           <div style="display:flex;align-items:center;gap:10px;">
             <span id="time-slider-val" style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text-primary);">--:--</span>
-            <button id="time-slider-collapse-btn" onclick="toggleTimeSliderCollapsed()" aria-label="Minimize time simulator" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
+            <button id="time-slider-collapse-btn" data-action="toggleTimeSliderCollapsed" aria-label="Minimize time simulator" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
           </div>
         </div>
-        <input type="range" id="time-slider" min="0" max="1439" step="15" value="540" style="width:100%;accent-color:var(--gold);cursor:pointer;touch-action:pan-x;" oninput="onTimeSliderChange(this.value)">
+        <input type="range" id="time-slider" min="0" max="1439" step="15" value="540" style="width:100%;accent-color:var(--gold);cursor:pointer;touch-action:pan-x;" data-action="onTimeSliderChange">
       </div>
       <!-- Collapsed pill shown when the simulator is minimized — tap to bring it back -->
-      <button id="time-slider-pill" onclick="toggleTimeSliderCollapsed()" style="display:none;position:absolute;z-index:9000;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:8px 14px;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--gold);align-items:center;gap:6px;pointer-events:auto;cursor:pointer;">
+      <button id="time-slider-pill" data-action="toggleTimeSliderCollapsed" style="display:none;position:absolute;z-index:9000;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:8px 14px;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--gold);align-items:center;gap:6px;pointer-events:auto;cursor:pointer;">
         🕐 <span id="time-slider-pill-val">--:--</span>
       </button>
       <div id="street-quest" style="display:none">
         <div class="sq-top">
           <div class="sq-title">Street Quest</div>
-          <button class="sq-btn" onclick="toggleStreetQuest()">End Quest</button>
+          <button class="sq-btn" data-action="toggleStreetQuest">End Quest</button>
         </div>
         <div class="sq-stats">
           <div class="sq-stat"><div class="sq-lbl">Score</div><div class="sq-val" id="sq-score">0</div></div>
@@ -197,7 +197,7 @@
           <div class="nav-badge"><span class="nav-ping"></span>Live Navigation</div>
           <div style="display:flex;align-items:center;gap:8px;">
             <div class="nav-wx" id="wx-display">☀️ --°C</div>
-            <button id="nav-card-collapse-btn" onclick="toggleNavCardCollapsed()" aria-label="Minimize live navigation" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
+            <button id="nav-card-collapse-btn" data-action="toggleNavCardCollapsed" aria-label="Minimize live navigation" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
           </div>
         </div>
         <div class="nav-dest" id="nav-next">Select a city to begin</div>
@@ -226,9 +226,9 @@
               <h1 class="hero-title">Know <em>exactly when</em> to visit — before you go.</h1>
               <p class="hero-copy">The question every trip should start with: <strong>"When should I visit this place for the best possible experience?"</strong> India In-Time answers it with live crowd, weather, sunrise/sunset and seasonal data — then builds the itinerary around the answer.</p>
               <div class="hero-actions">
-                <button class="hero-btn hero-btn-primary" onclick="document.getElementById('city-select').focus()">Build a standout plan</button>
-                <button class="hero-btn hero-btn-secondary" onclick="switchToView('map-view',0)">Preview live map</button>
-                <button class="hero-btn hero-btn-secondary" onclick="showAppFeedback()">💬 Feedback</button>
+                <button class="hero-btn hero-btn-primary" data-action="focusCitySelect">Build a standout plan</button>
+                <button class="hero-btn hero-btn-secondary" data-action="switchToView" data-view="map-view" data-idx="0">Preview live map</button>
+                <button class="hero-btn hero-btn-secondary" data-action="showAppFeedback">💬 Feedback</button>
               </div>
               <div class="hero-metrics">
                 <div class="hero-metric">
@@ -280,11 +280,11 @@
         <div class="sec-label">Explore India</div>
         <div class="search-bar-wrap">
           <input type="text" id="city-input" class="search-inp" placeholder="Search any city or district…">
-          <button class="search-btn" onclick="searchCity()">Search</button>
+          <button class="search-btn" data-action="searchCity">Search</button>
         </div>
 
         <div class="sec-label">Popular Destinations</div>
-        <select class="city-select" id="city-select" onchange="if(this.value)switchCity(this.value)">
+        <select class="city-select" id="city-select" data-action="switchCity">
           <optgroup label="Andhra Pradesh"><option value="vizag">🌴 Visakhapatnam</option></optgroup>
           <optgroup label="Telangana"><option value="hyderabad">🕌 Hyderabad</option></optgroup>
           <optgroup label="Delhi"><option value="delhi">🏛️ New Delhi</option></optgroup>
@@ -423,14 +423,14 @@
         </div>
 
         <div style="display:flex;gap:10px;">
-          <button class="btn-gen" onclick="openCustomizeModal()" style="flex:1;background:var(--bg-layer3);border:1px solid var(--border-strong);color:var(--text-primary);">
+          <button class="btn-gen" data-action="openCustomizeModal" style="flex:1;background:var(--bg-layer3);border:1px solid var(--border-strong);color:var(--text-primary);">
             <span>Customize Places</span> <span>🛠️</span>
           </button>
-          <button class="btn-gen" onclick="generatePlan()" style="flex:1;">
+          <button class="btn-gen" data-action="generatePlan" style="flex:1;">
             <span>Generate Itinerary</span> <span>✦</span>
           </button>
         </div>
-        <button class="btn-secondary" onclick="toggleLoadPanel()">📂 Load Saved Itinerary</button>
+        <button class="btn-secondary" data-action="toggleLoadPanel">📂 Load Saved Itinerary</button>
       </div>
 
       <div id="plan-summary-banner" class="plan-summary-banner" style="display:none">
@@ -456,15 +456,15 @@
             <span class="live-dot"></span>
             <span class="live-panel-title">Navigation Controls</span>
           </div>
-          <button class="btn-start-live" id="btn-start" onclick="startTrip()">🚀 Start Live Tracking</button>
+          <button class="btn-start-live" id="btn-start" data-action="startTrip">🚀 Start Live Tracking</button>
           <div class="quick-controls">
-            <button class="qc-btn qc-jade"    id="btn-follow-live" onclick="toggleLiveFollow()">🎯 Following</button>
-            <button class="qc-btn qc-pink"   onclick="addNearby()">📍 Add Detour</button>
-            <button class="qc-btn qc-violet" onclick="skipStop()">⏭️ Skip Stop</button>
-            <button class="qc-btn qc-blue"   onclick="smartExtend()">⏱️ +1 Hour</button>
-            <button class="qc-btn qc-amber"  onclick="optimizeRoute()">⚡ Optimize</button>
-            <button class="qc-btn qc-jade"    onclick="toggleStreetQuest()">🕹️ Street Quest</button>
-            <button class="qc-btn qc-full"   onclick="aiSuggestAlternative()">✨ AI Alternative</button>
+            <button class="qc-btn qc-jade"    id="btn-follow-live" data-action="toggleLiveFollow">🎯 Following</button>
+            <button class="qc-btn qc-pink"   data-action="addNearby">📍 Add Detour</button>
+            <button class="qc-btn qc-violet" data-action="skipStop">⏭️ Skip Stop</button>
+            <button class="qc-btn qc-blue"   data-action="smartExtend">⏱️ +1 Hour</button>
+            <button class="qc-btn qc-amber"  data-action="optimizeRoute">⚡ Optimize</button>
+            <button class="qc-btn qc-jade"    data-action="toggleStreetQuest">🕹️ Street Quest</button>
+            <button class="qc-btn qc-full"   data-action="aiSuggestAlternative">✨ AI Alternative</button>
           </div>
         </div>
       </div>
@@ -473,7 +473,7 @@
       <!-- AI Tools — floating button triggers side drawer -->
       <div id="aitools-section" style="display:none">
         <div style="padding:8px 14px 14px;">
-          <button onclick="openAiDrawer()" style="width:100%;padding:12px 16px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#0099b8);border:none;color:#000;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 20px rgba(0,212,255,.2);">
+          <button data-action="openAiDrawer" style="width:100%;padding:12px 16px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#0099b8);border:none;color:#000;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 20px rgba(0,212,255,.2);">
             <span style="font-size:18px">✦</span> AI Tools & Exclusive Features
             <span style="margin-left:auto;font-size:16px">→</span>
           </button>
@@ -485,9 +485,9 @@
         <div class="itin-hdr">
           <div class="itin-title">Itinerary</div>
           <div class="itin-actions">
-            <button class="itn-btn itnb-green" id="btn-save"  style="display:none" onclick="saveIt()">💾 Save</button>
-            <button class="itn-btn itnb-blue"  id="btn-share" style="display:none" onclick="shareIt()">📤 Share</button>
-            <button class="itn-btn itnb-teal"  onclick="switchToView('tools-view',4)">💸 Budget</button>
+            <button class="itn-btn itnb-green" id="btn-save"  style="display:none" data-action="saveIt">💾 Save</button>
+            <button class="itn-btn itnb-blue"  id="btn-share" style="display:none" data-action="shareIt">📤 Share</button>
+            <button class="itn-btn itnb-teal"  data-action="switchToView" data-view="tools-view" data-idx="4">💸 Budget</button>
             <span class="status-chip" id="trip-st">PLAN</span>
           </div>
         </div>
@@ -517,7 +517,7 @@
     <div id="chat-view" class="view">
       <div class="chat-topbar">
         <div class="chat-topbar-left">
-          <button class="back-btn" onclick="goBack()">
+          <button class="back-btn" data-action="goBack">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
             Back
           </button>
@@ -525,8 +525,8 @@
           <div class="chat-ai-status"><span class="ai-online"></span>Online</div>
         </div>
         <div class="chat-topbar-btns">
-          <button id="btn-voice" onclick="toggleVoice()" class="chat-ctrl-btn ccb-muted">🔇 Voice</button>
-          <button id="btn-voice-input" onclick="startVoiceInput()" class="chat-ctrl-btn ccb-purple">🎤 Speak</button>
+          <button id="btn-voice" data-action="toggleVoice" class="chat-ctrl-btn ccb-muted">🔇 Voice</button>
+          <button id="btn-voice-input" data-action="startVoiceInput" class="chat-ctrl-btn ccb-purple">🎤 Speak</button>
         </div>
       </div>
       <div id="chat-messages">
@@ -539,7 +539,7 @@
       </div>
       <div class="chat-input-bar">
         <input type="text" id="chat-in" placeholder="e.g. When's the best time to visit Kailasagiri?">
-        <button class="send-btn" aria-label="Send message" onclick="handleChat()">
+        <button class="send-btn" aria-label="Send message" data-action="handleChat">
           <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
         </button>
       </div>
@@ -548,7 +548,7 @@
     <!-- ═══ TOOLS VIEW ═══ -->
     <div id="tools-view" class="view" style="display:none">
       <div style="padding:10px 14px 4px;border-bottom:1px solid var(--border-subtle);background:var(--sidebar-bg);display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <button class="back-btn" onclick="goBack()">
+        <button class="back-btn" data-action="goBack">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
           Back
         </button>
@@ -563,16 +563,16 @@
 
   <!-- BOTTOM NAV -->
   <nav id="bottom-nav" role="navigation" aria-label="Main navigation">
-    <div class="nav-item active" role="button" tabindex="0" onclick="switchToView('map-view',0)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('map-view',0);}">
+    <div class="nav-item active" role="button" tabindex="0" data-action="switchToView" data-view="map-view" data-idx="0">
       <span class="nav-ico" aria-hidden="true">🗺️</span><span class="nav-lbl">Map</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" onclick="switchToView('plan-view',1)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('plan-view',1);}">
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="plan-view" data-idx="1">
       <span class="nav-ico" aria-hidden="true">📋</span><span class="nav-lbl">Plan</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" onclick="switchToView('chat-view',2)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('chat-view',2);}">
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="chat-view" data-idx="2">
       <span class="nav-ico" aria-hidden="true">💬</span><span class="nav-lbl">Chat</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" onclick="switchToView('tools-view',3)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchToView('tools-view',3);}">
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="tools-view" data-idx="3">
       <span class="nav-ico" aria-hidden="true">🧰</span><span class="nav-lbl">Tools</span>
     </div>
   </nav>
@@ -593,17 +593,17 @@
   <div class="modal-content" style="background:var(--bg-layer1);border:1px solid var(--border-strong);border-radius:24px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-card);overflow:hidden;">
     <div style="padding:20px;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
       <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:0;color:var(--text-primary);">Customize Places 🛠️</h3>
-      <button onclick="closeCustomizeModal()" aria-label="Close" style="background:none;border:none;color:var(--text-primary);font-size:28px;line-height:1;cursor:pointer;padding:0;">&times;</button>
+      <button data-action="closeCustomizeModal" aria-label="Close" style="background:none;border:none;color:var(--text-primary);font-size:28px;line-height:1;cursor:pointer;padding:0;">&times;</button>
     </div>
     <div style="padding:15px 20px;display:flex;gap:10px;border-bottom:1px solid var(--border-subtle);">
-      <button onclick="selectAllCustomPlaces(true)" class="btn-secondary" style="flex:1;padding:8px;font-size:12px;border-radius:12px;">Select All</button>
-      <button onclick="selectAllCustomPlaces(false)" class="btn-secondary" style="flex:1;padding:8px;font-size:12px;border-radius:12px;">Deselect All</button>
+      <button data-action="selectAllCustomPlaces" data-arg="true" class="btn-secondary" style="flex:1;padding:8px;font-size:12px;border-radius:12px;">Select All</button>
+      <button data-action="selectAllCustomPlaces" data-arg="false" class="btn-secondary" style="flex:1;padding:8px;font-size:12px;border-radius:12px;">Deselect All</button>
     </div>
     <div id="customize-places-list" style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;">
       <!-- Populated by JS -->
     </div>
     <div style="padding:20px;border-top:1px solid var(--border-subtle);">
-      <button onclick="applyCustomPlaces()" class="btn-gen" style="width:100%;">
+      <button data-action="applyCustomPlaces" class="btn-gen" style="width:100%;">
         <span>Save & Generate</span> <span>✦</span>
       </button>
     </div>

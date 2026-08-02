@@ -96,6 +96,42 @@ describe('requireAdminAuth — legacy shared-key path', () => {
     );
   });
 
+  test('ADMIN_LEGACY_KEY_DISABLED=true rejects a correct key — a real kill switch, not just observability', async () => {
+    const ORIGINAL_DISABLED = process.env.ADMIN_LEGACY_KEY_DISABLED;
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    process.env.ADMIN_LEGACY_KEY_DISABLED = 'true';
+    const req = { headers: { 'x-admin-key': 'correct-secret' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('DEPRECATED')
+    );
+
+    if (ORIGINAL_DISABLED === undefined) delete process.env.ADMIN_LEGACY_KEY_DISABLED;
+    else process.env.ADMIN_LEGACY_KEY_DISABLED = ORIGINAL_DISABLED;
+  });
+
+  test('any value other than the literal string "true" leaves the legacy path enabled (fails safe/open toward the existing behavior, not silently locking admins out on a typo)', async () => {
+    const ORIGINAL_DISABLED = process.env.ADMIN_LEGACY_KEY_DISABLED;
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    process.env.ADMIN_LEGACY_KEY_DISABLED = 'yes'; // not the exact string 'true'
+    const req = { headers: { 'x-admin-key': 'correct-secret' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+
+    if (ORIGINAL_DISABLED === undefined) delete process.env.ADMIN_LEGACY_KEY_DISABLED;
+    else process.env.ADMIN_LEGACY_KEY_DISABLED = ORIGINAL_DISABLED;
+  });
+
   // Regression test: query-string ?key= support was deliberately removed
   // (secrets in URLs leak via access logs/browser history/proxies).
   test('does NOT accept the key via query string', async () => {

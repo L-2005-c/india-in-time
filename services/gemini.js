@@ -16,7 +16,7 @@ let consecutiveFailures = 0;
 let circuitOpenedAt = 0;
 let activeRequests = 0;
 const requestQueue = [];           // queued promises when at max concurrency
-const stats = { total: 0, success: 0, failure: 0, cached: 0, retries: 0, circuitTrips: 0 };
+const stats = { total: 0, success: 0, failure: 0, cached: 0, retries: 0, circuitTrips: 0, fallbackModelUsed: 0 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,8 +94,9 @@ function releaseSlot() {
 async function _callGeminiOnce(parts, opts = {}) {
   const timeoutMs = opts.timeoutMs || config.gemini.timeoutMs;
   const genConfig = opts.generationConfig || {};
+  const model = opts.model || config.gemini.model;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.gemini.model}:generateContent?key=${config.gemini.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.gemini.apiKey}`;
 
   const body = {
     contents: [{ parts }],
@@ -223,7 +224,39 @@ async function callGemini(parts, opts = {}) {
       }
     }
 
-    // All retries exhausted
+    // ── All retries against the primary model exhausted ────────────────
+    // Last resort: try the fallback model once, but only if this was a
+    // retryable failure (network error, 429, 5xx) — a 4xx validation error
+    // means the request itself was malformed, and a different model won't
+    // fix that, so don't waste a call on it.
+    if (config.gemini.fallbackModel && lastError && lastError.retryable !== false) {
+      try {
+        logger.warn(
+          { module: 'gemini', primaryModel: config.gemini.model, fallbackModel: config.gemini.fallbackModel, err: lastError.message },
+          'Primary model exhausted all retries — trying fallback model'
+        );
+        const result = await _callGeminiOnce(parts, { ...opts, model: config.gemini.fallbackModel });
+
+        recordSuccess();
+        stats.success++;
+        stats.fallbackModelUsed++;
+
+        if (cacheKey && result) {
+          geminiCache.set(cacheKey, result, opts.cacheTtlMs);
+          try {
+            await setCachedAiResponse(cacheKey, result);
+          } catch (err) {
+            logger.warn({ module: 'gemini', err: err.message }, 'DB cache write error');
+          }
+        }
+
+        return result;
+      } catch (fallbackErr) {
+        logger.warn({ module: 'gemini', fallbackModel: config.gemini.fallbackModel, err: fallbackErr.message }, 'Fallback model also failed');
+        lastError = fallbackErr;
+      }
+    }
+
     stats.failure++;
     recordFailure();
     throw lastError || new Error('Gemini call failed after all retries');

@@ -8,11 +8,20 @@ function buildHelmetOptions() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        // 'unsafe-inline' is still required for now — the frontend uses
-        // inline onclick= handlers and inline <script> blocks throughout
-        // app.js/index.html. Removing this needs the inline-handler cleanup
-        // tracked in README.md's "Known gaps" list; until then this at
-        // least blocks loading script from any origin NOT listed below.
+        // 'unsafe-inline' is still required for now. index.html and
+        // admin-feedback.html's own inline onclick=/onkeydown=/onchange=/
+        // oninput= attributes are gone — converted to a data-action
+        // delegation pattern, see the STATIC_ACTIONS table + delegated
+        // listeners near the end of frontend/public/app.js, verified in
+        // __tests__/frontend.staticActions.test.js. What's NOT done: app.js
+        // still dynamically generates onclick= attributes inside template-
+        // literal HTML strings when rendering place cards, saved trips,
+        // etc. (e.g. `<button onclick="delExp(${e.id})">`). Converting
+        // those is materially riskier — the arguments come from live data,
+        // not fixed literals, and there's no browser/e2e test coverage in
+        // this environment to catch a subtle breakage. Until that's done,
+        // this directive can't be tightened; this at least blocks loading
+        // script from any origin NOT listed below.
         scriptSrc: [
           "'self'", "'unsafe-inline'",
           'https://www.googletagmanager.com',
@@ -28,7 +37,9 @@ function buildHelmetOptions() {
         // and inline style="" attributes. Omitting these left script-src-attr
         // at helmet's default of 'none', which silently blocked every single
         // onclick=/onkeydown= handler in the app — i.e. every button on the
-        // page stopped working. Must be set explicitly.
+        // page stopped working. Must be set explicitly. Still needed for the
+        // same reason as scriptSrc above — app.js's dynamically-generated
+        // onclick= attributes, not the static ones in the HTML files.
         scriptSrcAttr: ["'unsafe-inline'"],
         styleSrcAttr: ["'unsafe-inline'"],
         styleSrc: [

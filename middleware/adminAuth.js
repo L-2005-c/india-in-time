@@ -69,6 +69,12 @@ async function tryFirebaseAdminAuth(req) {
 function tryLegacyKeyAuth(req) {
   const configured = process.env.ADMIN_FEEDBACK_KEY;
   if (!configured) return false;
+  // Kill switch: once the deprecation logging below shows nothing actually
+  // depends on this path anymore, an operator can retire it with a config
+  // change (set ADMIN_LEGACY_KEY_DISABLED=true) rather than a code deploy —
+  // and can flip it back on immediately if that turns out to be wrong,
+  // without waiting on a rollback.
+  if (process.env.ADMIN_LEGACY_KEY_DISABLED === 'true') return false;
   const provided = req.headers['x-admin-key'];
   if (!provided || !timingSafeStringEqual(provided, configured)) return false;
   req.adminAuthMethod = 'legacy-shared-key';

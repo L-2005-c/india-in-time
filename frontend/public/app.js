@@ -3060,6 +3060,92 @@ document.addEventListener('click', (e) => {
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-role="fb-comment"]')) updateFbCounter(e.target);
 });
+
+// ── Delegated action handling for index.html's static onclick= buttons ──────
+// Converts index.html's inline onclick="fn(args)" attributes to the same
+// data-action delegation pattern used above for in-chat widget buttons —
+// one listener, attached once, works for every button carrying data-action
+// regardless of when it entered the DOM. Arguments that used to be literal
+// values inside the onclick string now live in data-* attributes on the
+// button itself (e.g. onclick="switchToView('map-view',0)" became
+// data-action="switchToView" data-view="map-view" data-idx="0"), read here
+// rather than parsed out of an arbitrary string — this stays a fixed lookup
+// table of real function references, never eval()/new Function() on
+// attribute content, so it doesn't need (and doesn't get) 'unsafe-eval'.
+//
+// A few onclick= values chained multiple calls together with `;`
+// (e.g. "toggleLoadPanel();toggleUserMenu()") — those got small named
+// wrapper functions below instead of trying to encode a call sequence in
+// a data attribute.
+function openLoadPanelFromMenu(){ toggleLoadPanel(); toggleUserMenu(); }
+function openBudgetFromMenu(){ switchToView('tools-view',3); renderBudget(); toggleUserMenu(); }
+function openPassportFromMenu(){ switchToView('tools-view',3); renderPassport(); toggleUserMenu(); }
+// These two replace onclick="document.getElementById(...).____" inline DOM
+// expressions — trivial, but still had to move out of an attribute like
+// everything else here.
+function closeNotifToast(){ const el=document.getElementById('notif-toast'); if(el) el.style.display='none'; }
+function focusCitySelect(){ const el=document.getElementById('city-select'); if(el) el.focus(); }
+
+const STATIC_ACTIONS = {
+  addNearby, aiSuggestAlternative, applyCustomPlaces, closeAiDrawer, closeCustomizeModal,
+  closeNotifToast, compassTap, doSignOut, focusCitySelect, generatePlan, goBack, handleChat,
+  installPWA, locateMe, openAiDrawer, openBudgetFromMenu, openCustomizeModal,
+  openLoadPanelFromMenu, openPassportFromMenu, optimizeRoute, resetGPS, saveIt, searchCity,
+  shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
+  toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
+  toggleTimeSliderCollapsed, toggleUserMenu, toggleVoice, waShare,
+  // These read extra args off the button's own dataset rather than taking
+  // none — kept in the same table since dispatch below doesn't care.
+  selectAllCustomPlaces: (btn) => selectAllCustomPlaces(btn.dataset.arg === 'true'),
+  switchToView: (btn) => switchToView(btn.dataset.view, Number(btn.dataset.idx)),
+  // event.currentTarget is what signInWithGoogle uses to find+disable the
+  // clicked button — under delegation the real DOM event's currentTarget
+  // would be `document` (whatever the listener is attached to), not the
+  // button, so this passes a minimal shim carrying just the property the
+  // function actually reads instead of the raw event.
+  signInWithGoogle: (btn) => signInWithGoogle({ currentTarget: btn }),
+};
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  // Buttons handled by CHAT_ACTIONS above (in-chat widgets) use the exact
+  // same data-action attribute name — check that table first so a name
+  // that exists in both isn't silently shadowed one way or the other; in
+  // practice the two tables' key sets are disjoint (verified in
+  // __tests__/frontend.staticActions.test.js), so this is a safety net,
+  // not something that fires in normal operation.
+  const fn = CHAT_ACTIONS[btn.dataset.action] || STATIC_ACTIONS[btn.dataset.action];
+  if (fn) fn(btn);
+});
+
+// Keyboard activation (Enter/Space) for role="button" elements that carry
+// data-action — e.g. the bottom-nav items, which are <div role="button">,
+// not real <button> elements, so they don't get free Enter/Space handling
+// from the browser. Reuses whatever data-action (and data-view/data-idx
+// etc.) the element already has for click; nothing new to attach per
+// element, same table, same dispatch.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest('[role="button"][data-action]');
+  if (!el) return;
+  e.preventDefault();
+  const fn = CHAT_ACTIONS[el.dataset.action] || STATIC_ACTIONS[el.dataset.action];
+  if (fn) fn(el);
+});
+
+// The city <select> and the trip time <input type="range"> read the
+// element's own current value (this.value under the old onchange=/oninput=
+// attributes), so those two go through 'change'/'input' delegation rather
+// than 'click'.
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-action="switchCity"]');
+  if (el && el.value) switchCity(el.value);
+});
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-action="onTimeSliderChange"]');
+  if (el) onTimeSliderChange(el.value);
+});
+
 function addTypingIndicator(){return addMsg('<span style="display:flex;gap:4px;align-items:center"><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .2s infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .4s infinite"></span></span>');}
 function getRecentBotText(){const rows=[...document.querySelectorAll('#chat-messages .msg-row')].reverse();for(const row of rows){if(row.classList.contains('from-user')) continue;const bubble=row.querySelector('.bubble');const text=String(bubble?.textContent||'').trim();if(text) return text.toLowerCase();}return '';}
 
