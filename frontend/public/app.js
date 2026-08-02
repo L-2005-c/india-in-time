@@ -3022,7 +3022,7 @@ function escapeHtml(str){
 // here as long as the code reading them only ever uses them for lookups/
 // comparisons, never feeds them into innerHTML or eval.
 const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div','button','textarea'];
-const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','type','maxlength','rows','placeholder','aria-label','disabled'];
+const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','data-rating','type','maxlength','rows','placeholder','aria-label','disabled'];
 function sanitizeChatHtml(html){
   const str = String(html ?? '');
   if (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
@@ -3051,12 +3051,6 @@ const CHAT_ACTIONS = {
   fbSetStar, fbSetCat, fbSubmit, fbSkip,
   rateStopClick, runReplannerClick,
 };
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  const fn = CHAT_ACTIONS[btn.dataset.action];
-  if (fn) fn(btn);
-});
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-role="fb-comment"]')) updateFbCounter(e.target);
 });
