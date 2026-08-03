@@ -16,6 +16,12 @@
 //      admin-feedback.html) — but every admin action authenticated this
 //      way is indistinguishable from any other holder of the key. Prefer
 //      migrating callers to (1) over time; see README.md's "Known gaps".
+//      Two operator controls, neither required:
+//        - ADMIN_LEGACY_KEY_DISABLED=true — disable this path immediately.
+//        - ADMIN_LEGACY_KEY_EXPIRES=<date> — disable it automatically once
+//          that date passes, so retirement is a deadline, not a task
+//          someone has to remember. Leave both unset to keep today's
+//          behavior (no expiry) unchanged.
 //
 // Query-string (?key=) support was deliberately never re-added — secrets
 // in URLs get logged (server access logs, browser history, proxies).
@@ -75,6 +81,25 @@ function tryLegacyKeyAuth(req) {
   // and can flip it back on immediately if that turns out to be wrong,
   // without waiting on a rollback.
   if (process.env.ADMIN_LEGACY_KEY_DISABLED === 'true') return false;
+  // Optional forced expiry: ADMIN_LEGACY_KEY_EXPIRES=2026-12-31 (or any
+  // Date-parseable value) makes retirement a *deadline* rather than a
+  // manual step someone has to remember to take. Unset by default (this
+  // path never expires on its own unless an operator opts in), so this is
+  // purely additive — existing deployments are unaffected until someone
+  // sets it. An invalid/unparseable value is treated as "not set" rather
+  // than silently disabling admin access on a typo.
+  const expiresRaw = process.env.ADMIN_LEGACY_KEY_EXPIRES;
+  if (expiresRaw) {
+    const expiresAt = new Date(expiresRaw);
+    if (!Number.isNaN(expiresAt.getTime()) && Date.now() >= expiresAt.getTime()) {
+      logger.warn(
+        { expiresAt: expiresAt.toISOString() },
+        '[adminAuth] legacy shared-key auth rejected — ADMIN_LEGACY_KEY_EXPIRES has passed. ' +
+          'Remove ADMIN_FEEDBACK_KEY or grant callers a Firebase admin claim instead.'
+      );
+      return false;
+    }
+  }
   const provided = req.headers['x-admin-key'];
   if (!provided || !timingSafeStringEqual(provided, configured)) return false;
   req.adminAuthMethod = 'legacy-shared-key';

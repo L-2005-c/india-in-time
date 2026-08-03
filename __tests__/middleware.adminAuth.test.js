@@ -132,6 +132,59 @@ describe('requireAdminAuth — legacy shared-key path', () => {
     else process.env.ADMIN_LEGACY_KEY_DISABLED = ORIGINAL_DISABLED;
   });
 
+  test('ADMIN_LEGACY_KEY_EXPIRES in the past rejects a correct key — a deadline, not just a manual switch', async () => {
+    const ORIGINAL_EXPIRES = process.env.ADMIN_LEGACY_KEY_EXPIRES;
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    process.env.ADMIN_LEGACY_KEY_EXPIRES = '2020-01-01';
+    const req = { headers: { 'x-admin-key': 'correct-secret' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ expiresAt: expect.any(String) }),
+      expect.stringContaining('ADMIN_LEGACY_KEY_EXPIRES has passed')
+    );
+
+    if (ORIGINAL_EXPIRES === undefined) delete process.env.ADMIN_LEGACY_KEY_EXPIRES;
+    else process.env.ADMIN_LEGACY_KEY_EXPIRES = ORIGINAL_EXPIRES;
+  });
+
+  test('ADMIN_LEGACY_KEY_EXPIRES in the future still allows a correct key', async () => {
+    const ORIGINAL_EXPIRES = process.env.ADMIN_LEGACY_KEY_EXPIRES;
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    process.env.ADMIN_LEGACY_KEY_EXPIRES = '2099-01-01';
+    const req = { headers: { 'x-admin-key': 'correct-secret' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+
+    if (ORIGINAL_EXPIRES === undefined) delete process.env.ADMIN_LEGACY_KEY_EXPIRES;
+    else process.env.ADMIN_LEGACY_KEY_EXPIRES = ORIGINAL_EXPIRES;
+  });
+
+  test('an unparseable ADMIN_LEGACY_KEY_EXPIRES is ignored (fails safe/open, not a silent lockout on a typo)', async () => {
+    const ORIGINAL_EXPIRES = process.env.ADMIN_LEGACY_KEY_EXPIRES;
+    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
+    process.env.ADMIN_LEGACY_KEY_EXPIRES = 'not-a-real-date';
+    const req = { headers: { 'x-admin-key': 'correct-secret' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+
+    if (ORIGINAL_EXPIRES === undefined) delete process.env.ADMIN_LEGACY_KEY_EXPIRES;
+    else process.env.ADMIN_LEGACY_KEY_EXPIRES = ORIGINAL_EXPIRES;
+  });
+
   // Regression test: query-string ?key= support was deliberately removed
   // (secrets in URLs leak via access logs/browser history/proxies).
   test('does NOT accept the key via query string', async () => {

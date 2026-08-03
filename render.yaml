@@ -10,7 +10,15 @@ services:
     runtime: node
     plan: starter
     region: singapore # closest Render region to India as of writing; change if a closer one exists by the time you deploy
-    buildCommand: npm ci --omit=dev
+    # Full `npm ci` (not --omit=dev) because build:frontend needs esbuild/
+    # clean-css-cli (devDependencies) to produce frontend/public/dist/ —
+    # config.resolveIndexHtmlPath() already serves that automatically in
+    # production when present (see config/index.js), but nothing previously
+    # ran the build itself as part of a real deploy. `npm prune --omit=dev`
+    # afterward drops the devDependencies from node_modules before
+    # startCommand runs, so the running process's dependency footprint is
+    # unchanged from before.
+    buildCommand: npm ci && npm run build:frontend && npm prune --omit=dev
     startCommand: node server.js
     healthCheckPath: /api/health
     envVars:

@@ -121,3 +121,88 @@ describe('notFoundHandler', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 });
+
+describe('errorHandler — optional error-reporting webhook', () => {
+  let errorHandler;
+  const ORIGINAL_FETCH = global.fetch;
+  const ORIGINAL_URL = process.env.ERROR_REPORTING_WEBHOOK_URL;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env.NODE_ENV = 'production';
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.CORS_ORIGIN = 'https://example.com';
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.CORS_ORIGIN;
+    if (ORIGINAL_URL === undefined) delete process.env.ERROR_REPORTING_WEBHOOK_URL;
+    else process.env.ERROR_REPORTING_WEBHOOK_URL = ORIGINAL_URL;
+    global.fetch = ORIGINAL_FETCH;
+    jest.clearAllMocks();
+  });
+
+  test('does nothing (no fetch call) when ERROR_REPORTING_WEBHOOK_URL is unset — matches prior behavior exactly', () => {
+    delete process.env.ERROR_REPORTING_WEBHOOK_URL;
+    global.fetch = jest.fn();
+    ({ errorHandler } = require('../middleware/errorHandler'));
+
+    const err = new Error('boom');
+    err.statusCode = 500;
+    errorHandler(err, { method: 'GET', path: '/api/x' }, mockRes(), () => {});
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('POSTs a JSON payload to the configured URL for a 5xx error', () => {
+    process.env.ERROR_REPORTING_WEBHOOK_URL = 'https://hooks.example.com/errors';
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    ({ errorHandler } = require('../middleware/errorHandler'));
+
+    const err = new Error('database exploded');
+    err.statusCode = 503;
+    errorHandler(err, { method: 'GET', path: '/api/trips', requestId: 'req-9' }, mockRes(), () => {});
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toBe('https://hooks.example.com/errors');
+    expect(opts.method).toBe('POST');
+    const payload = JSON.parse(opts.body);
+    expect(payload.error).toBe('database exploded');
+    expect(payload.status).toBe(503);
+    expect(payload.requestId).toBe('req-9');
+    expect(payload.stack).toBeDefined();
+  });
+
+  test('does NOT fire the webhook for a 4xx (client) error — only real incidents', () => {
+    process.env.ERROR_REPORTING_WEBHOOK_URL = 'https://hooks.example.com/errors';
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    ({ errorHandler } = require('../middleware/errorHandler'));
+
+    const err = new Error('bad input');
+    err.statusCode = 400;
+    errorHandler(err, { method: 'POST', path: '/api/places' }, mockRes(), () => {});
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('a failed webhook delivery never throws or blocks the response', async () => {
+    process.env.ERROR_REPORTING_WEBHOOK_URL = 'https://hooks.example.com/errors';
+    global.fetch = jest.fn().mockRejectedValue(new Error('webhook endpoint unreachable'));
+    ({ errorHandler } = require('../middleware/errorHandler'));
+
+    const err = new Error('boom');
+    err.statusCode = 500;
+    const res = mockRes();
+
+    expect(() => errorHandler(err, { method: 'GET', path: '/api/x' }, res, () => {})).not.toThrow();
+    // The HTTP response itself is synchronous and unaffected by the
+    // fire-and-forget webhook's eventual failure.
+    expect(res.status).toHaveBeenCalledWith(500);
+
+    // Let the rejected promise's .catch() run so it doesn't surface as an
+    // unhandled rejection in a later test.
+    await new Promise((resolve) => setImmediate(resolve));
+  });
+});

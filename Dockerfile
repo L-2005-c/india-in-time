@@ -1,15 +1,33 @@
 # syntax=docker/dockerfile:1
 
-# ── Build stage ───────────────────────────────────────────────────────────
+# ── Dependencies stage (production-only, ships into the runtime image) ────
 # package.json pins "engines": { "node": "20.x" } — match it exactly rather
 # than floating on "node:20" so a future 20.x patch bump doesn't silently
 # change behavior between local dev and this image.
-FROM node:20-alpine AS build
+FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-# Production-only deps here; nodemon (devDependency) never ships in the image.
+# Production-only deps here; nodemon/esbuild/clean-css-cli (devDependencies)
+# never ship in the runtime image.
 RUN npm ci --omit=dev
+
+# ── Frontend build stage (needs devDependencies: esbuild, clean-css-cli) ──
+# config.resolveIndexHtmlPath() already knows how to serve
+# frontend/public/dist/ automatically in production when it exists (see
+# config/index.js) — the only piece that was missing was actually running
+# `npm run build:frontend` as part of the deploy itself, rather than relying
+# on someone to remember to run it by hand. This stage does that: full
+# `npm ci` (devDependencies included, needed for esbuild/clean-css-cli),
+# then the build script, and only its *output* (frontend/public/dist/) is
+# copied into the runtime stage below — the devDependencies used to produce
+# it never reach the final image.
+FROM node:20-alpine AS frontend-build
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+COPY . .
+RUN npm run build:frontend
 
 # ── Runtime stage ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime
@@ -19,12 +37,13 @@ ENV NODE_ENV=production
 # Run as a non-root user rather than the image's default root.
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# frontend/public is served as static files by server.js (config.publicDir) —
-# no separate build step exists for it (plain JS/CSS/HTML, no bundler), so
-# there's nothing to compile here beyond installing backend deps above.
+# Minified, content-hashed frontend bundle — overwrites the empty/absent
+# frontend/public/dist/ from the plain `COPY . .` above with the real build
+# output. Source frontend/public/index.html itself is never modified by the
+# build (see scripts/build-frontend.js), so this is purely additive.
+COPY --from=frontend-build /app/frontend/public/dist ./frontend/public/dist
 
 USER appuser
 

@@ -2,6 +2,54 @@
 // Catches all unhandled errors and returns structured JSON responses.
 
 const config = require('../config');
+const logger = require('../lib/logger');
+
+// ── Optional error-reporting webhook (lightweight APM/alerting hook) ───────
+// This project has no APM/error-tracking integration (Sentry, Datadog,
+// OpenTelemetry, etc.) — production 5xx incidents are otherwise diagnosed
+// from logs alone. Adding a specific vendor SDK is a real dependency and
+// config decision an operator should make deliberately, not something to
+// bake in silently — so instead this is a generic, zero-dependency hook:
+// if ERROR_REPORTING_WEBHOOK_URL is set, every 5xx error is POSTed there
+// as JSON (compatible with a Slack/Discord incoming webhook, a serverless
+// function that forwards to Sentry/Datadog, or any custom ingestion
+// endpoint). Unset (the default) — completely inert, matching prior
+// behavior exactly. Fire-and-forget: never awaited by the response path,
+// has its own timeout, and any failure is logged, never thrown — a flaky
+// or unreachable webhook endpoint must never turn a handled error into an
+// unhandled one.
+const REPORT_TIMEOUT_MS = 3000;
+
+function reportErrorAsync(err, logData) {
+  const url = process.env.ERROR_REPORTING_WEBHOOK_URL;
+  if (!url || typeof fetch !== 'function') return;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      service: 'india-in-time-backend',
+      env: config.isProd ? 'production' : 'development',
+      ...logData,
+      // Full stack is deliberately included here even in production — this
+      // payload goes to the operator's own error-tracking endpoint, not to
+      // the end user (that distinction is enforced separately below, in
+      // the actual HTTP response).
+      stack: err.stack,
+    }),
+    signal: controller.signal,
+  })
+    .catch((reportErr) => {
+      logger.warn(
+        { err: reportErr.message },
+        '[errorHandler] error-reporting webhook failed — the original error above was still logged/handled normally'
+      );
+    })
+    .finally(() => clearTimeout(timer));
+}
 
 /**
  * Global error handler middleware.
@@ -25,6 +73,7 @@ function errorHandler(err, req, res, _next) {
   if (statusCode >= 500) {
     logData.stack = err.stack;
     console.error('[ERROR]', JSON.stringify(logData, null, 2));
+    reportErrorAsync(err, logData);
   } else {
     console.warn('[WARN]', JSON.stringify(logData));
   }

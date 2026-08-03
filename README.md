@@ -81,7 +81,7 @@ Two deployment targets are configured:
 A `Dockerfile` is also provided (multi-stage, non-root user, built-in
 healthcheck) if you'd rather run this anywhere else that speaks Docker.
 
-### Frontend production build (optional, not yet wired in automatically)
+### Frontend production build
 
 ```bash
 npm run build:frontend
@@ -89,11 +89,18 @@ npm run build:frontend
 
 Minifies `app.js`, `client-api.js`, and `styles.css` into
 `frontend/public/dist/` with content-hashed filenames (verified: ~32%
-smaller JS, ~17% smaller CSS). This is **not yet referenced by
-`index.html`** — wiring it in fully needs a small build step that rewrites
-`index.html`'s script/link tags to point at the hashed output in production,
-which wasn't done here to avoid further changes to `index.html` without a
-way to visually verify the result. Until then this is available tooling,
+smaller JS, ~17% smaller CSS), plus a `dist/index.html` that references the
+hashed output — `config.resolveIndexHtmlPath()` serves that automatically
+in production when it exists (falling back to the unminified source
+otherwise, never a hard failure). **This now runs automatically as part of
+both deploy paths** — `render.yaml`'s `buildCommand` runs it (then
+`npm prune --omit=dev` to drop the devDependencies — esbuild/clean-css-cli —
+used to produce it before `startCommand` runs), and the `Dockerfile` builds
+it in a dedicated `frontend-build` stage and copies only the output into
+the runtime image. An operator running `git clone` + `node server.js`
+directly outside either pipeline (e.g. bare local prototyping in
+`NODE_ENV=production`) would still need to run this manually first; both
+real deploy targets no longer require that.
 not an active part of the deploy.
 
 ### Required environment variables
@@ -142,6 +149,69 @@ This project underwent an external technical audit; the following were
 identified and are being worked through (see CI status and open issues for
 current state):
 
+- [x] `middleware/auth.js` (Firebase ID token verification — the single
+      highest-risk file in the repo, since every route that trusts `req.uid`
+      depends on it) had only ~8% test coverage; everything else in the
+      codebase mocked it away rather than testing it directly. Added
+      `__tests__/middleware.auth.test.js` (19 tests) against a mocked
+      `firebase-admin`, covering: missing/malformed `FIREBASE_SERVICE_ACCOUNT`,
+      both raw-JSON and base64-encoded service-account formats,
+      `admin.credential.cert()` throwing, `admin.initializeApp()` only ever
+      being called once across repeated requests, and the success/expired-
+      token/missing-header paths of `requireAuth`, `optionalAuth`, and the
+      low-level `verifyToken` helper `adminAuth.js` depends on. Coverage on
+      this file: 8.16% → 100% statements. Full-suite coverage overall:
+      84.0% → 86.5% statements, 86.5% → 89.2% lines. All 407 tests
+      (34 suites) pass; `npm audit` still 0 vulnerabilities.
+- [x] The frontend minification build (`npm run build:frontend`) worked
+      correctly and `config.resolveIndexHtmlPath()` already knew how to
+      serve its output automatically in production — but nothing in either
+      real deploy path (`render.yaml`, `Dockerfile`) actually *ran* the
+      build step, so a real deploy would silently keep serving unminified
+      source regardless. Fixed on both: `render.yaml`'s `buildCommand` is
+      now `npm ci && npm run build:frontend && npm prune --omit=dev` (full
+      install so esbuild/clean-css-cli are available to the build, pruned
+      back to production-only before `startCommand` runs — verified locally
+      end-to-end: builds, prunes to 272 packages, 0 vulnerabilities,
+      `server.js` still passes `node --check`); the `Dockerfile` gained a
+      dedicated `frontend-build` stage (full deps, runs the build) whose
+      *output only* (`frontend/public/dist/`) is copied into the runtime
+      image — the devDependencies used to produce it never ship. Docker
+      build itself still hasn't been run against a live daemon in this
+      environment (same caveat as below); the `npm run build:frontend`
+      command it depends on has been verified directly.
+- [x] `routes/ai.js` (55% → 100% statements) and `routes/time-intelligence.js`
+      (48% → 100% statements) were the two least-tested route files, sitting
+      behind the two most business-differentiating features (AI itineraries,
+      time intelligence). Added `__tests__/routes.ai.smoke.test.js` (39 tests
+      — every remaining text/vision endpoint verified reachable and wired to
+      the correct Gemini function, plus direct tests of the handful of
+      endpoints with real aggregation logic: `/triprating`'s expense sum and
+      stamp count, `/replanner`'s remaining-stop visit-time mapping,
+      `/prep`/`/insta`'s stop-list slicing), `__tests__/routes.timeIntelligence.status.test.js`
+      (10 tests — `/status` had 0% direct coverage before this; alternatives
+      attachment, MAX_PLACES capping, weather pass-through), and
+      `__tests__/routes.timeIntelligence.errors.test.js` (5 tests — the
+      try/catch 500 branches neither route's happy-path tests could reach).
+- [x] The legacy admin shared-key (`ADMIN_FEEDBACK_KEY`/`x-admin-key`) had a
+      manual kill switch (`ADMIN_LEGACY_KEY_DISABLED`) but no forced
+      expiry — retirement depended on someone remembering to flip it.
+      Added `ADMIN_LEGACY_KEY_EXPIRES` (any Date-parseable value; unset by
+      default, fully backward-compatible): once that date passes, the
+      legacy path stops accepting requests automatically, turning
+      retirement into an enforced deadline rather than a task. An
+      unparseable value is ignored rather than treated as "expire now" on
+      a typo. 3 new tests in `__tests__/middleware.adminAuth.test.js`.
+- [x] No APM/error-tracking integration existed, so 5xx incidents could only
+      be diagnosed from logs. Rather than committing to one vendor's SDK
+      unasked, added a generic, zero-dependency hook: `middleware/
+      errorHandler.js` now POSTs a JSON payload to
+      `ERROR_REPORTING_WEBHOOK_URL` (if set) for every 5xx error — compatible
+      with a Slack/Discord webhook or a small forwarder to whichever real
+      APM gets chosen later. Fire-and-forget with a 3s timeout; a failed or
+      unreachable webhook is logged and never throws or blocks the actual
+      HTTP response. Unset by default — inert, identical to prior behavior.
+      4 new tests in `__tests__/middleware.errorHandler.test.js`.
 - [x] Automated test suite (Jest) — `__tests__/` (357 tests, 33 suites). Also
       closed the remaining coverage gaps on `services/timeIntelligence.js`
       (11.6% → 92.2%) and `services/placesDiscovery.js` (19.4% → 48.1%,
