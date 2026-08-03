@@ -4753,18 +4753,27 @@ window.onload=()=>{
     attachTileErrorHandling(window._tileLayer);
     window._tileLayer.addTo(map);
 
-    // If a MapTiler key is configured server-side (MAPTILER_KEY env var),
-    // prepend it as the primary source — it's a real per-account key with a
-    // 100k-loads/month free tier meant for production traffic, unlike the
-    // CARTO/OSM entries above which are shared anonymous demo endpoints kept
-    // here purely as a fallback chain. This fetch is fire-and-forget so the
-    // map isn't blocked from rendering while it resolves.
+    // If MapTiler key(s) are configured server-side (MAPTILER_KEY,
+    // MAPTILER_KEY_2, MAPTILER_KEY_3, MAPTILER_KEY_4 env vars), chain them
+    // in order as the primary sources: key 1 is tried first, and if it
+    // starts failing hard (monthly quota exhausted, invalid, etc.) the
+    // tileerror handling above (tileErrorCount > 20 within a 15s window)
+    // automatically calls switchTileLayer() to move on to key 2, then key 3,
+    // then key 4 — and only falls through to the CARTO/OSM anonymous
+    // endpoints once every configured key has been exhausted. This fetch is
+    // fire-and-forget so the map isn't blocked from rendering while it
+    // resolves.
     fetch('/api/config').then(r=>r.json()).then(cfg=>{
-      if(cfg && cfg.maptilerKey && tileSourceIdx===0){
-        TILE_SOURCES.unshift({
-          url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${cfg.maptilerKey}`,
-          opts:{attribution:'&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19,keepBuffer:4}
-        });
+      const keys = cfg && Array.isArray(cfg.maptilerKeys) ? cfg.maptilerKeys : [];
+      if(keys.length && tileSourceIdx===0){
+        // Unshift in reverse so the final TILE_SOURCES order is
+        // key1, key2, key3, key4, then the existing CARTO/OSM fallbacks.
+        for(let i = keys.length - 1; i >= 0; i--){
+          TILE_SOURCES.unshift({
+            url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${keys[i]}`,
+            opts:{attribution:'&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19,keepBuffer:4}
+          });
+        }
         switchTileLayer(0);
       }
     }).catch(e=>console.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));

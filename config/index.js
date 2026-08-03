@@ -117,11 +117,24 @@ const config = {
   // MapTiler (map tiles). Optional — deliberately NOT requireEnv()'d, since
   // the frontend already has a CARTO/OSM fallback chain (see TILE_SOURCES
   // in app.js) and should keep working without this. When set, the /api/config
-  // endpoint exposes it to the frontend so it's tried first. This key is
-  // inherently public once served to the browser (it goes straight into an
-  // <img>/tile request URL) — the actual protection is restricting it to
-  // your domain in the MapTiler dashboard, not keeping it out of app.js.
-  maptilerKey: (process.env.MAPTILER_KEY || '').trim(),
+  // endpoint exposes these to the frontend so one is tried first. These keys
+  // are inherently public once served to the browser (they go straight into
+  // an <img>/tile request URL) — the actual protection is restricting each
+  // one to your domain in the MapTiler dashboard, not keeping them out of
+  // app.js.
+  //
+  // Supports up to 4 keys (MAPTILER_KEY, MAPTILER_KEY_2, MAPTILER_KEY_3,
+  // MAPTILER_KEY_4) so free-tier load (100k map loads/month each) doesn't
+  // all land on one key. The frontend tries them in order — key 1 first,
+  // then automatically fails over to key 2, key 3, key 4 in sequence once
+  // the current one starts erroring hard (quota exhausted, etc.) — see
+  // /api/config in server.js and the MapTiler block in app.js.
+  maptilerKeys: [
+    process.env.MAPTILER_KEY,
+    process.env.MAPTILER_KEY_2,
+    process.env.MAPTILER_KEY_3,
+    process.env.MAPTILER_KEY_4,
+  ].map(k => (k || '').trim()).filter(Boolean),
 };
 
 // ── Frontend index.html resolution ──────────────────────────────────────────

@@ -217,14 +217,14 @@ app.get('/api/health/live', (_req, res) => {
 });
 
 // Public, minimal client config. Only ever add values here that are safe to
-// hand to any visitor's browser (this endpoint has no auth). maptilerKey is
-// fine to expose this way — it's going straight into a tile <img> URL either
-// way, and it's meant to be restricted by domain in the MapTiler dashboard,
-// not kept secret. Do NOT add GEMINI_API_KEY, FIREBASE_SERVICE_ACCOUNT, or
-// ADMIN_FEEDBACK_KEY here.
+// hand to any visitor's browser (this endpoint has no auth). maptilerKeys is
+// fine to expose this way — each one is going straight into a tile <img> URL
+// either way, and they're meant to be restricted by domain in the MapTiler
+// dashboard, not kept secret. Do NOT add GEMINI_API_KEY,
+// FIREBASE_SERVICE_ACCOUNT, or ADMIN_FEEDBACK_KEY here.
 app.get('/api/config', (_req, res) => {
   res.json({
-    maptilerKey: config.maptilerKey || null,
+    maptilerKeys: config.maptilerKeys,
   });
 });
 
