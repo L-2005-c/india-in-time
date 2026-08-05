@@ -3541,6 +3541,13 @@ window.onload=()=>{
     let tileSourceIdx = 0;
     let tileErrorCount = 0;
     let tileErrorWindowStart = Date.now();
+    // A typical viewport only has ~10-15 tiles visible at once. The old
+    // threshold (>20 errors in 15s) could rarely if ever be reached from a
+    // single exhausted/invalid key, so keys never actually failed over —
+    // this was the root cause of "shifting" not happening. Lowered to a
+    // number a normal screen's worth of failing tiles can realistically hit.
+    const TILE_ERROR_THRESHOLD = 6;
+    const TILE_ERROR_WINDOW_MS = 10000;
 
     function buildTileLayer(idx){
       const src = TILE_SOURCES[idx];
@@ -3549,6 +3556,11 @@ window.onload=()=>{
 
     function switchTileLayer(idx){
       tileSourceIdx = idx;
+      // Reset the error counter/window on every switch so the freshly
+      // activated source is judged on its own errors, not ones left over
+      // from whatever source we just abandoned.
+      tileErrorCount = 0;
+      tileErrorWindowStart = Date.now();
       const newLayer = buildTileLayer(tileSourceIdx);
       attachTileErrorHandling(newLayer);
       newLayer.addTo(map);
@@ -3574,14 +3586,28 @@ window.onload=()=>{
         // a short window, switch the whole layer to the next fallback
         // source rather than leaving the map broken.
         const now = Date.now();
-        if(now - tileErrorWindowStart > 15000){ tileErrorCount = 0; tileErrorWindowStart = now; }
+        if(now - tileErrorWindowStart > TILE_ERROR_WINDOW_MS){ tileErrorCount = 0; tileErrorWindowStart = now; }
         tileErrorCount++;
-        if(tileErrorCount > 20 && tileSourceIdx < TILE_SOURCES.length - 1){
-          tileErrorCount = 0;
+        if(tileErrorCount > TILE_ERROR_THRESHOLD && tileSourceIdx < TILE_SOURCES.length - 1){
           switchTileLayer(tileSourceIdx + 1);
           console.warn('[map] Primary tile source struggling, switched to fallback basemap.');
         }
       });
+    }
+
+    // Probe a MapTiler key with a single cheap tile request before ever
+    // relying on it as the "primary" source. Without this, a key that's
+    // already exhausted/invalid *before* the page even loads would still be
+    // tried first and had to wait on the on-screen error-count fallback
+    // above to notice — which, combined with the old high threshold, is why
+    // failover felt like it wasn't happening at all. Runs all keys in
+    // parallel but returns them filtered in their original priority order.
+    async function pickWorkingMaptilerKeys(keys){
+      const probe = k => fetch(`https://api.maptiler.com/maps/streets-v2/0/0/0.png?key=${k}`, { method:'GET', cache:'no-store' })
+        .then(r => r.ok ? k : null)
+        .catch(() => null);
+      const results = await Promise.all(keys.map(probe));
+      return results.filter(Boolean);
     }
 
     window._tileLayer = buildTileLayer(tileSourceIdx);
@@ -3598,18 +3624,29 @@ window.onload=()=>{
     // endpoints once every configured key has been exhausted. This fetch is
     // fire-and-forget so the map isn't blocked from rendering while it
     // resolves.
-    fetch('/api/config').then(r=>r.json()).then(cfg=>{
+    fetch('/api/config').then(r=>r.json()).then(async cfg=>{
       const keys = cfg && Array.isArray(cfg.maptilerKeys) ? cfg.maptilerKeys : [];
       if(keys.length && tileSourceIdx===0){
+        // Skip any key that's already dead (quota exhausted, revoked,
+        // domain-restricted against this host, etc.) instead of blindly
+        // trusting key 1. If the probe itself fails for some unrelated
+        // reason (e.g. the browser is briefly offline), fall back to using
+        // the full key list as-is rather than stranding the map on CARTO.
+        const working = await pickWorkingMaptilerKeys(keys);
+        const usableKeys = working.length ? working : keys;
+        // Visible in the browser console so a misconfigured deployment
+        // (e.g. only MAPTILER_KEY set, not _2/_3/_4) is obvious at a glance
+        // instead of looking like a broken failover.
+        console.info(`[map] MapTiler: ${keys.length} key(s) configured server-side, ${working.length} passed the pre-flight probe. Using ${usableKeys.length} in fallback chain.`);
         // Unshift in reverse so the final TILE_SOURCES order is
         // key1, key2, key3, key4, then the existing CARTO/OSM fallbacks.
-        for(let i = keys.length - 1; i >= 0; i--){
+        for(let i = usableKeys.length - 1; i >= 0; i--){
           TILE_SOURCES.unshift({
-            url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${keys[i]}`,
+            url:`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${usableKeys[i]}`,
             opts:{attribution:'&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19,keepBuffer:4}
           });
         }
-        switchTileLayer(0);
+        if(tileSourceIdx===0) switchTileLayer(0);
       }
     }).catch(e=>console.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
     // Leaflet computes its tile grid from the container's size at creation
