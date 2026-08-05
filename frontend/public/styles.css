@@ -97,32 +97,6 @@ body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--text-prim
 ::-webkit-scrollbar-thumb{background:var(--border-mid);border-radius:2px;}
 ::-webkit-scrollbar-track{background:transparent;}
 
-/* Keyboard-focus ring — visible only for keyboard/assistive nav,
-   never on mouse/touch taps, so it layers cleanly over the existing
-   :active press-states without adding visual noise. */
-:focus{outline:none;}
-:focus-visible{
-  outline:2px solid var(--gold);
-  outline-offset:2px;
-  border-radius:4px;
-  transition:outline-color .15s;
-}
-input:focus-visible,textarea:focus-visible,select:focus-visible{
-  outline-offset:0;
-  border-radius:inherit;
-}
-
-/* Respect OS-level motion preference — kills decorative
-   keyframe animation & long transitions, keeps instant state changes */
-@media (prefers-reduced-motion: reduce){
-  *,*::before,*::after{
-    animation-duration:0.001ms !important;
-    animation-iteration-count:1 !important;
-    transition-duration:0.001ms !important;
-    scroll-behavior:auto !important;
-  }
-}
-
 /* Subtle grain overlay for premium feel */
 body::before {
   content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
@@ -1288,8 +1262,7 @@ body::before {
 .emer-ico{font-size:22px;background:rgba(239,68,68,.08);padding:8px;border-radius:10px;}
 .emer-name{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--text-primary);}
 .emer-num{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--teal);}
-.emer-share-btn{width:100%;padding:13px;border-radius:14px;margin-top:10px;background:linear-gradient(135deg,#dc2626,#be123c);border:none;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .15s;}
-.emer-share-btn:active{transform:scale(.97);}
+.emer-share-btn{width:100%;padding:13px;border-radius:14px;margin-top:10px;background:linear-gradient(135deg,#dc2626,#be123c);border:none;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
 
 .budget-card{background:var(--bg-layer1);border:1px solid var(--border-default);border-radius:16px;padding:16px;margin-bottom:10px;}
 .budget-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
@@ -1305,14 +1278,12 @@ body::before {
 .exp-add-row{display:flex;gap:8px;margin-bottom:10px;}
 .exp-add-row .search-inp{flex:1;}
 .exp-add-row .search-inp.small{width:80px;flex:none;padding:10px 12px;}
-.btn-add-exp{background:linear-gradient(135deg,var(--jade),#00b880);border:none;border-radius:12px;color:#000;font-weight:800;font-size:18px;padding:0 14px;cursor:pointer;flex-shrink:0;transition:transform .15s;}
-.btn-add-exp:active{transform:scale(.94);}
+.btn-add-exp{background:linear-gradient(135deg,var(--jade),#00b880);border:none;border-radius:12px;color:#000;font-weight:800;font-size:18px;padding:0 14px;cursor:pointer;flex-shrink:0;}
 .exp-list{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;}
-.exp-item{background:var(--bg-glass);border:1px solid var(--border-default);border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-primary);transition:background .15s;}
+.exp-item{background:var(--bg-glass);border:1px solid var(--border-default);border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-primary);}
 .exp-item-right{display:flex;align-items:center;gap:10px;}
 .exp-del{background:none;border:none;color:var(--coral);font-size:16px;cursor:pointer;}
-.btn-ai-budget{width:100%;padding:12px;border-radius:14px;margin-top:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;color:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:transform .15s,box-shadow .15s;}
-.btn-ai-budget:active{transform:scale(.97);}
+.btn-ai-budget{width:100%;padding:12px;border-radius:14px;margin-top:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;color:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;}
 
 .passport-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-bottom:80px;}
 .passport-stamp{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-layer1);border:1.5px solid var(--border-default);border-radius:14px;padding:14px 6px;gap:5px;cursor:pointer;transition:all .2s;text-align:center;}
@@ -1323,7 +1294,7 @@ body::before {
 .stamp-name.unlocked{color:var(--gold);}
 .stamp-badge{background:var(--gold);color:#000;font-size:7px;font-weight:800;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;}
 
-.saved-plan-item{background:var(--bg-layer1);border:1px solid var(--border-default);border-radius:14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;transition:border-color .15s,transform .15s;}
+.saved-plan-item{background:var(--bg-layer1);border:1px solid var(--border-default);border-radius:14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
 .sp-name{font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:var(--text-primary);}
 .sp-date{font-size:9px;color:var(--text-muted);margin-top:2px;letter-spacing:0.3px;}
 .sp-btns{display:flex;gap:6px;flex-shrink:0;}
@@ -1979,23 +1950,4 @@ body::after{
   background:linear-gradient(160deg, rgba(255,255,255,0.7), rgba(255,255,255,0.35));
   border-color:rgba(0,0,0,0.06);
   box-shadow:0 8px 24px rgba(0,0,0,.08);
-}
-
-/* ═══════════════════════════════════════════
-   DESKTOP POINTER POLISH
-   Hover-lift only for real mice/trackpads — gated behind
-   (hover:hover) + (pointer:fine) so touch devices never get a
-   "sticky" hover state stuck on after a tap.
-═══════════════════════════════════════════ */
-@media (hover:hover) and (pointer:fine){
-  .ai-card:hover{transform:translateY(-2px);border-color:var(--gold-border);}
-  .tool-card:hover{transform:translateY(-2px);border-color:var(--gold-border);box-shadow:0 6px 20px rgba(0,0,0,.25);}
-  .stop-card:hover{border-color:var(--border-strong);box-shadow:0 4px 18px rgba(0,0,0,.3);}
-  .budget-card:hover,.lingo-card:hover,.emer-card:hover,.saved-plan-item:hover{
-    border-color:var(--border-mid);
-  }
-  .exp-item:hover{background:var(--bg-layer2);}
-  .day-tab:not(.active):hover{border-color:var(--border-mid);color:var(--text-secondary);}
-  .itn-btn:hover{filter:brightness(1.15);}
-  .passport-stamp:hover{transform:translateY(-2px);}
 }
