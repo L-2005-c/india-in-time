@@ -3,51 +3,6 @@
 import { getTransportConfig } from '../data/cities.js';
 import { hvKm } from './geo.js';
 
-// Time-string ("HH:MM") -> minutes-since-midnight, clamped to a valid day.
-const t2m=(s,fallback=0)=>{
-  const [h,m]=String(s||'').split(':').map(Number);
-  if(!Number.isFinite(h)||!Number.isFinite(m)) return fallback;
-  return Math.max(0,Math.min(23,h))*60+Math.max(0,Math.min(59,m));
-};
-
-// Sunrise/sunset results cache, keyed by coords+day — pure memoization,
-// no dependency on any other app state.
-const _sunTimesCache = new Map();
-
-// Daypart baseline crowd weights — kept in sync with
-// data/time-intelligence-rules.json's crowdWeights so the frontend's
-// "quick" score and the backend's authoritative Time Intelligence Engine
-// (services/timeIntelligence.js) agree with each other.
-const CROWD_BASE_BY_DAYPART = { earlyMorning: 0.3, morning: 0.6, lateMorning: 0.8, afternoon: 0.9, evening: 1.1, night: 0.5 };
-const CROWD_WEEKEND_MULT = 1.4;
-const CROWD_PEAK_MULT = 1.5;
-
-// Persona weighting for itinerary personalization (mirrors
-// data/time-intelligence-rules.json on the backend — kept here too so
-// client-side scoring doesn't need a network round trip).
-const PERSONA_WEIGHTS = {
-  photographer: { sunrise: 14, sunset: 14, scenic: 8, monument: 5 },
-  family:       { safety: 10, park: 8, garden: 8, museum: 6 },
-  adventure:    { hill: 10, waterfall: 9, fort: 7 },
-  food_lover:   { food: 12, market: 9 },
-  history:      { monument: 11, fort: 10, museum: 10, temple: 5 },
-  nature:       { park: 9, garden: 8, beach: 6, waterfall: 7 },
-};
-
-// Trip-mode weighting (who's traveling: solo/duo/trio/family/group) —
-// mirrors the "tripModes" section of data/time-intelligence-rules.json on
-// the backend. Additive bonuses on the same additive scale as
-// PERSONA_WEIGHTS above (stopTimeScore's scoring throughout this module is
-// additive, not multiplicative). A trip has exactly one mode, unlike
-// personas.
-const TRIP_MODE_WEIGHTS = {
-  solo:   { cafe: 8, museum: 8, market: 6, sunrise: 8, sunset: 8, nightlife: -6 },
-  duo:    { sunset: 14, sunrise: 8, beach: 8, scenic: 10, garden: 6, food: 6 },
-  trio:   { food: 10, market: 8, nightlife: 6, scenic: 6 },
-  family: { park: 10, garden: 10, museum: 8, temple: 4, nightlife: -15 },
-  group:  { market: 8, food: 10, nightlife: 8, monument: 4 },
-};
-
 function getTrafficMultiplier(cityId, minuteOfDay){
   const config = getTransportConfig(cityId);
   const base = config.congestion || 1.0;
@@ -521,5 +476,4 @@ function stopClimateNote(stop, arriveMin, temp){
 
 export {
   getTrafficMultiplier, getTrafficLevel, getCrowdMultiplier, getCrowdLevel, getSmartTravelTime, getSmartVisitTime, getTransportOptions, getCurrentLocalMin, getSunTimesClient, placeSunTimes, getPlaceDynamicStatus, getDaypartClient, getCrowdPrediction, calculateExperienceScore, dayPartForMinutes, climateMode, estimateTravelMinutes, tripModeBonus, personaBonus, stopTimeScore, stopClimateNote,
-  t2m, CROWD_BASE_BY_DAYPART, CROWD_WEEKEND_MULT, CROWD_PEAK_MULT, PERSONA_WEIGHTS, TRIP_MODE_WEIGHTS,
 };

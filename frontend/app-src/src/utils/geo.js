@@ -1,20 +1,5 @@
 // Geometry, route-ordering and place-list helper functions.
 // All pure functions — no shared app state, no DOM access.
-import { getHiddenGems } from '../data/cities.js';
-import { calculateExperienceScore, t2m } from './time-intel.js';
-
-// Shared guard against NaN/undefined/malformed coordinate pairs. Any place
-// with bad coords (missing geocode, failed AI hydration, etc.) must never
-// reach a Leaflet L.marker()/L.polyline() call — Leaflet throws "Invalid
-// LatLng object", which crashes whatever loop or function called it.
-const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
-
-// How much one "unit" of bad time-fit (a stop landing at a rough time —
-// closed, peak crowd, missed golden hour, heat/rain) counts against, in
-// the same km units as travel distance, when the optimizer weighs order
-// changes. Tuned so time-fit meaningfully influences order without
-// completely overriding geography.
-const TIME_FIT_KM_WEIGHT = 2.2;
 
 const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
 
@@ -324,5 +309,4 @@ function estimateStopLoadMinutes(stops){
 
 export {
   hvKm, isFiniteLatLon, normalizeLatLon, significantWords, dedupePlacesByProximity, withHiddenGems, mergePlacePools, sortNearestNeighbor, routeDistanceKm, centroidOfStops, clusterStopsByArea, orderStopsAreaWise, estimateTimeFitPenaltyKm, optimizeStopOrder, bearingBetween, keepNearbyCluster, famousPlaceScore, prioritizePlanStops, interpolatePathPoint, getRouteStopsForDay, estimateStopLoadMinutes,
-  hasValidCoords, TIME_FIT_KM_WEIGHT,
 };

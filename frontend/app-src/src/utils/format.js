@@ -1,15 +1,4 @@
 // Small formatting / text-safety helpers, no shared app state.
-
-// Duration formatter (minutes -> "1h 20m" style). Used by formatTripWindow
-// below and by several call sites in core/app.js.
-const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
-
-// Chat message HTML sanitization allow-list, passed to DOMPurify below.
-const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div','button','textarea'];
-const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','type','maxlength','rows','placeholder','aria-label','disabled'];
-
-const COMPASS_DIRS = ['North','North-East','East','South-East','South','South-West','West','North-West'];
-
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -43,5 +32,4 @@ function degToCompassLabel(deg){
 
 export {
   escapeHtml, sanitizeChatHtml, formatAiText, formatTripWindow, fmt12, degToCompassLabel,
-  fmtM, CHAT_ALLOWED_TAGS, CHAT_ALLOWED_ATTR, COMPASS_DIRS,
 };
