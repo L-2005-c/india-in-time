@@ -36,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="./styles.css?v=20260731-csp-fix">
+<link rel="stylesheet" href="./styles.css?v=20260805-ui-polish">
 
 </head>
 <body>
@@ -585,8 +585,8 @@
      sanitizeChatHtml() helper in app.js for how this is used, and its
      fallback if this script fails to load. -->
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-<script src="./client-api.js?v=20260805-v5"></script>
-<script type="module" src="./app.js?v=20260805-v5"></script>
+<script src="./client-api.js?v=20260806-v7"></script>
+<script type="module" src="./app.js?v=20260806-v7"></script>
 </body>
 <!-- Customize Places Modal -->
 <div id="customize-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px;">
@@ -613,7 +613,7 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=20260805-v5', { updateViaCache:'none' })
+    navigator.serviceWorker.register('/sw.js?v=20260806-v7', { updateViaCache:'none' })
       .then(reg => console.log('[SW] Registered:', reg.scope))
       .catch(err => console.warn('[SW] Registration failed:', err));
 

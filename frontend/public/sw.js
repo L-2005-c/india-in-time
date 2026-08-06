@@ -3,15 +3,15 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v15-9-maptiler-failover';
+const CACHE_NAME = 'india-in-time-v16-1-gen-btn-state';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/app.js?v=20260805-v5',
-  '/styles.css?v=20260731-csp-fix',
-  '/client-api.js?v=20260805-v5',
+  '/app.js?v=20260806-v7',
+  '/styles.css?v=20260805-ui-polish',
+  '/client-api.js?v=20260806-v7',
   '/logo-mark.png?v=20260603-logo',
   '/favicon-32.png?v=20260603-logo',
   '/apple-touch-icon.png?v=20260603-logo',
