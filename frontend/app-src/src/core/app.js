@@ -6,17 +6,19 @@ import {
   getTrafficLevel, getCrowdMultiplier, getCrowdLevel, getSmartTravelTime, getSmartVisitTime,
   getTransportOptions, getCurrentLocalMin, placeSunTimes, getPlaceDynamicStatus,
   getCrowdPrediction, calculateExperienceScore, dayPartForMinutes, stopTimeScore, stopClimateNote,
+  t2m,
 } from '../utils/time-intel.js';
 import {
   hvKm, isFiniteLatLon, normalizeLatLon, withHiddenGems, mergePlacePools, optimizeStopOrder,
   bearingBetween, keepNearbyCluster, prioritizePlanStops, interpolatePathPoint,
-  getRouteStopsForDay, estimateStopLoadMinutes,
+  getRouteStopsForDay, estimateStopLoadMinutes, hasValidCoords,
 } from '../utils/geo.js';
 import {
   calculateStopBudget, calculateTripBudget,
 } from '../utils/budget-calc.js';
 import {
   escapeHtml, sanitizeChatHtml, formatAiText, formatTripWindow, fmt12, degToCompassLabel,
+  fmtM,
 } from '../utils/format.js';
 
 // ══════════════════════════════════════════════════
@@ -235,19 +237,9 @@ const placeCache=new Map();
 const placeLoadPromises=new Map();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const t2m=(s,fallback=0)=>{
-  const [h,m]=String(s||'').split(':').map(Number);
-  if(!Number.isFinite(h)||!Number.isFinite(m)) return fallback;
-  return Math.max(0,Math.min(23,h))*60+Math.max(0,Math.min(59,m));
-};
-const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
+// t2m, fmtM, hasValidCoords are imported from utils/time-intel.js, utils/format.js,
+// and utils/geo.js respectively — see the import block at the top of this file.
 const sync=()=>{if(mdPlan.length>0)mdPlan[dayIdx]=itin;};
-// Shared guard against NaN/undefined/malformed coordinate pairs. Any place
-// with bad coords (missing geocode, failed AI hydration, etc.) must never
-// reach a Leaflet L.marker()/L.polyline() call — Leaflet throws "Invalid
-// LatLng object" and that throw was reaching production because several
-// call sites only checked `coords.length`, which [NaN, NaN] still passes.
-const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
 
 // ── Global Leaflet safety net ───────────────────────────────────────────────
 // hasValidCoords() above fixed the call sites we could find (renderMapMarkers,
@@ -352,16 +344,8 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
 
 // --- TIME BASED BEHAVIOUR HELPERS ---
-
-// Real sunrise/sunset for a place's coordinates + date, so "best at
-// sunrise/sunset" badges/scoring track the actual sun rather than a fixed
-// 5–7 AM / 5–7 PM clock window (which drifts by well over an hour across
-// India's geography and through the year). Same approximation as the
-// backend's services/timeIntelligence.js computeSunTimes(), ported client-
-// side so the route optimizer can call it synchronously per candidate stop
-// order without a network round trip. Results are cached per
-// coords+day since they don't change within a session.
-const _sunTimesCache = new Map();
+// Real sunrise/sunset computation and its _sunTimesCache now live in
+// utils/time-intel.js (getSunTimesClient/placeSunTimes) — imported above.
 
 window.globalSimulationTime = getCurrentLocalMin();
 
@@ -515,13 +499,8 @@ setTimeout(() => {
 
 
 
-// Daypart baseline crowd weights — kept in sync with
-// data/time-intelligence-rules.json's crowdWeights so the frontend's
-// "quick" score and the backend's authoritative Time Intelligence Engine
-// (services/timeIntelligence.js) agree with each other.
-const CROWD_BASE_BY_DAYPART = { earlyMorning: 0.3, morning: 0.6, lateMorning: 0.8, afternoon: 0.9, evening: 1.1, night: 0.5 };
-const CROWD_WEEKEND_MULT = 1.4;
-const CROWD_PEAK_MULT = 1.5;
+// Daypart baseline crowd weights (CROWD_BASE_BY_DAYPART etc.) now live in
+// utils/time-intel.js, imported above alongside getCrowdPrediction.
 
 function getTimeBadgesHtml(loc, evalTime) {
   const status = getPlaceDynamicStatus(loc, evalTime);
@@ -578,8 +557,12 @@ function checkTimeIntelNotifications(){
         addMsg(`🟡 <strong>${loc.name}</strong> closes in ${minsToClose} minutes.`);
       }
       if(loc.is_sunset_spot){
-        const sunsetMin = 18*60; // approx local sunset; refined by realSunsetMin when available
-        const target = (typeof realSunsetMin === 'number') ? realSunsetMin : sunsetMin;
+        // Real sunset for this stop's coordinates (see utils/time-intel.js
+        // placeSunTimes) rather than the fixed 18:00 approximation — this
+        // was previously checked via a `realSunsetMin` variable that was
+        // never actually declared/computed anywhere, so this branch always
+        // silently fell back to the fixed time.
+        const target = placeSunTimes(loc).sunsetMin;
         const minsToSunset = target - now;
         const goldenKey = `golden-${loc.id}`;
         if(minsToSunset > 0 && minsToSunset <= 25 && !window._tiNotified.has(goldenKey)){
@@ -708,13 +691,8 @@ function getRouteStart(){
 
 
 
-// How much one "unit" of bad time-fit (a stop landing at a rough time —
-// closed, peak crowd, missed golden hour, heat/rain) counts against, in
-// the same km units as travel distance, when the optimizer below weighs
-// order changes. Tuned so time-fit meaningfully influences order without
-// completely overriding geography (e.g. never route someone 20km out of
-// the way just to shave a few crowd-score points).
-const TIME_FIT_KM_WEIGHT = 2.2;
+// TIME_FIT_KM_WEIGHT now lives in utils/geo.js next to
+// estimateTimeFitPenaltyKm(), the only place that uses it.
 // Simulates a candidate stop order's projected arrival time at each stop
 // (same 0.45 km/min travel estimate used later to compute the real
 // schedule — see the s.tt assignment in the sync/recalc block) and scores
@@ -735,7 +713,7 @@ function updateFollowButton(){
 // close to half the map, so let the user shrink it down to just the top
 // badge/weather row and bring it back with the same tap.
 const NAV_CARD_COLLAPSED_KEY='iit_nav_card_collapsed';
-window.toggleNavCardCollapsed=function(forceState){
+function toggleNavCardCollapsed(forceState){
   const card=document.getElementById('nav-card');
   const btn=document.getElementById('nav-card-collapse-btn');
   if(!card) return;
@@ -746,7 +724,7 @@ window.toggleNavCardCollapsed=function(forceState){
     btn.setAttribute('aria-label',collapsed?'Expand live navigation':'Minimize live navigation');
   }
   try{ localStorage.setItem(NAV_CARD_COLLAPSED_KEY, collapsed?'1':'0'); }catch(_e){}
-};
+}
 function restoreNavCardCollapsed(){
   let wasCollapsed=false;
   try{ wasCollapsed=localStorage.getItem(NAV_CARD_COLLAPSED_KEY)==='1'; }catch(_e){}
@@ -862,32 +840,9 @@ function turnArrowForInstruction(text){
 
 
 
-// Persona weighting for itinerary personalization (mirrors data/time-intelligence-rules.json
-// on the backend — kept here too so client-side scoring doesn't need a network round trip).
-const PERSONA_WEIGHTS = {
-  photographer: { sunrise: 14, sunset: 14, scenic: 8, monument: 5 },
-  family:       { safety: 10, park: 8, garden: 8, museum: 6 },
-  adventure:    { hill: 10, waterfall: 9, fort: 7 },
-  food_lover:   { food: 12, market: 9 },
-  history:      { monument: 11, fort: 10, museum: 10, temple: 5 },
-  nature:       { park: 9, garden: 8, beach: 6, waterfall: 7 },
-};
+// PERSONA_WEIGHTS and TRIP_MODE_WEIGHTS now live in utils/time-intel.js
+// next to personaBonus()/tripModeBonus(), the only functions that use them.
 window.selectedPersonas = window.selectedPersonas || [];
-
-// Trip-mode weighting (who's traveling: solo/duo/trio/family/group) — mirrors
-// the "tripModes" section of data/time-intelligence-rules.json on the
-// backend. Backend uses multiplicative weights against a 0-100ish score;
-// here we use additive bonuses on the same additive scale as PERSONA_WEIGHTS
-// above, since stopTimeScore's scoring system throughout this file is
-// additive, not multiplicative. A trip has exactly one mode (not a list),
-// unlike personas.
-const TRIP_MODE_WEIGHTS = {
-  solo:   { cafe: 8, museum: 8, market: 6, sunrise: 8, sunset: 8, nightlife: -6 },
-  duo:    { sunset: 14, sunrise: 8, beach: 8, scenic: 10, garden: 6, food: 6 },
-  trio:   { food: 10, market: 8, nightlife: 6, scenic: 6 },
-  family: { park: 10, garden: 10, museum: 8, temple: 4, nightlife: -15 },
-  group:  { market: 8, food: 10, nightlife: 8, monument: 4 },
-};
 window.selectedTripMode = window.selectedTripMode || null;
 
 
@@ -1882,8 +1837,8 @@ function chatAbout(name){switchToView('chat-view',2);setTimeout(()=>{document.ge
 // this allowlist was built to close. New data-* attributes are fine to add
 // here as long as the code reading them only ever uses them for lookups/
 // comparisons, never feeds them into innerHTML or eval.
-const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div','button','textarea'];
-const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','type','maxlength','rows','placeholder','aria-label','disabled'];
+// (CHAT_ALLOWED_TAGS / CHAT_ALLOWED_ATTR now live in utils/format.js,
+// next to sanitizeChatHtml() which is the only place that reads them.)
 function addMsg(html,isBot=true){const box=document.getElementById('chat-messages');const row=document.createElement('div');row.className='msg-row'+(isBot?'':' from-user')+' fade-in';const safe=sanitizeChatHtml(html);row.innerHTML=isBot?`<div class="msg-avatar av-ai">AI</div><div class="bubble">${safe}</div>`:`<div class="bubble user-b">${safe}</div><div class="msg-avatar av-me">ME</div>`;box.appendChild(row);box.scrollTop=box.scrollHeight;return row;}
 
 // ── Delegated action handling for in-chat widget buttons ────────────────────
@@ -1939,7 +1894,11 @@ const STATIC_ACTIONS = {
   openLoadPanelFromMenu, openPassportFromMenu, optimizeRoute, resetGPS, saveIt, searchCity,
   shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
   toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
-  toggleTimeSliderCollapsed, toggleUserMenu, toggleVoice, waShare,
+  toggleUserMenu, toggleVoice, waShare,
+  // toggleTimeSliderCollapsed is defined inside a closure (see the IIFE
+  // above) and escapes it via `window.`, not a bare module-scope binding —
+  // so it can't use the object shorthand like its neighbors here.
+  toggleTimeSliderCollapsed: (...args) => window.toggleTimeSliderCollapsed(...args),
   // These read extra args off the button's own dataset rather than taking
   // none — kept in the same table since dispatch below doesn't care.
   selectAllCustomPlaces: (btn) => selectAllCustomPlaces(btn.dataset.arg === 'true'),
@@ -2681,7 +2640,8 @@ function shareEmergency(){if(!cLat||!cLon){alert('GPS not available.');return;}c
 // deriveHeading()). This intentionally does not rotate the map itself:
 // applyMapHeadingRotation() above documents why that breaks Leaflet's tile
 // positioning, so this stays a read-only indicator + info action instead.
-const COMPASS_DIRS = ['North','North-East','East','South-East','South','South-West','West','North-West'];
+// (COMPASS_DIRS now lives in utils/format.js, next to degToCompassLabel()
+// which is the only place that reads it.)
 function compassTap(){
   if(lastHeading==null){
     showToast('🧭','Direction','Start moving, or begin live navigation, to detect your heading.');
