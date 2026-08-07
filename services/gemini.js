@@ -8,6 +8,7 @@ const { geminiCache } = require('./cache');
 const crypto = require('crypto');
 const { getCachedAiResponse, setCachedAiResponse } = require('../db/queries');
 const logger = require('../lib/logger');
+const { keepAliveAgent } = require('../lib/httpAgent');
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ async function _callGeminiOnce(parts, opts = {}) {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
     signal:  AbortSignal.timeout(timeoutMs),
+    agent:   keepAliveAgent,
   }).catch(err => {
     // node-fetch v2 embeds the FULL request URL — including our API key
     // querystring — into its error message on any network-level failure

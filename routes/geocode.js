@@ -20,6 +20,7 @@ const fetch   = require('node-fetch');
 const router  = express.Router();
 const config  = require('../config');
 const { geocodeCache } = require('../services/cache');
+const { keepAliveAgent } = require('../lib/httpAgent');
 
 // ── Global sequential throttle ────────────────────────────────────────────
 // Serializes outbound Nominatim calls across ALL concurrent requests (not
@@ -47,6 +48,7 @@ async function geocodeViaPhoton(q) {
   const upstream = await fetch(url, {
     headers: { 'User-Agent': config.nominatim.userAgent },
     signal: AbortSignal.timeout(config.nominatim.timeoutMs),
+    agent: keepAliveAgent,
   });
   if (!upstream.ok) {
     const err = new Error('Photon upstream error');
@@ -90,6 +92,7 @@ router.get('/', async (req, res) => {
             'User-Agent': config.nominatim.userAgent,
           },
           signal: AbortSignal.timeout(config.nominatim.timeoutMs),
+          agent: keepAliveAgent,
         });
 
         if (!upstream.ok) {

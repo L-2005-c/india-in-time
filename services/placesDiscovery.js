@@ -9,6 +9,7 @@
 const fetch = require('node-fetch');
 const { callGeminiText } = require('./gemini');
 const { distKm } = require('../utils/geo');
+const { keepAliveAgent } = require('../lib/httpAgent');
 const {
   isConfidentWikiMatch, tokenOverlap, dedupePlacesByName,
   inferFallbackCategory, visitMinutesForCat,
@@ -166,6 +167,7 @@ async function fetchWiki(lat, lon, _cityName) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
     signal: AbortSignal.timeout(12000),
+    agent: keepAliveAgent,
   });
   if (!res.ok) return [];
   const data = await res.json();
@@ -205,6 +207,7 @@ async function geocodePlaceViaNominatimOnly(placeName, cityName, cityLat, cityLo
       'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)',
     },
     signal: AbortSignal.timeout(9000),
+    agent: keepAliveAgent,
   });
   if (!res.ok) return null;
   const results = await res.json();
@@ -257,6 +260,7 @@ async function geocodePlaceViaPhoton(placeName, cityName, cityLat, cityLon, cate
     const res = await fetch(url, {
       headers: { 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
       signal: AbortSignal.timeout(9000),
+      agent: keepAliveAgent,
     });
     if (!res.ok) return null;
     data = await res.json();
@@ -490,6 +494,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
       const res = await fetch(url, {
         headers: { 'Accept-Language': 'en-US,en', 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
         signal: AbortSignal.timeout(9000),
+        agent: keepAliveAgent,
       });
       if (!res.ok) continue;
       const rows = await res.json();
@@ -576,6 +581,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
         const res = await fetch(url, {
           headers: { 'User-Agent': 'IndiaInTime/1.0 (travel-planner-app)' },
           signal: AbortSignal.timeout(9000),
+          agent: keepAliveAgent,
         });
         if (!res.ok) continue;
         const data = await res.json();

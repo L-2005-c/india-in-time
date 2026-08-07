@@ -6,6 +6,7 @@
 const express = require('express');
 const fetch   = require('node-fetch');
 const router  = express.Router();
+const { keepAliveAgent } = require('../lib/httpAgent');
 
 function weatherEmoji(code) {
   if (code <= 1)  return '☀️';
@@ -16,7 +17,7 @@ function weatherEmoji(code) {
 
 async function fetchOpenMeteo(lat, lon, timeoutMs = 8000) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
-  const upstream = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  const upstream = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), agent: keepAliveAgent });
   if (!upstream.ok) {
     const body = await upstream.text().catch(() => '');
     const err = new Error(`Open-Meteo responded ${upstream.status}: ${body.slice(0, 200)}`);
