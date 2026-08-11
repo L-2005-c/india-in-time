@@ -1313,31 +1313,25 @@ function getTimeBadgesHtml(loc, evalTime) {
   return html;
 }
 
-/** Compact expandable TI panel — glassmorphism card matching product mockups. */
+/** Compact expandable TI panel for map/list cards when loc._ti is present. */
 function getTravelIntelPanelHtml(loc) {
   const ti = loc && loc._ti;
   if (!ti || ti.visitScore == null) return '';
-  const crowd = ti.crowdLevel || ti.crowd?.level || '—';
-  const wx = ti.weather?.suitability || '—';
-  const golden = (ti.scenic && (ti.scenic.suitability === 'Excellent' || ti.inGoldenHour?.sunset || ti.inGoldenHour?.sunrise))
-    ? 'Ideal' : (ti.scenic?.suitability || '—');
-  const hint = (ti.explanation && ti.explanation.summary)
-    || (ti.arrival && ti.arrival.recommendedDeparture ? `Leave ~${ti.arrival.recommendedDeparture}` : '')
-    || (ti.statusLabel || '');
-  return `<div class="ti-glass-card">
-    <div class="ti-title-row">
-      <div>
-        <div class="ti-place">${escapeHtml(loc.name || '')}</div>
-        <div class="ti-sub">✦ AI Recommendation · ${escapeHtml(ti.visitLabel || 'Score')}</div>
-      </div>
-      <div class="ti-score">${ti.visitScore}<span>/100</span></div>
+  const why = (ti.explanation && ti.explanation.bullets) ? ti.explanation.bullets.slice(0, 4).map(b => {
+    const icon = b.type === 'positive' ? '✓' : b.type === 'caution' ? '!' : '·';
+    return `${icon} ${b.text}`;
+  }).join('<br>') : (ti.explanation && ti.explanation.summary) || '';
+  const depart = ti.arrival && ti.arrival.recommendedDeparture ? ti.arrival.recommendedDeparture : '';
+  return `<div class="ti-panel" style="margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border-subtle,#333);background:var(--bg-layer2,#1a1a1a);font-size:11px;line-height:1.4;">
+    <div style="font-weight:600;margin-bottom:4px;">Travel Intelligence · ⭐ ${ti.visitScore}/100 ${ti.visitLabel||''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;opacity:.9;">
+      <span>👥 ${ti.crowdLevel||ti.crowd?.level||'—'}</span>
+      <span>🌦 ${ti.weather?.suitability||'—'}</span>
+      <span>🚗 ${ti.traffic?.trafficLevel||'—'}</span>
+      <span>🌅 ${ti.scenic?.suitability||'—'}</span>
     </div>
-    <div class="ti-metrics">
-      <div class="ti-metric"><span class="ico">👥</span><div class="lbl">Crowd</div><div class="val">${escapeHtml(String(crowd))}</div></div>
-      <div class="ti-metric"><span class="ico">☀️</span><div class="lbl">Weather</div><div class="val">${escapeHtml(String(wx))}</div></div>
-      <div class="ti-metric"><span class="ico">🌅</span><div class="lbl">Golden Hour</div><div class="val">${escapeHtml(String(golden))}</div></div>
-    </div>
-    ${hint ? `<div class="ti-hint">⏱ ${escapeHtml(String(hint))}</div>` : ''}
+    ${why ? `<div style="margin-top:6px;opacity:.85;">${why}</div>` : ''}
+    ${depart ? `<div style="margin-top:6px;">Leave ~<strong>${depart}</strong></div>` : ''}
   </div>`;
 }
 
@@ -1345,107 +1339,6 @@ function getTravelIntelPanelHtml(loc) {
 // hour starts in 25 minutes", "heavy crowd expected after 6 PM" — checked
 // once a minute against whatever is currently on the plan/route, and only
 // surfaced once per stop so the chat isn't spammed on every tick.
-
-// ── Golden-hour / "Sunset Magic" suggestion card (map overlay) ─────────────
-const GH_DISMISS_KEY = 'tt_gh_dismiss_day';
-function ghTodayKey(){
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
-}
-function isGoldenHourWindow(nowMin, sunsetMin){
-  if (sunsetMin == null || !Number.isFinite(sunsetMin)) return false;
-  // Show from 2.5h before sunset through 30m after
-  return nowMin >= sunsetMin - 150 && nowMin <= sunsetMin + 30;
-}
-function collectGoldenHourSpots(){
-  const pool = [];
-  const src = (typeof LOCS !== 'undefined' && LOCS && LOCS.length) ? LOCS
-    : (typeof itin !== 'undefined' && itin && itin.length) ? itin.filter(s => !s.isBreak) : [];
-  src.forEach(l => {
-    if (l.is_sunset_spot || l.is_sunrise_spot || (l.cat && /fort|viewpoint|nature|beach|monument|temple/i.test(String(l.cat)))) {
-      pool.push(l);
-    }
-  });
-  return pool.slice(0, 8);
-}
-function ensureGoldenHourCard(){
-  let el = document.getElementById('gh-hero-card');
-  if (el) return el;
-  const mapView = document.getElementById('map-view');
-  if (!mapView) return null;
-  el = document.createElement('div');
-  el.id = 'gh-hero-card';
-  el.className = 'gh-hero-card';
-  el.innerHTML = `
-    <button type="button" class="gh-close" aria-label="Dismiss" data-action="dismissGoldenHourCard">×</button>
-    <div class="gh-bg" id="gh-hero-bg"></div>
-    <div class="gh-body">
-      <div class="gh-badge">☀️ Sunset Magic</div>
-      <div class="gh-title" id="gh-hero-title">Tonight's golden hour</div>
-      <div class="gh-sub" id="gh-hero-sub">Golden skies. Epic views. Unforgettable vibes.</div>
-      <div class="gh-row">
-        <button type="button" class="gh-cta" data-action="startGoldenHourPlan">→ Start evening plan</button>
-        <div class="gh-spots"><strong id="gh-hero-count">0</strong><small>SPOTS</small></div>
-      </div>
-    </div>`;
-  mapView.appendChild(el);
-  return el;
-}
-function dismissGoldenHourCard(){
-  try { localStorage.setItem(GH_DISMISS_KEY, ghTodayKey()); } catch(_e) {}
-  const el = document.getElementById('gh-hero-card');
-  if (el) el.classList.remove('visible');
-}
-function startGoldenHourPlan(){
-  const spots = collectGoldenHourSpots();
-  if (spots.length) {
-    // Prefer plan view + focus evening
-    try {
-      if (typeof switchToView === 'function') switchToView('plan-view', 1);
-      if (typeof addMsg === 'function') {
-        addMsg(`🌅 <strong>Evening golden-hour plan</strong> — ${spots.length} scenic stop${spots.length>1?'s':''} near sunset. Generate a plan or open Map to explore.`);
-      }
-    } catch(_e) {}
-  }
-  dismissGoldenHourCard();
-}
-function updateGoldenHourSuggestion(){
-  try {
-    if (localStorage.getItem(GH_DISMISS_KEY) === ghTodayKey()) return;
-    const parts = (typeof getISTParts === 'function') ? getISTParts(new Date()) : null;
-    const nowMin = parts ? (parts.hour * 60 + parts.min) : (new Date().getHours() * 60 + new Date().getMinutes());
-    // Approximate sunset ~18:30 IST if sun calc unavailable on client
-    let sunsetMin = 18 * 60 + 30;
-    if (typeof LOCS !== 'undefined' && LOCS[0] && LOCS[0]._ti && LOCS[0]._ti.sunset) {
-      const [h,m] = String(LOCS[0]._ti.sunset).split(':').map(Number);
-      if (Number.isFinite(h)) sunsetMin = h * 60 + (m || 0);
-    }
-    if (!isGoldenHourWindow(nowMin, sunsetMin)) {
-      const el = document.getElementById('gh-hero-card');
-      if (el) el.classList.remove('visible');
-      return;
-    }
-    const spots = collectGoldenHourSpots();
-    if (!spots.length) return;
-    const el = ensureGoldenHourCard();
-    if (!el) return;
-    const title = document.getElementById('gh-hero-title');
-    const sub = document.getElementById('gh-hero-sub');
-    const count = document.getElementById('gh-hero-count');
-    const bg = document.getElementById('gh-hero-bg');
-    if (title) title.textContent = "Tonight's golden hour";
-    if (sub) sub.textContent = `${spots[0].name || 'Scenic spots'} · best light near sunset`;
-    if (count) count.textContent = String(Math.min(spots.length, 9));
-    if (bg) {
-      // Warm gradient fallback (no external image dependency)
-      bg.style.backgroundImage = 'linear-gradient(135deg, #f59e0b 0%, #ea580c 40%, #7c2d12 100%)';
-    }
-    el.classList.add('visible');
-  } catch (e) {
-    console.warn('[gh-card]', e.message || e);
-  }
-}
-
 window._tiNotified = window._tiNotified || new Set();
 function checkTimeIntelNotifications(){
   try{
@@ -3357,7 +3250,6 @@ const STATIC_ACTIONS = {
   installPWA, locateMe, openAiDrawer, openBudgetFromMenu, openCustomizeModal,
   openLoadPanelFromMenu, openPassportFromMenu, optimizeRoute, resetGPS, saveIt, searchCity,
   shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
-  dismissGoldenHourCard, startGoldenHourPlan,
   toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
   toggleTimeSliderCollapsed, toggleUserMenu, toggleVoice, waShare,
   // These read extra args off the button's own dataset rather than taking
@@ -3528,43 +3420,41 @@ async function enrichPlacesWithTravelIntel(places, limit = 30) {
   }
 }
 
-/** Premium multi-factor Travel Intelligence card — glass UI (mockup style). */
+/** Premium multi-factor Travel Intelligence card (mobile-first). */
 function ti_renderIntelligenceCard(place, state){
   const score = state.visitScore != null ? state.visitScore : '—';
   const label = state.visitLabel || '';
   const conf = state.confidence ? `${state.confidence.level || ''} — ${state.confidence.confidence ?? ''}%` : '';
   const crowd = state.crowd?.level || state.crowdLevel || '—';
   const wx = state.weather?.suitability || '—';
-  const golden = (state.scenic?.suitability === 'Excellent' || state.inGoldenHour?.sunset || state.inGoldenHour?.sunrise) ? 'Ideal' : (state.scenic?.suitability || '—');
-  const why = (state.explanation?.bullets || []).slice(0, 4).map(b => {
+  const traffic = state.traffic?.trafficLevel || state.traffic?.level || '—';
+  const scenic = state.scenic?.suitability || '—';
+  const why = (state.explanation?.bullets || []).slice(0, 6).map(b => {
     const icon = b.type === 'positive' ? '✓' : b.type === 'caution' ? '!' : '·';
-    return `${icon} ${escapeHtml(b.text)}`;
-  }).join('<br>') || (state.explanation?.summary ? escapeHtml(state.explanation.summary) : '');
+    return `${icon} ${b.text}`;
+  }).join('<br>') || (state.explanation?.summary || '');
   const depart = state.arrival?.recommendedDeparture || '';
   const window = state.scenic?.bestScenicWindow
     ? `${state.scenic.bestScenicWindow.start || ''} – ${state.scenic.bestScenicWindow.end || ''}`
     : (state.arrival?.experienceWindow ? `${state.arrival.experienceWindow.start} – ${state.arrival.experienceWindow.end}` : '');
-  const hint = window
-    ? `Visit ${window} for magical light & fewer crowds.`
-    : (depart ? `Leave ~${depart}` : (state.statusLabel || ''));
+  const sourceNote = state.crowd?.source ? `Crowd source: ${state.crowd.source}` : '';
   return `
-<div class="ti-glass-card" style="max-width:420px;">
-  <div class="ti-title-row">
-    <div>
-      <div style="font-size:10px;letter-spacing:.06em;color:#a78bfa;margin-bottom:4px;">BEST TIME TO VISIT</div>
-      <div class="ti-place">${escapeHtml(place.name)}</div>
-      <div class="ti-sub">✦ AI Recommendation${label ? ' · ' + escapeHtml(label) : ''}</div>
-    </div>
-    <div class="ti-score">${score}<span>/100</span></div>
+<div style="border:1px solid var(--border-subtle,#333);border-radius:14px;padding:14px 16px;background:var(--bg-layer2,#1a1a1a);max-width:420px;font-size:13px;line-height:1.45;">
+  <div style="font-size:11px;letter-spacing:.04em;opacity:.7;margin-bottom:4px;">BEST TIME TO VISIT</div>
+  <div style="font-weight:700;font-size:16px;margin-bottom:2px;">${escapeHtml(place.name)}</div>
+  <div style="opacity:.9;margin-bottom:8px;">${escapeHtml(state.statusLabel || '')}</div>
+  ${window ? `<div style="margin-bottom:6px;">🕐 ${escapeHtml(window)}</div>` : ''}
+  <div style="font-size:18px;font-weight:700;margin:8px 0;">⭐ ${score}/100 ${escapeHtml(label)}</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;font-size:12px;">
+    <span>👥 Crowd ${escapeHtml(String(crowd))}</span>
+    <span>🌦 Weather ${escapeHtml(String(wx))}</span>
+    <span>🚗 Traffic ${escapeHtml(String(traffic))}</span>
+    <span>🌅 Scenic ${escapeHtml(String(scenic))}</span>
   </div>
-  <div class="ti-metrics">
-    <div class="ti-metric"><span class="ico">👥</span><div class="lbl">Crowd</div><div class="val">${escapeHtml(String(crowd))}</div></div>
-    <div class="ti-metric"><span class="ico">☀️</span><div class="lbl">Weather</div><div class="val">${escapeHtml(String(wx))}</div></div>
-    <div class="ti-metric"><span class="ico">🌅</span><div class="lbl">Golden Hour</div><div class="val">${escapeHtml(String(golden))}</div></div>
-  </div>
-  ${hint ? `<div class="ti-hint">⏱ ${escapeHtml(String(hint))}</div>` : ''}
-  ${why ? `<div style="margin-top:8px;font-size:11px;color:#ddd6fe;">${why}</div>` : ''}
-  ${conf ? `<div style="margin-top:6px;font-size:10px;color:#a78bfa;">Confidence: ${escapeHtml(conf)}</div>` : ''}
+  ${why ? `<div style="margin-top:8px;"><div style="font-size:11px;opacity:.7;margin-bottom:4px;">WHY?</div>${why}</div>` : ''}
+  ${depart ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-subtle,#333);">Recommended departure <strong>${escapeHtml(depart)}</strong></div>` : ''}
+  ${conf ? `<div style="margin-top:6px;font-size:11px;opacity:.75;">Confidence: ${escapeHtml(conf)}</div>` : ''}
+  ${sourceNote ? `<div style="margin-top:4px;font-size:10px;opacity:.6;">${escapeHtml(sourceNote)}</div>` : ''}
 </div>`.trim();
 }
 
@@ -3914,7 +3804,7 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
         if(!d.routes?.[0]?.geometry?.coordinates) throw new Error('No route geometry');
         const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
         map.removeLayer(rLine);
-        rLine=L.polyline(lc,{color:'#a855f7',weight:tripActive?6:5,opacity:0.95,lineCap:'round',lineJoin:'round'}).addTo(map);
+        rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);
         // NOTE: deliberately no fitBounds() here while tripActive. This used
         // to call map.fitBounds() on every road-route refresh during live
         // navigation (every ~15s or 25m of movement — see initGPS()), which
@@ -4008,7 +3898,7 @@ async function renderRoute(){
     mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml));
   });
   if(raw.length>=2){
-    rLine=L.polyline(raw,{color:'#a855f7',weight:tripActive?6:5,opacity:0.92,lineCap:'round',lineJoin:'round'}).addTo(map);
+    rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);
     if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});
   }
   document.getElementById('nav-next').textContent=routeStops[0].name;const defaultNavText=`Head towards ${routeStops[0].name} (~${nsDist})`;document.getElementById('nav-turn').textContent=defaultNavText;document.getElementById('nav-turn-icon').textContent=turnArrowForInstruction(defaultNavText);document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;
@@ -5133,7 +5023,6 @@ window.onload=()=>{
     window._tileLayer = buildTileLayer(tileSourceIdx);
     attachTileErrorHandling(window._tileLayer);
     window._tileLayer.addTo(map);
-    setTimeout(function(){ try{ updateGoldenHourSuggestion(); }catch(_e){} }, 1200);
 
     // If MapTiler key(s) are configured server-side (MAPTILER_KEY,
     // MAPTILER_KEY_2, MAPTILER_KEY_3, MAPTILER_KEY_4 env vars), chain them
