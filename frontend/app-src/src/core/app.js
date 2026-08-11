@@ -1,4 +1,15 @@
-const API = window.API; // ✅ loaded by <script> above
+// Resolve window.API at call-time. Capturing `const API = window.API` at module
+// init freezes `undefined` if client-api.js failed or ordered after the bundle.
+const API = new Proxy({}, {
+  get(_t, prop) {
+    const a = window.API;
+    if (!a) {
+      throw new Error("API not loaded — /client-api.js missing or failed (check Network tab)");
+    }
+    const v = a[prop];
+    return typeof v === "function" ? v.bind(a) : v;
+  },
+});
 
 // ══════════════════════════════════════════════════
 // FIREBASE CONFIG — PASTE YOUR VALUES BELOW

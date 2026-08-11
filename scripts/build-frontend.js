@@ -30,6 +30,31 @@ const VITE_BIN = path.join(__dirname, '..', 'node_modules', '.bin', process.plat
 function main() {
   console.log('Building frontend production bundle (Vite)...');
   execFileSync(VITE_BIN, ['build', '--config', VITE_CONFIG], { stdio: 'inherit' });
+
+  // Safety: public static files live at site root (logo, client-api, manifest,
+  // favicons). If any tool rewrote them under /dist/, put them back.
+  const fs = require('fs');
+  const distIndex = path.join(__dirname, '..', 'frontend', 'public', 'dist', 'index.html');
+  if (fs.existsSync(distIndex)) {
+    let html = fs.readFileSync(distIndex, 'utf8');
+    const before = html;
+    const staticFiles = [
+      'logo-mark.png', 'client-api.js', 'manifest.json', 'favicon-32.png',
+      'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'sw.js',
+    ];
+    for (const f of staticFiles) {
+      html = html.split('/dist/' + f).join('/' + f);
+    }
+    if (html !== before) {
+      fs.writeFileSync(distIndex, html);
+      console.log('Post-processed dist/index.html: restored root paths for public static assets.');
+    }
+    // Sanity check
+    if (html.includes('/dist/client-api.js') || html.includes('/dist/logo-mark.png')) {
+      console.warn('WARNING: dist/index.html still references /dist/ static assets');
+    }
+  }
+
   console.log('Done. Output in frontend/public/dist/ (content-hashed, served automatically in');
   console.log('production — see config.resolveIndexHtmlPath()/server.js).');
 }

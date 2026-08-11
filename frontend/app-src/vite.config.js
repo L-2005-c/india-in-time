@@ -6,26 +6,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: __dirname,
-  // Assets are served under /dist by Express (see server.js)
-  base: '/dist/',
-  // Static assets (icons, manifest.json, sw.js, admin-feedback.html, ...) stay in
-  // frontend/public/ and are served by Express directly (see server.js) — both in
-  // dev (Vite serves this same dir at "/") and in prod (Express's fallback static
-  // handler). copyPublicDir:false keeps `vite build` from also copying them into
-  // dist/, which would just duplicate files Express already serves from the source
-  // location.
+  // Root base so absolute paths in index.html stay at site root:
+  //   /logo-mark.png, /client-api.js, /manifest.json, /favicon-32.png
+  // Vite emits hashed bundles at /assets/* which Express serves from
+  // frontend/public/dist/assets (see server.js app.use('/assets', ...)).
+  // Previous base '/dist/' rewrote those public assets to /dist/logo-mark.png
+  // etc., which 404'd in production and left window.API undefined.
+  base: '/',
   publicDir: path.resolve(__dirname, '../public'),
   build: {
     outDir: path.resolve(__dirname, '../public/dist'),
     emptyOutDir: true,
+    // Do not copy entire public/ into dist/ (would nest dist/dist and
+    // duplicate files Express already serves from public/).
     copyPublicDir: false,
+    assetsDir: 'assets',
   },
   server: {
     port: 5173,
     proxy: {
-      // Local dev: `vite dev` serves the frontend on :5173, the Express API
-      // server runs separately (npm run dev) on :3000 — proxy /api so the
-      // frontend can call relative paths exactly like it does in prod.
       '/api': {
         target: process.env.BACKEND_URL || 'http://localhost:3000',
         changeOrigin: true,
