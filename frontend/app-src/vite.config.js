@@ -6,6 +6,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: __dirname,
+  // Assets are served under /dist by Express (see server.js)
+  base: '/dist/',
   // Static assets (icons, manifest.json, sw.js, admin-feedback.html, ...) stay in
   // frontend/public/ and are served by Express directly (see server.js) — both in
   // dev (Vite serves this same dir at "/") and in prod (Express's fallback static

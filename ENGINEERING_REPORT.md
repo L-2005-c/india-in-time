@@ -99,3 +99,12 @@ Base 55 + bonuses for weather, coords, hours, category rules, traffic, historica
 - City-specific traffic calibration from routing APIs
 - Preference embeddings from trip history
 - Sequence model for day itineraries
+
+### UI blank-page fix (2026-08-11)
+**Cause:** Production served `dist/index.html` which referenced `/assets/*.js|.css`, but Express only mounted hashed files under `/dist/assets/` → **404** for CSS/JS → white/unstyled shell.
+
+**Fixes:**
+1. Mount `/assets` → `frontend/public/dist/assets`
+2. Default `resolveIndexHtmlPath()` to **source** `index.html` (`/app.js` + `/styles.css`) so UI cannot blank
+3. Vite `base: '/dist/'` so future dist builds emit `/dist/assets/...`
+4. Opt into dist with env `USE_DIST_FRONTEND=1`

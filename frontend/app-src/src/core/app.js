@@ -1,23 +1,4 @@
-// ── Extracted pure modules (see src/data/ and src/utils/) ──────────────────────
-import {
-  CITIES, getHiddenGems, getLocalPlaces,
-} from '../data/cities.js';
-import {
-  getTrafficLevel, getCrowdMultiplier, getCrowdLevel, getSmartTravelTime, getSmartVisitTime,
-  getTransportOptions, getCurrentLocalMin, placeSunTimes, getPlaceDynamicStatus,
-  getCrowdPrediction, calculateExperienceScore, dayPartForMinutes, stopTimeScore, stopClimateNote,
-} from '../utils/time-intel.js';
-import {
-  hvKm, isFiniteLatLon, normalizeLatLon, withHiddenGems, mergePlacePools, optimizeStopOrder,
-  bearingBetween, keepNearbyCluster, prioritizePlanStops, interpolatePathPoint,
-  getRouteStopsForDay, estimateStopLoadMinutes,
-} from '../utils/geo.js';
-import {
-  calculateStopBudget, calculateTripBudget,
-} from '../utils/budget-calc.js';
-import {
-  escapeHtml, sanitizeChatHtml, formatAiText, formatTripWindow, fmt12, degToCompassLabel,
-} from '../utils/format.js';
+const API = window.API; // ✅ loaded by <script> above
 
 // ══════════════════════════════════════════════════
 // FIREBASE CONFIG — PASTE YOUR VALUES BELOW
@@ -27,8 +8,6 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signO
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-const API = window.API; // ✅ loaded by <script> above
 
 const firebaseConfig = {
   apiKey:            "AIzaSyDdFpaAOXT2DcniMoh2jJGlReMYLZy8DDM",
@@ -86,7 +65,168 @@ Object.assign(window, {
 // ══════════════════════════════════════════════════
 // CURATED CITIES DATABASE
 // ══════════════════════════════════════════════════
+const CITIES = {
+  vizag:     {id:"vizag",     name:"Visakhapatnam", emoji:"🌴", lat:17.6868, lon:83.2185, locs:[]},
+  hyderabad: {id:"hyderabad", name:"Hyderabad",      emoji:"🕌", lat:17.3850, lon:78.4867, locs:[]},
+  goa:       {id:"goa",       name:"Goa",            emoji:"🏖️", lat:15.4909, lon:73.8278, locs:[]},
+  jaipur:    {id:"jaipur",    name:"Jaipur",         emoji:"🏰", lat:26.9124, lon:75.7873, locs:[]},
+  udaipur:   {id:"udaipur",   name:"Udaipur",        emoji:"🌅", lat:24.5854, lon:73.7125, locs:[]},
+  delhi:     {id:"delhi",     name:"New Delhi",      emoji:"🏛️", lat:28.6139, lon:77.2090, locs:[]},
+  mumbai:    {id:"mumbai",    name:"Mumbai",         emoji:"🎬", lat:18.9220, lon:72.8347, locs:[]},
+  bengaluru: {id:"bengaluru", name:"Bengaluru",      emoji:"🌳", lat:12.9716, lon:77.5946, locs:[]},
+  kochi:     {id:"kochi",     name:"Kochi",          emoji:"🛶", lat:9.9312,  lon:76.2673, locs:[]},
+  agra:      {id:"agra",      name:"Agra",           emoji:"🕌", lat:27.1767, lon:78.0081, locs:[]},
+  varanasi:  {id:"varanasi",  name:"Varanasi",       emoji:"🛕", lat:25.3176, lon:82.9739, locs:[]},
+  kolkata:   {id:"kolkata",   name:"Kolkata",        emoji:"🚊", lat:22.5726, lon:88.3639, locs:[]},
+};
 
+const LOCAL_PLACE_SEEDS = {
+  vizag: [
+    ['Ramakrishna Beach','beach',17.7142,83.3237,90,'05:30','21:00'],
+    ['INS Kursura Submarine Museum','scenic',17.7172,83.3301,60,'10:00','20:00'],
+    ['Kailasagiri','scenic',17.7492,83.3418,75,'06:00','20:00'],
+    ['Rushikonda Beach','beach',17.7825,83.3851,90,'05:30','21:00'],
+    ['Tenneti Park','scenic',17.7484,83.3495,45,'06:00','20:00'],
+    ['Simhachalam Temple','temple',17.7666,83.2501,75,'06:00','20:30'],
+    ['Yarada Beach','beach',17.6549,83.2691,90,'06:00','19:00'],
+    ['Venkatadri Vantillu','food',17.7251,83.3205,45,'11:00','23:00'],
+    ['TU 142 Aircraft Museum','scenic',17.718,83.3299,50,'10:00','20:00'],
+    ['Matsyadarshini Aquarium','scenic',17.7127,83.3199,45,'09:00','20:30'],
+    ['VUDA Park','scenic',17.7241,83.3395,45,'08:30','20:30'],
+    ['Ross Hill Church','temple',17.6904,83.2871,45,'06:00','19:00'],
+    ['Dolphins Nose Lighthouse','scenic',17.6765,83.2926,60,'10:00','17:00'],
+    ['Bheemili Beach','beach',17.8903,83.4559,90,'06:00','20:00'],
+    ['Thotlakonda Buddhist Complex','scenic',17.8285,83.4092,60,'09:00','18:00'],
+    ['Bavikonda Buddhist Complex','scenic',17.8177,83.3910,60,'09:00','18:00'],
+    ['Bojjana Konda','scenic',17.7103,83.016,75,'09:00','18:00'],
+    ['Indira Gandhi Zoological Park','scenic',17.7657,83.3488,120,'09:00','17:00'],
+    ['Kambalakonda Wildlife Sanctuary','scenic',17.7784,83.3349,90,'09:00','17:30'],
+    ['Appikonda Beach','beach',17.5681,83.1714,75,'06:00','19:00'],
+    ['Gangavaram Beach','beach',17.6192,83.2329,75,'06:00','19:00'],
+    ['Victory at Sea War Memorial','scenic',17.7187,83.3322,35,'06:00','21:00'],
+    ['Sri Kanaka Mahalakshmi Temple','temple',17.6998,83.2971,45,'05:00','21:00'],
+    ['ISKCON Temple Visakhapatnam','temple',17.7678,83.3667,50,'07:30','20:30'],
+    ['VMRDA City Central Park','scenic',17.7218,83.3055,45,'05:00','21:00'],
+    ['Sagar Nagar Beach','beach',17.7618,83.3604,60,'06:00','20:00'],
+    ['Mangamaripeta Beach','beach',17.8252,83.4163,75,'06:00','19:30'],
+    ['Lawsons Bay Beach','beach',17.7338,83.3424,60,'06:00','20:00'],
+    ['Daspalla Restaurant','food',17.7106,83.3003,45,'11:00','23:00'],
+    ['Ramakrishna Beach Food Court','food',17.7142,83.3224,45,'11:00','22:30'],
+    ['Sea Inn Raju Gari Dhaba','food',17.7839,83.383,50,'11:00','23:00'],
+    ['Sai Priya Beach Restaurant','food',17.7858,83.3845,50,'11:00','23:00'],
+    ['Alpha Hotel Vizag','food',17.7122,83.3018,40,'07:00','22:30'],
+  ],
+  hyderabad: [
+    ['Charminar','scenic',17.3616,78.4747,60,'09:00','17:30'],
+    ['Golconda Fort','scenic',17.3833,78.4011,90,'09:00','17:30'],
+    ['Salar Jung Museum','scenic',17.3713,78.4804,90,'10:00','17:00'],
+    ['Hussain Sagar Lake','scenic',17.4239,78.4738,60,'06:00','21:00'],
+    ['Birla Mandir','temple',17.4062,78.4691,60,'07:00','21:00'],
+    ['Chowmahalla Palace','scenic',17.3578,78.4717,75,'10:00','17:00'],
+    ['Paradise Biryani','food',17.4416,78.4870,45,'11:00','23:00'],
+    ['Cafe Niloufer','food',17.3991,78.4624,40,'07:00','23:00'],
+  ],
+  goa: [
+    ['Baga Beach','beach',15.5553,73.7517,90,'06:00','22:00'],
+    ['Calangute Beach','beach',15.5494,73.7535,90,'06:00','22:00'],
+    ['Fort Aguada','scenic',15.4922,73.7730,75,'09:30','18:00'],
+    ['Basilica of Bom Jesus','temple',15.5009,73.9116,60,'09:00','18:30'],
+    ['Dona Paula View Point','scenic',15.4527,73.8036,45,'06:00','20:00'],
+    ['Miramar Beach','beach',15.4827,73.8074,60,'06:00','21:00'],
+    ['Thalassa','food',15.6164,73.7555,60,'12:00','23:30'],
+    ['Ritz Classic Panaji','food',15.4989,73.8278,45,'11:00','23:00'],
+  ],
+  jaipur: [
+    ['Amber Fort','scenic',26.9855,75.8513,90,'08:00','18:00'],
+    ['Hawa Mahal','scenic',26.9239,75.8267,45,'09:00','16:30'],
+    ['City Palace Jaipur','scenic',26.9258,75.8237,75,'09:30','17:00'],
+    ['Jantar Mantar Jaipur','scenic',26.9248,75.8246,60,'09:00','16:30'],
+    ['Nahargarh Fort','scenic',26.9402,75.8170,75,'10:00','18:00'],
+    ['Birla Mandir Jaipur','temple',26.8923,75.8155,45,'06:00','21:00'],
+    ['Lassiwala','food',26.9166,75.8102,35,'08:00','16:00'],
+    ['Rawat Mishthan Bhandar','food',26.9213,75.7967,45,'08:00','22:30'],
+  ],
+  udaipur: [
+    ['City Palace Udaipur','scenic',24.5764,73.6835,90,'09:30','17:30'],
+    ['Lake Pichola','scenic',24.5720,73.6790,75,'06:00','20:00'],
+    ['Jag Mandir','scenic',24.5675,73.6775,75,'10:00','18:00'],
+    ['Saheliyon Ki Bari','scenic',24.6032,73.6868,45,'09:00','19:00'],
+    ['Fateh Sagar Lake','scenic',24.6015,73.6748,60,'06:00','20:00'],
+    ['Jagdish Temple','temple',24.5799,73.6823,45,'05:00','22:00'],
+    ['Ambrai Restaurant','food',24.5781,73.6814,60,'11:00','23:00'],
+    ['Natraj Dining Hall','food',24.5724,73.6997,45,'11:00','22:30'],
+  ],
+  delhi: [
+    ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
+    ['Red Fort','scenic',28.6562,77.2410,90,'09:30','16:30'],
+    ['Qutub Minar','scenic',28.5245,77.1855,75,'07:00','17:00'],
+    ['Humayun Tomb','scenic',28.5933,77.2507,75,'06:00','18:00'],
+    ['Lotus Temple','temple',28.5535,77.2588,60,'09:00','17:30'],
+    ['Akshardham Temple','temple',28.6127,77.2773,90,'10:00','20:00'],
+    ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
+    ['Paranthe Wali Gali','food',28.6560,77.2307,45,'09:00','22:00'],
+  ],
+  mumbai: [
+    ['Gateway of India','scenic',18.9220,72.8347,45,'06:00','22:00'],
+    ['Marine Drive','scenic',18.9430,72.8238,60,'06:00','23:00'],
+    ['Chhatrapati Shivaji Maharaj Vastu Sangrahalaya','scenic',18.9269,72.8326,75,'10:15','18:00'],
+    ['Siddhivinayak Temple','temple',19.0169,72.8305,60,'05:30','21:50'],
+    ['Haji Ali Dargah','temple',18.9827,72.8089,60,'05:30','22:00'],
+    ['Juhu Beach','beach',19.0988,72.8267,75,'06:00','22:00'],
+    ['Leopold Cafe','food',18.9220,72.8317,45,'07:30','23:30'],
+    ['Bademiya','food',18.9217,72.8324,45,'12:00','23:30'],
+  ],
+  bengaluru: [
+    ['Bangalore Palace','scenic',13.0035,77.5891,75,'10:00','17:30'],
+    ['Lalbagh Botanical Garden','scenic',12.9507,77.5848,75,'06:00','19:00'],
+    ['Cubbon Park','scenic',12.9763,77.5929,60,'06:00','18:00'],
+    ['ISKCON Temple Bangalore','temple',13.0098,77.5511,60,'07:15','20:30'],
+    ['Tipu Sultan Summer Palace','scenic',12.9596,77.5736,60,'08:30','17:30'],
+    ['Ulsoor Lake','scenic',12.9824,77.6199,45,'06:00','20:00'],
+    ['Vidyarthi Bhavan','food',12.9450,77.5714,40,'06:30','20:00'],
+    ['MTR Lalbagh','food',12.9551,77.5856,45,'06:30','21:30'],
+  ],
+  kochi: [
+    ['Fort Kochi Beach','beach',9.9637,76.2375,75,'06:00','21:00'],
+    ['Chinese Fishing Nets','scenic',9.9667,76.2420,45,'06:00','18:30'],
+    ['Mattancherry Palace','scenic',9.9576,76.2592,60,'10:00','17:00'],
+    ['Paradesi Synagogue','temple',9.9570,76.2596,45,'10:00','18:00'],
+    ['St Francis Church','temple',9.9653,76.2417,45,'09:00','17:00'],
+    ['Marine Drive Kochi','scenic',9.9772,76.2773,60,'06:00','22:00'],
+    ['Kashi Art Cafe','food',9.9650,76.2425,45,'08:30','22:00'],
+    ['Kayees Rahmathulla Cafe','food',9.9627,76.2547,45,'11:00','22:00'],
+  ],
+  agra: [
+    ['Taj Mahal','scenic',27.1751,78.0421,120,'06:00','18:30'],
+    ['Agra Fort','scenic',27.1795,78.0211,90,'06:00','18:00'],
+    ['Mehtab Bagh','scenic',27.1797,78.0419,60,'06:00','18:00'],
+    ['Itmad-ud-Daulah','scenic',27.1929,78.0310,60,'06:00','18:00'],
+    ['Akbar Tomb Sikandra','scenic',27.2207,77.9506,75,'06:00','18:00'],
+    ['Jama Masjid Agra','temple',27.1837,78.0179,45,'06:00','20:00'],
+    ['Pinch of Spice','food',27.1596,78.0432,45,'11:00','23:00'],
+    ['Deviram Sweets','food',27.1667,78.0087,35,'08:00','22:00'],
+  ],
+  varanasi: [
+    ['Dashashwamedh Ghat','scenic',25.3062,83.0107,75,'05:00','22:00'],
+    ['Kashi Vishwanath Temple','temple',25.3109,83.0107,75,'04:00','23:00'],
+    ['Assi Ghat','scenic',25.2887,83.0061,60,'05:00','22:00'],
+    ['Sarnath','scenic',25.3716,83.0252,90,'09:00','17:00'],
+    ['Ramnagar Fort','scenic',25.2694,83.0292,75,'10:00','17:00'],
+    ['Manikarnika Ghat','scenic',25.3102,83.0140,45,'05:00','22:00'],
+    ['Kashi Chaat Bhandar','food',25.3094,83.0061,40,'16:00','22:30'],
+    ['Blue Lassi','food',25.3095,83.0088,35,'08:00','22:00'],
+  ],
+  kolkata: [
+    ['Victoria Memorial','scenic',22.5448,88.3426,90,'10:00','17:00'],
+    ['Howrah Bridge','scenic',22.5851,88.3468,45,'06:00','22:00'],
+    ['Indian Museum','scenic',22.5580,88.3507,75,'10:00','17:00'],
+    ['Dakshineswar Kali Temple','temple',22.6550,88.3570,75,'06:00','21:00'],
+    ['Kalighat Kali Temple','temple',22.5204,88.3425,60,'05:00','22:30'],
+    ['Prinsep Ghat','scenic',22.5552,88.3317,60,'06:00','21:00'],
+    ['Peter Cat','food',22.5524,88.3526,45,'11:00','23:00'],
+    ['Arsalan Park Circus','food',22.5415,88.3657,45,'11:00','23:30'],
+  ],
+};
 
 // ══════════════════════════════════════════════════
 // HIDDEN GEMS — genuinely off-the-radar spots, verified real
@@ -95,25 +235,401 @@ Object.assign(window, {
 // that gap IS the product: "found by locals, not by algorithms."
 // reviewGap = approx Google review count, for the pitch narrative.
 // ══════════════════════════════════════════════════
+const HIDDEN_GEM_SEEDS = {
+  vizag: [
+    { name:'Kondakarla Ava Lake', cat:'scenic', coords:[17.6036,82.9979], vt:90, ot:'05:30', ct:'18:30',
+      why:'A freshwater lake & bird sanctuary reached only by hand-paddled wooden catamarans — locals kept motorboats out on purpose to protect it.',
+      reviewGap:'~330 Google reviews vs Kailasagiri\'s 40,000+', bestFor:'Sunrise boat ride, birdwatching' },
+    { name:'Erra Matti Dibbalu', cat:'scenic', coords:[17.8750,83.4308], vt:60, ot:'06:00', ct:'18:00',
+      why:'Million-year-old red sand dune formations — a protected Geo-Heritage site most tour packages skip entirely because there\'s no signage or road markers.',
+      reviewGap:'~34 Google reviews vs RK Beach\'s 60,000+', bestFor:'Sunrise/sunset photography, geology' },
+    { name:'Rama Naidu Studios', cat:'scenic', coords:[17.8092,83.3975], vt:75, ot:'09:00', ct:'17:00',
+      why:'A working film studio on a hilltop above Rushikonda with a full Bay of Bengal view — most visitors drive right past it on the beach road.',
+      reviewGap:'~1,650 Google reviews vs Kailasagiri\'s 40,000+', bestFor:'Film sets, coastal viewpoint, photography' },
+    { name:'NTPC Simhadri Beach', cat:'beach', coords:[17.5483,83.1178], vt:60, ot:'06:00', ct:'19:00',
+      why:'A near-empty stretch of shoreline by the NTPC pump station, 30km south of the city — wedding photographers know it, tourists don\'t.',
+      reviewGap:'~300 Google reviews vs Rushikonda\'s 15,000+', bestFor:'Quiet walks, wedding-style photography' },
+    { name:'Thatipudi Reservoir', cat:'scenic', coords:[18.1722,83.1914],  vt:90, ot:'09:00', ct:'17:30',
+      why:'A migratory-bird reservoir feeding Vizag\'s own drinking water, ~55km out — locals call it the "Jewel of Vizianagaram" but it barely shows up in Vizag trip searches.',
+      reviewGap:'~2,480 Google reviews, but almost never surfaced for "Vizag" searches', bestFor:'Boating, sunset, day trip' },
+    { name:'Gambheeram Gadda Reservoir', cat:'scenic', coords:[17.8761,83.3475], vt:90, ot:'06:00', ct:'18:00',
+      why:'A forest-ringed reservoir just past the city limits, reachable only by unpaved road — reviewers literally say the drive "feels like hell but the view feels like heaven."',
+      reviewGap:'~170 Google reviews for a genuinely camera-worthy reservoir', bestFor:'Camping, fishing, quiet picnic' },
+    { name:'Lambasingi', cat:'scenic', coords:[17.8186,82.4922], vt:180, ot:'05:00', ct:'18:00',
+      why:'Andhra Pradesh\'s only frost-prone village, nicknamed "Kashmir of Andhra Pradesh" — a ~3hr drive out, so most Vizag trip itineraries skip it entirely despite the coffee plantations and misty sunrise views.',
+      reviewGap:'Rarely appears in standard Vizag itineraries despite its unique climate', bestFor:'Winter frost/fog (Dec-Jan), sunrise, coffee plantations — full-day trip' },
+    { name:'Meghadri Gedda Reservoir', cat:'scenic', coords:[17.7812,83.1810], vt:60, ot:'06:00', ct:'18:30',
+      why:'A working drinking-water reservoir on the west side of the city with floating solar panels and a small Durga temple nearby — locals use it as their evening-walk spot, tourists don\'t know it exists.',
+      reviewGap:'~480 Google reviews for a reservoir that\'s actually inside city limits', bestFor:'Evening walks, birdwatching (Jan-Feb migratory season)' },
+    { name:'Konam Dam', cat:'scenic', coords:[17.9663,82.8545], vt:90, ot:'07:00', ct:'18:00',
+      why:'A hill-ringed reservoir with cheap boating and waterfalls nearby — reviewers say it just needs better roads to become a proper tourist spot, which is exactly why it\'s still peaceful.',
+      reviewGap:'~270 Google reviews for a genuinely scenic reservoir', bestFor:'Boating, picnics, photography' },
+    { name:'Seethapalem Beach', cat:'beach', coords:[17.4751,82.9938], vt:120, ot:'06:00', ct:'18:00',
+      why:'One of Vizag\'s highest-rated beaches (4.7★) and almost nobody has heard of it — you reach it via a backwater boat ride through muddy access roads, which is exactly what keeps it pristine.',
+      reviewGap:'4.7★ rating with only ~670 Google reviews vs RK Beach\'s 60,000+', bestFor:'Backwater boat ride, sunrise, genuinely uncrowded sand' },
+    { name:'Katiki Waterfalls', cat:'scenic', coords:[18.2792,82.9988], vt:150, ot:'08:00', ct:'17:00',
+      why:'A multi-stage waterfall near Araku you can walk right up to and stand under — most Vizag-to-Araku day trips stop at Borra Caves and never make the short detour here.',
+      reviewGap:'~1,180 Google reviews for a genuinely stand-under-it waterfall', bestFor:'Waterfall trekking, photography — pair with Araku Valley day trip' },
+    { name:'Araku Anantagiri Coffee Plantations', cat:'scenic', coords:[18.2577,82.9893], vt:90, ot:'06:00', ct:'18:00',
+      why:'Misty, working coffee estates planted by the British in the 1920s — reviewers call the early-morning walk "magical," and it\'s a five-minute stop most Araku day-trippers drive straight past.',
+      reviewGap:'~2,260 Google reviews for a working plantation most itineraries skip', bestFor:'Early morning mist, coffee-harvest season (Dec-Jan), photography' },
+  ],
+  hyderabad: [
+    { name:'Paigah Tombs', cat:'scenic', coords:[17.3440,78.5042], vt:45, ot:'09:00', ct:'17:30',
+      why:'Intricately carved marble-and-stucco tombs of the Nizams\' most powerful noble family, in a quiet corner most tourists skip entirely for Charminar.',
+      reviewGap:'Barely any Google reviews vs Charminar\'s 200,000+', bestFor:'Architecture, quiet photography' },
+    { name:'Durgam Cheruvu', cat:'scenic', coords:[17.4300,78.3895], vt:60, ot:'06:00', ct:'21:00',
+      why:'A 400-year-old "Secret Lake" that once fed Golconda Fort — now ringed by granite cliffs and a glass cable bridge, still missing from most first-timer itineraries.',
+      reviewGap:'~4,760 Google reviews vs Golconda Fort\'s 60,000+', bestFor:'Evening boating, cable bridge views' },
+    { name:'Sudha Car Museum', cat:'scenic', coords:[17.3570,78.4543], vt:45, ot:'09:30', ct:'18:00',
+      why:'A Guinness-listed collection of drivable cars shaped like a burger, a lipstick, a cricket bat — the quirkiest 40 minutes in Hyderabad, and almost never on a tour itinerary.',
+      reviewGap:'Rarely appears alongside Charminar/Golconda on standard tours', bestFor:'Families, quirky photography' },
+    { name:'Ameenpur Lake', cat:'scenic', coords:[17.5225,78.3344], vt:60, ot:'06:00', ct:'19:00',
+      why:'An officially notified Biodiversity Heritage Site — over 170 bird species on a lake most Hyderabad first-timers have never heard of.',
+      reviewGap:'~1,270 Google reviews vs Hussain Sagar\'s far heavier footfall', bestFor:'Sunrise/sunset birdwatching, photography' },
+  ],
+  goa: [
+    { name:'Tambdi Surla Temple', cat:'temple', coords:[15.4390,74.2526], vt:60, ot:'08:30', ct:'17:30',
+      why:'Goa\'s oldest surviving temple (13th-century Kadamba-style basalt), tucked inside the Bhagwan Mahavir Wildlife Sanctuary — most Goa trips never leave the coast to find it.',
+      reviewGap:'~5,680 Google reviews vs Baga Beach\'s 30,000+', bestFor:'Architecture, monsoon greenery, quiet reflection' },
+    { name:'Reis Magos Fort', cat:'scenic', coords:[15.4964,73.8091], vt:60, ot:'09:30', ct:'17:00',
+      why:'A restored 16th-century fort with sweeping Mandovi River views — most tourists drive straight past it on the way to the far more crowded Fort Aguada.',
+      reviewGap:'~11,300 Google reviews vs Fort Aguada\'s 40,000+', bestFor:'Sunset views, history, photography' },
+    { name:'Divar Island', cat:'scenic', coords:[15.5277,73.9066], vt:120, ot:'07:00', ct:'18:00',
+      why:'A ferry-only island of paddy fields and Portuguese-era villages on the Mandovi River — reviewers call it "still not ruined by the invasion of tourists."',
+      reviewGap:'~870 Google reviews vs Baga Beach\'s 30,000+', bestFor:'Cycling, village life, ferry ride' },
+    { name:'Cabo de Rama Fort', cat:'scenic', coords:[15.0888,73.9216], vt:60, ot:'09:30', ct:'17:30',
+      why:'Clifftop ruins with a still-active chapel and panoramic Arabian Sea views — far quieter than the North Goa forts most itineraries default to.',
+      reviewGap:'Considerably less crowded than Fort Aguada despite similar sea views', bestFor:'Sunset, cliffside photography, quiet ruins' },
+  ],
+  jaipur: [
+    { name:'Panna Meena ka Kund', cat:'scenic', coords:[26.9912,75.8513], vt:30, ot:'07:00', ct:'18:00',
+      why:'A perfectly symmetrical 16th-century stepwell right near Amber Fort — everyone drives past it straight to the fort gate and misses it.',
+      reviewGap:'~6,380 Google reviews vs Amber Fort\'s 100,000+', bestFor:'Photography, architecture' },
+    { name:'Gaitor Ki Chhatriyan', cat:'scenic', coords:[26.9431,75.8247], vt:45, ot:'09:30', ct:'17:00',
+      why:'The royal cremation ground of Jaipur\'s Kachwaha kings — marble cenotaphs as detailed as the City Palace, but almost silent compared to it.',
+      reviewGap:'~6,170 Google reviews vs City Palace\'s 70,000+', bestFor:'Quiet heritage walks, photography' },
+    { name:'Isarlat Sargasooli', cat:'scenic', coords:[26.9244,75.8208], vt:30, ot:'09:00', ct:'16:30',
+      why:'A 7-storey "Victory Tower" in the old city with a 360° view of the Pink City — most visitors rush to Hawa Mahal a few streets away and never climb it.',
+      reviewGap:'~7,160 Google reviews vs Hawa Mahal\'s 90,000+', bestFor:'Panoramic views, sunset' },
+    { name:'Sisodia Rani ka Bagh', cat:'scenic', coords:[26.8994,75.8587], vt:60, ot:'08:00', ct:'20:00',
+      why:'A terraced 1728 royal garden built as a gift for Jaipur\'s queen — multi-level fountains and Krishna-Radha murals that most visitors never make time for.',
+      reviewGap:'~6,500 Google reviews vs City Palace\'s 70,000+', bestFor:'Evening walks, Mughal-style gardens, peacocks' },
+    { name:'Vidyadhar Bagh', cat:'scenic', coords:[26.8998,75.8536], vt:60, ot:'08:00', ct:'20:00',
+      why:'A cascading terraced garden honoring Jaipur\'s chief architect, right next to Sisodia Rani ka Bagh — reviewers describe having it entirely to themselves even in peak season.',
+      reviewGap:'~1,060 Google reviews for an Italianate garden most tourists never find', bestFor:'Quiet evenings, photography, architecture' },
+  ],
+  udaipur: [
+    { name:'Ahar Museum', cat:'scenic', coords:[24.5864,73.7211], vt:45, ot:'10:00', ct:'17:00',
+      why:'A Chalcolithic archaeological site and royal cenotaph complex 2km from the centre — overshadowed completely by City Palace and Lake Pichola.',
+      reviewGap:'~1,900 Google reviews vs City Palace\'s 30,000+', bestFor:'History, quiet exploration' },
+    { name:'Badi Lake', cat:'scenic', coords:[24.6173,73.6227], vt:60, ot:'05:00', ct:'19:00',
+      why:'A still, hill-ringed lake locals call "Tiger Lake" — 12km out, with none of Fateh Sagar\'s crowds and better sunsets.',
+      reviewGap:'Far fewer visitors than Fateh Sagar Lake despite similar views', bestFor:'Sunset, Bahubali Hills trek nearby' },
+    { name:'Nehru Garden', cat:'scenic', coords:[24.5963,73.6734], vt:75, ot:'09:00', ct:'18:00',
+      why:'A boat-only island garden in the middle of Fateh Sagar Lake — reaching it is half the experience, and it stays far less crowded than the lakeside itself.',
+      reviewGap:'~1,860 Google reviews vs Lake Pichola\'s far heavier footfall', bestFor:'Boat ride, sunset, musical fountain (evenings)' },
+    { name:'Neemach Mata Mandir', cat:'temple', coords:[24.6132,73.6758], vt:60, ot:'05:00', ct:'21:00',
+      why:'A hilltop temple with a ropeway and 360° views over Fateh Sagar Lake — reviewers repeatedly say it\'s "much less crowded than Karni Mata" for the same views.',
+      reviewGap:'~1,790 Google reviews for a temple most itineraries skip for the more famous Karni Mata', bestFor:'Sunrise, ropeway views, quiet darshan' },
+  ],
+  delhi: [
+    { name:'Agrasen ki Baoli', cat:'scenic', coords:[28.6261,77.2250], vt:30, ot:'09:00', ct:'17:30',
+      why:'A 108-step stepwell hidden a block from Connaught Place — free entry, eerily photogenic, and still missed by most first-time visitors.',
+      reviewGap:'~46,800 Google reviews vs India Gate\'s 200,000+', bestFor:'Photography, quick heritage stop' },
+    { name:'Mehrauli Archaeological Park', cat:'scenic', coords:[28.5202,77.1877], vt:75, ot:'06:00', ct:'18:30',
+      why:'Over 1,000 years of Delhi\'s history — including the Jamali Kamali tomb — spread through a quiet park right next to Qutub Minar, yet far less crowded.',
+      reviewGap:'~3,900 Google reviews vs Qutub Minar\'s 100,000+', bestFor:'History, peaceful walks, photography' },
+    { name:'Sunder Nursery', cat:'scenic', coords:[28.5956,77.2452], vt:60, ot:'06:00', ct:'21:00',
+      why:'A restored Mughal-era heritage garden right next to Humayun\'s Tomb — locals treat it as their favourite picnic spot; tourists mostly don\'t know it exists.',
+      reviewGap:'~21,900 Google reviews vs Humayun\'s Tomb\'s 60,000+', bestFor:'Picnics, gardens, golden-hour photography' },
+    { name:'Rajon Ki Baoli', cat:'scenic', coords:[28.5203,77.1834], vt:30, ot:'10:00', ct:'17:30',
+      why:'A 1506 Lodi-era stepwell inside Mehrauli Archaeological Park — reviewers call it "far less crowded" than the famous Agrasen ki Baoli, with the same dramatic symmetry.',
+      reviewGap:'~690 Google reviews vs Agrasen ki Baoli\'s 46,800', bestFor:'Photography, quiet architecture' },
+    { name:'Sanjay Van', cat:'scenic', coords:[28.5329,77.1813], vt:75, ot:'05:00', ct:'19:00',
+      why:'A genuine forest inside Delhi, with hidden ruins scattered through the trails — reviewers say it has "the healthiest air in Delhi."',
+      reviewGap:'~2,170 Google reviews for a forest most tourists never realize exists', bestFor:'Morning walks, birdwatching, jogging' },
+  ],
+  mumbai: [
+    { name:'Banganga Tank', cat:'scenic', coords:[18.9455,72.7936], vt:30, ot:'06:00', ct:'20:00',
+      why:'A 12th-century freshwater tank ringed by temples, tucked into Malabar Hill just steps from the sea — most tourists never leave the Gateway/Marine Drive loop to find it.',
+      reviewGap:'~920 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Photography, quiet heritage walk' },
+    { name:'Gilbert Hill', cat:'scenic', coords:[19.1206,72.8402], vt:30, ot:'06:00', ct:'19:00',
+      why:'A 66-million-year-old volcanic rock column — one of only two like it on Earth — rising straight out of an Andheri neighbourhood, and almost nobody visits it.',
+      reviewGap:'~460 Google reviews for a genuine geological rarity', bestFor:'Sunset views, unique photography' },
+    { name:'Sewri Mud-flats', cat:'scenic', coords:[18.9984,72.8611], vt:60, ot:'06:00', ct:'18:00',
+      why:'Thousands of flamingos gather on these mudflats every winter (Nov–May) and most of Mumbai has no idea it happens inside the city.',
+      reviewGap:'~110 Google reviews for a genuine flamingo migration spot', bestFor:'Flamingo season (Nov-May), check tide timings before visiting' },
+    { name:'Bandra Fort', cat:'scenic', coords:[19.0419,72.8184], vt:60, ot:'06:00', ct:'18:30',
+      why:'A ruined 17th-century fort with the best view of the Bandra-Worli Sea Link in the city — most itineraries stop at Marine Drive and never make it here.',
+      reviewGap:'~28,400 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Sunset, sea-link views, Bollywood filming spot' },
+    { name:'Global Vipassana Pagoda', cat:'scenic', coords:[19.2282,72.8059], vt:90, ot:'09:00', ct:'19:00',
+      why:'The world\'s largest stone dome built without a single supporting pillar — reached by ferry from Borivali, and almost never on a first-timer\'s Mumbai list.',
+      reviewGap:'~21,600 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Architecture, meditation, ferry ride' },
+  ],
+  bengaluru: [
+    { name:'Turahalli Forest', cat:'scenic', coords:[12.8832,77.5250], vt:60, ot:'05:30', ct:'18:30',
+      why:'Bengaluru\'s last surviving forest — sunrise treks and cycling trails just past the edge of the city, still missing from most "things to do" lists.',
+      reviewGap:'~10,200 Google reviews vs Lalbagh\'s 90,000+', bestFor:'Sunrise trekking, cycling, birdwatching' },
+    { name:'National Gallery of Modern Art (Bengaluru)', cat:'scenic', coords:[12.9894,77.5881], vt:60, ot:'10:00', ct:'18:00',
+      why:'A colonial mansion turned modern-art gallery on Palace Road — steps from Bangalore Palace, but almost nobody stops in.',
+      reviewGap:'~1,970 Google reviews vs Bangalore Palace\'s 30,000+', bestFor:'Art, quiet indoor escape from the heat' },
+    { name:'Manchanabele Dam', cat:'scenic', coords:[12.8749,77.3361], vt:120, ot:'06:00', ct:'18:00',
+      why:'A rock-and-forest-ringed dam on the Arkavathi River ~40km out — reviewers call the sunset here "magical" and the crowd nonexistent compared to Nandi Hills.',
+      reviewGap:'~2,720 Google reviews for a genuinely scenic dam most day-trippers overlook', bestFor:'Sunset, picnics, kayaking' },
+    { name:'Hesaraghatta Lake', cat:'scenic', coords:[13.1500,77.4900], vt:75, ot:'06:00', ct:'18:00',
+      why:'A birdwatcher\'s paradise on Bengaluru\'s edge — raptors, migratory flocks, and open grassland skies that most city visitors never realize exist this close.',
+      reviewGap:'~2,120 Google reviews vs Lalbagh\'s 90,000+', bestFor:'Birdwatching, scenic drives, sunrise' },
+  ],
+  kochi: [
+    { name:'Kumbalangi Village', cat:'scenic', coords:[9.8761,76.2871], vt:90, ot:'07:00', ct:'18:00',
+      why:'Kerala\'s first model eco-tourism village — mangroves, fishing canals, and Chinese-net demonstrations by actual fishermen, 20 minutes from Fort Kochi and still overlooked.',
+      reviewGap:'A fraction of Fort Kochi\'s foot traffic despite being minutes away', bestFor:'Canoeing, village life, Chinese fishing nets' },
+    { name:'Puthenthodu Beach', cat:'beach', coords:[9.8695,76.2629], vt:60, ot:'06:00', ct:'19:00',
+      why:'A quiet crescent beach in Chellanam, past Kumbalangi — clean sand, no beach shacks, and none of Fort Kochi Beach\'s crowds.',
+      reviewGap:'~1,490 Google reviews vs Fort Kochi Beach\'s much heavier footfall', bestFor:'Sunset, peaceful swimming' },
+  ],
+  agra: [
+    { name:'Chini Ka Rauza', cat:'scenic', coords:[27.2008,78.0343], vt:45, ot:'08:00', ct:'17:00',
+      why:'A Persian-tiled Mughal tomb on the Yamuna, glazed in turquoise and green — reviewers call it a "hidden gem" outright, and it sees a fraction of Taj Mahal\'s crowds.',
+      reviewGap:'~1,130 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Photography, riverside quiet, Mughal architecture' },
+    { name:'Soor Sarovar Bird Sanctuary', cat:'scenic', coords:[27.2360,77.8526], vt:90, ot:'08:00', ct:'18:00',
+      why:'A Ramsar-listed wetland (Keetham Lake) 20km from the city with migratory Siberian cranes — most Agra itineraries never make time for it.',
+      reviewGap:'~960 Google reviews for a globally recognised wetland', bestFor:'Birdwatching, winter migratory season' },
+    { name:'Mankameshwar Temple, Agra', cat:'temple', coords:[27.1837,78.0175], vt:30, ot:'05:00', ct:'22:00',
+      why:'One of Agra\'s oldest Shiva temples, tucked in a narrow old-city lane — locals swear by the evening aarti, tourists rarely find it.',
+      reviewGap:'~6,970 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Evening aarti, local culture' },
+    { name:'Wildlife SOS Elephant Conservation and Care Center', cat:'scenic', coords:[27.3000,77.7940], vt:120, ot:'10:00', ct:'17:00',
+      why:'A real rescue sanctuary for elephants retired from decades of abuse — no riding, no touching, just watching them roam free. Reviewers call it one of the most moving experiences in Agra, and most Taj-focused itineraries never hear about it.',
+      reviewGap:'~710 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Ethical wildlife experience, families, a genuinely emotional stop' },
+  ],
+  varanasi: [
+    { name:'Bharat Kala Bhavan Museum', cat:'scenic', coords:[25.2715,82.9960], vt:60, ot:'10:30', ct:'16:30',
+      why:'A 100,000-artifact museum inside BHU with a world-class Mughal miniature painting collection — reviewers repeatedly call it Varanasi\'s best-kept secret.',
+      reviewGap:'~1,690 Google reviews vs Kashi Vishwanath Temple\'s 40,000+', bestFor:'Art, miniature paintings, quiet indoor culture' },
+    { name:'Panchganga Ghat', cat:'scenic', coords:[25.3150,83.0182], vt:30, ot:'05:00', ct:'20:00',
+      why:'Believed to be the confluence of five sacred rivers, with the same golden-hour ghat views as Dashashwamedh — minus the crowds and touts.',
+      reviewGap:'~1,360 Google reviews vs Dashashwamedh Ghat\'s far heavier footfall', bestFor:'Sunrise boat rides, quiet reflection' },
+  ],
+  kolkata: [
+    { name:'Marble Palace', cat:'scenic', coords:[22.5822,88.3602], vt:60, ot:'10:00', ct:'16:00',
+      why:'A 19th-century mansion crammed with Western sculpture and art, in North Kolkata — barely on any tourist itinerary despite rivaling Victoria Memorial\'s grandeur.',
+      reviewGap:'Rarely appears on Google review counts at all vs Victoria Memorial\'s 100,000+', bestFor:'Art, colonial-era architecture' },
+    { name:'Kumartuli Potter\'s Lane', cat:'scenic', coords:[22.5994,88.3635], vt:60, ot:'08:00', ct:'19:00',
+      why:'The narrow lanes where Kolkata\'s idol-makers hand-craft every Durga Puja idol in the city — most tourists never wander past College Street to find it.',
+      reviewGap:'~310 Google reviews for the artisan heart of the city\'s biggest festival', bestFor:'Craft, photography, especially pre-Durga Puja' },
+    { name:'South Park Street Cemetery', cat:'scenic', coords:[22.5466,88.3602], vt:60, ot:'10:00', ct:'17:00',
+      why:'One of the world\'s oldest non-church cemeteries (1767) — moss-covered obelisks and colonial mausoleums that reviewers describe as "stepping into a quiet conversation with history."',
+      reviewGap:'~1,720 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'History, colonial architecture, quiet reflection' },
+    { name:'Rabindra Sarovar Lake', cat:'scenic', coords:[22.5110,88.3561], vt:60, ot:'05:00', ct:'19:00',
+      why:'South Kolkata\'s favourite lake for a morning walk — locals call it "the lungs of Kolkata," and it barely registers with visiting tourists.',
+      reviewGap:'~4,710 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'Morning walks, birdwatching, jogging' },
+  ],
+};
 
+function getHiddenGems(cityId){
+  return (HIDDEN_GEM_SEEDS[cityId] || []).map(g => ({
+    id: `gem_${cityId}_${g.name.toLowerCase().replace(/[^a-z0-9]/g,'')}`,
+    name:g.name, cat:g.cat, coords:g.coords, vt:g.vt, ot:g.ot, ct:g.ct,
+    isHiddenGem:true, why:g.why, reviewGap:g.reviewGap, bestFor:g.bestFor,
+    importance:'must_see', importanceScore:88, fallbackSource:'curated_hidden_gem',
+  }));
+}
 
 // ══════════════════════════════════════════════════
 // CITY TRANSPORT CONFIG — Per-city fare rates & modes
 // ══════════════════════════════════════════════════
+const CITY_TRANSPORT_CONFIG = {
+  vizag:     { hasMetro:false, hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:10, cabBase:50,  cabPerKm:14, trainFare:[10,40], congestion:0.9  },
+  hyderabad: { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:12, cabBase:50,  cabPerKm:15, trainFare:[10,30], metroFare:[10,60], congestion:1.15 },
+  goa:       { hasMetro:false, hasTrain:false, busFare:[10,25],  autoBase:30, autoPerKm:14, cabBase:80,  cabPerKm:18, congestion:0.75 },
+  jaipur:    { hasMetro:true,  hasTrain:true,  busFare:[10,25],  autoBase:25, autoPerKm:11, cabBase:50,  cabPerKm:14, trainFare:[10,25], metroFare:[10,30], congestion:1.0  },
+  udaipur:   { hasMetro:false, hasTrain:false, busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:50,  cabPerKm:14, congestion:0.85 },
+  delhi:     { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:11, cabBase:50,  cabPerKm:16, trainFare:[10,30], metroFare:[10,60], congestion:1.3  },
+  mumbai:    { hasMetro:true,  hasTrain:true,  busFare:[5,25],   autoBase:23, autoPerKm:14, cabBase:50,  cabPerKm:18, trainFare:[5,15],  metroFare:[10,50], congestion:1.35 },
+  bengaluru: { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:30, autoPerKm:13, cabBase:50,  cabPerKm:16, trainFare:[10,25], metroFare:[10,55], congestion:1.25 },
+  kochi:     { hasMetro:true,  hasTrain:true,  busFare:[8,25],   autoBase:25, autoPerKm:12, cabBase:50,  cabPerKm:15, trainFare:[10,20], metroFare:[10,40], congestion:0.9  },
+  agra:      { hasMetro:false, hasTrain:true,  busFare:[10,25],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,25], congestion:1.0  },
+  varanasi:  { hasMetro:false, hasTrain:true,  busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,20], congestion:1.05 },
+  kolkata:   { hasMetro:true,  hasTrain:true,  busFare:[7,25],   autoBase:25, autoPerKm:12, cabBase:40,  cabPerKm:14, trainFare:[5,15],  metroFare:[5,30],  congestion:1.2  },
+};
+const DEFAULT_TRANSPORT_CONFIG = { hasMetro:false, hasTrain:false, busFare:[10,30], autoBase:25, autoPerKm:12, cabBase:50, cabPerKm:15, congestion:1.0 };
 
+const ENTRY_FEE_ESTIMATES = { scenic:50, temple:0, beach:0, food:0, break:0 };
 
 // ── Transport & Traffic Intelligence ──────────────────────────────────────────
+function getTransportConfig(cityId){ return CITY_TRANSPORT_CONFIG[cityId] || CITY_TRANSPORT_CONFIG[currentCityId] || DEFAULT_TRANSPORT_CONFIG; }
 
+function getTrafficMultiplier(cityId, minuteOfDay){
+  const config = getTransportConfig(cityId);
+  const base = config.congestion || 1.0;
+  if(minuteOfDay >= 8*60 && minuteOfDay < 10*60)  return base * 1.5;
+  if(minuteOfDay >= 10*60 && minuteOfDay < 12*60) return base * 1.15;
+  if(minuteOfDay >= 12*60 && minuteOfDay < 14*60) return base * 1.1;
+  if(minuteOfDay >= 14*60 && minuteOfDay < 17*60) return base * 1.05;
+  if(minuteOfDay >= 17*60 && minuteOfDay < 20*60) return base * 1.6;
+  if(minuteOfDay >= 20*60 && minuteOfDay < 22*60) return base * 0.9;
+  if(minuteOfDay >= 22*60 || minuteOfDay < 6*60)  return base * 0.7;
+  return base * 1.0;
+}
 
+function getTrafficLevel(multiplier){
+  if(multiplier <= 1.05) return { level:'light',   label:'Light Traffic',    emoji:'🟢' };
+  if(multiplier <= 1.35) return { level:'moderate', label:'Moderate Traffic',  emoji:'🟡' };
+  return                        { level:'heavy',    label:'Heavy Traffic',    emoji:'🔴' };
+}
 
+function getCrowdMultiplier(stop, dayOfWeek, minuteOfDay){
+  let mult = 1.0;
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  if(isWeekend) mult += 0.2;
+  const month = new Date().getMonth();
+  if(month >= 9 || month <= 2) mult += 0.15;
+  if(minuteOfDay >= 10*60 && minuteOfDay < 14*60) mult += 0.2;
+  if(minuteOfDay >= 16*60 && minuteOfDay < 18*60) mult += 0.15;
+  if(minuteOfDay < 8*60 || minuteOfDay >= 20*60) mult -= 0.15;
+  if(stop?.cat === 'scenic') mult += 0.1;
+  if(stop?.cat === 'temple' && (minuteOfDay >= 6*60 && minuteOfDay < 9*60)) mult += 0.15;
+  if(stop?.cat === 'beach' && isWeekend) mult += 0.2;
+  if(stop?.importance === 'must_see') mult += 0.15;
+  return Math.max(0.7, Math.min(2.0, mult));
+}
 
+function getCrowdLevel(multiplier){
+  if(multiplier <= 0.9) return { level:'low',     label:'Low Crowd',    emoji:'🟢' };
+  if(multiplier <= 1.2) return { level:'medium',  label:'Medium Crowd', emoji:'🟡' };
+  if(multiplier <= 1.5) return { level:'high',    label:'High Crowd',   emoji:'🟠' };
+  return                       { level:'extreme', label:'Very Crowded', emoji:'🔴' };
+}
 
+function getSmartTravelTime(fromCoords, toCoords, cityId, arriveMin, isFirstStop){
+  if(!fromCoords || !toCoords) return isFirstStop ? 10 : 20;
+  const km = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
+  const baseMinutes = Math.max(isFirstStop ? 10 : 12, Math.min(45, Math.round(km / 0.42)));
+  const trafficMult = getTrafficMultiplier(cityId, arriveMin);
+  return Math.round(baseMinutes * trafficMult);
+}
 
+function getSmartVisitTime(stop, arriveMin, dayOfWeek){
+  const baseVt = stop?.vt || 60;
+  const crowdMult = getCrowdMultiplier(stop, typeof dayOfWeek==='number'?dayOfWeek:new Date().getDay(), arriveMin);
+  const crowdAdjust = 1 + (crowdMult - 1) * 0.4;
+  return Math.round(baseVt * Math.max(0.85, Math.min(1.4, crowdAdjust)));
+}
 
+function getTransportOptions(fromCoords, toCoords, cityId, arriveMin){
+  const config = getTransportConfig(cityId);
+  const km = fromCoords && toCoords ? hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) : 3;
+  const trafficMult = getTrafficMultiplier(cityId, arriveMin);
+  const options = [];
+  if(km <= 2.0){
+    options.push({ mode:'walk', icon:'🚶', label:'Walk', fare:0, fareStr:'Free', time:Math.round(km * 14),
+      link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=walking` : '#' });
+  }
+  options.push({ mode:'bus', icon:'🚌', label:'Bus',
+    fare:Math.round(config.busFare[0] + (config.busFare[1]-config.busFare[0]) * Math.min(1, km/10)),
+    get fareStr(){ return `₹${this.fare}`; },
+    time:Math.round((km / 0.3) * trafficMult),
+    link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=transit` : '#' });
+  if(config.hasMetro){
+    const mf = config.metroFare || [10,60];
+    let modeLabel = 'Metro';
+    let lastMileFare = 0;
+    let lastMileTime = 0;
+    if (km > 3.5) {
+      const lastMileKm = Math.min(3, km * 0.2); // assume nearest metro is 1-3km from dest
+      if (lastMileKm > 1.2) {
+        lastMileFare = Math.round(config.autoBase + (lastMileKm * config.autoPerKm));
+        lastMileTime = Math.round((lastMileKm / 0.4) * trafficMult);
+        modeLabel = 'Metro+Auto';
+      } else {
+        lastMileTime = Math.round(lastMileKm * 14);
+        modeLabel = 'Metro+Walk';
+      }
+    }
+    options.push({ mode:'metro', icon:'🚇', label:modeLabel,
+      fare:Math.round(mf[0] + (mf[1]-mf[0]) * Math.min(1, km/15)) + lastMileFare,
+      get fareStr(){ return `₹${this.fare}`; },
+      time:Math.round(km / 0.55 + 8) + lastMileTime,
+      link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=transit` : '#' });
+  }
+  if(config.hasTrain && km > 3){
+    const tf = config.trainFare || [10,30];
+    let modeLabel = 'Train';
+    let lastMileFare = 0;
+    let lastMileTime = 0;
+    if (km > 5.0) {
+      const lastMileKm = Math.min(4, km * 0.25);
+      if (lastMileKm > 1.2) {
+        lastMileFare = Math.round(config.autoBase + (lastMileKm * config.autoPerKm));
+        lastMileTime = Math.round((lastMileKm / 0.4) * trafficMult);
+        modeLabel = 'Train+Auto';
+      } else {
+        lastMileTime = Math.round(lastMileKm * 14);
+        modeLabel = 'Train+Walk';
+      }
+    }
+    options.push({ mode:'train', icon:'🚂', label:modeLabel,
+      fare:Math.round(tf[0] + (tf[1]-tf[0]) * Math.min(1, km/20)) + lastMileFare,
+      get fareStr(){ return `₹${this.fare}`; },
+      time:Math.round(km / 0.5 + 12) + lastMileTime,
+      link:toCoords ? `https://www.google.com/maps/dir/?api=1&destination=${toCoords[0]},${toCoords[1]}&travelmode=transit` : '#' });
+  }
+  options.push({ mode:'auto', icon:'🛺', label:'Auto',
+    fare:Math.round(config.autoBase + config.autoPerKm * km),
+    get fareStr(){ return `₹${this.fare}`; },
+    time:Math.round((km / 0.4) * trafficMult),
+    link:toCoords ? `https://book.olacabs.com/?drop_lat=${toCoords[0]}&drop_lng=${toCoords[1]}` : '#' });
+  options.push({ mode:'cab', icon:'🚕', label:'Cab',
+    fare:Math.round(config.cabBase + config.cabPerKm * km),
+    get fareStr(){ return `₹${this.fare}`; },
+    time:Math.round((km / 0.45) * trafficMult),
+    link:toCoords ? `https://m.uber.com/ul/?action=setPickup&dropoff[latitude]=${toCoords[0]}&dropoff[longitude]=${toCoords[1]}` : '#' });
+  const cheapest = options.reduce((a,b) => a.fare <= b.fare ? a : b);
+  const fastest  = options.reduce((a,b) => a.time <= b.time ? a : b);
+  cheapest.isCheapest = true;
+  if(fastest.mode !== cheapest.mode) fastest.isFastest = true;
+  return { options, km, trafficMult };
+}
 
 // ── Budget Calculator ─────────────────────────────────────────────────────────
+function calculateStopBudget(stop, prevCoords, cityId){
+  const config = getTransportConfig(cityId);
+  const km = prevCoords && stop?.coords ? hvKm(prevCoords[0], prevCoords[1], stop.coords[0], stop.coords[1]) : 0;
+  const transport = Math.round(config.autoBase + config.autoPerKm * km);
+  const entry = ENTRY_FEE_ESTIMATES[stop?.cat] || 0;
+  const food = stop?.cat === 'food' ? 300 : 0;
+  return { transport, entry, food, misc:0, total:transport+entry+food };
+}
 
+function calculateDayBudget(dayStops, cityId, startCoords){
+  let totals = { transport:0, entry:0, food:0, misc:0, total:0 };
+  let prevCoords = startCoords;
+  for(const stop of (dayStops||[])){
+    if(stop.isBreak){ prevCoords = stop.coords; continue; }
+    const b = calculateStopBudget(stop, prevCoords, cityId);
+    totals.transport += b.transport;
+    totals.entry += b.entry;
+    totals.food += b.food;
+    totals.total += b.total;
+    prevCoords = stop.coords;
+  }
+  return totals;
+}
 
+function calculateTripBudget(plan, cityId, startCoords){
+  const days = [];
+  let grandTotal = { transport:0, entry:0, food:0, misc:0, total:0 };
+  for(const dayStops of (plan||[])){
+    const db = calculateDayBudget(dayStops, cityId, startCoords);
+    days.push(db);
+    grandTotal.transport += db.transport;
+    grandTotal.entry += db.entry;
+    grandTotal.food += db.food;
+    grandTotal.total += db.total;
+  }
+  return { days, grandTotal };
+}
 
 let tripBudgetData = null;
 
@@ -166,6 +682,9 @@ let map,rLine,mkrs=[],liveMkr=null;
 // Leaflet with no validation). followLivePosition() already had this exact
 // guard inline; this centralizes it so every call site gets the same
 // protection instead of relying on each one remembering to add it.
+function isFiniteLatLon(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
 
 let cLat=null,cLon=null,tripActive=false,tripStart=null;
 // Set once the user manually picks a city (search box or dropdown), so the
@@ -251,6 +770,7 @@ const t2m=(s,fallback=0)=>{
 };
 const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
 const sync=()=>{if(mdPlan.length>0)mdPlan[dayIdx]=itin;};
+const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
 // Shared guard against NaN/undefined/malformed coordinate pairs. Any place
 // with bad coords (missing geocode, failed AI hydration, etc.) must never
 // reach a Leaflet L.marker()/L.polyline() call — Leaflet throws "Invalid
@@ -361,6 +881,10 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
 
 // --- TIME BASED BEHAVIOUR HELPERS ---
+function getCurrentLocalMin() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
 
 // Real sunrise/sunset for a place's coordinates + date, so "best at
 // sunrise/sunset" badges/scoring track the actual sun rather than a fixed
@@ -371,6 +895,51 @@ const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floo
 // order without a network round trip. Results are cached per
 // coords+day since they don't change within a session.
 const _sunTimesCache = new Map();
+function getSunTimesClient(lat, lon, date = new Date()) {
+  const dayKey = `${lat.toFixed(2)},${lon.toFixed(2)},${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  if (_sunTimesCache.has(dayKey)) return _sunTimesCache.get(dayKey);
+  let result;
+  try {
+    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
+    const lngHour = lon / 15;
+    const zenith = 90.833;
+    const calc = (isRise) => {
+      const t = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24;
+      const M = 0.9856 * t - 3.289;
+      let L = M + 1.916 * Math.sin((M * Math.PI) / 180) + 0.020 * Math.sin((2 * M * Math.PI) / 180) + 282.634;
+      L = ((L % 360) + 360) % 360;
+      let RA = (180 / Math.PI) * Math.atan(0.91764 * Math.tan((L * Math.PI) / 180));
+      RA = ((RA % 360) + 360) % 360;
+      const Lquadrant = Math.floor(L / 90) * 90;
+      const RAquadrant = Math.floor(RA / 90) * 90;
+      RA = RA + (Lquadrant - RAquadrant);
+      RA /= 15;
+      const sinDec = 0.39782 * Math.sin((L * Math.PI) / 180);
+      const cosDec = Math.cos(Math.asin(sinDec));
+      const cosH = (Math.cos((zenith * Math.PI) / 180) - sinDec * Math.sin((lat * Math.PI) / 180)) / (cosDec * Math.cos((lat * Math.PI) / 180));
+      if (cosH > 1 || cosH < -1) return null;
+      let H = isRise ? 360 - (180 / Math.PI) * Math.acos(cosH) : (180 / Math.PI) * Math.acos(cosH);
+      H /= 15;
+      const T = H + RA - 0.06571 * t - 6.622;
+      let UT = T - lngHour;
+      UT = ((UT % 24) + 24) % 24;
+      let localT = UT + 5.5; // IST
+      localT = ((localT % 24) + 24) % 24;
+      return Math.round(localT * 60);
+    };
+    const sunriseMin = calc(true);
+    const sunsetMin = calc(false);
+    result = { sunriseMin: sunriseMin ?? 6 * 60, sunsetMin: sunsetMin ?? 18 * 60 + 30 };
+  } catch (_e) {
+    result = { sunriseMin: 6 * 60, sunsetMin: 18 * 60 + 30 };
+  }
+  _sunTimesCache.set(dayKey, result);
+  return result;
+}
+function placeSunTimes(loc, date = new Date()) {
+  const [lat, lon] = loc.coords || [20.5937, 78.9629];
+  return getSunTimesClient(lat, lon, date);
+}
 
 window.globalSimulationTime = getCurrentLocalMin();
 
@@ -522,7 +1091,119 @@ setTimeout(() => {
   }
 })();
 
+function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
+  let score = 50;
+  const reasons = [];
+  let state = "Normal";
 
+  const status = getPlaceDynamicStatus(loc, simTime);
+  const crowd = getCrowdPrediction(loc, simTime);
+  const { sunriseMin, sunsetMin } = placeSunTimes(loc);
+
+  if (status.status === 'closed') {
+    return { score: 0, state: 'Closed', reasons: ['🔴 Currently Closed', 'Check opening hours before visiting.'] };
+  }
+
+  // Base score boost for being open
+  score += 15;
+  reasons.push('🟢 Currently Open');
+
+  // Time of Day — windows are now the place's real sunrise/sunset (±75 min)
+  // rather than a fixed 5:00-7:30 AM / 5:00-7:00 PM clock window, which used
+  // to be off by well over an hour depending on the city and time of year.
+  if (simTime >= sunriseMin - 30 && simTime <= sunriseMin + 90) {
+    if (loc.is_sunrise_spot) {
+      score += 35;
+      state = "Sunrise Mode";
+      reasons.push('🌅 Perfect time for Sunrise View');
+      reasons.push('📸 Golden lighting for photography');
+    } else {
+      score += 10;
+      state = "Morning Mode";
+      reasons.push('🌤️ Peaceful morning atmosphere');
+    }
+  } else if (simTime >= sunsetMin - 90 && simTime <= sunsetMin + 30) {
+    if (loc.is_sunset_spot) {
+      score += 35;
+      state = "Golden Hour";
+      reasons.push('🌇 Perfect time for Sunset View');
+      reasons.push('📸 Excellent Golden Hour lighting');
+    } else {
+      score += 10;
+      state = "Evening Mode";
+      reasons.push('🌆 Pleasant evening vibe');
+    }
+  } else if (simTime >= sunsetMin + 30) {
+    if (loc.has_nightlife) {
+      score += 25;
+      state = "Night Mode";
+      reasons.push('🍹 Vibrant Nightlife is active');
+    } else if (loc.indoor_outdoor === 'outdoor' && loc.cat !== 'food') {
+      score -= 20;
+      reasons.push('🌙 Outdoor attraction at night (Limited visibility)');
+    }
+  }
+
+  // Heat Alert & Weather
+  if (window.realTemp && window.realTemp > 35 && simTime >= 720 && simTime <= 960) {
+    if (loc.indoor_outdoor === 'indoor') {
+      score += 20;
+      state = "Heat Escape";
+      reasons.push('❄️ Great AC/Indoor escape from extreme heat');
+    } else if (loc.indoor_outdoor === 'outdoor') {
+      score -= 30;
+      state = "Heat Alert";
+      reasons.push('⚠️ Extreme Heat warning for outdoor activity');
+    }
+  }
+  // Rain and strong wind used to only show up as badges elsewhere
+  // (getTimeBadgesHtml) without ever touching the score itself, so a
+  // rain-soaked outdoor spot or a wind-battered viewpoint could still rank
+  // as a top recommendation. Now they actually move the score.
+  if (window.realWeatherMain && /rain|storm|drizzle/i.test(window.realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
+    score -= 20;
+    reasons.push('🌧 Rain expected — outdoor visit may be uncomfortable');
+  }
+  if (window.realWind >= 30 && (loc.cat === 'beach' || loc.cat === 'scenic' || loc.is_sunset_spot)) {
+    score -= 10;
+    reasons.push('💨 Strong winds at this open viewpoint/beach');
+  }
+
+  // Crowd Analysis
+  if (crowd === 'Very High') {
+    score -= 15;
+    reasons.push('👥 Very High Crowd expected');
+  } else if (crowd === 'High') {
+    score -= 5;
+    reasons.push('👥 High Crowd expected');
+  } else {
+    score += 10;
+    reasons.push('🚶 Low/Moderate Crowd expected');
+  }
+  
+  if (status.status === 'closing_soon') {
+    score -= 15;
+    reasons.push('🟡 Closing soon (Hurry!)');
+  }
+
+  score = Math.max(1, Math.min(100, score));
+  return { score, state: state !== "Normal" ? state : "Recommended", reasons };
+}
+
+function getPlaceDynamicStatus(loc, evalTime) {
+  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
+  const ot = t2m(loc.ot || '06:00');
+  const ct = t2m(loc.ct || '23:00', 23 * 60);
+  // Some places (night markets, bars, 24hr spots) close after midnight, e.g.
+  // 18:00–02:00. A plain `now < ot || now >= ct` check always reported these
+  // as closed during their actual overnight open hours.
+  const overnight = ct <= ot;
+  const isOpen = overnight ? (now >= ot || now < ct) : (now >= ot && now < ct);
+  if (!isOpen) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
+  const minsToClose = overnight ? (now < ct ? ct - now : (1440 - now) + ct) : ct - now;
+  if (minsToClose <= 60 && minsToClose > 0) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
+  return { status: 'open', label: '🟢 Open', color: 'var(--success-color)' };
+}
 
 // Daypart baseline crowd weights — kept in sync with
 // data/time-intelligence-rules.json's crowdWeights so the frontend's
@@ -531,6 +1212,45 @@ setTimeout(() => {
 const CROWD_BASE_BY_DAYPART = { earlyMorning: 0.3, morning: 0.6, lateMorning: 0.8, afternoon: 0.9, evening: 1.1, night: 0.5 };
 const CROWD_WEEKEND_MULT = 1.4;
 const CROWD_PEAK_MULT = 1.5;
+function getDaypartClient(nowMin, sunsetMin) {
+  if (nowMin >= 5 * 60 && nowMin < 9 * 60) return 'earlyMorning';
+  if (nowMin >= 9 * 60 && nowMin < 12 * 60) return 'lateMorning';
+  if (nowMin >= 12 * 60 && nowMin < 16 * 60) return 'afternoon';
+  if (nowMin >= 16 * 60 && nowMin < sunsetMin) return 'evening';
+  if (nowMin >= sunsetMin || nowMin < 5 * 60) return 'night';
+  return 'morning';
+}
+function getCrowdPrediction(loc, evalTime) {
+  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
+  const isWeekend = [0, 6].includes(new Date().getDay());
+  const { sunsetMin } = placeSunTimes(loc);
+  const daypart = getDaypartClient(now, sunsetMin);
+
+  let isPeakNow = false;
+  if (loc.peak_hours) {
+    const parts = loc.peak_hours.split('-');
+    if (parts.length === 2) {
+      const pStart = t2m(parts[0].trim());
+      const pEnd = t2m(parts[1].trim());
+      isPeakNow = now >= pStart && now <= pEnd;
+    }
+  }
+
+  // Previously this only varied by weekday/weekend and otherwise ignored
+  // time of day completely — a 2 AM stop showed the exact same crowd level
+  // as an 11 AM one. Now it starts from a per-daypart baseline (same shape
+  // as the backend engine) and layers weekend/peak-hour multipliers on top.
+  let score = CROWD_BASE_BY_DAYPART[daypart] ?? 0.6;
+  if (isWeekend) score *= CROWD_WEEKEND_MULT;
+  if (isPeakNow) score *= CROWD_PEAK_MULT;
+  if (loc.cat === 'market' || loc.cat === 'food') score *= 1.15;
+
+  if (score < 0.35) return 'Very Low';
+  if (score < 0.6) return 'Low';
+  if (score < 0.95) return 'Moderate';
+  if (score < 1.4) return 'High';
+  return 'Very High';
+}
 
 function getTimeBadgesHtml(loc, evalTime) {
   const status = getPlaceDynamicStatus(loc, evalTime);
@@ -564,8 +1284,44 @@ function getTimeBadgesHtml(loc, evalTime) {
   if (status.status === 'open' && scoreInfo.score >= 80) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(168,85,247,0.25); display:inline-block; margin-top:4px; margin-right:4px;">✨ Best Time Now</span>`;
   }
+
+  // Advanced Travel Intelligence badges when backend state is attached (loc._ti)
+  const ti = loc._ti;
+  if (ti && ti.visitScore != null) {
+    const band = ti.visitLabel || '';
+    const color = ti.visitScore >= 75 ? 'rgba(34,197,94,0.25)' : ti.visitScore >= 50 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.2)';
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${color}; display:inline-block; margin-top:4px; margin-right:4px;">⭐ ${ti.visitScore}/100 ${band}</span>`;
+    if (ti.confidence && ti.confidence.level) {
+      html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(100,100,255,0.15); display:inline-block; margin-top:4px; margin-right:4px;">Confidence ${ti.confidence.level}</span>`;
+    }
+    if (ti.crowd && ti.crowd.source) {
+      html += `<span style="font-size:9px; padding:2px 6px; border-radius:4px; background:rgba(0,0,0,0.15); display:inline-block; margin-top:4px; margin-right:4px;">Crowd: ${ti.crowd.source}</span>`;
+    }
+  }
   
   return html;
+}
+
+/** Compact expandable TI panel for map/list cards when loc._ti is present. */
+function getTravelIntelPanelHtml(loc) {
+  const ti = loc && loc._ti;
+  if (!ti || ti.visitScore == null) return '';
+  const why = (ti.explanation && ti.explanation.bullets) ? ti.explanation.bullets.slice(0, 4).map(b => {
+    const icon = b.type === 'positive' ? '✓' : b.type === 'caution' ? '!' : '·';
+    return `${icon} ${b.text}`;
+  }).join('<br>') : (ti.explanation && ti.explanation.summary) || '';
+  const depart = ti.arrival && ti.arrival.recommendedDeparture ? ti.arrival.recommendedDeparture : '';
+  return `<div class="ti-panel" style="margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border-subtle,#333);background:var(--bg-layer2,#1a1a1a);font-size:11px;line-height:1.4;">
+    <div style="font-weight:600;margin-bottom:4px;">Travel Intelligence · ⭐ ${ti.visitScore}/100 ${ti.visitLabel||''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;opacity:.9;">
+      <span>👥 ${ti.crowdLevel||ti.crowd?.level||'—'}</span>
+      <span>🌦 ${ti.weather?.suitability||'—'}</span>
+      <span>🚗 ${ti.traffic?.trafficLevel||'—'}</span>
+      <span>🌅 ${ti.scenic?.suitability||'—'}</span>
+    </div>
+    ${why ? `<div style="margin-top:6px;opacity:.85;">${why}</div>` : ''}
+    ${depart ? `<div style="margin-top:6px;">Leave ~<strong>${depart}</strong></div>` : ''}
+  </div>`;
 }
 
 // ── Real-time notifications (spec §7): "closes in 45 minutes", "golden
@@ -656,6 +1412,7 @@ function createBreakStop(anchorStop,index,duration){
     isBreak:true,
   };
 }
+function getRouteStopsForDay(dayStops){return (dayStops||[]).filter(stop=>!stop?.isBreak);}
 function applyBreakPlanToCurrentItinerary(baseStops){
   const routeStops=(baseStops||getRouteStopsForDay(itin)).map(stop=>({ ...stop }));
   const breakEvery=getBreakEveryMinutes();
@@ -674,6 +1431,22 @@ function applyBreakPlanToCurrentItinerary(baseStops){
     activeSinceBreak += travel + visit;
   });
   return rebuilt;
+}
+function estimateStopLoadMinutes(stops){
+  return (stops||[]).reduce((sum, stop) => sum + (stop?.vt || 60) + 20, 0);
+}
+function normalizeLatLon(coords){
+  // Expect [lat, lon]. If it looks swapped (common in older saved plans), fix it.
+  const a=Number(coords?.[0]);
+  const b=Number(coords?.[1]);
+  if (Number.isNaN(a) || Number.isNaN(b)) return coords;
+  const aIsLat=a>=6 && a<=38;
+  const aIsLon=a>=68 && a<=98;
+  const bIsLat=b>=6 && b<=38;
+  const bIsLon=b>=68 && b<=98;
+  if (aIsLat && bIsLon) return [a,b];
+  if (aIsLon && bIsLat) return [b,a];
+  return [a,b];
 }
 
 function getCityCenter(){
@@ -695,27 +1468,175 @@ function getPreviewRouteStart(){
   return getCityCenter() || ((cLat && cLon) ? [cLat, cLon] : null);
 }
 
+function getLocalPlaces(cityId, cityName){
+  const key=String(cityId||'').toLowerCase();
+  const byName=Object.entries(CITIES).find(([,city])=>String(city.name||'').toLowerCase()===String(cityName||'').toLowerCase())?.[0];
+  const seeds=LOCAL_PLACE_SEEDS[key] || LOCAL_PLACE_SEEDS[byName] || [];
+  return seeds.map((seed,i)=>{
+    const [name,cat,lat,lon,vt,ot,ct]=seed;
+    return {
+      id:`local_${key||byName||'city'}_${i}`,
+      name,cat,coords:[lat,lon],vt,ot,ct,
+      fallbackSource:'local_seed',
+      importance:cat==='food'?'famous':i<6?'must_see':i<8?'famous':'local',
+      importanceScore:cat==='food'?70:Math.max(35,100-i*6),
+    };
+  });
+}
 
 // Catch the SAME physical place listed under different name variants
 // (e.g. "Sri Kanaka Mahalakshmi Temple" vs "...Ammavari Temple", or
 // "Fort Kochi Beach" vs "Fort Kochi Beach Park"). If two places sit within
 // ~180m of each other AND share a significant name word, they're almost
 // certainly the same spot — keep only the stronger one (by importanceScore).
+const DEDUPE_STOPWORDS = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
+function significantWords(n){
+  return String(n||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>=4 && !DEDUPE_STOPWORDS.has(w));
+}
+function dedupePlacesByProximity(list){
+  const all = [...list].sort((a,b)=>(b.importanceScore||0)-(a.importanceScore||0));
+  const kept = [];
+  for(const place of all){
+    if (!hasValidCoords(place?.coords)) continue;
+    const words = significantWords(place.name);
+    const dup = kept.find(k => {
+      if (!hasValidCoords(k.coords)) return false;
+      const d = hvKm(k.coords[0],k.coords[1],place.coords[0],place.coords[1]);
+      if (d > 0.18) return false;
+      const kWords = significantWords(k.name);
+      return words.some(w => kWords.includes(w));
+    });
+    if (dup) {
+      dup.importanceScore = Math.max(dup.importanceScore||0, place.importanceScore||0);
+      dup.isHiddenGem = dup.isHiddenGem || place.isHiddenGem;
+      continue;
+    }
+    kept.push(place);
+  }
+  return kept;
+}
 
 // Folds a city's verified Hidden Gems into the place pool automatically, so
 // they're part of every itinerary's candidate list by default — not only
 // when someone manually opens the Hidden Gems tool in chat.
+function withHiddenGems(cityId, list){
+  const gems = getHiddenGems(cityId);
+  return dedupePlacesByProximity(gems.length ? [...list, ...gems] : list);
+}
 
+function mergePlacePools(...pools){
+  const byName=new Map();
+  for(const place of pools.flat()){
+    if(!hasValidCoords(place?.coords)) continue;
+    const key=String(place.name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    if(!key) continue;
+    place.id = place.id || key;
+    const existing=byName.get(key);
+    if(!existing){
+      byName.set(key,place);
+      continue;
+    }
+    byName.set(key,{
+      ...place,
+      ...existing,
+      id: existing.id || place.id || key,
+      importanceScore:Math.max(existing.importanceScore||0,place.importanceScore||0),
+      importance:(existing.importanceScore||0)>=(place.importanceScore||0)?existing.importance:place.importance,
+    });
+  }
+  return dedupePlacesByProximity([...byName.values()]);
+}
 
+function sortNearestNeighbor(arr,sLat,sLon){
+  if(arr.length<=1)return arr;
+  let sorted=[],unsorted=[...arr],firstIdx=0;
+  if(sLat&&sLon){let minD=Infinity;for(let i=0;i<unsorted.length;i++){const d=hvKm(sLat,sLon,unsorted[i].coords[0],unsorted[i].coords[1]);if(d<minD){minD=d;firstIdx=i;}}}
+  sorted.push(unsorted.splice(firstIdx,1)[0]);
+  while(unsorted.length>0){const last=sorted[sorted.length-1];let ci=0,minD=Infinity;for(let i=0;i<unsorted.length;i++){const d=hvKm(last.coords[0],last.coords[1],unsorted[i].coords[0],unsorted[i].coords[1]);if(d<minD){minD=d;ci=i;}}sorted.push(unsorted.splice(ci,1)[0]);}
+  return sorted;
+}
 
 function getRouteStart(){
   if(cLat&&cLon) return [cLat,cLon];
   return getCityCenter();
 }
 
+function routeDistanceKm(stops,start){
+  if(!Array.isArray(stops)||stops.length===0) return 0;
+  let total=0;
+  let prev=start;
+  for(const stop of stops){
+    if(prev) total+=hvKm(prev[0],prev[1],stop.coords[0],stop.coords[1]);
+    prev=stop.coords;
+  }
+  return total;
+}
 
+function centroidOfStops(stops){
+  if(!Array.isArray(stops)||stops.length===0) return null;
+  const sum=stops.reduce((acc,stop)=>{
+    acc.lat+=stop.coords[0];
+    acc.lon+=stop.coords[1];
+    return acc;
+  },{lat:0,lon:0});
+  return [sum.lat/stops.length,sum.lon/stops.length];
+}
 
+function clusterStopsByArea(stops){
+  if(!Array.isArray(stops)||stops.length===0) return [];
 
+  const CLUSTER_RADIUS_KM = 3.2;
+  const clusters = [];
+
+  for(const stop of stops){
+    let bestCluster = null;
+    let bestDist = Infinity;
+
+    for(const cluster of clusters){
+      const d = hvKm(cluster.center[0], cluster.center[1], stop.coords[0], stop.coords[1]);
+      if(d < CLUSTER_RADIUS_KM && d < bestDist){
+        bestCluster = cluster;
+        bestDist = d;
+      }
+    }
+
+    if(!bestCluster){
+      clusters.push({ stops:[stop], center:[stop.coords[0], stop.coords[1]] });
+      continue;
+    }
+
+    bestCluster.stops.push(stop);
+    bestCluster.center = centroidOfStops(bestCluster.stops);
+  }
+
+  return clusters;
+}
+
+function orderStopsAreaWise(stops,start){
+  if(!Array.isArray(stops)||stops.length<=2) return [...(stops||[])];
+
+  const clusters = clusterStopsByArea(stops);
+  const clusterOrder = sortNearestNeighbor(
+    clusters.map((cluster, index)=>({
+      id:`cluster_${index}`,
+      coords:cluster.center,
+      cluster,
+    })),
+    start?.[0],
+    start?.[1]
+  );
+
+  const ordered = [];
+  let currentStart = start;
+
+  for(const item of clusterOrder){
+    const local = sortNearestNeighbor(item.cluster.stops, currentStart?.[0], currentStart?.[1]);
+    ordered.push(...local);
+    currentStart = local[local.length - 1]?.coords || currentStart;
+  }
+
+  return ordered;
+}
 
 // How much one "unit" of bad time-fit (a stop landing at a rough time —
 // closed, peak crowd, missed golden hour, heat/rain) counts against, in
@@ -731,7 +1652,54 @@ const TIME_FIT_KM_WEIGHT = 2.2;
 // map-marker colors and place badges — so open/closed, crowd, sunrise/
 // sunset, and weather all factor into which order is "better", not just
 // distance.
+function estimateTimeFitPenaltyKm(stops, start) {
+  if (!Array.isArray(stops) || !stops.length) return 0;
+  let clock = t2m(document.getElementById('s-time')?.value || '09:00', 9 * 60);
+  let prev = start;
+  let penalty = 0;
+  for (const stop of stops) {
+    if (prev) clock += Math.max(5, Math.round(hvKm(prev[0], prev[1], stop.coords[0], stop.coords[1]) / 0.45));
+    const { score } = calculateExperienceScore(stop, clock % 1440);
+    penalty += (1 - score / 100) * TIME_FIT_KM_WEIGHT; // 0 = perfect fit, full weight = worst
+    clock += stop.vt || 60;
+    prev = stop.coords;
+  }
+  return penalty;
+}
 
+function optimizeStopOrder(stops,start){
+  if(!Array.isArray(stops)||stops.length<=2) return [...(stops||[])];
+
+  // Combined cost = travel distance + time-of-day fitness penalty, so the
+  // 2-opt search below can trade a slightly longer drive for a much better-
+  // timed visit (e.g. hitting a sunset spot near sunset, or dodging a
+  // stop's peak-crowd window) instead of purely chasing the shortest route.
+  const routeCost=(candidate)=>routeDistanceKm(candidate,start)+estimateTimeFitPenaltyKm(candidate,start);
+
+  let ordered=orderStopsAreaWise(stops,start);
+  let improved=true;
+  let guard=0;
+
+  while(improved&&guard<8){
+    improved=false;
+    guard+=1;
+    for(let i=0;i<ordered.length-2;i++){
+      for(let j=i+1;j<ordered.length-1;j++){
+        const candidate=[
+          ...ordered.slice(0,i),
+          ...ordered.slice(i,j+1).reverse(),
+          ...ordered.slice(j+1),
+        ];
+        if(routeCost(candidate)+0.05<routeCost(ordered)){
+          ordered=candidate;
+          improved=true;
+        }
+      }
+    }
+  }
+
+  return ordered;
+}
 
 function updateFollowButton(){
   const btn=document.getElementById('btn-follow-live');
@@ -812,6 +1780,15 @@ function toggleLiveFollow(forceState){
   if(autoFollowLive) followLivePosition(true);
 }
 
+function bearingBetween(from,to){
+  const toRad=v=>v*Math.PI/180;
+  const toDeg=v=>(v*180/Math.PI+360)%360;
+  const lat1=toRad(from[0]), lat2=toRad(to[0]);
+  const dLon=toRad(to[1]-from[1]);
+  const y=Math.sin(dLon)*Math.cos(lat2);
+  const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+  return toDeg(Math.atan2(y,x));
+}
 
 function applyMapHeadingRotation(){
   // Rotating Leaflet's map pane can blank the tile layer because Leaflet uses
@@ -951,11 +1928,76 @@ function turnArrowForInstruction(text){
   return '🧭';
 }
 
+function keepNearbyCluster(stops,start,maxRadiusKm=6){
+  if(!Array.isArray(stops)||stops.length<=1||!start) return [...(stops||[])];
+  const sorted=sortNearestNeighbor(stops,start[0],start[1]);
+  const anchor=sorted[0]?.coords || start;
+  const nearby=sorted.filter(stop=>hvKm(anchor[0],anchor[1],stop.coords[0],stop.coords[1])<=maxRadiusKm);
+  return nearby.length>=2 ? nearby : sorted.slice(0, Math.min(4, sorted.length));
+}
 
+function famousPlaceScore(stop,start){
+  if(!stop?.coords) return -999;
+  const dist = start ? hvKm(start[0], start[1], stop.coords[0], stop.coords[1]) : 0;
+  const name = String(stop.name||'').toLowerCase();
+  let fame = 0;
+  fame += Number(stop.importanceScore||0);
+  if(stop.importance==='must_see') fame += 25;
+  else if(stop.importance==='famous') fame += 10;
+  if(stop.aiRanked) fame += 8;
+  if(String(stop.id||'').startsWith('wiki_')) fame += 5;
+  if(stop.cat==='beach' || stop.cat==='temple') fame += 2;
+  if(/\b(park|beach|temple|fort|palace|museum|zoo|aquarium|caves|cave|hill|peak|viewpoint|view point|ghat|falls|lake|garden|island|monument|statue)\b/.test(name)) fame += 3;
+  if(/\b(famous|iconic|heritage|central|main|old|grand)\b/.test(name)) fame += 2;
+  if(stop.wikiMatched) fame += 2;
+  return fame * 4 - dist;
+}
 
+function prioritizePlanStops(stops,start,prefs=[]){
+  if(!Array.isArray(stops)||!stops.length) return [];
+  const wantsFood = prefs.includes('food');
+  let foodStops = stops.filter(s=>s.cat==='food');
+  let attractionStops = stops.filter(s=>s.cat!=='food');
 
+  if(attractionStops.length){
+    attractionStops = [...attractionStops]
+      .sort((a,b)=>famousPlaceScore(b,start)-famousPlaceScore(a,start))
+      .slice(0, Math.min(attractionStops.length, 50)); // enough for multi-day trips
+    attractionStops = sortNearestNeighbor(attractionStops, start?.[0], start?.[1]);
+  }
 
+  if(foodStops.length){
+    foodStops = keepNearbyCluster(foodStops,start,wantsFood && prefs.length===1 ? 4 : 3.5)
+      .sort((a,b)=>{
+        const da = start ? hvKm(start[0],start[1],a.coords[0],a.coords[1]) : 0;
+        const db = start ? hvKm(start[0],start[1],b.coords[0],b.coords[1]) : 0;
+        return da-db;
+      });
+  }
 
+  if(!wantsFood) return attractionStops;
+  if(!attractionStops.length) return foodStops;
+  return [...attractionStops, ...foodStops];
+}
+
+function dayPartForMinutes(mins){
+  if(mins < 11*60) return 'Morning';
+  if(mins < 15*60) return 'Afternoon';
+  if(mins < 19*60) return 'Evening';
+  return 'Night';
+}
+
+function climateMode(temp){
+  if(temp >= 33) return 'hot';
+  if(temp <= 23) return 'cool';
+  return 'pleasant';
+}
+
+function estimateTravelMinutes(prevCoords, stop, isFirstStop=false){
+  if(!prevCoords || !stop?.coords) return isFirstStop ? 10 : 20;
+  const km = hvKm(prevCoords[0], prevCoords[1], stop.coords[0], stop.coords[1]);
+  return Math.max(isFirstStop ? 10 : 12, Math.min(35, Math.round(km / 0.42)));
+}
 
 // Persona weighting for itinerary personalization (mirrors data/time-intelligence-rules.json
 // on the backend — kept here too so client-side scoring doesn't need a network round trip).
@@ -985,9 +2027,118 @@ const TRIP_MODE_WEIGHTS = {
 };
 window.selectedTripMode = window.selectedTripMode || null;
 
+function tripModeBonus(stop, tripMode){
+  const weights = tripMode && TRIP_MODE_WEIGHTS[tripMode];
+  if(!weights) return 0;
+  let bonus = 0;
+  if(weights.sunrise && stop.is_sunrise_spot) bonus += weights.sunrise;
+  if(weights.sunset && stop.is_sunset_spot) bonus += weights.sunset;
+  if(weights.nightlife && stop.has_nightlife) bonus += weights.nightlife;
+  if(weights[stop.cat]) bonus += weights[stop.cat];
+  return bonus;
+}
 
+function personaBonus(stop, personas){
+  if(!personas || !personas.length) return 0;
+  let bonus = 0;
+  personas.forEach(p=>{
+    const weights = PERSONA_WEIGHTS[p];
+    if(!weights) return;
+    if(weights.sunrise && stop.is_sunrise_spot) bonus += weights.sunrise;
+    if(weights.sunset && stop.is_sunset_spot) bonus += weights.sunset;
+    if(weights.safety && stop.family_friendly) bonus += weights.safety;
+    if(weights[stop.cat]) bonus += weights[stop.cat];
+  });
+  return bonus;
+}
 
+function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null, tripMode=null){
+  const part = dayPartForMinutes(arriveMin);
+  const climate = climateMode(temp);
+  let score = Math.max(0, 12 - priorityIndex) + Math.min(20, Number(stop.importanceScore||0) / 5);
 
+  // Extreme heat: push outdoor stops out of the 12-16h window instead of
+  // just favoring indoor ones — a real reroute signal, not just a note.
+  if (stop.indoor_outdoor === 'outdoor' && temp >= 38 && arriveMin >= 12*60 && arriveMin <= 16*60) {
+    score -= 25;
+  }
+  // Strong wind: warn beaches / viewpoints / sunset spots away from that slot.
+  if (wind >= 30 && (stop.cat === 'beach' || stop.cat === 'scenic' || stop.is_sunset_spot)) {
+    score -= 15;
+  }
+  score += personaBonus(stop, personas || window.selectedPersonas);
+  score += tripModeBonus(stop, tripMode || window.selectedTripMode);
+
+  if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) score += 15;
+  if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) score += 15;
+  if (stop.has_nightlife && arriveMin >= 19*60) score += 8;
+  if (stop.indoor_outdoor === 'indoor' && climate === 'hot' && arriveMin >= 12*60 && arriveMin <= 16*60) score += 5;
+  if (stop.best_visiting_hours) {
+    const parts = stop.best_visiting_hours.split('-');
+    if (parts.length === 2) {
+      const sMin = t2m(parts[0].trim());
+      const eMin = t2m(parts[1].trim());
+      if (arriveMin >= sMin && arriveMin <= eMin) score += 10;
+    }
+  }
+
+  if(stop.cat === 'food'){
+    if(arriveMin >= 12*60 && arriveMin <= 15*60) score += 14;
+    else if(arriveMin >= 18*60 && arriveMin <= 22*60) score += 16;
+    else if(arriveMin >= 9*60 && arriveMin < 11*60) score += 6;
+    else score -= 6;
+    if(/\b(cafe|coffee|breakfast|bakery)\b/i.test(stop.name || '') && part === 'Morning') score += 4;
+    if(/\b(seafood|biryani|restaurant|mess|eatery|hotel)\b/i.test(stop.name || '') && part !== 'Morning') score += 3;
+    return score;
+  }
+  if(stop.cat === 'temple'){
+    if(part === 'Morning') score += 12;
+    else if(part === 'Evening') score += 8;
+    else if(part === 'Afternoon') score += 1;
+    else score -= 5;
+    return score;
+  }
+  if(stop.cat === 'beach'){
+    if(climate === 'hot'){
+      if(part === 'Morning' || part === 'Evening') score += 12;
+      else score -= 8;
+    } else {
+      if(part === 'Morning' || part === 'Evening') score += 9;
+      else if(part === 'Afternoon') score += 3;
+      else score -= 4;
+    }
+    return score;
+  }
+  if(climate === 'hot'){
+    if(part === 'Morning' || part === 'Evening') score += 8;
+    else if(part === 'Afternoon') score -= 2;
+  } else {
+    if(part === 'Morning' || part === 'Afternoon' || part === 'Evening') score += 6;
+    else score -= 3;
+  }
+  return score;
+}
+
+function stopClimateNote(stop, arriveMin, temp){
+  const part = dayPartForMinutes(arriveMin);
+  const climate = climateMode(temp);
+  
+  if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) return '🌅 Sunrise View';
+  if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) return '🌇 Sunset View';
+  if (stop.has_nightlife && arriveMin >= 19*60) return '🍹 Nightlife';
+  if (stop.indoor_outdoor === 'indoor' && climate === 'hot' && part === 'Afternoon') return '🏛️ Indoor Heat Escape';
+
+  if(stop.cat === 'food'){
+    if(part === 'Afternoon') return 'Lunch Stop';
+    if(part === 'Evening') return 'Sunset Snack';
+    if(part === 'Night') return 'Dinner Stop';
+    return 'Food Break';
+  }
+  if(stop.cat === 'beach' && climate === 'hot') return part === 'Morning' ? 'Cool Morning Window' : 'Best Near Sunset';
+  if(stop.cat === 'temple') return part === 'Morning' ? 'Peaceful Morning Visit' : 'Calmer Evening Slot';
+  if(climate === 'hot' && part === 'Afternoon') return 'Short Climate-Friendly Visit';
+  return `${part} Highlight`;
+}
 
 function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=0, breakDuration=0){
   let currentMin = startMin;
@@ -1189,6 +2340,31 @@ function getPlayableRoutePoints(){
   return fallback;
 }
 
+function interpolatePathPoint(path, ratio){
+  if(path.length===0) return null;
+  if(path.length===1) return path[0];
+  const segments=[];
+  let total=0;
+  for(let i=1;i<path.length;i++){
+    const len=hvKm(path[i-1][0],path[i-1][1],path[i][0],path[i][1]);
+    segments.push(len);
+    total+=len;
+  }
+  if(total<=0) return path[Math.min(path.length-1,1)];
+  let target=total*Math.min(Math.max(ratio,0),1);
+  for(let i=1;i<path.length;i++){
+    const seg=segments[i-1];
+    if(target<=seg){
+      const t=seg===0?0:target/seg;
+      return [
+        path[i-1][0]+(path[i][0]-path[i-1][0])*t,
+        path[i-1][1]+(path[i][1]-path[i-1][1])*t,
+      ];
+    }
+    target-=seg;
+  }
+  return path[path.length-1];
+}
 
 function createQuestMarker(coords, emoji, color){
   return L.marker(coords,{
@@ -1571,6 +2747,9 @@ function getSelectedPrefs(){
   return Array.from(document.querySelectorAll('.pref:checked')).map(el => el.value);
 }
 
+function formatTripWindow(days, minutesPerDay){
+  return `${days} day${days===1?'':'s'} / ${fmtM(minutesPerDay)}`;
+}
 
 function updatePlannerShowcase(){
   const days = parseInt(document.getElementById('n-days')?.value, 10) || 1;
@@ -1954,6 +3133,9 @@ function chatAbout(name){switchToView('chat-view',2);setTimeout(()=>{document.ge
 // renders user-typed or AI-generated text now escapes it first — either with
 // escapeHtml() directly (plain text) or formatAiText() (escapes, then safely
 // re-applies only **bold** and newline formatting on the escaped text).
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // ── Chat/toast HTML sanitizer ────────────────────────────────────────────
 // addMsg()/showToast() render fragments built by template-literal-interpolating
@@ -1979,6 +3161,21 @@ function chatAbout(name){switchToView('chat-view',2);setTimeout(()=>{document.ge
 // comparisons, never feeds them into innerHTML or eval.
 const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div','button','textarea'];
 const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','type','maxlength','rows','placeholder','aria-label','disabled'];
+function sanitizeChatHtml(html){
+  const str = String(html ?? '');
+  if (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+    return window.DOMPurify.sanitize(str, {
+      ALLOWED_TAGS: CHAT_ALLOWED_TAGS,
+      ALLOWED_ATTR: CHAT_ALLOWED_ATTR,
+      ALLOW_DATA_ATTR: false,
+    });
+  }
+  console.warn('[security] DOMPurify unavailable \u2014 falling back to plain-text rendering for chat messages.');
+  return escapeHtml(str);
+}
+function formatAiText(str){
+  return escapeHtml(str).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+}
 function addMsg(html,isBot=true){const box=document.getElementById('chat-messages');const row=document.createElement('div');row.className='msg-row'+(isBot?'':' from-user')+' fade-in';const safe=sanitizeChatHtml(html);row.innerHTML=isBot?`<div class="msg-avatar av-ai">AI</div><div class="bubble">${safe}</div>`:`<div class="bubble user-b">${safe}</div><div class="msg-avatar av-me">ME</div>`;box.appendChild(row);box.scrollTop=box.scrollHeight;return row;}
 
 // ── Delegated action handling for in-chat widget buttons ────────────────────
@@ -2168,6 +3365,10 @@ function ti_findPlace(query){
 }
 
 function ti_renderState(place, state){
+  // Premium Travel Intelligence card when advanced fields are present
+  if (state.visitScore != null || state.explanation) {
+    return ti_renderIntelligenceCard(place, state);
+  }
   const closeStr = state.minutesToClose!=null ? (state.minutesToClose>=60?`${Math.floor(state.minutesToClose/60)}h ${state.minutesToClose%60}m`:`${state.minutesToClose}m`) : null;
   const parts=[
     `⏰ <strong>${place.name}</strong> — ${state.statusLabel}`,
@@ -2181,6 +3382,60 @@ function ti_renderState(place, state){
     (state.notifications||[]).map(n=>`🔔 ${n}`).join('<br>') || null,
   ];
   return parts.filter(Boolean).join('<br>');
+}
+
+
+/** Batch-enrich places with backend Travel Intelligence into place._ti (non-blocking). */
+async function enrichPlacesWithTravelIntel(places, limit = 30) {
+  try {
+    if (!places || !places.length || !window.API || !API.timeIntelligenceStatus) return;
+    const slice = places.slice(0, limit);
+    const weather = { tempC: typeof realTemp === 'number' ? realTemp : null, condition: realWeatherMain || null, windKph: window.realWind };
+    const { places: states } = await API.timeIntelligenceStatus(slice.map(ti_placePayload), weather);
+    if (!Array.isArray(states)) return;
+    const byName = Object.fromEntries(states.map(s => [s.name, s]));
+    places.forEach(p => { if (byName[p.name]) p._ti = byName[p.name]; });
+  } catch (e) {
+    console.warn('[TI enrich]', e.message || e);
+  }
+}
+
+/** Premium multi-factor Travel Intelligence card (mobile-first). */
+function ti_renderIntelligenceCard(place, state){
+  const score = state.visitScore != null ? state.visitScore : '—';
+  const label = state.visitLabel || '';
+  const conf = state.confidence ? `${state.confidence.level || ''} — ${state.confidence.confidence ?? ''}%` : '';
+  const crowd = state.crowd?.level || state.crowdLevel || '—';
+  const wx = state.weather?.suitability || '—';
+  const traffic = state.traffic?.trafficLevel || state.traffic?.level || '—';
+  const scenic = state.scenic?.suitability || '—';
+  const why = (state.explanation?.bullets || []).slice(0, 6).map(b => {
+    const icon = b.type === 'positive' ? '✓' : b.type === 'caution' ? '!' : '·';
+    return `${icon} ${b.text}`;
+  }).join('<br>') || (state.explanation?.summary || '');
+  const depart = state.arrival?.recommendedDeparture || '';
+  const window = state.scenic?.bestScenicWindow
+    ? `${state.scenic.bestScenicWindow.start || ''} – ${state.scenic.bestScenicWindow.end || ''}`
+    : (state.arrival?.experienceWindow ? `${state.arrival.experienceWindow.start} – ${state.arrival.experienceWindow.end}` : '');
+  const sourceNote = state.crowd?.source ? `Crowd source: ${state.crowd.source}` : '';
+  return `
+<div style="border:1px solid var(--border-subtle,#333);border-radius:14px;padding:14px 16px;background:var(--bg-layer2,#1a1a1a);max-width:420px;font-size:13px;line-height:1.45;">
+  <div style="font-size:11px;letter-spacing:.04em;opacity:.7;margin-bottom:4px;">BEST TIME TO VISIT</div>
+  <div style="font-weight:700;font-size:16px;margin-bottom:2px;">${escapeHtml(place.name)}</div>
+  <div style="opacity:.9;margin-bottom:8px;">${escapeHtml(state.statusLabel || '')}</div>
+  ${window ? `<div style="margin-bottom:6px;">🕐 ${escapeHtml(window)}</div>` : ''}
+  <div style="font-size:18px;font-weight:700;margin:8px 0;">⭐ ${score}/100 ${escapeHtml(label)}</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;font-size:12px;">
+    <span>👥 Crowd ${escapeHtml(String(crowd))}</span>
+    <span>🌦 Weather ${escapeHtml(String(wx))}</span>
+    <span>🚗 Traffic ${escapeHtml(String(traffic))}</span>
+    <span>🌅 Scenic ${escapeHtml(String(scenic))}</span>
+  </div>
+  ${why ? `<div style="margin-top:8px;"><div style="font-size:11px;opacity:.7;margin-bottom:4px;">WHY?</div>${why}</div>` : ''}
+  ${depart ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-subtle,#333);">Recommended departure <strong>${escapeHtml(depart)}</strong></div>` : ''}
+  ${conf ? `<div style="margin-top:6px;font-size:11px;opacity:.75;">Confidence: ${escapeHtml(conf)}</div>` : ''}
+  ${sourceNote ? `<div style="margin-top:4px;font-size:10px;opacity:.6;">${escapeHtml(sourceNote)}</div>` : ''}
+</div>`.trim();
 }
 
 async function bestTimeToVisit(query){
@@ -2494,11 +3749,17 @@ function renderMapMarkers() {
         <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
           ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
         </ul>
+        ${typeof getTimeBadgesHtml==='function' ? getTimeBadgesHtml(l) : ''}
+        ${typeof getTravelIntelPanelHtml==='function' ? getTravelIntelPanelHtml(l) : ''}
       </div>
     `;
     const mkr = L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml);
     allPlacesMkrs.push(mkr);
   });
+  // Enrich LOCS with backend Travel Intelligence (async; next redraw shows panel)
+  if (typeof enrichPlacesWithTravelIntel === 'function' && window.LOCS?.length) {
+    enrichPlacesWithTravelIntel(window.LOCS);
+  }
 }
 
 // Public OSRM demo mirrors used for turn-by-turn road routing during live
@@ -2610,6 +3871,8 @@ async function renderRoute(){
         <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
           ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
         </ul>
+        ${typeof getTimeBadgesHtml==='function' ? getTimeBadgesHtml(l) : ''}
+        ${typeof getTravelIntelPanelHtml==='function' ? getTravelIntelPanelHtml(l) : ''}
       </div>
     `;
     mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml));
@@ -2638,6 +3901,7 @@ async function renderRoute(){
   if(streetQuestActive) setupStreetQuest();
 }
 
+function fmt12(d){const h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM',hh=h%12||12,mm=String(m).padStart(2,'0');return `${hh}:${mm} ${ap}`;}
 function getScheduleStart(){const startMin=t2m(document.getElementById('s-time')?.value||'09:00',9*60);const t=new Date();t.setHours(Math.floor(startMin/60),startMin%60,0,0);return t;}
 function getScheduleEnd(){return new Date(getScheduleStart().getTime()+getTripMinutes()*60000);}
 function recalcTimes(opts={}){
@@ -2729,7 +3993,7 @@ function updateItinUI(){
     }
     const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
 
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
@@ -2785,6 +4049,9 @@ function shareEmergency(){if(!cLat||!cLon){alert('GPS not available.');return;}c
 // applyMapHeadingRotation() above documents why that breaks Leaflet's tile
 // positioning, so this stays a read-only indicator + info action instead.
 const COMPASS_DIRS = ['North','North-East','East','South-East','South','South-West','West','North-West'];
+function degToCompassLabel(deg){
+  return COMPASS_DIRS[Math.round(((deg%360)+360)%360/45)%8];
+}
 function compassTap(){
   if(lastHeading==null){
     showToast('🧭','Direction','Start moving, or begin live navigation, to detect your heading.');

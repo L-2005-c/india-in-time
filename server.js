@@ -251,6 +251,13 @@ app.use('/dist', express.static(require('path').join(config.publicDir, 'dist'), 
   setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
 }));
 
+// Vite default emits /assets/* while Express only mounted /dist. Without this,
+// production index.html from dist/ references /assets/*.js|.css that 404 —
+// white/unstyled shell (login chrome only). Serve hashed build assets at /assets.
+app.use('/assets', express.static(require('path').join(config.publicDir, 'dist', 'assets'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
+}));
+
 app.use(express.static(config.publicDir, {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.json')) {

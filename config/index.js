@@ -150,8 +150,22 @@ const path = require('path');
 
 config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
   const distIndex = path.join(config.publicDir, 'dist', 'index.html');
-  if (config.isProd && fs.existsSync(distIndex)) return distIndex;
-  return path.join(config.publicDir, 'index.html');
+  const sourceIndex = path.join(config.publicDir, 'index.html');
+  // Opt into dist with USE_DIST_FRONTEND=1. Default to source index.html
+  // (loads /app.js + /styles.css) so a Vite path mismatch cannot blank the UI.
+  const preferDist = process.env.USE_DIST_FRONTEND === '1' || process.env.USE_DIST_FRONTEND === 'true';
+  if (preferDist && config.isProd && fs.existsSync(distIndex)) return distIndex;
+  // Legacy: if dist exists AND assets dir has files, use dist in prod
+  if (config.isProd && preferDist === false && fs.existsSync(distIndex)) {
+    const assetsDir = path.join(config.publicDir, 'dist', 'assets');
+    try {
+      if (fs.existsSync(assetsDir) && fs.readdirSync(assetsDir).length > 0) {
+        // Still prefer source unless explicitly opted in — dist migration incomplete
+        return sourceIndex;
+      }
+    } catch (_e) { /* fall through */ }
+  }
+  return sourceIndex;
 };
 
 module.exports = config;
