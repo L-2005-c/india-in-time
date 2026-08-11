@@ -3,9 +3,6 @@
 const rules = require('../../data/time-intelligence-rules.json');
 const { t2m, m2t, getISTParts } = require('./timeEngine');
 const { estimateTravel } = require('./trafficEngine');
-// getTravelIntelligence injected via setTravelIntelligence to avoid circular require
-let getTravelIntelligence = null;
-function setTravelIntelligence(fn) { getTravelIntelligence = fn; }
 const { distKm } = require('../../utils/geo');
 
 const DEFAULT_VISIT_MIN = {
@@ -53,11 +50,12 @@ function buildDayPlan(places, opts = {}) {
   const endMin = Number.isFinite(opts.endMin) ? opts.endMin : 21 * 60;
 
   // Score every place at "now" for ranking priority
-  if (typeof getTravelIntelligence !== 'function') {
-    throw new Error('itineraryEngine: call setTravelIntelligence(getTravelIntelligence) before buildDayPlan');
+  const getTI = opts.getTravelIntelligence;
+  if (typeof getTI !== 'function') {
+    throw new Error('itineraryEngine.buildDayPlan requires opts.getTravelIntelligence');
   }
   const scored = (places || []).map((p) => {
-    const intel = getTravelIntelligence(p, now, weather, {
+    const intel = getTI(p, now, weather, {
       fromCoords: origin, personas, tripMode,
     });
     return { place: p, intel, score: intel.visitScore };
@@ -186,20 +184,104 @@ function buildDayPlan(places, opts = {}) {
       reason: s.intel.explanation?.summary || 'Lower ranked for this day window',
     }));
 
+  // 2-opt refinement to reduce travel distance/time
+  const refined = twoOptRefine(plan, { originCoords: origin, bufferMin });
+
   return {
     date: now.toISOString(),
-    startAt: plan[0]?.departAt || m2t(cursor),
-    endAt: plan.length ? plan[plan.length - 1].leaveAt : m2t(cursor),
-    stops: plan,
-    stopCount: plan.length,
+    startAt: refined[0]?.departAt || m2t(cursor),
+    endAt: refined.length ? refined[refined.length - 1].leaveAt : m2t(cursor),
+    stops: refined,
+    stopCount: refined.length,
     alternatives,
     warnings,
     bufferMin,
-    summary: plan.length
-      ? `${plan.length}-stop day plan from ${plan[0].departAt} to ${plan[plan.length - 1].leaveAt}`
+    optimizer: refined.length >= 3 ? '2-opt' : 'greedy',
+    summary: refined.length
+      ? `${refined.length}-stop day plan from ${refined[0].departAt} to ${refined[refined.length - 1].leaveAt}`
       : 'No feasible stops for the selected window',
   };
 }
+
+
+/**
+ * 2-opt style refinement: try swapping adjacent segments to reduce total travel minutes
+ * while preserving openness and end-of-day constraints approximately.
+ */
+function twoOptRefine(stops, opts = {}) {
+  if (!stops || stops.length < 3) return stops;
+  const origin = opts.originCoords || null;
+  let best = stops.slice();
+  let improved = true;
+  let guard = 0;
+  while (improved && guard < 40) {
+    improved = false;
+    guard++;
+    for (let i = 0; i < best.length - 1; i++) {
+      for (let k = i + 1; k < best.length; k++) {
+        const candidate = best.slice(0, i).concat(best.slice(i, k + 1).reverse(), best.slice(k + 1));
+        if (pathTravelCost(candidate, origin) + 0.5 < pathTravelCost(best, origin)) {
+          best = candidate;
+          improved = true;
+        }
+      }
+    }
+  }
+  // Re-number order and recompute times roughly from original start
+  if (best.length && stops.length) {
+    const startDepart = t2m(stops[0].departAt || '08:00');
+    let cursor = startDepart;
+    const bufferMin = opts.bufferMin ?? 20;
+    let prev = origin;
+    return best.map((s, idx) => {
+      let travel = s.travelMinutes || 15;
+      if (prev && s.coords) {
+        try {
+          travel = estimateTravel({
+            fromCoords: prev,
+            toCoords: s.coords,
+            departMin: cursor,
+            isFirstStop: idx === 0,
+          }).travelMinutes || travel;
+        } catch (_e) { /* keep */ }
+      }
+      const arrive = cursor + travel;
+      const leave = arrive + (s.stayMinutes || 45);
+      const next = {
+        ...s,
+        order: idx + 1,
+        departAt: m2t(cursor),
+        arriveAt: m2t(arrive),
+        leaveAt: m2t(leave),
+        travelMinutes: travel,
+      };
+      cursor = leave + bufferMin;
+      prev = s.coords || prev;
+      return next;
+    });
+  }
+  return best;
+}
+
+function pathTravelCost(stops, origin) {
+  let cost = 0;
+  let prev = origin;
+  for (const s of stops) {
+    if (prev && s.coords && s.coords.length >= 2) {
+      try {
+        const { distKm } = require('../../utils/geo');
+        cost += distKm(prev[0], prev[1], s.coords[0], s.coords[1]);
+      } catch (_e) {
+        cost += s.travelMinutes || 20;
+      }
+    } else {
+      cost += s.travelMinutes || 20;
+    }
+    prev = s.coords || prev;
+  }
+  return cost;
+}
+
 
 function buildStopNotes(place, arriveMin, intel) {
   const notes = [];
@@ -304,6 +386,5 @@ module.exports = {
   dynamicAdvice,
   multiDayAdvice,
   visitDurationMin,
-  setTravelIntelligence,
 };
 

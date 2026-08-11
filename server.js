@@ -25,8 +25,17 @@ const logger  = require('./lib/logger');
 // as-is — each worker independently guarding itself against Gemini failures
 // is a reasonable resilience pattern, not a correctness bug like the rate
 // limiter split was.) Set CLUSTER_WORKERS to override either way.
-const numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10)
+let numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10)
   || (process.env.REDIS_URL ? os.cpus().length : 1);
+if (numCPUs > 1 && !process.env.REDIS_URL) {
+  const msg = 'CLUSTER_WORKERS>1 without REDIS_URL multiplies per-worker rate-limit buckets; refusing in production. Set REDIS_URL or CLUSTER_WORKERS=1.';
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌', msg);
+    process.exit(1);
+  }
+  console.warn('⚠️', msg, '— forcing CLUSTER_WORKERS=1');
+  numCPUs = 1;
+}
 
 // Vercel serverless functions are a fresh process per invocation — there's
 // no meaningful "primary forks workers" relationship there, and spawning
@@ -82,8 +91,8 @@ const { initDatabase, closeDatabase } = require('./db/init');
 // ── Import middleware ────────────────────────────────────────────────────────
 const { requestLogger }   = require('./middleware/requestLogger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const { aiLimiter, placesLimiter, weatherLimiter, generalLimiter } = require('./middleware/rateLimiter');
-const { validateAiRequest, validatePlacesRequest, validateWeatherRequest, validateGeocodeRequest } = require('./middleware/validator');
+const { aiLimiter, placesLimiter, weatherLimiter, generalLimiter, timeIntelLimiter } = require('./middleware/rateLimiter');
+const { validateAiRequest, validatePlacesRequest, validateTimeIntelRequest, validateWeatherRequest, validateGeocodeRequest } = require('./middleware/validator');
 const { analyticsMiddleware } = require('./routes/analytics');
 
 // ── Import routes ────────────────────────────────────────────────────────────
@@ -95,6 +104,7 @@ const aiRoutes           = require('./routes/ai');
 const tripsRoutes        = require('./routes/trips');
 const favoritesRoutes    = require('./routes/favorites');
 const timeIntelRoutes    = require('./routes/time-intelligence');
+const travelDataRoutes   = require('./routes/travel-data');
 const feedbackRoutes     = require('./routes/feedback');
 const { router: analyticsRoutes } = require('./routes/analytics');
 
@@ -155,7 +165,8 @@ app.use('/api/trips', generalLimiter, tripsRoutes);
 app.use('/api/favorites', generalLimiter, favoritesRoutes);
 
 // GeoAI Time Intelligence Engine (open/closed status, crowd, badges, personalization)
-app.use('/api/time-intelligence', generalLimiter, timeIntelRoutes);
+app.use('/api/time-intelligence', timeIntelLimiter, validateTimeIntelRequest, timeIntelRoutes);
+app.use('/api/travel-data', generalLimiter, travelDataRoutes);
 
 // Feedback (per-place ratings + overall app experience)
 app.use('/api/feedback', generalLimiter, feedbackRoutes);

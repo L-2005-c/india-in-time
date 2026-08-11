@@ -86,6 +86,7 @@ const config = {
     places:   parseInt(process.env.RATE_LIMIT_PLACES, 10)   || 10,
     weather:  parseInt(process.env.RATE_LIMIT_WEATHER, 10)  || 60,
     general:  parseInt(process.env.RATE_LIMIT_GENERAL, 10)  || 100,
+    timeIntel: parseInt(process.env.RATE_LIMIT_TIME_INTEL, 10) || 30,
     windowMs: 60 * 1000, // 1 minute window
   },
 
@@ -138,32 +139,55 @@ const config = {
 };
 
 // ── Frontend index.html resolution ──────────────────────────────────────────
-// scripts/build-frontend.js produces frontend/public/dist/index.html
-// (referencing the minified, content-hashed JS/CSS it also builds) but does
-// NOT touch the source frontend/public/index.html. This resolves which one
-// to actually serve at request time: the dist build when it exists and
-// we're in production, the source file otherwise (local dev, or a
-// production deploy that simply hasn't run `npm run build:frontend` — this
-// fails back safely rather than 404ing).
+// Frontend shell resolution:
+// - Default: source frontend/public/index.html (loads /app.js + /styles.css).
+// - Opt-in dist: set USE_DIST_FRONTEND=1 in production after verifying
+//   /dist/assets/* paths resolve (Vite base is /dist/).
+// This default was chosen after a production blank-page incident where
+// dist/index.html referenced /assets/* that Express did not serve.
 const fs = require('fs');
 const path = require('path');
 
 config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
   const distIndex = path.join(config.publicDir, 'dist', 'index.html');
   const sourceIndex = path.join(config.publicDir, 'index.html');
-  // Opt into dist with USE_DIST_FRONTEND=1. Default to source index.html
-  // (loads /app.js + /styles.css) so a Vite path mismatch cannot blank the UI.
-  const preferDist = process.env.USE_DIST_FRONTEND === '1' || process.env.USE_DIST_FRONTEND === 'true';
-  if (preferDist && config.isProd && fs.existsSync(distIndex)) return distIndex;
-  // Legacy: if dist exists AND assets dir has files, use dist in prod
-  if (config.isProd && preferDist === false && fs.existsSync(distIndex)) {
-    const assetsDir = path.join(config.publicDir, 'dist', 'assets');
+  const forceSource = process.env.USE_SOURCE_FRONTEND === '1' || process.env.USE_SOURCE_FRONTEND === 'true';
+  const forceDist = process.env.USE_DIST_FRONTEND === '1' || process.env.USE_DIST_FRONTEND === 'true';
+
+  if (forceSource) return sourceIndex;
+
+  function distIsHealthy() {
+    if (!fs.existsSync(distIndex)) return false;
     try {
-      if (fs.existsSync(assetsDir) && fs.readdirSync(assetsDir).length > 0) {
-        // Still prefer source unless explicitly opted in — dist migration incomplete
-        return sourceIndex;
+      const html = fs.readFileSync(distIndex, 'utf8');
+      // Collect script/link asset paths referenced by dist index
+      const refs = [];
+      const re = /(?:src|href)=["']([^"']*assets\/[^"']+)["']/g;
+      let m;
+      while ((m = re.exec(html)) !== null) refs.push(m[1]);
+      if (!refs.length) return false;
+      // Each ref must exist on disk under publicDir (paths are absolute like /dist/assets/x.js)
+      for (const ref of refs) {
+        const rel = ref.replace(/^\//, '');
+        const full = path.join(config.publicDir, rel.startsWith('dist/') ? rel : path.join('dist', rel.replace(/^dist\//, '')));
+        // Also try: /dist/assets/foo -> public/dist/assets/foo
+        //           /assets/foo -> public/dist/assets/foo (legacy)
+        const candidates = [
+          path.join(config.publicDir, rel),
+          path.join(config.publicDir, 'dist', rel.replace(/^dist\//, '')),
+          path.join(config.publicDir, 'dist', 'assets', path.basename(rel)),
+        ];
+        if (!candidates.some((c) => fs.existsSync(c))) return false;
       }
-    } catch (_e) { /* fall through */ }
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  if (config.isProd || forceDist) {
+    if (forceDist && fs.existsSync(distIndex)) return distIndex;
+    if (distIsHealthy()) return distIndex;
   }
   return sourceIndex;
 };

@@ -36,6 +36,13 @@ jobs:
       - name: Syntax-check frontend app.js
         run: node --check frontend/public/app.js
 
+      - name: Frontend modular structure + Vite build
+        run: |
+          test -f frontend/app-src/src/utils/travel-intel-ui.js
+          test -f frontend/app-src/src/core/app.js
+          npm run build:frontend
+          test -d frontend/public/dist/assets
+
       - name: Run test suite
         run: npm test
 

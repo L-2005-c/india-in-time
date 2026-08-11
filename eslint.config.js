@@ -6,7 +6,7 @@
 
 module.exports = [
   {
-    ignores: ['node_modules/**', 'frontend/public/**', 'coverage/**'],
+    ignores: ['node_modules/**', 'frontend/public/**', 'frontend/public/dist/**', 'coverage/**'],
   },
   {
     files: ['**/*.js'],
@@ -44,6 +44,30 @@ module.exports = [
       'prefer-const': 'warn',
       eqeqeq: ['warn', 'smart'],
       'no-empty': ['warn', { allowEmptyCatch: true }],
+    },
+  },
+
+  {
+    files: ['frontend/app-src/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-undef': 'warn',
+      'prefer-const': 'warn',
     },
   },
   {

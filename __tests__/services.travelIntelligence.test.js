@@ -166,3 +166,16 @@ describe('multiDayAdvice', () => {
     expect(result.suggestions[0].action).toBe('reschedule');
   });
 });
+
+describe('day plan 2-opt', () => {
+  test('optimizer field present for multi-stop plans', () => {
+    const { buildDayPlan } = require('../services/travelIntelligence');
+    const plan = buildDayPlan([
+      { name: 'A', cat: 'fort', ot: '09:00', ct: '18:00', coords: [26.91, 75.78] },
+      { name: 'B', cat: 'monument', ot: '09:00', ct: '18:00', coords: [26.92, 75.82] },
+      { name: 'C', cat: 'food', ot: '08:00', ct: '22:00', coords: [26.915, 75.79] },
+    ], { now: new Date('2026-01-15T09:00:00+05:30'), originCoords: [26.91, 75.78], maxStops: 5, weather: { tempC: 24, condition: 'Clear' } });
+    expect(plan.stopCount).toBeGreaterThan(0);
+    expect(['2-opt', 'greedy']).toContain(plan.optimizer);
+  });
+});

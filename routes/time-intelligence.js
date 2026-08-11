@@ -1,9 +1,10 @@
+const logger = require('../lib/logger');
 // routes/time-intelligence.js — GeoAI Time / Travel Intelligence Engine API
 const express = require('express');
 const router = express.Router();
 const { getBatchState, personalizeScore, suggestOpenAlternatives, getTravelIntelligence } = require('../services/timeIntelligence');
-const { rankPlacesForDay, buildDayPlan, dynamicAdvice, multiDayAdvice } = require('../services/travelIntelligence');
-const MAX_PLACES = 200;
+const { rankPlacesForDay, buildDayPlan, dynamicAdvice, multiDayAdvice, getTravelIntelligenceAsync } = require('../services/travelIntelligence');
+const MAX_PLACES = 50; // lowered for CPU safety (was 200)
 
 router.post('/status', (req, res) => {
   try {
@@ -25,7 +26,7 @@ router.post('/status', (req, res) => {
     });
     res.json({ at: now.toISOString(), places: withAlternatives });
   } catch (err) {
-    console.error('[time-intelligence:status]', err.message);
+    logger.error('[time-intelligence:status]', err.message);
     res.status(500).json({ error: 'Failed to compute time intelligence status' });
   }
 });
@@ -39,20 +40,40 @@ router.post('/score', (req, res) => {
     const scored = places.map((p) => ({ name: p.name, score: personalizeScore(p.baseScore ?? 1, p, personas || [], tripMode || null) }));
     res.json({ scored });
   } catch (err) {
-    console.error('[time-intelligence:score]', err.message);
+    logger.error('[time-intelligence:score]', err.message);
     res.status(500).json({ error: 'Failed to compute personalized scores' });
   }
 });
 
-router.post('/recommend', (req, res) => {
+router.post('/recommend', async (req, res) => {
   try {
     const { weather, at, fromCoords, personas, tripMode, publicHoliday } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
     const places = rawPlaces.slice(0, MAX_PLACES);
     const now = at ? new Date(at) : new Date();
-    const options = { fromCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null, personas: Array.isArray(personas) ? personas : [], tripMode: tripMode || null, publicHoliday: !!publicHoliday, region: req.body?.region || null, enableLiveRouting: req.body?.enableLiveRouting === true };
-    const ranked = rankPlacesForDay(places, now, weather || null, options);
+    const options = {
+      fromCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
+      personas: Array.isArray(personas) ? personas : [],
+      tripMode: tripMode || null,
+      publicHoliday: !!publicHoliday,
+      region: req.body?.region || null,
+      enableLiveRouting: req.body?.enableLiveRouting === true,
+    };
+
+    let ranked;
+    if (options.enableLiveRouting && options.fromCoords) {
+      // Parallel live routing (capped concurrency via Promise.all on sliced set)
+      const scored = await Promise.all(places.map(async (p) => {
+        const intel = await getTravelIntelligenceAsync(p, now, weather || null, options);
+        return { place: p, intel, score: intel.visitScore };
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      ranked = scored;
+    } else {
+      ranked = rankPlacesForDay(places, now, weather || null, options);
+    }
+
     res.json({
       at: now.toISOString(),
       recommendations: ranked.map(({ place, intel, score }) => ({
@@ -65,7 +86,7 @@ router.post('/recommend', (req, res) => {
       })),
     });
   } catch (err) {
-    console.error('[time-intelligence:recommend]', err.message);
+    logger.error('[time-intelligence:recommend]', err.message);
     res.status(500).json({ error: 'Failed to compute travel recommendations' });
   }
 });
@@ -95,7 +116,7 @@ router.post('/day-plan', (req, res) => {
     });
     res.json(plan);
   } catch (err) {
-    console.error('[time-intelligence:day-plan]', err.message);
+    logger.error('[time-intelligence:day-plan]', err.message);
     res.status(500).json({ error: 'Failed to build day plan' });
   }
 });
@@ -120,7 +141,7 @@ router.post('/advice', (req, res) => {
       arrival: intel.arrival, scenic: intel.scenic, weather: intel.weather, traffic: intel.traffic,
     }});
   } catch (err) {
-    console.error('[time-intelligence:advice]', err.message);
+    logger.error('[time-intelligence:advice]', err.message);
     res.status(500).json({ error: 'Failed to compute advice' });
   }
 });
@@ -148,7 +169,7 @@ router.post('/multi-day-advice', (req, res) => {
     const result = multiDayAdvice(intelList);
     res.json(result);
   } catch (err) {
-    console.error('[time-intelligence:multi-day-advice]', err.message);
+    logger.error('[time-intelligence:multi-day-advice]', err.message);
     res.status(500).json({ error: 'Failed to compute multi-day advice' });
   }
 });

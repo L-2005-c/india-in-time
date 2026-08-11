@@ -1,7 +1,13 @@
 const express = require('express');
 const request = require('supertest');
 const router = require('../routes/time-intelligence');
-function app() { const a = express(); a.use(express.json()); a.use('/api/time-intelligence', router); return a; }
+function app() {
+  const a = express();
+  a.use(express.json());
+  const { validateTimeIntelRequest } = require('../middleware/validator');
+  a.use('/api/time-intelligence', validateTimeIntelRequest, router);
+  return a;
+}
 
 describe('POST /api/time-intelligence/recommend', () => {
   test('requires places', async () => {
@@ -52,5 +58,34 @@ describe('POST /api/time-intelligence/advice', () => {
     expect(res.status).toBe(200);
     expect(res.body.advice).toHaveProperty('headline');
     expect(res.body.advice.actions.length).toBeGreaterThan(0);
+  });
+});
+
+describe('TI validation + live routing flag', () => {
+  test('rejects invalid coords', async () => {
+    const res = await request(app()).post('/api/time-intelligence/status').send({
+      places: [{ name: 'X', coords: [999, 0] }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('rejects non-array places', async () => {
+    const res = await request(app()).post('/api/time-intelligence/recommend').send({
+      places: 'nope',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('enableLiveRouting without fromCoords still ranks (heuristic)', async () => {
+    const res = await request(app()).post('/api/time-intelligence/recommend').send({
+      places: [
+        { name: 'Amber Fort', cat: 'fort', ot: '09:00', ct: '17:00', coords: [26.9124, 75.7873] },
+      ],
+      enableLiveRouting: true,
+      weather: { tempC: 24, condition: 'Clear' },
+      at: '2026-01-15T16:00:00+05:30',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.recommendations[0]).toHaveProperty('visitScore');
   });
 });

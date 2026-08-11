@@ -3160,7 +3160,7 @@ function escapeHtml(str){
 // here as long as the code reading them only ever uses them for lookups/
 // comparisons, never feeds them into innerHTML or eval.
 const CHAT_ALLOWED_TAGS = ['strong','em','b','i','br','span','u','small','div','button','textarea'];
-const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','type','maxlength','rows','placeholder','aria-label','disabled'];
+const CHAT_ALLOWED_ATTR = ['style','class','data-action','data-n','data-cat','data-role','data-place-id','data-place-name','data-arg','data-rating','type','maxlength','rows','placeholder','aria-label','disabled'];
 function sanitizeChatHtml(html){
   const str = String(html ?? '');
   if (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
@@ -3185,15 +3185,24 @@ function addMsg(html,isBot=true){const box=document.getElementById('chat-message
 // as needed) and get picked up here via one delegated listener, attached
 // once at module load — this works for buttons added to the DOM at any
 // point later, no per-button wiring needed.
-const CHAT_ACTIONS = {
-  fbSetStar, fbSetCat, fbSubmit, fbSkip,
-  rateStopClick, runReplannerClick,
-};
+// Populated by registerChatActions() AFTER handler functions are defined
+// (avoids capturing undefined when bundlers reorder const vs function).
+const CHAT_ACTIONS = Object.create(null);
+function registerChatActions() {
+  Object.assign(CHAT_ACTIONS, {
+    fbSetStar, fbSetCat, fbSubmit, fbSkip,
+    rateStopClick, runReplannerClick,
+  });
+}
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const fn = CHAT_ACTIONS[btn.dataset.action];
-  if (fn) fn(btn);
+  if (typeof fn === 'function') {
+    e.preventDefault();
+    e.stopImmediatePropagation(); // prevent STATIC_ACTIONS listener from double-firing (e.g. fbSetCat toggle on+off)
+    fn(btn);
+  }
 });
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-role="fb-comment"]')) updateFbCounter(e.target);
@@ -4311,21 +4320,24 @@ const APP_FEEDBACK_CATS = [['love_it','Loving it 😍'],['bug','Found a bug 🐛
 
 function showAppFeedback(){
   switchToView('chat-view', 2);
+  // Register handlers every time (safe; Object.assign overwrites) in case module
+  // init order left CHAT_ACTIONS empty under some bundlers.
+  if (typeof registerChatActions === 'function') registerChatActions();
   addMsg(`💬 <strong>How's India In-Time working for you?</strong><br>Your honest take — good or bad — genuinely shapes what we build next.` +
     `<div class="fb-card" data-role="fb-card" data-rating="0" data-cat="" style="margin-top:10px">` +
-      `<div data-role="fb-stars" style="display:flex;gap:6px;flex-wrap:wrap">` +
-        [1,2,3,4,5].map(n=>`<button type="button" data-action="fbSetStar" data-n="${n}" aria-label="Rate ${n} star${n>1?'s':''}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px 12px;font-size:16px;cursor:pointer;line-height:1">☆</button>`).join('') +
+      `<div data-role="fb-stars" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">` +
+        [1,2,3,4,5].map(n=>`<button type="button" data-action="fbSetStar" data-n="${n}" aria-label="Rate ${n} star${n>1?'s':''}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px 12px;font-size:16px;cursor:pointer;line-height:1;pointer-events:auto">☆</button>`).join('') +
       `</div>` +
-      `<div data-role="fb-tags" style="display:none;gap:6px;flex-wrap:wrap;margin-top:10px">` +
-        APP_FEEDBACK_CATS.map(([v,l])=>`<button type="button" data-action="fbSetCat" data-cat="${v}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer">${l}</button>`).join('') +
+      `<div data-role="fb-tags" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">` +
+        APP_FEEDBACK_CATS.map(([v,l])=>`<button type="button" data-action="fbSetCat" data-cat="${v}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;pointer-events:auto">${l}</button>`).join('') +
       `</div>` +
-      `<div data-role="fb-comment-wrap" style="display:none;margin-top:10px">` +
+      `<div data-role="fb-comment-wrap" style="display:block;margin-top:10px">` +
         `<textarea data-role="fb-comment" maxlength="2000" rows="2" placeholder="Anything specific? Totally optional." style="width:100%;box-sizing:border-box;background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px;font:inherit;color:inherit;resize:vertical"></textarea>` +
         `<div data-role="fb-counter" style="font-size:10px;color:var(--text-muted);text-align:right;margin-top:2px">0/2000</div>` +
       `</div>` +
-      `<div data-role="fb-actions" style="display:none;gap:8px;margin-top:8px">` +
-        `<button type="button" data-action="fbSubmit" style="background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--ocean);cursor:pointer">Send feedback</button>` +
-        `<button type="button" data-action="fbSkip" style="background:transparent;border:1px solid var(--border-default);border-radius:8px;padding:7px 14px;font-size:12px;color:var(--text-muted);cursor:pointer">Not now</button>` +
+      `<div data-role="fb-actions" style="display:flex;gap:8px;margin-top:8px">` +
+        `<button type="button" data-action="fbSubmit" style="background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--ocean);cursor:pointer;pointer-events:auto">Send feedback</button>` +
+        `<button type="button" data-action="fbSkip" style="background:transparent;border:1px solid var(--border-default);border-radius:8px;padding:7px 14px;font-size:12px;color:var(--text-muted);cursor:pointer;pointer-events:auto">Not now</button>` +
       `</div>` +
     `</div>`);
 }
@@ -4377,7 +4389,11 @@ async function fbSubmit(btn){
   const card = btn.closest('[data-role="fb-card"]');
   if(!card) return;
   const rating = parseInt(card.dataset.rating, 10) || 0;
-  if(!rating) return;
+  if(!rating){
+    if (typeof showToast === 'function') showToast('⭐','Pick a star rating','Tap 1–5 stars above, then send.',2500);
+    else alert('Please pick a star rating (1–5) before sending.');
+    return;
+  }
   const cat = card.dataset.cat || 'general';
   const commentEl = card.querySelector('[data-role="fb-comment"]');
   const message = commentEl ? commentEl.value.trim() : '';
@@ -5137,3 +5153,6 @@ window.onload=()=>{
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
 };
+
+// Ensure chat widget actions are bound after all handler declarations.
+try { registerChatActions(); } catch (_e) { console.warn('[feedback] registerChatActions failed', _e); }

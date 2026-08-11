@@ -3,15 +3,15 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v16-1-gen-btn-state';
+const CACHE_NAME = 'india-in-time-v20260811-review';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/app.js?v=20260806-v7',
-  '/styles.css?v=20260805-ui-polish',
-  '/client-api.js?v=20260806-v7',
+  '/app.js?v=20260811-review',
+  '/styles.css?v=20260811-review',
+  '/client-api.js?v=20260811-review',
   '/logo-mark.png?v=20260603-logo',
   '/favicon-32.png?v=20260603-logo',
   '/apple-touch-icon.png?v=20260603-logo',

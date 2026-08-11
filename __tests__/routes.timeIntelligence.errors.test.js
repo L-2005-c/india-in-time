@@ -76,15 +76,15 @@ describe('POST /api/time-intelligence/score — error handling and capping', () 
     expect(res.body.error).toMatch(/Failed to compute personalized scores/);
   });
 
-  test('caps an oversized places[] array at MAX_PLACES (200) rather than processing it unbounded', async () => {
+  test('caps an oversized places[] array at MAX_PLACES (50) rather than processing it unbounded', async () => {
     personalizeScore.mockImplementation((base) => base);
     const places = Array.from({ length: 250 }, (_, i) => ({ name: `P${i}`, baseScore: 1 }));
 
     const res = await request(app).post('/api/time-intelligence/score').send({ places });
 
     expect(res.status).toBe(200);
-    expect(res.body.scored).toHaveLength(200);
-    expect(personalizeScore).toHaveBeenCalledTimes(200);
+    expect(res.body.scored).toHaveLength(50);
+    expect(personalizeScore).toHaveBeenCalledTimes(50);
   });
 
   test('defaults baseScore to 1 when a place omits it', async () => {

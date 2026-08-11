@@ -163,11 +163,10 @@ function rankPlacesForDay(places, now = new Date(), weather = null, options = {}
   return ranked;
 }
 // Wire itinerary after getTravelIntelligence is defined (avoid circular init issues)
-itineraryEngine.setTravelIntelligence(getTravelIntelligence);
 
 module.exports = {
   getTravelIntelligence, getBatchTravelIntelligence, suggestOpenAlternatives, rankPlacesForDay,
-  buildDayPlan: itineraryEngine.buildDayPlan,
+  buildDayPlan: (places, opts = {}) => itineraryEngine.buildDayPlan(places, { ...opts, getTravelIntelligence: opts.getTravelIntelligence || getTravelIntelligence }),
   dynamicAdvice: itineraryEngine.dynamicAdvice,
   multiDayAdvice: itineraryEngine.multiDayAdvice,
   getTravelIntelligenceAsync,

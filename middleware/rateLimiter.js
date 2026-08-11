@@ -97,8 +97,14 @@ function createRateLimiter(tier = 'general') {
       checkRedisLimit(ip, tier, windowMs)
         .then(applyResult)
         .catch((err) => {
-          console.warn('[rateLimiter] Redis check failed, allowing request through:', err.message);
-          next();
+          // Expensive tiers: fall back to in-memory per-worker limit (not unlimited).
+          // General tier may fail open to preserve availability of health/static-adjacent APIs.
+          console.warn('[rateLimiter] Redis check failed, using memory fallback:', err.message);
+          if (tier === 'ai' || tier === 'places' || tier === 'timeIntel') {
+            applyResult(checkMemoryLimit(ip, tier, windowMs));
+          } else {
+            next();
+          }
         });
     } else {
       applyResult(checkMemoryLimit(ip, tier, windowMs));
@@ -111,6 +117,7 @@ const aiLimiter      = createRateLimiter('ai');
 const placesLimiter  = createRateLimiter('places');
 const weatherLimiter = createRateLimiter('weather');
 const generalLimiter = createRateLimiter('general');
+const timeIntelLimiter = createRateLimiter('timeIntel');
 
 module.exports = {
   createRateLimiter,
@@ -118,4 +125,5 @@ module.exports = {
   placesLimiter,
   weatherLimiter,
   generalLimiter,
+  timeIntelLimiter,
 };

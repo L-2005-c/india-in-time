@@ -144,3 +144,63 @@ module.exports = {
   validateWeatherRequest,
   validateGeocodeRequest,
 };
+
+
+/**
+ * Validate time-intelligence payloads: places array shape, coords, weather.
+ */
+function validateTimeIntelRequest(req, res, next) {
+  const body = req.body || {};
+  const places = body.places;
+
+  if (places !== undefined) {
+    if (!Array.isArray(places)) {
+      return res.status(400).json({ error: 'places must be an array' });
+    }
+    if (places.length > 50) {
+      body.places = places.slice(0, 50);
+    }
+    for (let i = 0; i < body.places.length; i++) {
+      const p = body.places[i];
+      if (!p || typeof p !== 'object') {
+        return res.status(400).json({ error: `places[${i}] must be an object` });
+      }
+      if (p.name != null && typeof p.name !== 'string') {
+        return res.status(400).json({ error: `places[${i}].name must be a string` });
+      }
+      if (p.name && String(p.name).length > 200) {
+        p.name = String(p.name).slice(0, 200);
+      }
+      if (p.coords != null) {
+        if (!Array.isArray(p.coords) || p.coords.length < 2
+            || !Number.isFinite(Number(p.coords[0])) || !Number.isFinite(Number(p.coords[1]))) {
+          return res.status(400).json({ error: `places[${i}].coords must be [lat, lon] numbers` });
+        }
+        const lat = Number(p.coords[0]), lon = Number(p.coords[1]);
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+          return res.status(400).json({ error: `places[${i}].coords out of range` });
+        }
+        p.coords = [lat, lon];
+      }
+    }
+  }
+
+  if (body.fromCoords != null) {
+    if (!Array.isArray(body.fromCoords) || body.fromCoords.length < 2
+        || !Number.isFinite(Number(body.fromCoords[0])) || !Number.isFinite(Number(body.fromCoords[1]))) {
+      return res.status(400).json({ error: 'fromCoords must be [lat, lon] numbers' });
+    }
+  }
+
+  if (body.weather != null && typeof body.weather !== 'object') {
+    return res.status(400).json({ error: 'weather must be an object' });
+  }
+
+  if (body.personas != null && !Array.isArray(body.personas)) {
+    return res.status(400).json({ error: 'personas must be an array' });
+  }
+
+  next();
+}
+
+module.exports.validateTimeIntelRequest = validateTimeIntelRequest;

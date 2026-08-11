@@ -102,7 +102,7 @@ describe('POST /api/time-intelligence/status', () => {
     expect(returned).toBeLessThanOrEqual(after);
   });
 
-  test('caps an oversized places[] array at MAX_PLACES (200) rather than processing it unbounded', async () => {
+  test('caps an oversized places[] array at MAX_PLACES (50) rather than processing it unbounded', async () => {
     const places = Array.from({ length: 250 }, (_, i) => ({
       name: `Place ${i}`,
       cat: 'cafe',
@@ -114,7 +114,7 @@ describe('POST /api/time-intelligence/status', () => {
     const res = await request(app).post('/api/time-intelligence/status').send({ at: AT, places });
 
     expect(res.status).toBe(200);
-    expect(res.body.places).toHaveLength(200);
+    expect(res.body.places).toHaveLength(50);
   });
 
   test('passes weather through to the underlying state computation without erroring', async () => {
