@@ -1999,3 +1999,251 @@ body::after{
   .itn-btn:hover{filter:brightness(1.15);}
   .passport-stamp:hover{transform:translateY(-2px);}
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   UI REFRESH 2026 — Glass TI card, golden-hour hero, light map lock
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Map stays light-style: never invert / dark-filter the tile pane */
+.leaflet-tile-pane,
+.leaflet-tile-pane img,
+.leaflet-layer image {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+[data-theme="dark"] .leaflet-tile-pane,
+[data-theme="light"] .leaflet-tile-pane {
+  filter: none !important;
+}
+
+/* Bottom nav — dark glass, purple active (mockup style) */
+#bottom-nav {
+  background: rgba(12, 10, 20, 0.82) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-top: 1px solid rgba(168, 85, 247, 0.18);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+}
+.nav-item.active .nav-lbl { color: #c084fc !important; font-weight: 700; }
+.nav-item.active .nav-ico { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65)); }
+.nav-item.active::before {
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.55), transparent) !important;
+}
+
+/* Floating Travel Intelligence glass card on map */
+.ti-glass-card {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(16, 12, 28, 0.78);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #f3e8ff;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ti-glass-card .ti-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ti-glass-card .ti-place {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.ti-glass-card .ti-sub {
+  font-size: 11px;
+  color: #c4b5fd;
+  margin-top: 2px;
+}
+.ti-glass-card .ti-score {
+  font-size: 28px;
+  font-weight: 800;
+  color: #c084fc;
+  line-height: 1;
+  text-align: right;
+}
+.ti-glass-card .ti-score span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a78bfa;
+  opacity: 0.85;
+}
+.ti-glass-card .ti-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+.ti-glass-card .ti-metric {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ti-glass-card .ti-metric .ico { font-size: 14px; display: block; margin-bottom: 2px; }
+.ti-glass-card .ti-metric .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: #a78bfa; }
+.ti-glass-card .ti-metric .val { font-size: 11px; font-weight: 700; color: #ede9fe; }
+.ti-glass-card .ti-hint {
+  font-size: 11px;
+  color: #ddd6fe;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Golden-hour / Sunset Magic suggestion card */
+.gh-hero-card {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  z-index: 900;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #1a1028;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 180, 80, 0.25);
+  display: none;
+  animation: ghSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gh-hero-card.visible { display: block; }
+@keyframes ghSlideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gh-hero-card .gh-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.75);
+}
+.gh-hero-card .gh-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, rgba(20, 10, 30, 0.92) 0%, rgba(40, 20, 10, 0.45) 55%, rgba(80, 40, 10, 0.2) 100%);
+}
+.gh-hero-card .gh-body {
+  position: relative;
+  z-index: 1;
+  padding: 16px 16px 14px;
+  color: #fff;
+}
+.gh-hero-card .gh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 200, 100, 0.35);
+  border-radius: 999px;
+  padding: 4px 10px;
+  margin-bottom: 8px;
+}
+.gh-hero-card .gh-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+.gh-hero-card .gh-sub {
+  font-size: 12px;
+  color: rgba(255, 240, 220, 0.88);
+  margin-bottom: 12px;
+}
+.gh-hero-card .gh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gh-hero-card .gh-cta {
+  border: none;
+  cursor: pointer;
+  background: #fff;
+  color: #1a1028;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.gh-hero-card .gh-cta:active { transform: scale(0.97); }
+.gh-hero-card .gh-spots {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #7c3aed;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  line-height: 1.05;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.55);
+  flex-shrink: 0;
+}
+.gh-hero-card .gh-spots strong { font-size: 16px; }
+.gh-hero-card .gh-spots small { font-size: 8px; letter-spacing: 0.08em; opacity: 0.9; }
+.gh-hero-card .gh-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.4);
+  border: none;
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Glowing stop markers on route */
+.route-glow-marker {
+  background: transparent !important;
+  border: none !important;
+}
+.route-glow-marker .rgm-inner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.route-glow-marker .rgm-inner.fort { background: #f59e0b; }
+.route-glow-marker .rgm-inner.nature { background: #3b82f6; }
+.route-glow-marker .rgm-inner.temple { background: #a855f7; }
+.route-glow-marker .rgm-inner.food { background: #f97316; }
+.route-glow-marker .rgm-inner.default { background: #8b5cf6; }
+
+/* Leaflet attribution stays subtle on light map */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #333 !important;
+  font-size: 10px !important;
+}
