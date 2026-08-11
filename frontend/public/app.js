@@ -750,6 +750,15 @@ let lastSpokenNavInstruction='';
 let lastSpokenAt=0;
 let lastHeading=null;
 let lastHeadingSample=null;
+// ── Live-nav marker smoothing/accuracy state ─────────────────────────────
+// displayedLat/displayedLon: where the marker is actually drawn right now —
+// kept separate from cLat/cLon (the raw last-accepted GPS fix) so the
+// marker can be animated smoothly toward each new fix instead of teleporting
+// the instant a new coordinate arrives. See animateLiveMarkerTo().
+let displayedLat=null, displayedLon=null, markerAnimFrame=null;
+// Last fix actually accepted into cLat/cLon (post-filtering), used by
+// isPlausibleGpsFix() below to reject spurious/noisy fixes.
+let lastAcceptedFix=null, lastAcceptedFixAt=0;
 const placeCache=new Map();
 const placeLoadPromises=new Map();
 
@@ -1275,8 +1284,44 @@ function getTimeBadgesHtml(loc, evalTime) {
   if (status.status === 'open' && scoreInfo.score >= 80) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(168,85,247,0.25); display:inline-block; margin-top:4px; margin-right:4px;">✨ Best Time Now</span>`;
   }
+
+  // Advanced Travel Intelligence badges when backend state is attached (loc._ti)
+  const ti = loc._ti;
+  if (ti && ti.visitScore != null) {
+    const band = ti.visitLabel || '';
+    const color = ti.visitScore >= 75 ? 'rgba(34,197,94,0.25)' : ti.visitScore >= 50 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.2)';
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${color}; display:inline-block; margin-top:4px; margin-right:4px;">⭐ ${ti.visitScore}/100 ${band}</span>`;
+    if (ti.confidence && ti.confidence.level) {
+      html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(100,100,255,0.15); display:inline-block; margin-top:4px; margin-right:4px;">Confidence ${ti.confidence.level}</span>`;
+    }
+    if (ti.crowd && ti.crowd.source) {
+      html += `<span style="font-size:9px; padding:2px 6px; border-radius:4px; background:rgba(0,0,0,0.15); display:inline-block; margin-top:4px; margin-right:4px;">Crowd: ${ti.crowd.source}</span>`;
+    }
+  }
   
   return html;
+}
+
+/** Compact expandable TI panel for map/list cards when loc._ti is present. */
+function getTravelIntelPanelHtml(loc) {
+  const ti = loc && loc._ti;
+  if (!ti || ti.visitScore == null) return '';
+  const why = (ti.explanation && ti.explanation.bullets) ? ti.explanation.bullets.slice(0, 4).map(b => {
+    const icon = b.type === 'positive' ? '✓' : b.type === 'caution' ? '!' : '·';
+    return `${icon} ${b.text}`;
+  }).join('<br>') : (ti.explanation && ti.explanation.summary) || '';
+  const depart = ti.arrival && ti.arrival.recommendedDeparture ? ti.arrival.recommendedDeparture : '';
+  return `<div class="ti-panel" style="margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border-subtle,#333);background:var(--bg-layer2,#1a1a1a);font-size:11px;line-height:1.4;">
+    <div style="font-weight:600;margin-bottom:4px;">Travel Intelligence · ⭐ ${ti.visitScore}/100 ${ti.visitLabel||''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;opacity:.9;">
+      <span>👥 ${ti.crowdLevel||ti.crowd?.level||'—'}</span>
+      <span>🌦 ${ti.weather?.suitability||'—'}</span>
+      <span>🚗 ${ti.traffic?.trafficLevel||'—'}</span>
+      <span>🌅 ${ti.scenic?.suitability||'—'}</span>
+    </div>
+    ${why ? `<div style="margin-top:6px;opacity:.85;">${why}</div>` : ''}
+    ${depart ? `<div style="margin-top:6px;">Leave ~<strong>${depart}</strong></div>` : ''}
+  </div>`;
 }
 
 // ── Real-time notifications (spec §7): "closes in 45 minutes", "golden
@@ -1771,6 +1816,92 @@ function deriveHeading(pos){
     if(moved>0.015) return bearingBetween(lastHeadingSample,next);
   }
   return lastHeading;
+}
+
+// ── GPS fix quality filter ───────────────────────────────────────────────
+// Raw phone GPS is noisy: a single bad fix (accuracy circle of 100m+, or a
+// multipath bounce off a building) can jump the blue marker off the road
+// entirely, which reads as "glitching" even though nothing is technically
+// broken. Google/Apple Maps' nav mode filters these before ever drawing
+// them: reject fixes whose accuracy is poor *and* claim real movement, and
+// reject fixes that imply an impossible speed given how long it's been
+// since the last accepted fix (a "teleport").
+const GPS_MAX_ACCURACY_M = 60;         // ignore low-confidence fixes unless nothing better has arrived
+const GPS_MAX_PLAUSIBLE_SPEED_MS = 55; // ~200km/h — generous ceiling for any road vehicle
+function isPlausibleGpsFix(pos){
+  if(!lastAcceptedFix) return true; // always accept the very first fix of the session
+  const elapsedS=(pos.timestamp-lastAcceptedFixAt)/1000;
+  if(elapsedS<=0) return true;
+  const movedKm=hvKm(lastAcceptedFix[0],lastAcceptedFix[1],pos.coords.latitude,pos.coords.longitude);
+  const impliedSpeed=(movedKm*1000)/elapsedS;
+  if(impliedSpeed>GPS_MAX_PLAUSIBLE_SPEED_MS) return false; // teleport — almost certainly a bad fix
+  const acc=pos.coords.accuracy;
+  if(Number.isFinite(acc) && acc>GPS_MAX_ACCURACY_M && impliedSpeed>2) return false; // low-confidence fix also claiming real movement
+  return true;
+}
+
+// Smoothly slides the live marker from wherever it's currently drawn to the
+// new fix over ~400ms (ease-out), mirroring Google Maps' blue-dot
+// interpolation, instead of snapping instantly — the instant-snap was what
+// made the marker look like it was jumping between GPS updates.
+function animateLiveMarkerTo(lat, lon){
+  if(!liveMkr){ displayedLat=lat; displayedLon=lon; return; }
+  if(markerAnimFrame) cancelAnimationFrame(markerAnimFrame);
+  const fromLat=displayedLat??lat, fromLon=displayedLon??lon;
+  const distM=hvKm(fromLat,fromLon,lat,lon)*1000;
+  // Skip animating near-zero movement (avoids a constant no-op rAF loop
+  // while stationary) and huge jumps (city switch, very first fix) — those
+  // should snap instantly rather than visibly "fly" across the whole map.
+  if(distM<0.5 || distM>150){ displayedLat=lat; displayedLon=lon; liveMkr.setLatLng([lat,lon]); return; }
+  const duration=400, start=performance.now();
+  const step=(now)=>{
+    const t=Math.min(1,(now-start)/duration);
+    const eased=1-Math.pow(1-t,3);
+    displayedLat=fromLat+(lat-fromLat)*eased;
+    displayedLon=fromLon+(lon-fromLon)*eased;
+    liveMkr.setLatLng([displayedLat,displayedLon]);
+    if(t<1) markerAnimFrame=requestAnimationFrame(step);
+    else markerAnimFrame=null;
+  };
+  markerAnimFrame=requestAnimationFrame(step);
+}
+
+// ── Snap-to-road ──────────────────────────────────────────────────────────
+// Projects a raw GPS point onto the nearest point of the currently-drawn
+// route polyline — the same "map matching" trick Google/Apple Maps use so
+// the nav arrow sits on the road instead of floating in a courtyard or
+// median that a noisy fix landed in. cLat/cLon (used for ETA/arrival math)
+// stay as the raw fix; only the drawn marker position is snapped. Falls
+// back to the raw point if there's no route yet, or if the fix is too far
+// from the route to plausibly be a snap (>40m — at that distance the user
+// has likely actually left the route, e.g. a wrong turn, and forcing them
+// back onto the line would itself be the glitch).
+function snapToRoute(lat, lon){
+  if(!rLine) return [lat, lon];
+  const latlngs=rLine.getLatLngs();
+  if(!latlngs || latlngs.length<2) return [lat, lon];
+  const p=L.latLng(lat, lon);
+  let best=null, bestDist=Infinity;
+  for(let i=0;i<latlngs.length-1;i++){
+    const candidate=closestPointOnSegment(p, latlngs[i], latlngs[i+1]);
+    const d=p.distanceTo(candidate);
+    if(d<bestDist){ bestDist=d; best=candidate; }
+  }
+  if(!best || bestDist>40) return [lat, lon];
+  return [best.lat, best.lng];
+}
+function closestPointOnSegment(p, a, b){
+  // Simple equirectangular projection — fine at the scale of one road
+  // segment (tens of metres), far cheaper than great-circle math for
+  // something recomputed on every GPS fix during live tracking.
+  const cosLat=Math.cos(a.lat*Math.PI/180);
+  const toXY=(pt)=>({x:pt.lng*cosLat, y:pt.lat});
+  const A=toXY(a), B=toXY(b), P=toXY(p);
+  const dx=B.x-A.x, dy=B.y-A.y;
+  const lenSq=dx*dx+dy*dy;
+  let t=lenSq>0 ? ((P.x-A.x)*dx+(P.y-A.y)*dy)/lenSq : 0;
+  t=Math.max(0,Math.min(1,t));
+  return L.latLng(a.lat+(b.lat-a.lat)*t, a.lng+(b.lng-a.lng)*t);
 }
 
 function maybeSpeakNavInstruction(text, force=false){
@@ -3234,6 +3365,10 @@ function ti_findPlace(query){
 }
 
 function ti_renderState(place, state){
+  // Premium Travel Intelligence card when advanced fields are present
+  if (state.visitScore != null || state.explanation) {
+    return ti_renderIntelligenceCard(place, state);
+  }
   const closeStr = state.minutesToClose!=null ? (state.minutesToClose>=60?`${Math.floor(state.minutesToClose/60)}h ${state.minutesToClose%60}m`:`${state.minutesToClose}m`) : null;
   const parts=[
     `⏰ <strong>${place.name}</strong> — ${state.statusLabel}`,
@@ -3247,6 +3382,60 @@ function ti_renderState(place, state){
     (state.notifications||[]).map(n=>`🔔 ${n}`).join('<br>') || null,
   ];
   return parts.filter(Boolean).join('<br>');
+}
+
+
+/** Batch-enrich places with backend Travel Intelligence into place._ti (non-blocking). */
+async function enrichPlacesWithTravelIntel(places, limit = 30) {
+  try {
+    if (!places || !places.length || !window.API || !API.timeIntelligenceStatus) return;
+    const slice = places.slice(0, limit);
+    const weather = { tempC: typeof realTemp === 'number' ? realTemp : null, condition: realWeatherMain || null, windKph: window.realWind };
+    const { places: states } = await API.timeIntelligenceStatus(slice.map(ti_placePayload), weather);
+    if (!Array.isArray(states)) return;
+    const byName = Object.fromEntries(states.map(s => [s.name, s]));
+    places.forEach(p => { if (byName[p.name]) p._ti = byName[p.name]; });
+  } catch (e) {
+    console.warn('[TI enrich]', e.message || e);
+  }
+}
+
+/** Premium multi-factor Travel Intelligence card (mobile-first). */
+function ti_renderIntelligenceCard(place, state){
+  const score = state.visitScore != null ? state.visitScore : '—';
+  const label = state.visitLabel || '';
+  const conf = state.confidence ? `${state.confidence.level || ''} — ${state.confidence.confidence ?? ''}%` : '';
+  const crowd = state.crowd?.level || state.crowdLevel || '—';
+  const wx = state.weather?.suitability || '—';
+  const traffic = state.traffic?.trafficLevel || state.traffic?.level || '—';
+  const scenic = state.scenic?.suitability || '—';
+  const why = (state.explanation?.bullets || []).slice(0, 6).map(b => {
+    const icon = b.type === 'positive' ? '✓' : b.type === 'caution' ? '!' : '·';
+    return `${icon} ${b.text}`;
+  }).join('<br>') || (state.explanation?.summary || '');
+  const depart = state.arrival?.recommendedDeparture || '';
+  const window = state.scenic?.bestScenicWindow
+    ? `${state.scenic.bestScenicWindow.start || ''} – ${state.scenic.bestScenicWindow.end || ''}`
+    : (state.arrival?.experienceWindow ? `${state.arrival.experienceWindow.start} – ${state.arrival.experienceWindow.end}` : '');
+  const sourceNote = state.crowd?.source ? `Crowd source: ${state.crowd.source}` : '';
+  return `
+<div style="border:1px solid var(--border-subtle,#333);border-radius:14px;padding:14px 16px;background:var(--bg-layer2,#1a1a1a);max-width:420px;font-size:13px;line-height:1.45;">
+  <div style="font-size:11px;letter-spacing:.04em;opacity:.7;margin-bottom:4px;">BEST TIME TO VISIT</div>
+  <div style="font-weight:700;font-size:16px;margin-bottom:2px;">${escapeHtml(place.name)}</div>
+  <div style="opacity:.9;margin-bottom:8px;">${escapeHtml(state.statusLabel || '')}</div>
+  ${window ? `<div style="margin-bottom:6px;">🕐 ${escapeHtml(window)}</div>` : ''}
+  <div style="font-size:18px;font-weight:700;margin:8px 0;">⭐ ${score}/100 ${escapeHtml(label)}</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;font-size:12px;">
+    <span>👥 Crowd ${escapeHtml(String(crowd))}</span>
+    <span>🌦 Weather ${escapeHtml(String(wx))}</span>
+    <span>🚗 Traffic ${escapeHtml(String(traffic))}</span>
+    <span>🌅 Scenic ${escapeHtml(String(scenic))}</span>
+  </div>
+  ${why ? `<div style="margin-top:8px;"><div style="font-size:11px;opacity:.7;margin-bottom:4px;">WHY?</div>${why}</div>` : ''}
+  ${depart ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-subtle,#333);">Recommended departure <strong>${escapeHtml(depart)}</strong></div>` : ''}
+  ${conf ? `<div style="margin-top:6px;font-size:11px;opacity:.75;">Confidence: ${escapeHtml(conf)}</div>` : ''}
+  ${sourceNote ? `<div style="margin-top:4px;font-size:10px;opacity:.6;">${escapeHtml(sourceNote)}</div>` : ''}
+</div>`.trim();
 }
 
 async function bestTimeToVisit(query){
@@ -3560,11 +3749,17 @@ function renderMapMarkers() {
         <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
           ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
         </ul>
+        ${typeof getTimeBadgesHtml==='function' ? getTimeBadgesHtml(l) : ''}
+        ${typeof getTravelIntelPanelHtml==='function' ? getTravelIntelPanelHtml(l) : ''}
       </div>
     `;
     const mkr = L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml);
     allPlacesMkrs.push(mkr);
   });
+  // Enrich LOCS with backend Travel Intelligence (async; next redraw shows panel)
+  if (typeof enrichPlacesWithTravelIntel === 'function' && window.LOCS?.length) {
+    enrichPlacesWithTravelIntel(window.LOCS);
+  }
 }
 
 // Public OSRM demo mirrors used for turn-by-turn road routing during live
@@ -3590,7 +3785,15 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
         const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
         map.removeLayer(rLine);
         rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);
-        if(tripActive) map.fitBounds(rLine.getBounds(),{paddingTopLeft:[40,40],paddingBottomRight:[40,230]});
+        // NOTE: deliberately no fitBounds() here while tripActive. This used
+        // to call map.fitBounds() on every road-route refresh during live
+        // navigation (every ~15s or 25m of movement — see initGPS()), which
+        // fights followLivePosition()'s own flyTo(): fitBounds yanks the
+        // camera out to frame the *entire remaining route* (sometimes whole
+        // city/coastline-wide), then the very next GPS-driven follow call
+        // flies back in to the close-up nav zoom — producing the wild
+        // zoom-in/zoom-out flicker seen during live tracking. During a trip,
+        // the camera should only ever be steered by followLivePosition().
         if(d.routes[0].legs){
           const activeLeg=d.routes[0].legs[0];
           if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}
@@ -3668,6 +3871,8 @@ async function renderRoute(){
         <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
           ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
         </ul>
+        ${typeof getTimeBadgesHtml==='function' ? getTimeBadgesHtml(l) : ''}
+        ${typeof getTravelIntelPanelHtml==='function' ? getTravelIntelPanelHtml(l) : ''}
       </div>
     `;
     mkrs.push(L.marker(l.coords,{icon:ic}).addTo(map).bindPopup(popupHtml));
@@ -3788,7 +3993,7 @@ function updateItinUI(){
     }
     const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
 
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
@@ -3887,12 +4092,18 @@ function initGPS(){
   if(!('geolocation' in navigator))return;if(wid!==null)navigator.geolocation.clearWatch(wid);
   wid=navigator.geolocation.watchPosition(pos=>{
     if(!Number.isFinite(pos.coords.latitude) || !Number.isFinite(pos.coords.longitude)) return; // reject a malformed fix instead of corrupting cLat/cLon with NaN
+    if(!isPlausibleGpsFix(pos)) return; // reject noisy/teleporting fixes — see isPlausibleGpsFix()
     const isF=cLat===null;cLat=pos.coords.latitude;cLon=pos.coords.longitude;
+    lastAcceptedFix=[cLat,cLon];lastAcceptedFixAt=pos.timestamp;
     if(isF) notifyGpsFix(cLat,cLon); // wakes up detectAndLoadCity() if it's waiting on the first fix
     lastHeading=deriveHeading(pos);
     lastHeadingSample=[cLat,cLon];
-    if(liveMkr)liveMkr.setLatLng([cLat,cLon]);
-    else liveMkr=L.marker([cLat,cLon],{icon:L.divIcon({className:'iit-marker',html:'<div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #2563eb;filter:drop-shadow(0 0 8px rgba(37,99,235,.8));transform-origin:50% 70%"></div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map);
+    // Snap the *drawn* marker onto the route road for a Google-Maps-style
+    // on-road position; cLat/cLon (used for ETA/arrival math elsewhere)
+    // stay as the raw, unsnapped fix. See snapToRoute()/animateLiveMarkerTo().
+    const [mLat,mLon]=tripActive?snapToRoute(cLat,cLon):[cLat,cLon];
+    if(!liveMkr)liveMkr=L.marker([mLat,mLon],{icon:L.divIcon({className:'iit-marker',html:'<div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #2563eb;filter:drop-shadow(0 0 8px rgba(37,99,235,.8));transform-origin:50% 70%"></div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map);
+    animateLiveMarkerTo(mLat,mLon);
     updateLiveMarkerHeading();
     document.getElementById('gps-txt').textContent=cLat.toFixed(3);
     if(tripActive) followLivePosition(isF);

@@ -1,0 +1,20 @@
+{
+  "_comment": "Major India festivals/events affecting tourism crowd. Static calendar — extend yearly. Dates are approximate fixed/known 2025-2027 windows where applicable; recurring names use monthHints for rule fallback.",
+  "festivals": [
+    { "id": "republic_day", "name": "Republic Day", "dates": ["2025-01-26", "2026-01-26", "2027-01-26"], "crowdImpact": 1.5, "regions": ["national"], "placeTypes": ["monument", "fort", "park"] },
+    { "id": "holi", "name": "Holi", "dates": ["2025-03-14", "2026-03-03", "2027-03-22"], "crowdImpact": 1.7, "regions": ["national"], "placeTypes": ["park", "garden", "market", "temple"] },
+    { "id": "eid", "name": "Eid", "monthHints": [4, 5], "crowdImpact": 1.4, "regions": ["national"], "placeTypes": ["market", "food", "monument"] },
+    { "id": "independence_day", "name": "Independence Day", "dates": ["2025-08-15", "2026-08-15", "2027-08-15"], "crowdImpact": 1.5, "regions": ["national"], "placeTypes": ["monument", "fort", "park"] },
+    { "id": "ganesh_chaturthi", "name": "Ganesh Chaturthi", "dates": ["2025-08-27", "2026-09-14", "2027-09-04"], "crowdImpact": 1.8, "regions": ["west", "maharashtra", "goa"], "placeTypes": ["temple", "market", "beach"] },
+    { "id": "navratri", "name": "Navratri", "dates": ["2025-09-22", "2026-10-11", "2027-10-01"], "durationDays": 9, "crowdImpact": 1.6, "regions": ["west", "north"], "placeTypes": ["temple", "market", "food"] },
+    { "id": "dussehra", "name": "Dussehra", "dates": ["2025-10-02", "2026-10-20", "2027-10-10"], "crowdImpact": 1.6, "regions": ["national"], "placeTypes": ["temple", "park", "monument"] },
+    { "id": "diwali", "name": "Diwali", "dates": ["2025-10-20", "2026-11-08", "2027-10-29"], "durationDays": 5, "crowdImpact": 1.9, "regions": ["national"], "placeTypes": ["market", "temple", "monument", "food"] },
+    { "id": "christmas", "name": "Christmas", "dates": ["2025-12-25", "2026-12-25", "2027-12-25"], "crowdImpact": 1.4, "regions": ["national", "goa", "kerala"], "placeTypes": ["market", "food", "beach", "monument"] },
+    { "id": "new_year", "name": "New Year", "dates": ["2025-12-31", "2026-12-31", "2027-12-31"], "crowdImpact": 1.6, "regions": ["national"], "placeTypes": ["beach", "market", "food"] },
+    { "id": "pushkar_fair", "name": "Pushkar Camel Fair", "dates": ["2025-11-01", "2026-11-20", "2027-11-09"], "durationDays": 7, "crowdImpact": 2.0, "regions": ["rajasthan", "pushkar"], "placeTypes": ["market", "temple", "scenic"] },
+    { "id": "kumbh", "name": "Kumbh Mela (period)", "monthHints": [1, 2, 3], "crowdImpact": 2.2, "regions": ["prayagraj", "haridwar", "nashik", "ujjain"], "placeTypes": ["temple", "market"] },
+    { "id": "onam", "name": "Onam", "dates": ["2025-09-05", "2026-08-26", "2027-09-14"], "durationDays": 10, "crowdImpact": 1.5, "regions": ["kerala"], "placeTypes": ["temple", "market", "food", "park"] },
+    { "id": "pongal", "name": "Pongal", "dates": ["2025-01-15", "2026-01-15", "2027-01-15"], "durationDays": 4, "crowdImpact": 1.5, "regions": ["tamil nadu", "south"], "placeTypes": ["temple", "market", "food"] },
+    { "id": "durga_puja", "name": "Durga Puja", "dates": ["2025-09-28", "2026-10-17", "2027-10-07"], "durationDays": 5, "crowdImpact": 1.9, "regions": ["west bengal", "east"], "placeTypes": ["temple", "market", "park"] }
+  ]
+}

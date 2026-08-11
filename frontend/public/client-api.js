@@ -75,6 +75,26 @@
     return post('/api/time-intelligence/status', { places, weather, at }, 12000);
   }
 
+  /** Full multi-factor Travel Intelligence ranking (visitScore, explanation, confidence). */
+  async function timeIntelligenceRecommend(places = [], opts = {}) {
+    const { weather = null, at = null, fromCoords = null, personas = null, tripMode = null } = opts;
+    return post('/api/time-intelligence/recommend', {
+      places, weather, at, fromCoords, personas, tripMode,
+    }, 15000);
+  }
+
+  async function timeIntelligenceDayPlan(places = [], opts = {}) {
+    return post('/api/time-intelligence/day-plan', { places, ...opts }, 20000);
+  }
+
+  async function timeIntelligenceAdvice(place, opts = {}) {
+    return post('/api/time-intelligence/advice', { place, ...opts }, 12000);
+  }
+
+  async function timeIntelligenceMultiDayAdvice(places = [], opts = {}) {
+    return post('/api/time-intelligence/multi-day-advice', { places, ...opts }, 15000);
+  }
+
   // ── Feedback ─────────────────────────────────────────────────────────────────
   async function submitPlaceFeedback(placeName, city, rating, accurate, comment) {
     return post('/api/feedback/place', { userId: (window.currentUser && window.currentUser.uid) || null, placeName, city, rating, accurate, comment });
@@ -262,7 +282,7 @@
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
-    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus,
+    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,
