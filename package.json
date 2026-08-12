@@ -1,6 +1,6 @@
 {
   "name": "india-in-time-backend",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "Backend API server for India In-Time travel app \u2014 production-grade fullstack",
   "main": "server.js",
   "engines": {
