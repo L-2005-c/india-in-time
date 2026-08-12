@@ -10,6 +10,12 @@ const cors    = require('cors');
 const cluster = require('cluster');
 const os      = require('os');
 const logger  = require('./lib/logger');
+const apm = require('./lib/apm');
+const multiRegion = require('./lib/multiRegion');
+const { sloMiddleware, getSloReport } = require('./lib/slo');
+const { tracingMiddleware } = require('./lib/tracing');
+apm.initSentry();
+multiRegion.assertHaConfig();
 
 // ── Clustering (10k User Concurrency) ────────────────────────────────────────
 // IMPORTANT: the rate limiter (middleware/rateLimiter.js) keeps its counters
@@ -130,6 +136,8 @@ if (config.server.trustProxy) {
 
 // 1. Request logging + ID assignment
 app.use(requestLogger);
+app.use(sloMiddleware());
+app.use(tracingMiddleware());
 app.use(maintenanceGuard);
 app.use(idempotency);
 app.use('/api', apiVersion);
@@ -201,7 +209,9 @@ app.get('/api/health', (_req, res) => {
     status:  'ok',
     ts:      Date.now(),
     uptime:  Math.round(process.uptime()),
-    version: '2.0.0',
+    version: '3.0.0',
+    region: apm.REGION,
+    ha: multiRegion.getRegionInfo(),
   });
 });
 
@@ -311,6 +321,10 @@ app.get('/api/health/live', (_req, res) => {
 // Exposes process, Gemini, and cache counters for scraping by Prometheus,
 // Grafana Agent, or any metrics sidecar. Kept behind admin auth so the
 // detailed internal counters are not a public reconnaissance surface.
+app.get('/api/slo', requireAdminAuth, (_req, res) => {
+  res.json(getSloReport());
+});
+
 app.get('/api/metrics', requireAdminAuth, (_req, res) => {
   const mem = process.memoryUsage();
   const gemini = geminiService.getStats();

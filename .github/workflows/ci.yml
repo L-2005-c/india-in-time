@@ -1,12 +1,5 @@
 name: CI
 
-# Runs on every push/PR to main. This gate actually runs lint + the Jest
-# suite + a Docker build against every change — none of these were wired up
-# before (an earlier version of this workflow only ran `node --check`,
-# a syntax check, and explicitly noted no test suite existed even though
-# one did — see git history / audit notes). Anything failing here now
-# blocks the merge; it doesn't just get logged and ignored.
-
 on:
   push:
     branches: [main]
@@ -21,39 +14,52 @@ jobs:
         node-version: ['20.x', '22.x']
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-
       - name: Install dependencies
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
-      - name: Syntax-check frontend app.js
+      - name: Syntax-check frontend
         run: node --check frontend/public/app.js
-
-      - name: Frontend modular structure + Vite build
+      - name: Frontend modular structure
         run: |
+          test -f frontend/app-src/src/utils/experience-score.js
+          test -f frontend/app-src/src/utils/travel-time.js
+          test -f frontend/app-src/src/utils/sun-times.js
+          test -f frontend/app-src/src/utils/stop-scoring.js
           test -f frontend/app-src/src/utils/travel-intel-ui.js
           test -f frontend/app-src/src/core/app.js
+          test -f frontend/app-src/src/modules/index.js
           npm run build:frontend
           test -d frontend/public/dist/assets
-
-      - name: Run test suite
+      - name: Unit tests
         run: npm test
-
-      - name: npm audit (non-blocking — tracked separately via Dependabot)
-        run: npm audit --omit=dev || true
+      - name: Security audit (high+)
+        run: npm audit --audit-level=high
 
   docker-build:
     runs-on: ubuntu-latest
     needs: lint-and-test
     steps:
       - uses: actions/checkout@v4
-
       - name: Build Docker image
         run: docker build -t india-in-time:ci-check .
+
+  security-headers:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - run: npm ci
+      - name: Security middleware present
+        run: |
+          test -f middleware/security.js
+          test -f SECURITY_AUDIT.md || test -f SECURITY_AUDIT.md
+          node -e "require('./middleware/security')"

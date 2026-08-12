@@ -1,7 +1,7 @@
 {
   "name": "india-in-time-backend",
-  "version": "2.0.0",
-  "description": "Backend API server for India In-Time travel app — production-grade fullstack",
+  "version": "3.3.0",
+  "description": "Backend API server for India In-Time travel app \u2014 production-grade fullstack",
   "main": "server.js",
   "engines": {
     "node": "20.x || 22.x"
@@ -22,7 +22,11 @@
     "dev:frontend": "vite --config frontend/app-src/vite.config.js",
     "loadtest:redis-ratelimit": "node scripts/redis-loadtest/run.js",
     "loadtest:redis-failopen": "node scripts/redis-loadtest/fail-open-check.js",
-    "loadtest:redis-cache": "node scripts/redis-loadtest/cache-check.js"
+    "loadtest:redis-cache": "node scripts/redis-loadtest/cache-check.js",
+    "test:ci": "jest --runInBand --coverage --coverageThreshold='{\"global\":{\"statements\":40,\"branches\":30,\"functions\":35,\"lines\":40}}'",
+    "security:audit": "npm audit --audit-level=high",
+    "check:production": "node scripts/production-check.js",
+    "slo:report": "node scripts/slo-report.js"
   },
   "jest": {
     "testEnvironment": "node",
@@ -49,7 +53,7 @@
     "ws": "^8.21.0"
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "uuid": "^11.1.1"
   },
   "devDependencies": {

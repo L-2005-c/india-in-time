@@ -1,7 +1,14 @@
-/**
- * Enterprise module registry — single import surface for domain modules.
- */
 export * as budget from './budget.js';
 export * as auth from './auth.js';
 export * as planner from './planner.js';
 export * as chatActions from './chatActions.js';
+export * as experienceScore from '../utils/experience-score.js';
+export * as travelTime from '../utils/travel-time.js';
+export * as sunTimes from '../utils/sun-times.js';
+export * as timeBadges from '../utils/time-badges.js';
+export * as stopScoring from '../utils/stop-scoring.js';
+export * as geo from '../utils/geo.js';
+export * as gps from '../utils/gps.js';
+export * as weatherUi from '../utils/weather-ui.js';
+export * as navRoute from '../utils/nav-route.js';
+export * as cityLoad from '../utils/city-load.js';

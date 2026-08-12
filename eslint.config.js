@@ -66,7 +66,7 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      'no-undef': 'warn',
+      'no-undef': 'error',
       'prefer-const': 'warn',
     },
   },

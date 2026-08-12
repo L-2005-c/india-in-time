@@ -3,6 +3,7 @@
 
 const config = require('../config');
 const logger = require('../lib/logger');
+const apm = require('../lib/apm');
 
 // ── Optional error-reporting webhook (lightweight APM/alerting hook) ───────
 // This project has no APM/error-tracking integration (Sentry, Datadog,
@@ -74,6 +75,7 @@ function errorHandler(err, req, res, _next) {
     logData.stack = err.stack;
     console.error('[ERROR]', JSON.stringify(logData, null, 2));
     reportErrorAsync(err, logData);
+    try { apm.captureException(err, logData); } catch (_e) {}
   } else {
     console.warn('[WARN]', JSON.stringify(logData));
   }

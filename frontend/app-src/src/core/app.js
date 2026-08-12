@@ -20,6 +20,89 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signO
 import { initializeFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
+import {
+  getTrafficMultiplier as _ttTrafficMult,
+  getTrafficLevel as _ttTrafficLevel,
+  getCrowdMultiplier as _ttCrowdMult,
+  getCrowdLevel as _ttCrowdLevel,
+  getSmartTravelTime as _ttSmartTravel,
+  getSmartVisitTime as _ttSmartVisit,
+} from '../utils/travel-time.js';
+import { getSunTimesClient as _sunTimesClient, placeSunTimes as _placeSunTimes } from '../utils/sun-times.js';
+import {
+  calculateExperienceScorePure,
+  getOpeningStatusPure,
+  getCrowdPredictionPure,
+  getDaypartClient as _getDaypartClient,
+  timeToMinutes as _timeToMinutes,
+  CROWD_BASE_BY_DAYPART as _CROWD_BASE,
+  CROWD_WEEKEND_MULT as _CROWD_WEEKEND,
+  CROWD_PEAK_MULT as _CROWD_PEAK,
+} from '../utils/experience-score.js';
+import { getTimeBadgesHtml as _getTimeBadgesHtml } from '../utils/time-badges.js';
+import {
+  isPlausibleGpsFix as _isPlausibleGpsFix,
+  GPS_MAX_ACCURACY_M as _GPS_MAX_ACCURACY_M,
+  GPS_MAX_PLAUSIBLE_SPEED_MS as _GPS_MAX_PLAUSIBLE_SPEED_MS,
+  createGpsFixCoordinator as _createGpsFixCoordinator,
+} from '../utils/gps.js';
+import {
+  detectWeatherChange as _detectWeatherChange,
+  shouldRetryWeather as _shouldRetryWeather,
+  weatherRetryDelayMs as _weatherRetryDelayMs,
+  formatWeatherDisplay as _formatWeatherDisplay,
+} from '../utils/weather-ui.js';
+import {
+  turnArrowForInstruction as _turnArrowForInstruction,
+  shouldSpeakNavInstruction as _shouldSpeakNavInstruction,
+} from '../utils/nav-route.js';
+import {
+  normalizeFetchedPlaces as _normalizeFetchedPlaces,
+  placesLoadCacheKey as _placesLoadCacheKey,
+  shouldRefetchPlaces as _shouldRefetchPlaces,
+  pickNearestCityId as _pickNearestCityId,
+} from '../utils/city-load.js';
+
+
+import {
+  hvKm as _geoHvKm,
+  hasValidCoords as _geoHasValidCoords,
+  isFiniteLatLon as _geoIsFiniteLatLon,
+  normalizeLatLon as _geoNormalizeLatLon,
+  significantWords as _geoSignificantWords,
+  dedupePlacesByProximity as _geoDedupe,
+  withHiddenGems as _geoWithHiddenGems,
+  mergePlacePools as _geoMergePools,
+  sortNearestNeighbor as _geoSortNN,
+  routeDistanceKm as _geoRouteKm,
+  centroidOfStops as _geoCentroid,
+  clusterStopsByArea as _geoCluster,
+  orderStopsAreaWise as _geoOrderArea,
+  estimateTimeFitPenaltyKm as _geoTimeFit,
+  optimizeStopOrder as _geoOptimize,
+  bearingBetween as _geoBearing,
+  keepNearbyCluster as _geoKeepNearby,
+  famousPlaceScore as _geoFamous,
+  prioritizePlanStops as _geoPrioritize,
+  getRouteStopsForDay as _geoRouteStops,
+  estimateStopLoadMinutes as _geoLoadMins,
+} from '../utils/geo.js';
+import {
+  dayPartForMinutes as _dayPart,
+  climateMode as _climateMode,
+  tripModeBonus as _tripModeBonus,
+  personaBonus as _personaBonus,
+  stopTimeScore as _stopTimeScore,
+  stopClimateNote as _stopClimateNote,
+} from '../utils/stop-scoring.js';
+import {
+  calculateStopBudget as _modStopBudget,
+  calculateDayBudget as _modDayBudget,
+  calculateTripBudget as _modTripBudget,
+} from '../modules/budget.js';
+
+
+
 const firebaseConfig = {
   apiKey:            "AIzaSyDdFpaAOXT2DcniMoh2jJGlReMYLZy8DDM",
   authDomain:        "india-in-time.firebaseapp.com",
@@ -480,59 +563,28 @@ function getTransportConfig(cityId){ return CITY_TRANSPORT_CONFIG[cityId] || CIT
 
 function getTrafficMultiplier(cityId, minuteOfDay){
   const config = getTransportConfig(cityId);
-  const base = config.congestion || 1.0;
-  if(minuteOfDay >= 8*60 && minuteOfDay < 10*60)  return base * 1.5;
-  if(minuteOfDay >= 10*60 && minuteOfDay < 12*60) return base * 1.15;
-  if(minuteOfDay >= 12*60 && minuteOfDay < 14*60) return base * 1.1;
-  if(minuteOfDay >= 14*60 && minuteOfDay < 17*60) return base * 1.05;
-  if(minuteOfDay >= 17*60 && minuteOfDay < 20*60) return base * 1.6;
-  if(minuteOfDay >= 20*60 && minuteOfDay < 22*60) return base * 0.9;
-  if(minuteOfDay >= 22*60 || minuteOfDay < 6*60)  return base * 0.7;
-  return base * 1.0;
+  return _ttTrafficMult(config.congestion || 1.0, minuteOfDay);
 }
 
 function getTrafficLevel(multiplier){
-  if(multiplier <= 1.05) return { level:'light',   label:'Light Traffic',    emoji:'🟢' };
-  if(multiplier <= 1.35) return { level:'moderate', label:'Moderate Traffic',  emoji:'🟡' };
-  return                        { level:'heavy',    label:'Heavy Traffic',    emoji:'🔴' };
+  return _ttTrafficLevel(multiplier);
 }
 
 function getCrowdMultiplier(stop, dayOfWeek, minuteOfDay){
-  let mult = 1.0;
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  if(isWeekend) mult += 0.2;
-  const month = new Date().getMonth();
-  if(month >= 9 || month <= 2) mult += 0.15;
-  if(minuteOfDay >= 10*60 && minuteOfDay < 14*60) mult += 0.2;
-  if(minuteOfDay >= 16*60 && minuteOfDay < 18*60) mult += 0.15;
-  if(minuteOfDay < 8*60 || minuteOfDay >= 20*60) mult -= 0.15;
-  if(stop?.cat === 'scenic') mult += 0.1;
-  if(stop?.cat === 'temple' && (minuteOfDay >= 6*60 && minuteOfDay < 9*60)) mult += 0.15;
-  if(stop?.cat === 'beach' && isWeekend) mult += 0.2;
-  if(stop?.importance === 'must_see') mult += 0.15;
-  return Math.max(0.7, Math.min(2.0, mult));
+  return _ttCrowdMult(stop, dayOfWeek, minuteOfDay);
 }
 
 function getCrowdLevel(multiplier){
-  if(multiplier <= 0.9) return { level:'low',     label:'Low Crowd',    emoji:'🟢' };
-  if(multiplier <= 1.2) return { level:'medium',  label:'Medium Crowd', emoji:'🟡' };
-  if(multiplier <= 1.5) return { level:'high',    label:'High Crowd',   emoji:'🟠' };
-  return                       { level:'extreme', label:'Very Crowded', emoji:'🔴' };
+  return _ttCrowdLevel(multiplier);
 }
 
 function getSmartTravelTime(fromCoords, toCoords, cityId, arriveMin, isFirstStop){
-  if(!fromCoords || !toCoords) return isFirstStop ? 10 : 20;
-  const km = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
-  const baseMinutes = Math.max(isFirstStop ? 10 : 12, Math.min(45, Math.round(km / 0.42)));
-  const trafficMult = getTrafficMultiplier(cityId, arriveMin);
-  return Math.round(baseMinutes * trafficMult);
+  const config = getTransportConfig(cityId);
+  return _ttSmartTravel(fromCoords, toCoords, config.congestion || 1.0, arriveMin, isFirstStop, hvKm);
 }
 
 function getSmartVisitTime(stop, arriveMin, dayOfWeek){
-  const baseVt = stop?.vt || 60;
-  const crowdMult = getCrowdMultiplier(stop, typeof dayOfWeek==='number'?dayOfWeek:new Date().getDay(), arriveMin);
-  const crowdAdjust = 1 + (crowdMult - 1) * 0.4;
-  return Math.round(baseVt * Math.max(0.85, Math.min(1.4, crowdAdjust)));
+  return _ttSmartVisit(stop, arriveMin, dayOfWeek);
 }
 
 function getTransportOptions(fromCoords, toCoords, cityId, arriveMin){
@@ -612,44 +664,14 @@ function getTransportOptions(fromCoords, toCoords, cityId, arriveMin){
 
 // ── Budget Calculator ─────────────────────────────────────────────────────────
 function calculateStopBudget(stop, prevCoords, cityId){
-  const config = getTransportConfig(cityId);
-  const km = prevCoords && stop?.coords ? hvKm(prevCoords[0], prevCoords[1], stop.coords[0], stop.coords[1]) : 0;
-  const transport = Math.round(config.autoBase + config.autoPerKm * km);
-  const entry = ENTRY_FEE_ESTIMATES[stop?.cat] || 0;
-  const food = stop?.cat === 'food' ? 300 : 0;
-  return { transport, entry, food, misc:0, total:transport+entry+food };
+  return _modStopBudget(stop, prevCoords, cityId, { hvKm, getTransportConfig });
 }
-
 function calculateDayBudget(dayStops, cityId, startCoords){
-  let totals = { transport:0, entry:0, food:0, misc:0, total:0 };
-  let prevCoords = startCoords;
-  for(const stop of (dayStops||[])){
-    if(stop.isBreak){ prevCoords = stop.coords; continue; }
-    const b = calculateStopBudget(stop, prevCoords, cityId);
-    totals.transport += b.transport;
-    totals.entry += b.entry;
-    totals.food += b.food;
-    totals.total += b.total;
-    prevCoords = stop.coords;
-  }
-  return totals;
+  return _modDayBudget(dayStops, cityId, startCoords, { hvKm, getTransportConfig });
 }
-
 function calculateTripBudget(plan, cityId, startCoords){
-  const days = [];
-  let grandTotal = { transport:0, entry:0, food:0, misc:0, total:0 };
-  for(const dayStops of (plan||[])){
-    const db = calculateDayBudget(dayStops, cityId, startCoords);
-    days.push(db);
-    grandTotal.transport += db.transport;
-    grandTotal.entry += db.entry;
-    grandTotal.food += db.food;
-    grandTotal.total += db.total;
-  }
-  return { days, grandTotal };
+  return _modTripBudget(plan, cityId, startCoords, { hvKm, getTransportConfig });
 }
-
-let tripBudgetData = null;
 
 function renderBudgetBreakdown(){
   const el = document.getElementById('budget-breakdown');
@@ -720,28 +742,11 @@ let userPickedCity=false;
 // marker separately settled on the user's real location moments later.
 // This makes city-detection wait for and reuse the *same* fix the live
 // marker uses, so the two can never disagree.
-let _gpsFixWaiters = [];
-function notifyGpsFix(lat, lon) {
-  const waiters = _gpsFixWaiters; _gpsFixWaiters = [];
-  waiters.forEach(w => w.resolve({ lat, lon }));
-}
-function notifyGpsError(err) {
-  const waiters = _gpsFixWaiters; _gpsFixWaiters = [];
-  waiters.forEach(w => w.reject(err));
-}
+const _gpsCoord = _createGpsFixCoordinator();
+function notifyGpsFix(lat, lon) { _gpsCoord.notifyFix(lat, lon); }
+function notifyGpsError(err) { _gpsCoord.notifyError(err); }
 function waitForFirstGpsFix(timeoutMs) {
-  if (Number.isFinite(cLat) && Number.isFinite(cLon)) return Promise.resolve({ lat: cLat, lon: cLon });
-  return new Promise((resolve, reject) => {
-    const entry = {
-      resolve: (pos) => { clearTimeout(timer); resolve(pos); },
-      reject:  (err) => { clearTimeout(timer); reject(err); },
-    };
-    const timer = setTimeout(() => {
-      _gpsFixWaiters = _gpsFixWaiters.filter(w => w !== entry);
-      reject(new Error('GPS fix timed out'));
-    }, timeoutMs);
-    _gpsFixWaiters.push(entry);
-  });
+  return _gpsCoord.waitForFirst(timeoutMs, { lat: cLat, lon: cLon });
 }
 let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
 // Tracks where/when the route line was last drawn from, so the live-tracking
@@ -914,52 +919,11 @@ function getCurrentLocalMin() {
 // coords+day since they don't change within a session.
 const _sunTimesCache = new Map();
 function getSunTimesClient(lat, lon, date = new Date()) {
-  const dayKey = `${lat.toFixed(2)},${lon.toFixed(2)},${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-  if (_sunTimesCache.has(dayKey)) return _sunTimesCache.get(dayKey);
-  let result;
-  try {
-    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
-    const lngHour = lon / 15;
-    const zenith = 90.833;
-    const calc = (isRise) => {
-      const t = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24;
-      const M = 0.9856 * t - 3.289;
-      let L = M + 1.916 * Math.sin((M * Math.PI) / 180) + 0.020 * Math.sin((2 * M * Math.PI) / 180) + 282.634;
-      L = ((L % 360) + 360) % 360;
-      let RA = (180 / Math.PI) * Math.atan(0.91764 * Math.tan((L * Math.PI) / 180));
-      RA = ((RA % 360) + 360) % 360;
-      const Lquadrant = Math.floor(L / 90) * 90;
-      const RAquadrant = Math.floor(RA / 90) * 90;
-      RA = RA + (Lquadrant - RAquadrant);
-      RA /= 15;
-      const sinDec = 0.39782 * Math.sin((L * Math.PI) / 180);
-      const cosDec = Math.cos(Math.asin(sinDec));
-      const cosH = (Math.cos((zenith * Math.PI) / 180) - sinDec * Math.sin((lat * Math.PI) / 180)) / (cosDec * Math.cos((lat * Math.PI) / 180));
-      if (cosH > 1 || cosH < -1) return null;
-      let H = isRise ? 360 - (180 / Math.PI) * Math.acos(cosH) : (180 / Math.PI) * Math.acos(cosH);
-      H /= 15;
-      const T = H + RA - 0.06571 * t - 6.622;
-      let UT = T - lngHour;
-      UT = ((UT % 24) + 24) % 24;
-      let localT = UT + 5.5; // IST
-      localT = ((localT % 24) + 24) % 24;
-      return Math.round(localT * 60);
-    };
-    const sunriseMin = calc(true);
-    const sunsetMin = calc(false);
-    result = { sunriseMin: sunriseMin ?? 6 * 60, sunsetMin: sunsetMin ?? 18 * 60 + 30 };
-  } catch (_e) {
-    result = { sunriseMin: 6 * 60, sunsetMin: 18 * 60 + 30 };
-  }
-  _sunTimesCache.set(dayKey, result);
-  return result;
+  return _sunTimesClient(lat, lon, date);
 }
 function placeSunTimes(loc, date = new Date()) {
-  const [lat, lon] = loc.coords || [20.5937, 78.9629];
-  return getSunTimesClient(lat, lon, date);
+  return _placeSunTimes(loc, date);
 }
-
-window.globalSimulationTime = getCurrentLocalMin();
 
 function onTimeSliderChange(val) {
   window.globalSimulationTime = parseInt(val, 10);
@@ -1110,217 +1074,49 @@ setTimeout(() => {
 })();
 
 function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
-  let score = 50;
-  const reasons = [];
-  let state = "Normal";
-
-  const status = getPlaceDynamicStatus(loc, simTime);
-  const crowd = getCrowdPrediction(loc, simTime);
-  const { sunriseMin, sunsetMin } = placeSunTimes(loc);
-
-  if (status.status === 'closed') {
-    return { score: 0, state: 'Closed', reasons: ['🔴 Currently Closed', 'Check opening hours before visiting.'] };
-  }
-
-  // Base score boost for being open
-  score += 15;
-  reasons.push('🟢 Currently Open');
-
-  // Time of Day — windows are now the place's real sunrise/sunset (±75 min)
-  // rather than a fixed 5:00-7:30 AM / 5:00-7:00 PM clock window, which used
-  // to be off by well over an hour depending on the city and time of year.
-  if (simTime >= sunriseMin - 30 && simTime <= sunriseMin + 90) {
-    if (loc.is_sunrise_spot) {
-      score += 35;
-      state = "Sunrise Mode";
-      reasons.push('🌅 Perfect time for Sunrise View');
-      reasons.push('📸 Golden lighting for photography');
-    } else {
-      score += 10;
-      state = "Morning Mode";
-      reasons.push('🌤️ Peaceful morning atmosphere');
-    }
-  } else if (simTime >= sunsetMin - 90 && simTime <= sunsetMin + 30) {
-    if (loc.is_sunset_spot) {
-      score += 35;
-      state = "Golden Hour";
-      reasons.push('🌇 Perfect time for Sunset View');
-      reasons.push('📸 Excellent Golden Hour lighting');
-    } else {
-      score += 10;
-      state = "Evening Mode";
-      reasons.push('🌆 Pleasant evening vibe');
-    }
-  } else if (simTime >= sunsetMin + 30) {
-    if (loc.has_nightlife) {
-      score += 25;
-      state = "Night Mode";
-      reasons.push('🍹 Vibrant Nightlife is active');
-    } else if (loc.indoor_outdoor === 'outdoor' && loc.cat !== 'food') {
-      score -= 20;
-      reasons.push('🌙 Outdoor attraction at night (Limited visibility)');
-    }
-  }
-
-  // Heat Alert & Weather
-  if (window.realTemp && window.realTemp > 35 && simTime >= 720 && simTime <= 960) {
-    if (loc.indoor_outdoor === 'indoor') {
-      score += 20;
-      state = "Heat Escape";
-      reasons.push('❄️ Great AC/Indoor escape from extreme heat');
-    } else if (loc.indoor_outdoor === 'outdoor') {
-      score -= 30;
-      state = "Heat Alert";
-      reasons.push('⚠️ Extreme Heat warning for outdoor activity');
-    }
-  }
-  // Rain and strong wind used to only show up as badges elsewhere
-  // (getTimeBadgesHtml) without ever touching the score itself, so a
-  // rain-soaked outdoor spot or a wind-battered viewpoint could still rank
-  // as a top recommendation. Now they actually move the score.
-  if (window.realWeatherMain && /rain|storm|drizzle/i.test(window.realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
-    score -= 20;
-    reasons.push('🌧 Rain expected — outdoor visit may be uncomfortable');
-  }
-  if (window.realWind >= 30 && (loc.cat === 'beach' || loc.cat === 'scenic' || loc.is_sunset_spot)) {
-    score -= 10;
-    reasons.push('💨 Strong winds at this open viewpoint/beach');
-  }
-
-  // Crowd Analysis
-  if (crowd === 'Very High') {
-    score -= 15;
-    reasons.push('👥 Very High Crowd expected');
-  } else if (crowd === 'High') {
-    score -= 5;
-    reasons.push('👥 High Crowd expected');
-  } else {
-    score += 10;
-    reasons.push('🚶 Low/Moderate Crowd expected');
-  }
-  
-  if (status.status === 'closing_soon') {
-    score -= 15;
-    reasons.push('🟡 Closing soon (Hurry!)');
-  }
-
-  score = Math.max(1, Math.min(100, score));
-  return { score, state: state !== "Normal" ? state : "Recommended", reasons };
+  const sun = placeSunTimes(loc);
+  const ctx = {
+    sunriseMin: sun.sunriseMin,
+    sunsetMin: sun.sunsetMin,
+    tempC: typeof realTemp !== 'undefined' ? realTemp : null,
+    weatherMain: typeof realWeatherMain !== 'undefined' ? realWeatherMain : '',
+    windKph: (typeof window !== 'undefined' && window.realWind) || 0,
+    isWeekend: [0, 6].includes(new Date().getDay()),
+  };
+  const pure = calculateExperienceScorePure(loc, simTime, ctx);
+  return pure;
 }
 
-function getPlaceDynamicStatus(loc, evalTime) {
-  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
-  const ot = t2m(loc.ot || '06:00');
-  const ct = t2m(loc.ct || '23:00', 23 * 60);
-  // Some places (night markets, bars, 24hr spots) close after midnight, e.g.
-  // 18:00–02:00. A plain `now < ot || now >= ct` check always reported these
-  // as closed during their actual overnight open hours.
-  const overnight = ct <= ot;
-  const isOpen = overnight ? (now >= ot || now < ct) : (now >= ot && now < ct);
-  if (!isOpen) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color)' };
-  const minsToClose = overnight ? (now < ct ? ct - now : (1440 - now) + ct) : ct - now;
-  if (minsToClose <= 60 && minsToClose > 0) return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
-  return { status: 'open', label: '🟢 Open', color: 'var(--success-color)' };
-}
-
-// Daypart baseline crowd weights — kept in sync with
-// data/time-intelligence-rules.json's crowdWeights so the frontend's
-// "quick" score and the backend's authoritative Time Intelligence Engine
-// (services/timeIntelligence.js) agree with each other.
-const CROWD_BASE_BY_DAYPART = { earlyMorning: 0.3, morning: 0.6, lateMorning: 0.8, afternoon: 0.9, evening: 1.1, night: 0.5 };
-const CROWD_WEEKEND_MULT = 1.4;
-const CROWD_PEAK_MULT = 1.5;
+const CROWD_BASE_BY_DAYPART = _CROWD_BASE;
+const CROWD_WEEKEND_MULT = _CROWD_WEEKEND;
+const CROWD_PEAK_MULT = _CROWD_PEAK;
 function getDaypartClient(nowMin, sunsetMin) {
-  if (nowMin >= 5 * 60 && nowMin < 9 * 60) return 'earlyMorning';
-  if (nowMin >= 9 * 60 && nowMin < 12 * 60) return 'lateMorning';
-  if (nowMin >= 12 * 60 && nowMin < 16 * 60) return 'afternoon';
-  if (nowMin >= 16 * 60 && nowMin < sunsetMin) return 'evening';
-  if (nowMin >= sunsetMin || nowMin < 5 * 60) return 'night';
-  return 'morning';
+  return _getDaypartClient(nowMin, sunsetMin);
 }
 function getCrowdPrediction(loc, evalTime) {
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const isWeekend = [0, 6].includes(new Date().getDay());
   const { sunsetMin } = placeSunTimes(loc);
-  const daypart = getDaypartClient(now, sunsetMin);
-
-  let isPeakNow = false;
-  if (loc.peak_hours) {
-    const parts = loc.peak_hours.split('-');
-    if (parts.length === 2) {
-      const pStart = t2m(parts[0].trim());
-      const pEnd = t2m(parts[1].trim());
-      isPeakNow = now >= pStart && now <= pEnd;
-    }
-  }
-
-  // Previously this only varied by weekday/weekend and otherwise ignored
-  // time of day completely — a 2 AM stop showed the exact same crowd level
-  // as an 11 AM one. Now it starts from a per-daypart baseline (same shape
-  // as the backend engine) and layers weekend/peak-hour multipliers on top.
-  let score = CROWD_BASE_BY_DAYPART[daypart] ?? 0.6;
-  if (isWeekend) score *= CROWD_WEEKEND_MULT;
-  if (isPeakNow) score *= CROWD_PEAK_MULT;
-  if (loc.cat === 'market' || loc.cat === 'food') score *= 1.15;
-
-  if (score < 0.35) return 'Very Low';
-  if (score < 0.6) return 'Low';
-  if (score < 0.95) return 'Moderate';
-  if (score < 1.4) return 'High';
-  return 'Very High';
+  return getCrowdPredictionPure(loc, now, { isWeekend, sunsetMin });
+}
+function getPlaceDynamicStatus(loc, evalTime) {
+  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
+  return getOpeningStatusPure(loc, now);
 }
 
 function getTimeBadgesHtml(loc, evalTime) {
-  const status = getPlaceDynamicStatus(loc, evalTime);
-  const crowd = getCrowdPrediction(loc, evalTime);
-  const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
-  const scoreInfo = calculateExperienceScore(loc, now);
-  
-  let html = `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${status.color}; color:#fff; display:inline-block; margin-top:4px; margin-right:4px;">${status.label}</span>`;
-  
-  if (crowd === 'High' || crowd === 'Very High') {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,100,100,0.2); display:inline-block; margin-top:4px; margin-right:4px;">👥 Peak Crowd</span>`;
-  }
-  
-  const { sunriseMin, sunsetMin } = placeSunTimes(loc);
-  if (loc.is_sunrise_spot && now >= sunriseMin - 30 && now <= sunriseMin + 90) {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,200,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌅 Best at Sunrise</span>`;
-  }
-  if (loc.is_sunset_spot && now >= sunsetMin - 90 && now <= sunsetMin + 30) {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,100,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌇 Best at Sunset</span>`;
-  }
-  
-  if (realTemp && realTemp > 35 && loc.indoor_outdoor === 'outdoor') {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,0,0,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🔥 Hot Weather</span>`;
-  }
-  if (realWeatherMain && /rain|storm|drizzle/i.test(realWeatherMain) && loc.indoor_outdoor !== 'indoor') {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(0,100,255,0.2); display:inline-block; margin-top:4px; margin-right:4px;">🌧 Rain Alert</span>`;
-  }
-  if (window.realWind >= 30 && (loc.cat === 'beach' || loc.cat === 'scenic' || loc.is_sunset_spot)) {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(120,180,255,0.2); display:inline-block; margin-top:4px; margin-right:4px;">💨 Strong Wind</span>`;
-  }
-  if (status.status === 'open' && scoreInfo.score >= 80) {
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(168,85,247,0.25); display:inline-block; margin-top:4px; margin-right:4px;">✨ Best Time Now</span>`;
-  }
-
-  // Advanced Travel Intelligence badges when backend state is attached (loc._ti)
-  const ti = loc._ti;
-  if (ti && ti.visitScore != null) {
-    const band = ti.visitLabel || '';
-    const color = ti.visitScore >= 75 ? 'rgba(34,197,94,0.25)' : ti.visitScore >= 50 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.2)';
-    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${color}; display:inline-block; margin-top:4px; margin-right:4px;">⭐ ${ti.visitScore}/100 ${band}</span>`;
-    if (ti.confidence && ti.confidence.level) {
-      html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(100,100,255,0.15); display:inline-block; margin-top:4px; margin-right:4px;">Confidence ${ti.confidence.level}</span>`;
-    }
-    if (ti.crowd && ti.crowd.source) {
-      html += `<span style="font-size:9px; padding:2px 6px; border-radius:4px; background:rgba(0,0,0,0.15); display:inline-block; margin-top:4px; margin-right:4px;">Crowd: ${ti.crowd.source}</span>`;
-    }
-  }
-  
-  return html;
+  return _getTimeBadgesHtml(loc, evalTime, {
+    getPlaceDynamicStatus,
+    getCrowdPrediction,
+    calculateExperienceScore,
+    placeSunTimes,
+    realTemp: typeof realTemp !== 'undefined' ? realTemp : null,
+    realWeatherMain: typeof realWeatherMain !== 'undefined' ? realWeatherMain : '',
+    realWind: (typeof window !== 'undefined' && window.realWind) || 0,
+    nowMin: getCurrentLocalMin(),
+  });
 }
 
-/** Compact expandable TI panel for map/list cards when loc._ti is present. */
 function getTravelIntelPanelHtml(loc) {
   const ti = loc && loc._ti;
   if (!ti || ti.visitScore == null) return '';
@@ -1430,7 +1226,6 @@ function createBreakStop(anchorStop,index,duration){
     isBreak:true,
   };
 }
-function getRouteStopsForDay(dayStops){return (dayStops||[]).filter(stop=>!stop?.isBreak);}
 function applyBreakPlanToCurrentItinerary(baseStops){
   const routeStops=(baseStops||getRouteStopsForDay(itin)).map(stop=>({ ...stop }));
   const breakEvery=getBreakEveryMinutes();
@@ -1450,23 +1245,6 @@ function applyBreakPlanToCurrentItinerary(baseStops){
   });
   return rebuilt;
 }
-function estimateStopLoadMinutes(stops){
-  return (stops||[]).reduce((sum, stop) => sum + (stop?.vt || 60) + 20, 0);
-}
-function normalizeLatLon(coords){
-  // Expect [lat, lon]. If it looks swapped (common in older saved plans), fix it.
-  const a=Number(coords?.[0]);
-  const b=Number(coords?.[1]);
-  if (Number.isNaN(a) || Number.isNaN(b)) return coords;
-  const aIsLat=a>=6 && a<=38;
-  const aIsLon=a>=68 && a<=98;
-  const bIsLat=b>=6 && b<=38;
-  const bIsLon=b>=68 && b<=98;
-  if (aIsLat && bIsLon) return [a,b];
-  if (aIsLon && bIsLat) return [b,a];
-  return [a,b];
-}
-
 function getCityCenter(){
   const city=CITIES[currentCityId];
   if(city?.lat&&city?.lon) return [city.lat,city.lon];
@@ -1502,222 +1280,26 @@ function getLocalPlaces(cityId, cityName){
   });
 }
 
-// Catch the SAME physical place listed under different name variants
-// (e.g. "Sri Kanaka Mahalakshmi Temple" vs "...Ammavari Temple", or
-// "Fort Kochi Beach" vs "Fort Kochi Beach Park"). If two places sit within
-// ~180m of each other AND share a significant name word, they're almost
-// certainly the same spot — keep only the stronger one (by importanceScore).
-const DEDUPE_STOPWORDS = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
-function significantWords(n){
-  return String(n||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>=4 && !DEDUPE_STOPWORDS.has(w));
-}
-function dedupePlacesByProximity(list){
-  const all = [...list].sort((a,b)=>(b.importanceScore||0)-(a.importanceScore||0));
-  const kept = [];
-  for(const place of all){
-    if (!hasValidCoords(place?.coords)) continue;
-    const words = significantWords(place.name);
-    const dup = kept.find(k => {
-      if (!hasValidCoords(k.coords)) return false;
-      const d = hvKm(k.coords[0],k.coords[1],place.coords[0],place.coords[1]);
-      if (d > 0.18) return false;
-      const kWords = significantWords(k.name);
-      return words.some(w => kWords.includes(w));
-    });
-    if (dup) {
-      dup.importanceScore = Math.max(dup.importanceScore||0, place.importanceScore||0);
-      dup.isHiddenGem = dup.isHiddenGem || place.isHiddenGem;
-      continue;
-    }
-    kept.push(place);
-  }
-  return kept;
-}
+// Geometry / routing pure helpers live in utils/geo.js
 
-// Folds a city's verified Hidden Gems into the place pool automatically, so
-// they're part of every itinerary's candidate list by default — not only
-// when someone manually opens the Hidden Gems tool in chat.
-function withHiddenGems(cityId, list){
-  const gems = getHiddenGems(cityId);
-  return dedupePlacesByProximity(gems.length ? [...list, ...gems] : list);
-}
-
-function mergePlacePools(...pools){
-  const byName=new Map();
-  for(const place of pools.flat()){
-    if(!hasValidCoords(place?.coords)) continue;
-    const key=String(place.name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-    if(!key) continue;
-    place.id = place.id || key;
-    const existing=byName.get(key);
-    if(!existing){
-      byName.set(key,place);
-      continue;
-    }
-    byName.set(key,{
-      ...place,
-      ...existing,
-      id: existing.id || place.id || key,
-      importanceScore:Math.max(existing.importanceScore||0,place.importanceScore||0),
-      importance:(existing.importanceScore||0)>=(place.importanceScore||0)?existing.importance:place.importance,
-    });
-  }
-  return dedupePlacesByProximity([...byName.values()]);
-}
-
-function sortNearestNeighbor(arr,sLat,sLon){
-  if(arr.length<=1)return arr;
-  let sorted=[],unsorted=[...arr],firstIdx=0;
-  if(sLat&&sLon){let minD=Infinity;for(let i=0;i<unsorted.length;i++){const d=hvKm(sLat,sLon,unsorted[i].coords[0],unsorted[i].coords[1]);if(d<minD){minD=d;firstIdx=i;}}}
-  sorted.push(unsorted.splice(firstIdx,1)[0]);
-  while(unsorted.length>0){const last=sorted[sorted.length-1];let ci=0,minD=Infinity;for(let i=0;i<unsorted.length;i++){const d=hvKm(last.coords[0],last.coords[1],unsorted[i].coords[0],unsorted[i].coords[1]);if(d<minD){minD=d;ci=i;}}sorted.push(unsorted.splice(ci,1)[0]);}
-  return sorted;
-}
-
-function getRouteStart(){
-  if(cLat&&cLon) return [cLat,cLon];
-  return getCityCenter();
-}
-
-function routeDistanceKm(stops,start){
-  if(!Array.isArray(stops)||stops.length===0) return 0;
-  let total=0;
-  let prev=start;
-  for(const stop of stops){
-    if(prev) total+=hvKm(prev[0],prev[1],stop.coords[0],stop.coords[1]);
-    prev=stop.coords;
-  }
-  return total;
-}
-
-function centroidOfStops(stops){
-  if(!Array.isArray(stops)||stops.length===0) return null;
-  const sum=stops.reduce((acc,stop)=>{
-    acc.lat+=stop.coords[0];
-    acc.lon+=stop.coords[1];
-    return acc;
-  },{lat:0,lon:0});
-  return [sum.lat/stops.length,sum.lon/stops.length];
-}
-
-function clusterStopsByArea(stops){
-  if(!Array.isArray(stops)||stops.length===0) return [];
-
-  const CLUSTER_RADIUS_KM = 3.2;
-  const clusters = [];
-
-  for(const stop of stops){
-    let bestCluster = null;
-    let bestDist = Infinity;
-
-    for(const cluster of clusters){
-      const d = hvKm(cluster.center[0], cluster.center[1], stop.coords[0], stop.coords[1]);
-      if(d < CLUSTER_RADIUS_KM && d < bestDist){
-        bestCluster = cluster;
-        bestDist = d;
-      }
-    }
-
-    if(!bestCluster){
-      clusters.push({ stops:[stop], center:[stop.coords[0], stop.coords[1]] });
-      continue;
-    }
-
-    bestCluster.stops.push(stop);
-    bestCluster.center = centroidOfStops(bestCluster.stops);
-  }
-
-  return clusters;
-}
-
-function orderStopsAreaWise(stops,start){
-  if(!Array.isArray(stops)||stops.length<=2) return [...(stops||[])];
-
-  const clusters = clusterStopsByArea(stops);
-  const clusterOrder = sortNearestNeighbor(
-    clusters.map((cluster, index)=>({
-      id:`cluster_${index}`,
-      coords:cluster.center,
-      cluster,
-    })),
-    start?.[0],
-    start?.[1]
-  );
-
-  const ordered = [];
-  let currentStart = start;
-
-  for(const item of clusterOrder){
-    const local = sortNearestNeighbor(item.cluster.stops, currentStart?.[0], currentStart?.[1]);
-    ordered.push(...local);
-    currentStart = local[local.length - 1]?.coords || currentStart;
-  }
-
-  return ordered;
-}
-
-// How much one "unit" of bad time-fit (a stop landing at a rough time —
-// closed, peak crowd, missed golden hour, heat/rain) counts against, in
-// the same km units as travel distance, when the optimizer below weighs
-// order changes. Tuned so time-fit meaningfully influences order without
-// completely overriding geography (e.g. never route someone 20km out of
-// the way just to shave a few crowd-score points).
-const TIME_FIT_KM_WEIGHT = 2.2;
-// Simulates a candidate stop order's projected arrival time at each stop
-// (same 0.45 km/min travel estimate used later to compute the real
-// schedule — see the s.tt assignment in the sync/recalc block) and scores
-// each arrival via calculateExperienceScore — the same function driving
-// map-marker colors and place badges — so open/closed, crowd, sunrise/
-// sunset, and weather all factor into which order is "better", not just
-// distance.
-function estimateTimeFitPenaltyKm(stops, start) {
-  if (!Array.isArray(stops) || !stops.length) return 0;
-  let clock = t2m(document.getElementById('s-time')?.value || '09:00', 9 * 60);
-  let prev = start;
-  let penalty = 0;
-  for (const stop of stops) {
-    if (prev) clock += Math.max(5, Math.round(hvKm(prev[0], prev[1], stop.coords[0], stop.coords[1]) / 0.45));
-    const { score } = calculateExperienceScore(stop, clock % 1440);
-    penalty += (1 - score / 100) * TIME_FIT_KM_WEIGHT; // 0 = perfect fit, full weight = worst
-    clock += stop.vt || 60;
-    prev = stop.coords;
-  }
-  return penalty;
-}
-
-function optimizeStopOrder(stops,start){
-  if(!Array.isArray(stops)||stops.length<=2) return [...(stops||[])];
-
-  // Combined cost = travel distance + time-of-day fitness penalty, so the
-  // 2-opt search below can trade a slightly longer drive for a much better-
-  // timed visit (e.g. hitting a sunset spot near sunset, or dodging a
-  // stop's peak-crowd window) instead of purely chasing the shortest route.
-  const routeCost=(candidate)=>routeDistanceKm(candidate,start)+estimateTimeFitPenaltyKm(candidate,start);
-
-  let ordered=orderStopsAreaWise(stops,start);
-  let improved=true;
-  let guard=0;
-
-  while(improved&&guard<8){
-    improved=false;
-    guard+=1;
-    for(let i=0;i<ordered.length-2;i++){
-      for(let j=i+1;j<ordered.length-1;j++){
-        const candidate=[
-          ...ordered.slice(0,i),
-          ...ordered.slice(i,j+1).reverse(),
-          ...ordered.slice(j+1),
-        ];
-        if(routeCost(candidate)+0.05<routeCost(ordered)){
-          ordered=candidate;
-          improved=true;
-        }
-      }
-    }
-  }
-
-  return ordered;
-}
+function significantWords(n){ return _geoSignificantWords(n); }
+function dedupePlacesByProximity(list){ return _geoDedupe(list); }
+function withHiddenGems(cityId, list){ return _geoWithHiddenGems(list, getHiddenGems(cityId)); }
+function mergePlacePools(...pools){ return _geoMergePools(...pools); }
+function sortNearestNeighbor(arr,sLat,sLon){ return _geoSortNN(arr,sLat,sLon); }
+function routeDistanceKm(stops,start){ return _geoRouteKm(stops,start); }
+function centroidOfStops(stops){ return _geoCentroid(stops); }
+function clusterStopsByArea(stops){ return _geoCluster(stops); }
+function orderStopsAreaWise(stops,start){ return _geoOrderArea(stops,start); }
+function estimateTimeFitPenaltyKm(stops, start) { return _geoTimeFit(stops, start); }
+function optimizeStopOrder(stops,start){ return _geoOptimize(stops,start); }
+function bearingBetween(from,to){ return _geoBearing(from,to); }
+function keepNearbyCluster(stops,start,maxRadiusKm=6){ return _geoKeepNearby(stops,start,maxRadiusKm); }
+function famousPlaceScore(stop,start){ return _geoFamous(stop,start); }
+function prioritizePlanStops(stops,start,prefs=[]){ return _geoPrioritize(stops,start,prefs); }
+function getRouteStopsForDay(dayStops){ return _geoRouteStops(dayStops); }
+function estimateStopLoadMinutes(stops){ return _geoLoadMins(stops); }
+function normalizeLatLon(coords){ return _geoNormalizeLatLon(coords); }
 
 function updateFollowButton(){
   const btn=document.getElementById('btn-follow-live');
@@ -1798,16 +1380,6 @@ function toggleLiveFollow(forceState){
   if(autoFollowLive) followLivePosition(true);
 }
 
-function bearingBetween(from,to){
-  const toRad=v=>v*Math.PI/180;
-  const toDeg=v=>(v*180/Math.PI+360)%360;
-  const lat1=toRad(from[0]), lat2=toRad(to[0]);
-  const dLon=toRad(to[1]-from[1]);
-  const y=Math.sin(dLon)*Math.cos(lat2);
-  const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
-  return toDeg(Math.atan2(y,x));
-}
-
 function applyMapHeadingRotation(){
   // Rotating Leaflet's map pane can blank the tile layer because Leaflet uses
   // the same transform for its own positioning. Keep heading on the player
@@ -1844,18 +1416,10 @@ function deriveHeading(pos){
 // them: reject fixes whose accuracy is poor *and* claim real movement, and
 // reject fixes that imply an impossible speed given how long it's been
 // since the last accepted fix (a "teleport").
-const GPS_MAX_ACCURACY_M = 60;         // ignore low-confidence fixes unless nothing better has arrived
-const GPS_MAX_PLAUSIBLE_SPEED_MS = 55; // ~200km/h — generous ceiling for any road vehicle
+const GPS_MAX_ACCURACY_M = _GPS_MAX_ACCURACY_M;
+const GPS_MAX_PLAUSIBLE_SPEED_MS = _GPS_MAX_PLAUSIBLE_SPEED_MS;
 function isPlausibleGpsFix(pos){
-  if(!lastAcceptedFix) return true; // always accept the very first fix of the session
-  const elapsedS=(pos.timestamp-lastAcceptedFixAt)/1000;
-  if(elapsedS<=0) return true;
-  const movedKm=hvKm(lastAcceptedFix[0],lastAcceptedFix[1],pos.coords.latitude,pos.coords.longitude);
-  const impliedSpeed=(movedKm*1000)/elapsedS;
-  if(impliedSpeed>GPS_MAX_PLAUSIBLE_SPEED_MS) return false; // teleport — almost certainly a bad fix
-  const acc=pos.coords.accuracy;
-  if(Number.isFinite(acc) && acc>GPS_MAX_ACCURACY_M && impliedSpeed>2) return false; // low-confidence fix also claiming real movement
-  return true;
+  return _isPlausibleGpsFix(pos, lastAcceptedFix, lastAcceptedFixAt, hvKm);
 }
 
 // Smoothly slides the live marker from wherever it's currently drawn to the
@@ -1926,7 +1490,7 @@ function maybeSpeakNavInstruction(text, force=false){
   if(!tripActive || !navVoiceEnabled || !text || !window.speechSynthesis) return;
   const normalized=String(text).replace(/\s+/g,' ').trim();
   const now=Date.now();
-  if(!force && (normalized===lastSpokenNavInstruction || now-lastSpokenAt<5000)) return;
+  if(!force && !_shouldSpeakNavInstruction(normalized, lastSpokenNavInstruction, lastSpokenAt, now, 5000)) return;
   lastSpokenNavInstruction=normalized;
   lastSpokenAt=now;
   speak(normalized);
@@ -1936,227 +1500,17 @@ function updateQuestLevel(){
   streetQuestLevel=1+Math.floor(streetQuestScore/50);
 }
 
-function turnArrowForInstruction(text){
-  const t=String(text||'').toLowerCase();
-  if(t.includes('left')) return '⬅️';
-  if(t.includes('right')) return '➡️';
-  if(t.includes('u-turn')) return '↩️';
-  if(t.includes('arrive')) return '🏁';
-  if(t.includes('straight') || t.includes('continue') || t.includes('depart')) return '⬆️';
-  return '🧭';
-}
+function turnArrowForInstruction(text){ return _turnArrowForInstruction(text); }
 
-function keepNearbyCluster(stops,start,maxRadiusKm=6){
-  if(!Array.isArray(stops)||stops.length<=1||!start) return [...(stops||[])];
-  const sorted=sortNearestNeighbor(stops,start[0],start[1]);
-  const anchor=sorted[0]?.coords || start;
-  const nearby=sorted.filter(stop=>hvKm(anchor[0],anchor[1],stop.coords[0],stop.coords[1])<=maxRadiusKm);
-  return nearby.length>=2 ? nearby : sorted.slice(0, Math.min(4, sorted.length));
-}
 
-function famousPlaceScore(stop,start){
-  if(!stop?.coords) return -999;
-  const dist = start ? hvKm(start[0], start[1], stop.coords[0], stop.coords[1]) : 0;
-  const name = String(stop.name||'').toLowerCase();
-  let fame = 0;
-  fame += Number(stop.importanceScore||0);
-  if(stop.importance==='must_see') fame += 25;
-  else if(stop.importance==='famous') fame += 10;
-  if(stop.aiRanked) fame += 8;
-  if(String(stop.id||'').startsWith('wiki_')) fame += 5;
-  if(stop.cat==='beach' || stop.cat==='temple') fame += 2;
-  if(/\b(park|beach|temple|fort|palace|museum|zoo|aquarium|caves|cave|hill|peak|viewpoint|view point|ghat|falls|lake|garden|island|monument|statue)\b/.test(name)) fame += 3;
-  if(/\b(famous|iconic|heritage|central|main|old|grand)\b/.test(name)) fame += 2;
-  if(stop.wikiMatched) fame += 2;
-  return fame * 4 - dist;
-}
-
-function prioritizePlanStops(stops,start,prefs=[]){
-  if(!Array.isArray(stops)||!stops.length) return [];
-  const wantsFood = prefs.includes('food');
-  let foodStops = stops.filter(s=>s.cat==='food');
-  let attractionStops = stops.filter(s=>s.cat!=='food');
-
-  if(attractionStops.length){
-    attractionStops = [...attractionStops]
-      .sort((a,b)=>famousPlaceScore(b,start)-famousPlaceScore(a,start))
-      .slice(0, Math.min(attractionStops.length, 50)); // enough for multi-day trips
-    attractionStops = sortNearestNeighbor(attractionStops, start?.[0], start?.[1]);
-  }
-
-  if(foodStops.length){
-    foodStops = keepNearbyCluster(foodStops,start,wantsFood && prefs.length===1 ? 4 : 3.5)
-      .sort((a,b)=>{
-        const da = start ? hvKm(start[0],start[1],a.coords[0],a.coords[1]) : 0;
-        const db = start ? hvKm(start[0],start[1],b.coords[0],b.coords[1]) : 0;
-        return da-db;
-      });
-  }
-
-  if(!wantsFood) return attractionStops;
-  if(!attractionStops.length) return foodStops;
-  return [...attractionStops, ...foodStops];
-}
-
-function dayPartForMinutes(mins){
-  if(mins < 11*60) return 'Morning';
-  if(mins < 15*60) return 'Afternoon';
-  if(mins < 19*60) return 'Evening';
-  return 'Night';
-}
-
-function climateMode(temp){
-  if(temp >= 33) return 'hot';
-  if(temp <= 23) return 'cool';
-  return 'pleasant';
-}
-
-function estimateTravelMinutes(prevCoords, stop, isFirstStop=false){
-  if(!prevCoords || !stop?.coords) return isFirstStop ? 10 : 20;
-  const km = hvKm(prevCoords[0], prevCoords[1], stop.coords[0], stop.coords[1]);
-  return Math.max(isFirstStop ? 10 : 12, Math.min(35, Math.round(km / 0.42)));
-}
-
-// Persona weighting for itinerary personalization (mirrors data/time-intelligence-rules.json
-// on the backend — kept here too so client-side scoring doesn't need a network round trip).
-const PERSONA_WEIGHTS = {
-  photographer: { sunrise: 14, sunset: 14, scenic: 8, monument: 5 },
-  family:       { safety: 10, park: 8, garden: 8, museum: 6 },
-  adventure:    { hill: 10, waterfall: 9, fort: 7 },
-  food_lover:   { food: 12, market: 9 },
-  history:      { monument: 11, fort: 10, museum: 10, temple: 5 },
-  nature:       { park: 9, garden: 8, beach: 6, waterfall: 7 },
-};
-window.selectedPersonas = window.selectedPersonas || [];
-
-// Trip-mode weighting (who's traveling: solo/duo/trio/family/group) — mirrors
-// the "tripModes" section of data/time-intelligence-rules.json on the
-// backend. Backend uses multiplicative weights against a 0-100ish score;
-// here we use additive bonuses on the same additive scale as PERSONA_WEIGHTS
-// above, since stopTimeScore's scoring system throughout this file is
-// additive, not multiplicative. A trip has exactly one mode (not a list),
-// unlike personas.
-const TRIP_MODE_WEIGHTS = {
-  solo:   { cafe: 8, museum: 8, market: 6, sunrise: 8, sunset: 8, nightlife: -6 },
-  duo:    { sunset: 14, sunrise: 8, beach: 8, scenic: 10, garden: 6, food: 6 },
-  trio:   { food: 10, market: 8, nightlife: 6, scenic: 6 },
-  family: { park: 10, garden: 10, museum: 8, temple: 4, nightlife: -15 },
-  group:  { market: 8, food: 10, nightlife: 8, monument: 4 },
-};
-window.selectedTripMode = window.selectedTripMode || null;
-
-function tripModeBonus(stop, tripMode){
-  const weights = tripMode && TRIP_MODE_WEIGHTS[tripMode];
-  if(!weights) return 0;
-  let bonus = 0;
-  if(weights.sunrise && stop.is_sunrise_spot) bonus += weights.sunrise;
-  if(weights.sunset && stop.is_sunset_spot) bonus += weights.sunset;
-  if(weights.nightlife && stop.has_nightlife) bonus += weights.nightlife;
-  if(weights[stop.cat]) bonus += weights[stop.cat];
-  return bonus;
-}
-
-function personaBonus(stop, personas){
-  if(!personas || !personas.length) return 0;
-  let bonus = 0;
-  personas.forEach(p=>{
-    const weights = PERSONA_WEIGHTS[p];
-    if(!weights) return;
-    if(weights.sunrise && stop.is_sunrise_spot) bonus += weights.sunrise;
-    if(weights.sunset && stop.is_sunset_spot) bonus += weights.sunset;
-    if(weights.safety && stop.family_friendly) bonus += weights.safety;
-    if(weights[stop.cat]) bonus += weights[stop.cat];
-  });
-  return bonus;
-}
-
+function dayPartForMinutes(mins){ return _dayPart(mins); }
+function climateMode(temp){ return _climateMode(temp); }
+function tripModeBonus(stop, tripMode){ return _tripModeBonus(stop, tripMode); }
+function personaBonus(stop, personas){ return _personaBonus(stop, personas); }
 function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null, tripMode=null){
-  const part = dayPartForMinutes(arriveMin);
-  const climate = climateMode(temp);
-  let score = Math.max(0, 12 - priorityIndex) + Math.min(20, Number(stop.importanceScore||0) / 5);
-
-  // Extreme heat: push outdoor stops out of the 12-16h window instead of
-  // just favoring indoor ones — a real reroute signal, not just a note.
-  if (stop.indoor_outdoor === 'outdoor' && temp >= 38 && arriveMin >= 12*60 && arriveMin <= 16*60) {
-    score -= 25;
-  }
-  // Strong wind: warn beaches / viewpoints / sunset spots away from that slot.
-  if (wind >= 30 && (stop.cat === 'beach' || stop.cat === 'scenic' || stop.is_sunset_spot)) {
-    score -= 15;
-  }
-  score += personaBonus(stop, personas || window.selectedPersonas);
-  score += tripModeBonus(stop, tripMode || window.selectedTripMode);
-
-  if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) score += 15;
-  if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) score += 15;
-  if (stop.has_nightlife && arriveMin >= 19*60) score += 8;
-  if (stop.indoor_outdoor === 'indoor' && climate === 'hot' && arriveMin >= 12*60 && arriveMin <= 16*60) score += 5;
-  if (stop.best_visiting_hours) {
-    const parts = stop.best_visiting_hours.split('-');
-    if (parts.length === 2) {
-      const sMin = t2m(parts[0].trim());
-      const eMin = t2m(parts[1].trim());
-      if (arriveMin >= sMin && arriveMin <= eMin) score += 10;
-    }
-  }
-
-  if(stop.cat === 'food'){
-    if(arriveMin >= 12*60 && arriveMin <= 15*60) score += 14;
-    else if(arriveMin >= 18*60 && arriveMin <= 22*60) score += 16;
-    else if(arriveMin >= 9*60 && arriveMin < 11*60) score += 6;
-    else score -= 6;
-    if(/\b(cafe|coffee|breakfast|bakery)\b/i.test(stop.name || '') && part === 'Morning') score += 4;
-    if(/\b(seafood|biryani|restaurant|mess|eatery|hotel)\b/i.test(stop.name || '') && part !== 'Morning') score += 3;
-    return score;
-  }
-  if(stop.cat === 'temple'){
-    if(part === 'Morning') score += 12;
-    else if(part === 'Evening') score += 8;
-    else if(part === 'Afternoon') score += 1;
-    else score -= 5;
-    return score;
-  }
-  if(stop.cat === 'beach'){
-    if(climate === 'hot'){
-      if(part === 'Morning' || part === 'Evening') score += 12;
-      else score -= 8;
-    } else {
-      if(part === 'Morning' || part === 'Evening') score += 9;
-      else if(part === 'Afternoon') score += 3;
-      else score -= 4;
-    }
-    return score;
-  }
-  if(climate === 'hot'){
-    if(part === 'Morning' || part === 'Evening') score += 8;
-    else if(part === 'Afternoon') score -= 2;
-  } else {
-    if(part === 'Morning' || part === 'Afternoon' || part === 'Evening') score += 6;
-    else score -= 3;
-  }
-  return score;
+  return _stopTimeScore(stop, arriveMin, temp, priorityIndex, wind, personas, tripMode);
 }
-
-function stopClimateNote(stop, arriveMin, temp){
-  const part = dayPartForMinutes(arriveMin);
-  const climate = climateMode(temp);
-  
-  if (stop.is_sunrise_spot && arriveMin >= 5.5*60 && arriveMin <= 7.5*60) return '🌅 Sunrise View';
-  if (stop.is_sunset_spot && arriveMin >= 17*60 && arriveMin <= 18.5*60) return '🌇 Sunset View';
-  if (stop.has_nightlife && arriveMin >= 19*60) return '🍹 Nightlife';
-  if (stop.indoor_outdoor === 'indoor' && climate === 'hot' && part === 'Afternoon') return '🏛️ Indoor Heat Escape';
-
-  if(stop.cat === 'food'){
-    if(part === 'Afternoon') return 'Lunch Stop';
-    if(part === 'Evening') return 'Sunset Snack';
-    if(part === 'Night') return 'Dinner Stop';
-    return 'Food Break';
-  }
-  if(stop.cat === 'beach' && climate === 'hot') return part === 'Morning' ? 'Cool Morning Window' : 'Best Near Sunset';
-  if(stop.cat === 'temple') return part === 'Morning' ? 'Peaceful Morning Visit' : 'Calmer Evening Slot';
-  if(climate === 'hot' && part === 'Afternoon') return 'Short Climate-Friendly Visit';
-  return `${part} Highlight`;
-}
+function stopClimateNote(stop, arriveMin, temp){ return _stopClimateNote(stop, arriveMin, temp); }
 
 function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=0, breakDuration=0){
   let currentMin = startMin;
@@ -2702,9 +2056,8 @@ async function fetchWeatherUI(lat,lon,attempt=0){
     // as a genuine failure, instead of showing "offline" for a server that's
     // simply still waking up.
     const status=parseInt(String(e.message).match(/(\d{3})$/)?.[1]||'0',10);
-    const looksLikeColdStart = status===502||status===503||status===0;
-    if(looksLikeColdStart && attempt<3){
-      setTimeout(()=>fetchWeatherUI(lat,lon,attempt+1), 5000*(attempt+1));
+    if(_shouldRetryWeather(status, attempt, 3)){
+      setTimeout(()=>fetchWeatherUI(lat,lon,attempt+1), _weatherRetryDelayMs(attempt));
       return;
     }
     const el=document.getElementById('wx-display');
@@ -2728,14 +2081,8 @@ setInterval(()=>{
 function detectWeatherChangeAndReoptimize(snap){
   const prev = window._lastWeatherSnapshot;
   window._lastWeatherSnapshot = snap;
-  if(!prev) return; // first reading of the session — nothing to compare against
-  const rainStarted = !/rain|storm|drizzle/i.test(prev.main||'') && /rain|storm|drizzle/i.test(snap.main||'');
-  const heatSpike = (snap.temp - prev.temp) >= 5 && snap.temp >= 36;
-  const windPickedUp = snap.wind >= 30 && prev.wind < 30;
-  if(rainStarted || heatSpike || windPickedUp){
-    const reason = rainStarted ? 'rain has started' : heatSpike ? 'temperature has spiked' : 'winds have picked up';
-    reoptimizeRemainingPlan(reason);
-  }
+  const { changed, reason } = _detectWeatherChange(prev, snap);
+  if(changed) reoptimizeRemainingPlan(reason);
 }
 
 // Rebuilds only the *not-yet-visited* stops for today using the latest
@@ -2974,7 +2321,7 @@ async function searchCity(q){
     const typing2=addTypingIndicator();
     const tTime=parseInt(document.getElementById('t-time')?.value)||600;
     const result=await API.fetchPlaces(lat,lon,currentCityName,tTime);
-    LOCS=withHiddenGems(currentCityId, (result.places||[]).map(p => ({ ...p, coords: normalizeLatLon(p.coords) })));
+    LOCS=withHiddenGems(currentCityId, _normalizeFetchedPlaces(result.places, normalizeLatLon));
     typing2.remove();
     if(LOCS.length>=3){
       updatePlannerShowcase();
@@ -3073,7 +2420,7 @@ async function generatePlan(){
     if(city){
       try{
         const result = await API.fetchPlaces(city.lat, city.lon, city.name, totalTripMinutes, { refresh:true, prefs:['food'] });
-        const foodPlaces=(result.places||[]).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
+        const foodPlaces=_normalizeFetchedPlaces(result.places, normalizeLatLon);
         avail=foodPlaces.filter(l=>prefs.includes(l.cat));
       }catch(_e){}
       if(!avail.length) avail=LOCS.filter(l=>prefs.includes(l.cat));
@@ -5166,12 +4513,10 @@ window.onload=()=>{
   initGPS(); // start the live-location watch FIRST — detectAndLoadCity() below waits on its first fix
   (function detectAndLoadCity() {
     function nearestCityTo(lat, lon) {
-      let nearestId = 'hyderabad', minDist = Infinity;
-      for (const [id, c] of Object.entries(CITIES)) {
-        const d = (c.lat - lat) ** 2 + (c.lon - lon) ** 2;
-        if (d < minDist) { minDist = d; nearestId = id; }
-      }
-      return nearestId;
+      return _pickNearestCityId(lat, lon, CITIES, (a,b,c,d) => {
+        // squared euclidean is fine for relative nearest among Indian cities
+        return (c - a) ** 2 + (d - b) ** 2;
+      }) || 'hyderabad';
     }
     function load(id) {
       // Never let a background/auto city load stomp on a city the user

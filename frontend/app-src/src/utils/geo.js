@@ -3,6 +3,8 @@
 
 const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
 
+const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
+
 const DEDUPE_STOPWORDS = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
 
 function isFiniteLatLon(lat, lon) {
@@ -50,9 +52,8 @@ function dedupePlacesByProximity(list){
   return kept;
 }
 
-function withHiddenGems(cityId, list){
-  const gems = getHiddenGems(cityId);
-  return dedupePlacesByProximity(gems.length ? [...list, ...gems] : list);
+function withHiddenGems(list, gems = []){
+  return dedupePlacesByProximity((gems && gems.length) ? [...list, ...gems] : list);
 }
 
 function mergePlacePools(...pools){
@@ -308,5 +309,5 @@ function estimateStopLoadMinutes(stops){
 }
 
 export {
-  hvKm, isFiniteLatLon, normalizeLatLon, significantWords, dedupePlacesByProximity, withHiddenGems, mergePlacePools, sortNearestNeighbor, routeDistanceKm, centroidOfStops, clusterStopsByArea, orderStopsAreaWise, estimateTimeFitPenaltyKm, optimizeStopOrder, bearingBetween, keepNearbyCluster, famousPlaceScore, prioritizePlanStops, interpolatePathPoint, getRouteStopsForDay, estimateStopLoadMinutes,
+  hvKm, hasValidCoords, isFiniteLatLon, normalizeLatLon, significantWords, dedupePlacesByProximity, withHiddenGems, mergePlacePools, sortNearestNeighbor, routeDistanceKm, centroidOfStops, clusterStopsByArea, orderStopsAreaWise, estimateTimeFitPenaltyKm, optimizeStopOrder, bearingBetween, keepNearbyCluster, famousPlaceScore, prioritizePlanStops, interpolatePathPoint, getRouteStopsForDay, estimateStopLoadMinutes,
 };

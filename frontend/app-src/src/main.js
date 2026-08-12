@@ -10,7 +10,10 @@ if (typeof document !== 'undefined') {
       ensureFocusVisibleStyles();
       window.__a11yAnnounce = announce;
       window.__appState = state;
-      window.__modules = modules; // enterprise module surface for gradual adoption
+      window.__modules = modules;
+      window.__experienceScore = modules.experienceScore || null;
+      window.__travelTime = modules.travelTime || null;
+      window.__sunTimes = modules.sunTimes || null;
     } catch (e) {
       console.warn('[enterprise-boot] failed', e);
     }

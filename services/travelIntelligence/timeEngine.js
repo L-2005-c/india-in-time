@@ -77,7 +77,16 @@ function computeGoldenHours(sunriseMin, sunsetMin) {
     eveningBlue: { start: m2t(Math.min(1439, sunsetMin + 5)), end: m2t(Math.min(1439, sunsetMin + blue + 5)), startMin: Math.min(1439, sunsetMin + 5), endMin: Math.min(1439, sunsetMin + blue + 5) },
   };
 }
-function inWindow(min, windows) { return (windows || []).some(([a, b]) => min >= t2m(a) && min <= t2m(b)); }
+function inWindow(min, windows) {
+  if (!Array.isArray(windows)) {
+    if (typeof windows === 'string' && windows.includes('-')) {
+      const parts = windows.split('-').map((s) => s.trim());
+      if (parts.length === 2) windows = [parts];
+      else return false;
+    } else return false;
+  }
+  return windows.some((w) => Array.isArray(w) && w.length >= 2 && min >= t2m(w[0]) && min <= t2m(w[1]));
+}
 function isInGoldenHour(nowMin, golden) {
   if (!golden) return { morning: false, evening: false, blue: false, any: false };
   const morning = nowMin >= golden.morningGolden.startMin && nowMin <= golden.morningGolden.endMin;
