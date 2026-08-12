@@ -139,20 +139,6 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_gemini_usage_time ON gemini_usage(created_at);
 
   -- Online ML model weight store (crowd logistic, preference, etc.)
-  CREATE TABLE IF NOT EXISTS audit_log (
-    id          SERIAL PRIMARY KEY,
-    action      VARCHAR(128) NOT NULL,
-    actor       VARCHAR(255),
-    resource    VARCHAR(255),
-    outcome     VARCHAR(64),
-    meta_json   TEXT,
-    ip          VARCHAR(45),
-    request_id  VARCHAR(64),
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at);
-  CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
-
   CREATE TABLE IF NOT EXISTS ml_model_weights (
     model_key    VARCHAR(64) PRIMARY KEY,
     weights_json TEXT NOT NULL,

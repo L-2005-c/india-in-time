@@ -34,13 +34,6 @@ if (isProd && corsOrigin === '*' && process.env.CORS_ALLOW_WILDCARD !== 'true') 
   process.exit(1);
 }
 
-
-// Enterprise: require Firebase service account in production (auth is mandatory)
-if (isProd && !process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error('❌  FIREBASE_SERVICE_ACCOUNT is required in production for verified user auth.');
-  process.exit(1);
-}
-
 const config = {
   env:  NODE_ENV,
   port: parseInt(process.env.PORT, 10) || 3000,
@@ -199,16 +192,4 @@ config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
   return sourceIndex;
 };
 
-// Enterprise runtime toggles (also see lib/featureFlags.js)
-config.enterprise = {
-  requireRedisInProd: process.env.REQUIRE_REDIS_IN_PROD === 'true',
-  auditEnabled: process.env.AUDIT_LOG_ENABLED !== 'false',
-};
-
-if (config.isProd && config.enterprise.requireRedisInProd && !process.env.REDIS_URL) {
-  console.error('❌  REQUIRE_REDIS_IN_PROD=true but REDIS_URL is not set.');
-  process.exit(1);
-}
-
 module.exports = config;
-
