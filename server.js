@@ -101,6 +101,9 @@ const { aiLimiter, placesLimiter, weatherLimiter, generalLimiter, timeIntelLimit
 const { validateAiRequest, validatePlacesRequest, validateTimeIntelRequest, validateWeatherRequest, validateGeocodeRequest } = require('./middleware/validator');
 const { analyticsMiddleware } = require('./routes/analytics');
 const { apiVersion } = require('./middleware/apiVersion');
+const { maintenanceGuard, listFlags, setFlag, getFlag, requireAiEnabled } = require('./lib/featureFlags');
+const { idempotency } = require('./middleware/idempotency');
+const { writeAudit } = require('./lib/auditLog');
 
 // ── Import routes ────────────────────────────────────────────────────────────
 const geocodeRoutes      = require('./routes/geocode');
@@ -127,6 +130,8 @@ if (config.server.trustProxy) {
 
 // 1. Request logging + ID assignment
 app.use(requestLogger);
+app.use(maintenanceGuard);
+app.use(idempotency);
 app.use('/api', apiVersion);
 
 // 2. CORS
@@ -164,7 +169,7 @@ app.use('/api/weather', weatherLimiter, validateWeatherRequest, weatherRoutes);
 app.use('/api/weather-alerts', weatherLimiter, validateWeatherRequest, weatherAlertRoutes);
 
 // AI (most expensive — strictest rate limiting)
-app.use('/api/ai', aiLimiter, validateAiRequest, aiRoutes);
+app.use('/api/ai', requireAiEnabled, aiLimiter, validateAiRequest, aiRoutes);
 
 // Trips (save/load/share)
 app.use('/api/trips', generalLimiter, tripsRoutes);
@@ -207,15 +212,70 @@ app.get('/api/health', (_req, res) => {
 // be wide open — see the technical due-diligence notes on this endpoint).
 // Gated with the same admin auth as the feedback dashboard; not wired into
 // any platform healthcheck path, so this doesn't affect deploy healthchecks.
-app.get('/api/health/ready', requireAdminAuth, (_req, res) => {
+// Kubernetes-style readiness (public, no secrets) — fails if DB unreachable
+app.get('/api/ready', async (_req, res) => {
+  const checks = { db: false, redis: null, maintenance: getFlag('maintenanceMode') };
+  try {
+    const { getDb } = require('./db/init');
+    const pool = getDb();
+    if (pool) {
+      await pool.query('SELECT 1');
+      checks.db = true;
+    }
+  } catch (e) {
+    checks.dbError = e.message;
+  }
+  if (process.env.REDIS_URL) {
+    try {
+      const Redis = require('ioredis');
+      const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
+      await r.connect();
+      await r.ping();
+      checks.redis = true;
+      r.disconnect();
+    } catch (e) {
+      checks.redis = false;
+      checks.redisError = e.message;
+    }
+  }
+  const ok = checks.db && !checks.maintenance && (checks.redis !== false);
+  res.status(ok ? 200 : 503).json({ status: ok ? 'ready' : 'not_ready', checks, ts: Date.now() });
+});
+
+app.get('/api/health/ready', requireAdminAuth, async (_req, res) => {
   const memMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
   const gemini = geminiService.getStats();
+  const checks = { db: false, redis: null };
+  try {
+    const { getDb } = require('./db/init');
+    const pool = getDb();
+    if (pool) {
+      await pool.query('SELECT 1');
+      checks.db = true;
+    }
+  } catch (e) {
+    checks.dbError = e.message;
+  }
+  if (process.env.REDIS_URL) {
+    try {
+      const Redis = require('ioredis');
+      const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
+      await r.connect();
+      await r.ping();
+      checks.redis = true;
+      r.disconnect();
+    } catch (e) {
+      checks.redis = false;
+    }
+  }
 
   res.json({
-    status:   'ready',
+    status:   checks.db ? 'ready' : 'degraded',
     ts:       Date.now(),
     uptime:   Math.round(process.uptime()),
     memory:   `${memMB}MB`,
+    checks,
+    flags: listFlags(),
     gemini: {
       circuitState: gemini.circuitState,
       totalCalls:   gemini.total,
@@ -228,6 +288,18 @@ app.get('/api/health/ready', requireAdminAuth, (_req, res) => {
       geocode: geocodeCache.getStats(),
     },
   });
+});
+
+// Feature flag admin
+app.get('/api/admin/flags', requireAdminAuth, (_req, res) => {
+  res.json({ flags: listFlags() });
+});
+app.post('/api/admin/flags', requireAdminAuth, (req, res) => {
+  const { name, value } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const v = setFlag(name, value);
+  writeAudit({ action: 'flag.set', actor: 'admin', resource: name, outcome: 'success', meta: { value: v }, ip: req.ip, requestId: req.requestId });
+  res.json({ flags: listFlags() });
 });
 
 // Simple liveness probe

@@ -72,6 +72,7 @@ async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const match = header.match(/^Bearer (.+)$/i);
   if (!match) {
+    try { require('../lib/auditLog').writeAudit({ action: 'auth.missing_token', outcome: 'denied', ip: req.ip, requestId: req.requestId }); } catch (_e) {}
     return res.status(401).json({ error: 'Missing Authorization: Bearer <token> header', code: 'AUTH_REQUIRED' });
   }
 

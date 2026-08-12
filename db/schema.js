@@ -103,7 +103,15 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_place_fb_place ON place_feedback(place_name, city);
   CREATE INDEX IF NOT EXISTS idx_app_fb_time    ON app_feedback(created_at);
 
-  -- Soft-delete support indexes
+  -- Soft-delete support: heal tables created before "deleted_at" existed.
+  -- CREATE TABLE IF NOT EXISTS above is a no-op on a table that already
+  -- exists, so on any database provisioned before this column was added,
+  -- the CREATE INDEX below would fail with "column deleted_at does not
+  -- exist". ADD COLUMN IF NOT EXISTS makes this safe to run every boot,
+  -- on both fresh and pre-existing databases.
+  ALTER TABLE trips ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+  ALTER TABLE favorites ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
   CREATE INDEX IF NOT EXISTS idx_trips_deleted ON trips(deleted_at) WHERE deleted_at IS NULL;
   CREATE INDEX IF NOT EXISTS idx_fav_deleted   ON favorites(deleted_at) WHERE deleted_at IS NULL;
 
@@ -139,6 +147,20 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_gemini_usage_time ON gemini_usage(created_at);
 
   -- Online ML model weight store (crowd logistic, preference, etc.)
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id          SERIAL PRIMARY KEY,
+    action      VARCHAR(128) NOT NULL,
+    actor       VARCHAR(255),
+    resource    VARCHAR(255),
+    outcome     VARCHAR(64),
+    meta_json   TEXT,
+    ip          VARCHAR(45),
+    request_id  VARCHAR(64),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+
   CREATE TABLE IF NOT EXISTS ml_model_weights (
     model_key    VARCHAR(64) PRIMARY KEY,
     weights_json TEXT NOT NULL,
