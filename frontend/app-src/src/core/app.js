@@ -663,6 +663,7 @@ function getTransportOptions(fromCoords, toCoords, cityId, arriveMin){
 }
 
 // ── Budget Calculator ─────────────────────────────────────────────────────────
+let tripBudgetData = null;
 function calculateStopBudget(stop, prevCoords, cityId){
   return _modStopBudget(stop, prevCoords, cityId, { hvKm, getTransportConfig });
 }
