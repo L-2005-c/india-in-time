@@ -17,7 +17,7 @@ const API = new Proxy({}, {
 import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
+import { initializeFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -32,7 +32,14 @@ const firebaseConfig = {
 
 const fbApp     = initializeApp(firebaseConfig);
 const auth      = getAuth(fbApp);
-const db        = getFirestore(fbApp);
+// Render (like many reverse proxies / corporate networks) doesn't reliably
+// pass through the bidirectional WebChannel stream Firestore's default
+// transport needs, which surfaces as "400 Bad Request" on the
+// Firestore/Listen endpoint from webchannel_blob_es2018.js. Auto-detecting
+// long-polling falls back to plain HTTP long-polling only when the
+// streaming handshake fails, so it's a no-op in environments where
+// WebChannel works fine.
+const db        = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true });
 const gProvider = new GoogleAuthProvider();
 let currentUser = null;
 

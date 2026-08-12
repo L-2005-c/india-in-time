@@ -37,10 +37,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-  <script type="module" crossorigin src="/assets/index-D85UF8pl.js"></script>
+  <script type="module" crossorigin src="/assets/index-CVmu_uY4.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-w3obMpSa.css">
 </head>
 <body>
+<a href="#app" class="skip-link">Skip to content</a>
+<style>
+.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999}
+.skip-link:focus{left:8px;top:8px;width:auto;height:auto;padding:8px 12px;background:#10b981;color:#000;overflow:visible}
+</style>
+
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
@@ -117,9 +123,9 @@
   Back
 </div>
 
-<div id="app">
+<div id="app" role="main">
   <!-- HEADER -->
-  <header id="header">
+  <header id="header" role="banner">
     <div class="header-inner">
       <div class="logo">
         <img class="header-logo-mark" src="/logo-mark.png?v=20260603-logo" alt="" width="62" height="27" decoding="sync">
