@@ -15,6 +15,15 @@ describe('config CORS wildcard guard', () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV };
     process.env.GEMINI_API_KEY = 'test-key';
+    // avoid tripping config's *separate* production Firebase guard in the
+    // tests below that expect NOT to exit — this suite only cares about the
+    // CORS wildcard guard specifically. See middleware.errorHandler.test.js
+    // for the matching comment on that guard.
+    process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({
+      project_id: 'test-project',
+      client_email: 'test@test-project.iam.gserviceaccount.com',
+      private_key: 'test-key',
+    });
     exitSpy = jest.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
     });

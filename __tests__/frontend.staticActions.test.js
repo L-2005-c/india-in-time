@@ -68,19 +68,47 @@ describe('index.html data-action values <-> app.js dispatch tables — real-file
   }
 
   function extractTableKeys(js, tableName) {
-    // Finds `const TABLE_NAME = { ... };` and pulls out its keys. Handles
-    // both `fnName,` (bare shorthand) and `fnName: (...) => ...` forms,
-    // including several comma-separated bare names on the same line (which
-    // is how most of both tables are actually formatted) — deliberately
-    // simple/regex-based rather than a full JS parser, since this only
-    // needs to work against the one object-literal shape both tables use.
-    const tableMatch = js.match(new RegExp(`const ${tableName}\\s*=\\s*\\{([\\s\\S]*?)\\n\\};`));
+    // Finds the object literal holding TABLE_NAME's entries and pulls out
+    // its keys. Handles both `fnName,` (bare shorthand) and
+    // `fnName: (...) => ...` forms, including several comma-separated bare
+    // names on the same line — deliberately simple/regex-based rather than
+    // a full JS parser.
+    //
+    // Two shapes are supported, since app.js uses both:
+    //   1. `const TABLE_NAME = { ... };`                (STATIC_ACTIONS)
+    //   2. `const TABLE_NAME = Object.create(null);`
+    //      ... later ...
+    //      `Object.assign(TABLE_NAME, { ... });`         (CHAT_ACTIONS — a
+    //      null-prototype object populated after its handler functions are
+    //      defined, so it can't accidentally pick up Object.prototype
+    //      members and doesn't capture `undefined` if a bundler reorders
+    //      const vs function declarations).
+    const directLiteral = js.match(new RegExp(`const ${tableName}\\s*=\\s*\\{([\\s\\S]*?)\\n\\};`));
+    const viaAssign = js.match(new RegExp(`Object\\.assign\\(${tableName},\\s*\\{([\\s\\S]*?)\\n\\s*\\}\\);`));
+    const tableMatch = directLiteral || viaAssign;
     if (!tableMatch) throw new Error(`Could not find ${tableName} in app.js — did it get renamed/restructured?`);
     const body = tableMatch[1];
     const keys = new Set();
+    // Depth is tracked CUMULATIVELY across the whole body, not reset per
+    // line — several entries (e.g. `drawerRun: (btn) => { ...multi-line
+    // function body..., }`) span multiple lines with their own nested
+    // `{ }`/`( )`. Only lines where the entry itself starts (depth is 0
+    // *before* the line, i.e. we're directly inside the outer object, not
+    // inside one of those nested function bodies) can contain a real
+    // top-level key — otherwise a bare statement like `const id = ...` or
+    // `if (el) el.click();` inside a nested body gets misread as a
+    // shorthand key named "const" or "if".
+    let depth = 0;
     for (const rawLine of body.split('\n')) {
       const line = rawLine.trim();
-      if (!line || line.startsWith('//')) continue;
+      const depthBeforeLine = depth;
+      // Update running depth for every line so later lines see accurate
+      // nesting, regardless of whether this line's keys get extracted.
+      for (const ch of line) {
+        if ('([{'.includes(ch)) depth++;
+        if (')]}'.includes(ch)) depth--;
+      }
+      if (!line || line.startsWith('//') || depthBeforeLine > 0) continue;
       for (const segment of splitTopLevelCommas(line)) {
         const trimmed = segment.trim();
         if (!trimmed) continue;

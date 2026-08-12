@@ -15,6 +15,14 @@ describe('config.resolveIndexHtmlPath', () => {
     process.env = { ...ORIGINAL_ENV };
     process.env.GEMINI_API_KEY = 'test-key';
     process.env.CORS_ORIGIN = 'https://example.com';
+    // avoid process.exit(1) in config's production Firebase guard when tests
+    // below set NODE_ENV=production — see middleware.errorHandler.test.js for
+    // the matching comment.
+    process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({
+      project_id: 'test-project',
+      client_email: 'test@test-project.iam.gserviceaccount.com',
+      private_key: 'test-key',
+    });
     delete process.env.USE_DIST_FRONTEND;
     delete process.env.USE_SOURCE_FRONTEND;
   });

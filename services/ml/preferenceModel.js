@@ -2,7 +2,7 @@
  * Preference model — exponential moving average of category affinities
  * from saved trips + place feedback. Used to re-rank itinerary suggestions.
  */
-const { getDb } = require('../db/init');
+const { getDb } = require('../../db/init');
 
 const ALPHA = 0.15; // EMA learning rate
 let affinities = Object.create(null); // cat -> score 0..1

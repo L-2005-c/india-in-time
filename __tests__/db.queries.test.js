@@ -57,11 +57,13 @@ describe('db/queries — trips', () => {
     expect(result).toEqual(row);
   });
 
-  test('deleteTrip scopes the delete to id AND user_id (prevents cross-user deletion)', async () => {
+  test('deleteTrip scopes the (soft) delete to id AND user_id (prevents cross-user deletion)', async () => {
+    // deleteTrip is a soft delete (sets deleted_at) rather than a hard DELETE —
+    // see db/schema.js's trips.deleted_at column.
     const pool = mockPool(async () => ({ rows: [] }));
     await queries.deleteTrip('trip1', 'user1');
     const [sql, params] = pool.query.mock.calls[0];
-    expect(sql).toMatch(/DELETE FROM trips WHERE id = \$1 AND user_id = \$2/);
+    expect(sql).toMatch(/UPDATE trips SET deleted_at = CURRENT_TIMESTAMP.*WHERE id = \$1 AND user_id = \$2 AND deleted_at IS NULL/s);
     expect(params).toEqual(['trip1', 'user1']);
   });
 });
@@ -82,11 +84,13 @@ describe('db/queries — favorites', () => {
     expect(await queries.isFavorite('u1', 'Nowhere', 'Nowhere')).toBe(false);
   });
 
-  test('removeFavorite scopes deletion to the owning user', async () => {
+  test('removeFavorite scopes the (soft) deletion to the owning user', async () => {
+    // removeFavorite is a soft delete (sets deleted_at) rather than a hard
+    // DELETE — see db/schema.js's favorites.deleted_at column.
     const pool = mockPool(async () => ({ rows: [] }));
     await queries.removeFavorite(42, 'u1');
     const [sql, params] = pool.query.mock.calls[0];
-    expect(sql).toMatch(/DELETE FROM favorites WHERE id = \$1 AND user_id = \$2/);
+    expect(sql).toMatch(/UPDATE favorites SET deleted_at = CURRENT_TIMESTAMP WHERE id = \$1 AND user_id = \$2 AND deleted_at IS NULL/);
     expect(params).toEqual([42, 'u1']);
   });
 });

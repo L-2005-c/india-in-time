@@ -13,7 +13,7 @@
  * Trained from place_feedback (rating + accurate) mapped to crowd intensity labels.
  * Persists weights to DB table ml_model_weights when available; otherwise memory.
  */
-const { getDb } = require('../db/init');
+const { getDb } = require('../../db/init');
 
 const FEATURE_DIM = 12;
 const LR = 0.05;
