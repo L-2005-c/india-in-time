@@ -170,21 +170,7 @@
       </button>
       
       <!-- TIME SLIDER UI — draggable + collapsible so it doesn't block the map on mobile -->
-      <div id="time-slider-container" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:9000;width:90%;max-width:400px;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:8px 20px 12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:8px;pointer-events:auto;touch-action:none;">
-        <div id="time-slider-handle" style="width:36px;height:5px;border-radius:3px;background:rgba(255,255,255,0.25);margin:2px auto 4px;cursor:grab;"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-family:'Playfair Display',serif;font-size:14px;color:var(--gold);font-weight:700;">Time Simulator</span>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span id="time-slider-val" style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text-primary);">--:--</span>
-            <button id="time-slider-collapse-btn" data-action="toggleTimeSliderCollapsed" aria-label="Minimize time simulator" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:22px;height:22px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;">▾</button>
-          </div>
-        </div>
-        <input type="range" id="time-slider" min="0" max="1439" step="15" value="540" style="width:100%;accent-color:var(--gold);cursor:pointer;touch-action:pan-x;" data-action="onTimeSliderChange">
-      </div>
-      <!-- Collapsed pill shown when the simulator is minimized — tap to bring it back -->
-      <button id="time-slider-pill" data-action="toggleTimeSliderCollapsed" style="display:none;position:absolute;z-index:9000;background:rgba(18,24,38,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:8px 14px;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--gold);align-items:center;gap:6px;pointer-events:auto;cursor:pointer;">
-        🕐 <span id="time-slider-pill-val">--:--</span>
-      </button>
+      <!-- Time Simulator removed -->
       <div id="street-quest" style="display:none">
         <div class="sq-top">
           <div class="sq-title">Street Quest</div>

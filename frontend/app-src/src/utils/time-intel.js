@@ -1,3 +1,8 @@
+function t2m(s, fallback = 0) {
+  const [h, m] = String(s || "").split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
+  return Math.max(0, Math.min(23, h)) * 60 + Math.max(0, Math.min(59, m));
+}
 // Time-of-day / traffic / crowd / weather scoring helpers.
 // All pure functions — arguments in, value out, no shared app state.
 import { getTransportConfig } from '../data/cities.js';

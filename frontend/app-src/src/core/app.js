@@ -925,37 +925,24 @@ function placeSunTimes(loc, date = new Date()) {
   return _placeSunTimes(loc, date);
 }
 
-function onTimeSliderChange(val) {
-  window.globalSimulationTime = parseInt(val, 10);
-  const hh = String(Math.floor(window.globalSimulationTime / 60)).padStart(2, '0');
-  const mm = String(window.globalSimulationTime % 60).padStart(2, '0');
-  
-  const h = parseInt(hh, 10);
-  const ap = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  const timeStr = `${h12}:${mm} ${ap}`;
-  
-  const valEl = document.getElementById('time-slider-val');
-  if (valEl) valEl.textContent = timeStr;
-  const pillValEl = document.getElementById('time-slider-pill-val');
-  if (pillValEl) pillValEl.textContent = timeStr;
-  
-  if (window.itin && window.itin.length > 0) {
-    if (typeof renderRoute === 'function') renderRoute();
-  } else {
-    // If no route is generated yet but markers are on map (e.g. preview)
-    if (typeof renderMapMarkers === 'function') renderMapMarkers();
+function onTimeSliderChange(_val) {
+  // Time Simulator UI removed — always use real local clock minutes
+  try {
+    const now = new Date();
+    window.globalSimulationTime = now.getHours() * 60 + now.getMinutes();
+  } catch (_e) {
+    window.globalSimulationTime = 12 * 60;
   }
 }
 
-// Initialize slider display on load
-setTimeout(() => {
-  const sld = document.getElementById('time-slider');
-  if(sld) {
-    sld.value = window.globalSimulationTime;
-    onTimeSliderChange(window.globalSimulationTime);
-  }
-}, 1000);
+// Time Simulator removed — seed simulation time from real clock
+try {
+  const _n = new Date();
+  window.globalSimulationTime = _n.getHours() * 60 + _n.getMinutes();
+} catch (_e) {
+  window.globalSimulationTime = 12 * 60;
+}
+
 
 // ═══════════════════════════════════════
 // Time Simulator — draggable + collapsible.

@@ -5,6 +5,14 @@ const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1
 
 const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
 
+const TIME_FIT_KM_WEIGHT = 0.85;
+function t2mLocal(s, fallback = 0) {
+  const parts = String(s || '').split(':').map(Number);
+  const h = parts[0], m = parts[1];
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
+  return Math.max(0, Math.min(23, h)) * 60 + Math.max(0, Math.min(59, m));
+}
+
 const DEDUPE_STOPWORDS = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
 
 function isFiniteLatLon(lat, lon) {
@@ -165,15 +173,26 @@ function orderStopsAreaWise(stops,start){
   return ordered;
 }
 
-function estimateTimeFitPenaltyKm(stops, start) {
+function estimateTimeFitPenaltyKm(stops, start, opts = {}) {
   if (!Array.isArray(stops) || !stops.length) return 0;
-  let clock = t2m(document.getElementById('s-time')?.value || '09:00', 9 * 60);
+  // Pure time-window fitness (no DOM / no app globals — that was causing t2m ReferenceError)
+  let clock = Number.isFinite(opts.startMin) ? opts.startMin : 9 * 60;
   let prev = start;
   let penalty = 0;
   for (const stop of stops) {
+    if (!stop?.coords) continue;
     if (prev) clock += Math.max(5, Math.round(hvKm(prev[0], prev[1], stop.coords[0], stop.coords[1]) / 0.45));
-    const { score } = calculateExperienceScore(stop, clock % 1440);
-    penalty += (1 - score / 100) * TIME_FIT_KM_WEIGHT; // 0 = perfect fit, full weight = worst
+    const now = ((clock % 1440) + 1440) % 1440;
+    const ot = t2mLocal(stop.ot, 6 * 60);
+    const ct = t2mLocal(stop.ct, 22 * 60);
+    let fit = 1;
+    const overnight = ct <= ot;
+    const open = overnight ? (now >= ot || now < ct) : (now >= ot && now < ct);
+    if (!open) fit = 0.15;
+    else if (stop.is_sunset_spot && (now < 16 * 60 || now > 19 * 60)) fit = 0.55;
+    else if (stop.is_sunrise_spot && (now < 5 * 60 || now > 8 * 60)) fit = 0.55;
+    else if (stop.cat === 'food' && !((now >= 12 * 60 && now <= 15 * 60) || (now >= 19 * 60 && now <= 22 * 60))) fit = 0.7;
+    penalty += (1 - fit) * TIME_FIT_KM_WEIGHT;
     clock += stop.vt || 60;
     prev = stop.coords;
   }
