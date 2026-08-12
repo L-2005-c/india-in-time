@@ -40,6 +40,12 @@
 
 </head>
 <body>
+<a href="#app" class="skip-link">Skip to content</a>
+<style>
+.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999}
+.skip-link:focus{left:8px;top:8px;width:auto;height:auto;padding:8px 12px;background:#10b981;color:#000;overflow:visible}
+</style>
+
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
@@ -116,9 +122,9 @@
   Back
 </div>
 
-<div id="app">
+<div id="app" role="main">
   <!-- HEADER -->
-  <header id="header">
+  <header id="header" role="banner">
     <div class="header-inner">
       <div class="logo">
         <img class="header-logo-mark" src="/logo-mark.png?v=20260603-logo" alt="" width="62" height="27" decoding="sync">

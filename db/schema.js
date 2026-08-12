@@ -22,7 +22,8 @@ const SCHEMA_SQL = `
     status      VARCHAR(50) DEFAULT 'saved',
     share_token VARCHAR(255) UNIQUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at  TIMESTAMP
   );
 
   -- Bookmarked / favorite places
@@ -36,6 +37,7 @@ const SCHEMA_SQL = `
     category    VARCHAR(100),
     notes       TEXT,
     added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at  TIMESTAMP,
     UNIQUE(user_id, place_name, city)
   );
 
@@ -100,6 +102,63 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_cache_expires ON place_cache(expires_at);
   CREATE INDEX IF NOT EXISTS idx_place_fb_place ON place_feedback(place_name, city);
   CREATE INDEX IF NOT EXISTS idx_app_fb_time    ON app_feedback(created_at);
+
+  -- Soft-delete support indexes
+  CREATE INDEX IF NOT EXISTS idx_trips_deleted ON trips(deleted_at) WHERE deleted_at IS NULL;
+  CREATE INDEX IF NOT EXISTS idx_fav_deleted   ON favorites(deleted_at) WHERE deleted_at IS NULL;
+
+  -- Historical crowd observations (pipeline target; engines blend when present)
+  CREATE TABLE IF NOT EXISTS historical_crowd (
+    id            SERIAL PRIMARY KEY,
+    place_name    VARCHAR(255) NOT NULL,
+    city          VARCHAR(255) NOT NULL,
+    region        VARCHAR(100),
+    observed_at   TIMESTAMP NOT NULL,
+    daypart       VARCHAR(32),
+    crowd_level   VARCHAR(32) NOT NULL,
+    crowd_score   SMALLINT CHECK (crowd_score BETWEEN 0 AND 100),
+    source        VARCHAR(64) DEFAULT 'user_report',
+    sample_size   INTEGER DEFAULT 1,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_hist_crowd_place ON historical_crowd(place_name, city);
+  CREATE INDEX IF NOT EXISTS idx_hist_crowd_time  ON historical_crowd(observed_at);
+
+  -- Gemini / AI usage for cost dashboards
+  CREATE TABLE IF NOT EXISTS gemini_usage (
+    id          SERIAL PRIMARY KEY,
+    endpoint    VARCHAR(255),
+    model       VARCHAR(100),
+    tokens_in   INTEGER DEFAULT 0,
+    tokens_out  INTEGER DEFAULT 0,
+    latency_ms  INTEGER,
+    success     BOOLEAN DEFAULT true,
+    cached      BOOLEAN DEFAULT false,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_gemini_usage_time ON gemini_usage(created_at);
+
+  -- Online ML model weight store (crowd logistic, preference, etc.)
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id          SERIAL PRIMARY KEY,
+    action      VARCHAR(128) NOT NULL,
+    actor       VARCHAR(255),
+    resource    VARCHAR(255),
+    outcome     VARCHAR(64),
+    meta_json   TEXT,
+    ip          VARCHAR(45),
+    request_id  VARCHAR(64),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+
+  CREATE TABLE IF NOT EXISTS ml_model_weights (
+    model_key    VARCHAR(64) PRIMARY KEY,
+    weights_json TEXT NOT NULL,
+    trained_n    INTEGER DEFAULT 0,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
 `;
 
 module.exports = { SCHEMA_SQL };

@@ -38,14 +38,13 @@ describe('security middleware (CSP / helmet headers)', () => {
     expect(csp).toContain('https://*.basemaps.cartocdn.com');
   });
 
-  // Regression test for a real production outage: helmet's own default for
-  // script-src-attr is 'none' and does NOT inherit script-src's
-  // 'unsafe-inline' — omitting this silently blocked every onclick=/
-  // onkeydown= handler in the app (i.e. the entire UI stopped responding).
-  test('explicitly allows inline event-handler attributes (script-src-attr / style-src-attr)', async () => {
+  // After converting all dynamic onclick= to data-action delegation,
+  // script-src-attr is tightened to 'none' (the secure default).
+  // style-src-attr still needs 'unsafe-inline' for dynamic style="" attributes.
+  test('blocks inline event-handler attributes (script-src-attr none) while allowing style-src-attr', async () => {
     const res = await request(app).get('/ping');
     const csp = res.headers['content-security-policy'];
-    expect(csp).toContain("script-src-attr 'unsafe-inline'");
+    expect(csp).toContain("script-src-attr 'none'");
     expect(csp).toContain("style-src-attr 'unsafe-inline'");
   });
 

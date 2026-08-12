@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: India In-Time API
+  version: "1.0.0"
+  description: |
+    Travel intelligence API for India In-Time.
+    Version negotiation: `X-API-Version: 1`, `?api_version=1`, or
+    `Accept: application/vnd.indiaintime.v1+json`.
+servers:
+  - url: /api
+    description: Relative to deployment origin
+paths:
+  /health:
+    get:
+      summary: Liveness health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  ts: { type: integer }
+                  uptime: { type: number }
+                  version: { type: string }
+  /health/live:
+    get:
+      summary: Simple liveness probe
+      operationId: getHealthLive
+      responses:
+        "200":
+          description: Alive
+  /health/ready:
+    get:
+      summary: Readiness with cache + Gemini circuit state
+      operationId: getHealthReady
+      security: [{ adminKey: [] }]
+      responses:
+        "200":
+          description: Ready
+        "401":
+          description: Admin auth required
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: getMetrics
+      security: [{ adminKey: [] }]
+      responses:
+        "200":
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema: { type: string }
+  /config:
+    get:
+      summary: Public client config (MapTiler keys etc.)
+      operationId: getConfig
+      responses:
+        "200":
+          description: Public config
+  /geocode:
+    get:
+      summary: Geocode a place name
+      operationId: geocode
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          required: true
+      responses:
+        "200":
+          description: Geocoding results
+  /places:
+    get:
+      summary: Discover places for a city
+      operationId: listPlaces
+      parameters:
+        - in: query
+          name: city
+          schema: { type: string }
+      responses:
+        "200":
+          description: Place list
+  /weather:
+    get:
+      summary: Weather proxy
+      operationId: getWeather
+      parameters:
+        - in: query
+          name: lat
+          schema: { type: number }
+        - in: query
+          name: lon
+          schema: { type: number }
+      responses:
+        "200":
+          description: Weather payload
+  /ai:
+    post:
+      summary: AI endpoints (itinerary, lens, etc.)
+      operationId: postAi
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: AI response
+  /trips:
+    get:
+      summary: List current user trips
+      operationId: listTrips
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Trip list
+    post:
+      summary: Save a trip
+      operationId: saveTrip
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Saved
+  /favorites:
+    get:
+      summary: List favorites
+      operationId: listFavorites
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Favorites
+  /time-intelligence/status:
+    post:
+      summary: Time intelligence status for places
+      operationId: timeIntelStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                places:
+                  type: array
+                  items: { type: object }
+      responses:
+        "200":
+          description: Status array
+  /time-intelligence/recommend:
+    post:
+      summary: Rank places for a day
+      operationId: timeIntelRecommend
+      responses:
+        "200":
+          description: Ranked places
+  /time-intelligence/day-plan:
+    post:
+      summary: Build a timed day plan
+      operationId: timeIntelDayPlan
+      responses:
+        "200":
+          description: Day plan
+  /feedback:
+    post:
+      summary: Submit place or app feedback
+      operationId: postFeedback
+      responses:
+        "200":
+          description: Accepted
+  /analytics/gemini:
+    get:
+      summary: Gemini usage / cost summary
+      operationId: geminiUsage
+      security: [{ adminKey: [] }]
+      parameters:
+        - in: query
+          name: hours
+          schema: { type: integer, default: 24 }
+      responses:
+        "200":
+          description: Usage by model
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+    adminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+
+  /analytics/ml/crowd:
+    get:
+      summary: Crowd ML model weights and training stats
+      security: [{ adminKey: [] }]
+      responses:
+        "200":
+          description: Model info
+  /analytics/ml/crowd/train:
+    post:
+      summary: Batch-train crowd model from place_feedback
+      security: [{ adminKey: [] }]
+      responses:
+        "200":
+          description: Training result
+  /analytics/gemini:
+    get:
+      summary: Gemini usage and estimated cost
+      security: [{ adminKey: [] }]
+      responses:
+        "200":
+          description: Usage summary

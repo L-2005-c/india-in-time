@@ -30,17 +30,13 @@ function buildHelmetOptions() {
           'https://unpkg.com',              // Leaflet
           'https://cdn.jsdelivr.net',       // DOMPurify
         ],
-        // IMPORTANT: helmet's own built-in defaults set script-src-attr and
-        // style-src-attr to 'none' and do NOT inherit scriptSrc/styleSrc's
-        // 'unsafe-inline' — these are separate CSP directives specifically
-        // for inline event-handler attributes (onclick=, onkeydown=, etc.)
-        // and inline style="" attributes. Omitting these left script-src-attr
-        // at helmet's default of 'none', which silently blocked every single
-        // onclick=/onkeydown= handler in the app — i.e. every button on the
-        // page stopped working. Must be set explicitly. Still needed for the
-        // same reason as scriptSrc above — app.js's dynamically-generated
-        // onclick= attributes, not the static ones in the HTML files.
-        scriptSrcAttr: ["'unsafe-inline'"],
+        // script-src-attr: previously required 'unsafe-inline' because app.js
+        // generated onclick= attributes in template HTML. Those have been
+        // converted to data-action delegation (see STATIC_ACTIONS in app.js).
+        // We now set 'none' so inline event-handler attributes are blocked —
+        // the intended security posture. style-src-attr still needs
+        // 'unsafe-inline' for dynamic style="" on cards/badges.
+        scriptSrcAttr: ["'none'"],
         styleSrcAttr: ["'unsafe-inline'"],
         styleSrc: [
           "'self'", "'unsafe-inline'",

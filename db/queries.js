@@ -20,7 +20,7 @@ async function getUserTrips(userId, limit = 50) {
   const { rows } = await pool.query(`
     SELECT id, city, city_lat, city_lon, config_json, stops_json, status, share_token, created_at, updated_at
     FROM trips
-    WHERE user_id = $1
+    WHERE user_id = $1 AND deleted_at IS NULL
     ORDER BY created_at DESC
     LIMIT $2
   `, [userId, limit]);
@@ -46,7 +46,7 @@ async function updateTripShareToken(tripId, token) {
 
 async function deleteTrip(tripId, userId) {
   const pool = getDb();
-  await pool.query(`DELETE FROM trips WHERE id = $1 AND user_id = $2`, [tripId, userId]);
+  await pool.query(`UPDATE trips SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, [tripId, userId]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,25 +66,25 @@ async function getUserFavorites(userId, city = null) {
   const pool = getDb();
   if (city) {
     const { rows } = await pool.query(`
-      SELECT * FROM favorites WHERE user_id = $1 AND city = $2 ORDER BY added_at DESC
+      SELECT * FROM favorites WHERE user_id = $1 AND city = $2 AND deleted_at IS NULL ORDER BY added_at DESC
     `, [userId, city]);
     return rows;
   }
   const { rows } = await pool.query(`
-    SELECT * FROM favorites WHERE user_id = $1 ORDER BY added_at DESC
+    SELECT * FROM favorites WHERE user_id = $1 AND deleted_at IS NULL ORDER BY added_at DESC
   `, [userId]);
   return rows;
 }
 
 async function removeFavorite(favoriteId, userId) {
   const pool = getDb();
-  await pool.query(`DELETE FROM favorites WHERE id = $1 AND user_id = $2`, [favoriteId, userId]);
+  await pool.query(`UPDATE favorites SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, [favoriteId, userId]);
 }
 
 async function isFavorite(userId, placeName, city) {
   const pool = getDb();
   const { rows } = await pool.query(`
-    SELECT 1 FROM favorites WHERE user_id = $1 AND place_name = $2 AND city = $3 LIMIT 1
+    SELECT 1 FROM favorites WHERE user_id = $1 AND place_name = $2 AND city = $3 AND deleted_at IS NULL LIMIT 1
   `, [userId, placeName, city]);
   return rows.length > 0;
 }
@@ -100,7 +100,7 @@ async function flushAnalyticsBuffer() {
   if (analyticsBuffer.length === 0) return;
   const batch = [...analyticsBuffer];
   analyticsBuffer = [];
-  
+
   try {
     const pool = getDb();
     const client = await pool.connect();
@@ -121,7 +121,20 @@ async function flushAnalyticsBuffer() {
       client.release();
     }
   } catch (err) {
+    // Durable fallback: re-queue the batch (cap to avoid unbounded memory)
+    // and spill to a local JSONL file so operators can recover after outages.
     console.warn('[analytics] Failed to batch log:', err.message);
+    const retry = batch.slice(0, 500);
+    analyticsBuffer = retry.concat(analyticsBuffer).slice(0, 2000);
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const spill = path.join(process.cwd(), 'data', 'analytics-spill.jsonl');
+      fs.mkdirSync(path.dirname(spill), { recursive: true });
+      fs.appendFileSync(spill, retry.map((r) => JSON.stringify({ ...r, spilledAt: Date.now() })).join('\n') + '\n');
+    } catch (spillErr) {
+      console.warn('[analytics] spill file write failed:', spillErr.message);
+    }
   }
 }
 
@@ -289,13 +302,51 @@ async function getAppFeedbackSummary(limit = 50) {
   return { ...(summary[0] || { count: 0, avg_rating: null }), recent };
 }
 
+async function logGeminiUsage({ endpoint, model, tokensIn, tokensOut, latencyMs, success, cached }) {
+  const pool = getDb();
+  try {
+    await pool.query(`
+      INSERT INTO gemini_usage (endpoint, model, tokens_in, tokens_out, latency_ms, success, cached)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [endpoint || null, model || null, tokensIn || 0, tokensOut || 0, latencyMs || null, success !== false, !!cached]);
+  } catch (e) {
+    // Table may not exist yet on older deploys — fail open
+    if (!/does not exist|relation/i.test(e.message)) {
+      console.warn('[gemini_usage]', e.message);
+    }
+  }
+}
+
+async function getGeminiUsageSummary(hours = 24) {
+  const pool = getDb();
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+  try {
+    const { rows } = await pool.query(`
+      SELECT model,
+             COUNT(*)::int AS calls,
+             SUM(CASE WHEN success THEN 1 ELSE 0 END)::int AS successes,
+             SUM(CASE WHEN cached THEN 1 ELSE 0 END)::int AS cached,
+             COALESCE(SUM(tokens_in),0)::int AS tokens_in,
+             COALESCE(SUM(tokens_out),0)::int AS tokens_out,
+             ROUND(AVG(latency_ms)::numeric, 1) AS avg_latency_ms
+      FROM gemini_usage
+      WHERE created_at >= $1
+      GROUP BY model
+      ORDER BY calls DESC
+    `, [since]);
+    return { hours, byModel: rows };
+  } catch (e) {
+    return { hours, byModel: [], error: e.message };
+  }
+}
+
 module.exports = {
   // Trips
   saveTrip, getUserTrips, getTripById, getTripByShareToken, updateTripShareToken, deleteTrip,
   // Favorites
   addFavorite, getUserFavorites, removeFavorite, isFavorite,
   // Analytics
-  logApiUsage, getApiUsageSummary, flushAnalyticsBuffer,
+  logApiUsage, getApiUsageSummary, flushAnalyticsBuffer, logGeminiUsage, getGeminiUsageSummary,
   // Place cache
   getCachedPlaces, setCachedPlaces, deleteCachedPlaces, purgeExpiredCache,
   // AI cache

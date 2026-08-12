@@ -2670,7 +2670,7 @@ function renderLoadPanel(){
   const cloud=window._fbPlans||[];
   const seen=new Set();
   const all=[...cloud,...local].filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return true;}).sort((a,b)=>b.ts-a.ts);
-  document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">📂 My Saved Plans ${currentUser?'☁️':''}</div></div>${all.length===0?'<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:24px;font-style:italic">No saved plans yet.</p>':all.map(d=>`<div class="saved-plan-item"><div><div class="sp-name">${escapeHtml(d.name)}</div><div class="sp-date">${new Date(d.ts).toLocaleString()} ${cloud.find(c=>c.id===d.id)?'☁️':''}</div></div><div class="sp-btns"><button class="sp-load" onclick="loadPlan('${encodeURIComponent(JSON.stringify(d))}')">Load</button><button class="sp-del" onclick="delPlan('${d.id}')">×</button></div></div>`).join('')}`;
+  document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">📂 My Saved Plans ${currentUser?'☁️':''}</div></div>${all.length===0?'<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:24px;font-style:italic">No saved plans yet.</p>':all.map(d=>`<div class="saved-plan-item"><div><div class="sp-name">${escapeHtml(d.name)}</div><div class="sp-date">${new Date(d.ts).toLocaleString()} ${cloud.find(c=>c.id===d.id)?'☁️':''}</div></div><div class="sp-btns"><button class="sp-load" data-action="loadPlan" data-plan="${encodeURIComponent(JSON.stringify(d))}">Load</button><button class="sp-del" data-action="delPlan" data-id="${d.id}">×</button></div></div>`).join('')}`;
 }
 function toggleLoadPanel(){switchToView('tools-view',3);renderLoadPanel();}
 
@@ -3225,7 +3225,7 @@ document.addEventListener('input', (e) => {
 // one listener, attached once, works for every button carrying data-action
 // regardless of when it entered the DOM. Arguments that used to be literal
 // values inside the onclick string now live in data-* attributes on the
-// button itself (e.g. onclick="switchToView('map-view',0)" became
+// button itself (e.g. data-action="switchToView" data-view="map-view" data-idx="0" became
 // data-action="switchToView" data-view="map-view" data-idx="0"), read here
 // rather than parsed out of an arbitrary string — this stays a fixed lookup
 // table of real function references, never eval()/new Function() on
@@ -3252,6 +3252,12 @@ const STATIC_ACTIONS = {
   shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
   toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
   toggleTimeSliderCollapsed, toggleUserMenu, toggleVoice, waShare,
+  // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
+  renderToolsHome, renderLingo, renderSafety, renderBudget, renderPassport,
+  prepGuide, postcard, getInstaSpots, getSouvenirGuide, showTripRating, showReplanner,
+  showWeatherAlerts, generateTripPDF, setupNotifications, showFestivalRadar,
+  showHiddenGems, showHartaalAlert, showCrowdPredictor, showFareNegotiator, showTripTribe,
+  shareEmergency, addExpense, analyzeBudget,
   // These read extra args off the button's own dataset rather than taking
   // none — kept in the same table since dispatch below doesn't care.
   selectAllCustomPlaces: (btn) => selectAllCustomPlaces(btn.dataset.arg === 'true'),
@@ -3262,6 +3268,35 @@ const STATIC_ACTIONS = {
   // button, so this passes a minimal shim carrying just the property the
   // function actually reads instead of the raw event.
   signInWithGoogle: (btn) => signInWithGoogle({ currentTarget: btn }),
+  // Arg-bearing handlers (data-* attributes)
+  delExp: (btn) => delExp(Number(btn.dataset.id)),
+  delPlan: (btn) => delPlan(btn.dataset.id),
+  loadPlan: (btn) => loadPlan(btn.dataset.plan),
+  speak: (btn) => speak(btn.dataset.text || ''),
+  chatAbout: (btn) => { if (btn.dataset.name) chatAbout(btn.dataset.name); },
+  aiFoodCard: (btn) => aiFoodCard(btn.dataset.name || '', btn.dataset.cat || ''),
+  clickFileInput: (btn) => {
+    const id = btn.dataset.inputId;
+    const el = id && document.getElementById(id);
+    if (el) el.click();
+  },
+  drawerRun: (btn) => {
+    closeAiDrawer();
+    const name = btn.dataset.run;
+    const fn = name && (STATIC_ACTIONS[name] || (typeof window[name] === 'function' ? window[name] : null));
+    if (typeof fn === 'function') {
+      // Allow drawer animation to finish before running heavy UI work
+      setTimeout(() => fn(btn), 50);
+    }
+  },
+  drawerFile: (btn) => {
+    closeAiDrawer();
+    const id = btn.dataset.inputId;
+    setTimeout(() => {
+      const el = id && document.getElementById(id);
+      if (el) el.click();
+    }, 350);
+  },
 };
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
@@ -3563,7 +3598,7 @@ async function generateTripPDF(){
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-function showToast(icon,title,msg,duration=5000){document.getElementById('notif-icon').textContent=icon;document.getElementById('notif-title').textContent=title;document.getElementById('notif-msg').innerHTML=sanitizeChatHtml(msg);const t=document.getElementById('notif-toast');t.style.display='block';requestAnimationFrame(()=>t.classList.add('show'));clearTimeout(window._toastHideTid);window._toastHideTid=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.style.display='none',280);},duration);}
+function showToast(icon,title,msg,duration=5000){try{if(typeof window.__a11yAnnounce==='function')window.__a11yAnnounce((title?title+'. ':'')+(msg||''));}catch(_e){}document.getElementById('notif-icon').textContent=icon;document.getElementById('notif-title').textContent=title;document.getElementById('notif-msg').innerHTML=sanitizeChatHtml(msg);const t=document.getElementById('notif-toast');t.style.display='block';requestAnimationFrame(()=>t.classList.add('show'));clearTimeout(window._toastHideTid);window._toastHideTid=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.style.display='none',280);},duration);}
 async function setupNotifications(){
   if(!itin.length){addMsg('Generate a plan first!');return;}
   let permGranted=false;if('Notification' in window){const p=await Notification.requestPermission();permGranted=p==='granted';}
@@ -3614,7 +3649,7 @@ async function setupNotifications(){
 // ── Budget ────────────────────────────────────────────────────────────────────
 function addExpense(){const ni=document.getElementById('exp-name'),ci=document.getElementById('exp-cost');if(!ni||!ci)return;const n=ni.value.trim(),c=parseFloat(ci.value);if(!n||isNaN(c)||c<=0)return;expenses.push({id:Date.now(),n,c});ni.value='';ci.value='';updateBudget();if(currentUser)saveUserData();}
 function delExp(id){expenses=expenses.filter(e=>e.id!==id);updateBudget();}
-function updateBudget(){const lim=parseFloat(document.getElementById('bud-limit')?.value)||0;const grp=Math.max(1,parseInt(document.getElementById('grp-sz')?.value)||1);const sp=expenses.reduce((s,e)=>s+e.c,0),rem=lim-sp;const re=document.getElementById('bud-rem');if(re){re.textContent=`₹${rem}`;re.style.color=rem<0?'#f87171':rem<lim*.2?'#fcd34d':'var(--jade)';}const ts=document.getElementById('bud-spent');if(ts)ts.textContent=`₹${sp}`;const pp=document.getElementById('bud-pp');if(pp)pp.textContent=`₹${(sp/grp).toFixed(2)}`;const pct=lim>0?Math.min(100,(sp/lim)*100):0;const pr=document.getElementById('bud-bar');if(pr){pr.style.width=`${pct}%`;pr.style.background=pct>90?'#ef4444':pct>75?'#f59e0b':'var(--jade)';}const el=document.getElementById('exp-list');if(!el)return;el.innerHTML=expenses.length?expenses.map(e=>`<div class="exp-item"><span>${escapeHtml(e.n)}</span><div class="exp-item-right"><span style="font-weight:700">₹${e.c}</span><button class="exp-del" onclick="delExp(${e.id})">×</button></div></div>`).join(''):'<p style="text-align:center;color:var(--text-muted);font-size:11px;padding:12px;font-style:italic">No expenses yet.</p>';}
+function updateBudget(){const lim=parseFloat(document.getElementById('bud-limit')?.value)||0;const grp=Math.max(1,parseInt(document.getElementById('grp-sz')?.value)||1);const sp=expenses.reduce((s,e)=>s+e.c,0),rem=lim-sp;const re=document.getElementById('bud-rem');if(re){re.textContent=`₹${rem}`;re.style.color=rem<0?'#f87171':rem<lim*.2?'#fcd34d':'var(--jade)';}const ts=document.getElementById('bud-spent');if(ts)ts.textContent=`₹${sp}`;const pp=document.getElementById('bud-pp');if(pp)pp.textContent=`₹${(sp/grp).toFixed(2)}`;const pct=lim>0?Math.min(100,(sp/lim)*100):0;const pr=document.getElementById('bud-bar');if(pr){pr.style.width=`${pct}%`;pr.style.background=pct>90?'#ef4444':pct>75?'#f59e0b':'var(--jade)';}const el=document.getElementById('exp-list');if(!el)return;el.innerHTML=expenses.length?expenses.map(e=>`<div class="exp-item"><span>${escapeHtml(e.n)}</span><div class="exp-item-right"><span style="font-weight:700">₹${e.c}</span><button class="exp-del" data-action="delExp" data-id="${e.id}">×</button></div></div>`).join(''):'<p style="text-align:center;color:var(--text-muted);font-size:11px;padding:12px;font-style:italic">No expenses yet.</p>';}
 async function analyzeBudget(){if(!expenses.length){alert('Add expenses first!');return;}const total=expenses.reduce((s,e)=>s+e.c,0);const limit=document.getElementById('bud-limit')?.value||5000;renderToolsHome();switchToView('chat-view',2);addMsg(`<span style="color:var(--jade)">💰 Analyzing your budget…</span>`);const typing=addTypingIndicator();try{const t=await API.aiBudgetAnalysis(currentCityName,limit,total,expenses);typing.remove();addMsg(t?formatAiText(t):'💡 Autos are 30% cheaper than app cabs!');}catch{typing.remove();addMsg('💡 Autos are 30% cheaper than app cabs!');}}
 
 // ── Tools Renderers ───────────────────────────────────────────────────────────
@@ -3637,35 +3672,35 @@ function renderToolsHome(){
     // UTILITIES
     '<div class="tools-section-title">Utilities</div>',
     '<div class="tool-cards">',
-      '<div class="tool-card" onclick="renderLingo()"><div class="tool-icon">🗣️</div><div class="tool-name">Lingo</div><div class="tool-desc">Local phrases</div></div>',
-      '<div class="tool-card" onclick="renderSafety()"><div class="tool-icon">🚨</div><div class="tool-name">Safety</div><div class="tool-desc">Emergency contacts</div></div>',
-      '<div class="tool-card" onclick="renderBudget()"><div class="tool-icon">💸</div><div class="tool-name">Budget</div><div class="tool-desc">Expense splitter</div></div>',
-      '<div class="tool-card" onclick="renderPassport()"><div class="tool-icon">🛂</div><div class="tool-name">Passport</div><div class="tool-desc">'+s+' stamps</div></div>',
+      '<div class="tool-card" data-action="renderLingo"><div class="tool-icon">🗣️</div><div class="tool-name">Lingo</div><div class="tool-desc">Local phrases</div></div>',
+      '<div class="tool-card" data-action="renderSafety"><div class="tool-icon">🚨</div><div class="tool-name">Safety</div><div class="tool-desc">Emergency contacts</div></div>',
+      '<div class="tool-card" data-action="renderBudget"><div class="tool-icon">💸</div><div class="tool-name">Budget</div><div class="tool-desc">Expense splitter</div></div>',
+      '<div class="tool-card" data-action="renderPassport"><div class="tool-icon">🛂</div><div class="tool-name">Passport</div><div class="tool-desc">'+s+' stamps</div></div>',
     '</div>',
 
     // SHARE & SAVE
     '<div class="tools-section-title">Share & Save</div>',
     '<div class="tool-cards">',
-      '<div class="tool-card" onclick="saveIt()"><div class="tool-icon">💾</div><div class="tool-name">Save Plan</div><div class="tool-desc">Sync to cloud ☁️</div></div>',
-      '<div class="tool-card" onclick="shareIt()"><div class="tool-icon">📤</div><div class="tool-name">Share Trip</div><div class="tool-desc">Copy & share</div></div>',
-      '<div class="tool-card" onclick="waShare()"><div class="tool-icon">💬</div><div class="tool-name">WhatsApp</div><div class="tool-desc">Share to WhatsApp</div></div>',
-      '<div class="tool-card" onclick="toggleLoadPanel()"><div class="tool-icon">📂</div><div class="tool-name">My Plans</div><div class="tool-desc">Cloud + local ☁️</div></div>',
+      '<div class="tool-card" data-action="saveIt"><div class="tool-icon">💾</div><div class="tool-name">Save Plan</div><div class="tool-desc">Sync to cloud ☁️</div></div>',
+      '<div class="tool-card" data-action="shareIt"><div class="tool-icon">📤</div><div class="tool-name">Share Trip</div><div class="tool-desc">Copy & share</div></div>',
+      '<div class="tool-card" data-action="waShare"><div class="tool-icon">💬</div><div class="tool-name">WhatsApp</div><div class="tool-desc">Share to WhatsApp</div></div>',
+      '<div class="tool-card" data-action="toggleLoadPanel"><div class="tool-icon">📂</div><div class="tool-name">My Plans</div><div class="tool-desc">Cloud + local ☁️</div></div>',
     '</div>',
 
     // EXCLUSIVE — 8 NEW FEATURES
     '<div class="tools-section-title">🚀 Exclusive — Not on Google Maps</div>',
     '<div class="tool-cards">',
-      '<div class="tool-card" onclick="showFestivalRadar()"><div class="tool-icon">🎪</div><div class="tool-name">Festival Radar</div><div class="tool-desc">Events today</div></div>',
-      '<div class="tool-card" onclick="showHiddenGems()"><div class="tool-icon">💎</div><div class="tool-name">Hidden Gems</div><div class="tool-desc">Secret spots</div></div>',
-      '<div class="tool-card" onclick="showHartaalAlert()"><div class="tool-icon">⚡</div><div class="tool-name">Strike Alert</div><div class="tool-desc">Bandh warning</div></div>',
-      '<div class="tool-card" onclick="showCrowdPredictor()"><div class="tool-icon">🧠</div><div class="tool-name">Crowd Predictor</div><div class="tool-desc">Best time to visit</div></div>',
-      '<div class="tool-card" onclick="showFareNegotiator()"><div class="tool-icon">💸</div><div class="tool-name">Fare Negotiator</div><div class="tool-desc">Exact price + script</div></div>',
-      '<div class="tool-card" onclick="showTripTribe()"><div class="tool-icon">👥</div><div class="tool-name">Trip Tribe</div><div class="tool-desc">Find travel buddies</div></div>',
-      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" onclick="document.getElementById(\'ar-in2\').click()">',
+      '<div class="tool-card" data-action="showFestivalRadar"><div class="tool-icon">🎪</div><div class="tool-name">Festival Radar</div><div class="tool-desc">Events today</div></div>',
+      '<div class="tool-card" data-action="showHiddenGems"><div class="tool-icon">💎</div><div class="tool-name">Hidden Gems</div><div class="tool-desc">Secret spots</div></div>',
+      '<div class="tool-card" data-action="showHartaalAlert"><div class="tool-icon">⚡</div><div class="tool-name">Strike Alert</div><div class="tool-desc">Bandh warning</div></div>',
+      '<div class="tool-card" data-action="showCrowdPredictor"><div class="tool-icon">🧠</div><div class="tool-name">Crowd Predictor</div><div class="tool-desc">Best time to visit</div></div>',
+      '<div class="tool-card" data-action="showFareNegotiator"><div class="tool-icon">💸</div><div class="tool-name">Fare Negotiator</div><div class="tool-desc">Exact price + script</div></div>',
+      '<div class="tool-card" data-action="showTripTribe"><div class="tool-icon">👥</div><div class="tool-name">Trip Tribe</div><div class="tool-desc">Find travel buddies</div></div>',
+      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="ar-in2">',
         '<div class="tool-icon">🔮</div><div><div class="tool-name">AR Overlay</div><div class="tool-desc">Point at any building for history & tips</div></div>',
         '<input type="file" id="ar-in2" accept="image/*" style="display:none" onchange="handleArOverlay(event)">',
       '</div>',
-      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" onclick="document.getElementById(\'food-safety-in2\').click()">',
+      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="food-safety-in2">',
         '<div class="tool-icon">🍡</div><div><div class="tool-name">Food Safety Scanner</div><div class="tool-desc">Is it safe to eat?</div></div>',
         '<input type="file" id="food-safety-in2" accept="image/*" style="display:none" onchange="handleFoodSafety(event)">',
       '</div>',
@@ -3674,38 +3709,38 @@ function renderToolsHome(){
     // AI TOOLS
     '<div class="tools-section-title">AI Tools for '+c+'</div>',
     '<div class="tool-cards">',
-      '<div class="tool-card" onclick="prepGuide()"><div class="tool-icon">🎒</div><div class="tool-name">Prep Guide</div><div class="tool-desc">What to pack</div></div>',
-      '<div class="tool-card" onclick="getInstaSpots()"><div class="tool-icon">📸</div><div class="tool-name">Insta-Spots</div><div class="tool-desc">Best photo angles</div></div>',
-      '<div class="tool-card" onclick="getSouvenirGuide()"><div class="tool-icon">🛍️</div><div class="tool-name">Souvenirs</div><div class="tool-desc">What to buy</div></div>',
-      '<div class="tool-card" onclick="showTripRating()"><div class="tool-icon">⭐</div><div class="tool-name">Rate My Trip</div><div class="tool-desc">AI trip report</div></div>',
-      '<div class="tool-card" onclick="showReplanner()"><div class="tool-icon">🧭</div><div class="tool-name">Replanner</div><div class="tool-desc">Running late?</div></div>',
-      '<div class="tool-card" onclick="startVoiceInput()"><div class="tool-icon">🎤</div><div class="tool-name">Voice AI</div><div class="tool-desc">Talk to assistant</div></div>',
-      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" onclick="document.getElementById(\'caption-in2\').click()">',
+      '<div class="tool-card" data-action="prepGuide"><div class="tool-icon">🎒</div><div class="tool-name">Prep Guide</div><div class="tool-desc">What to pack</div></div>',
+      '<div class="tool-card" data-action="getInstaSpots"><div class="tool-icon">📸</div><div class="tool-name">Insta-Spots</div><div class="tool-desc">Best photo angles</div></div>',
+      '<div class="tool-card" data-action="getSouvenirGuide"><div class="tool-icon">🛍️</div><div class="tool-name">Souvenirs</div><div class="tool-desc">What to buy</div></div>',
+      '<div class="tool-card" data-action="showTripRating"><div class="tool-icon">⭐</div><div class="tool-name">Rate My Trip</div><div class="tool-desc">AI trip report</div></div>',
+      '<div class="tool-card" data-action="showReplanner"><div class="tool-icon">🧭</div><div class="tool-name">Replanner</div><div class="tool-desc">Running late?</div></div>',
+      '<div class="tool-card" data-action="startVoiceInput"><div class="tool-icon">🎤</div><div class="tool-name">Voice AI</div><div class="tool-desc">Talk to assistant</div></div>',
+      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="caption-in2">',
         '<div class="tool-icon">📸</div><div><div class="tool-name">AI Photo Captions</div><div class="tool-desc">Instagram captions</div></div>',
         '<input type="file" id="caption-in2" accept="image/*" style="display:none" onchange="handleCaption(event)">',
       '</div>',
-      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" onclick="document.getElementById(\'translate-in2\').click()">',
+      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="translate-in2">',
         '<div class="tool-icon">🌐</div><div><div class="tool-name">Translate Sign / Menu</div><div class="tool-desc">Any language</div></div>',
         '<input type="file" id="translate-in2" accept="image/*" style="display:none" onchange="handleTranslate(event)">',
       '</div>',
-      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" onclick="document.getElementById(\'lens-in2\').click()">',
+      '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="lens-in2">',
         '<div class="tool-icon">🔍</div><div><div class="tool-name">AI Lens</div><div class="tool-desc">Identify landmarks</div></div>',
         '<input type="file" id="lens-in2" accept="image/*" style="display:none" onchange="handleAiLens(event)">',
       '</div>',
     '</div>'
   ].join('');
 }
-function renderLingo(){const phrases=[{en:'How much is this?',te:'Bhaiya, kitne ka hai?'},{en:'Where is the washroom?',te:'Washroom kahan hai?'},{en:'Stop the auto here',te:'Yahan rok do'},{en:'No spicy please',te:'Mirchi kam daalna'},{en:'Yes / No',te:'Haan / Nahi'},{en:'Too expensive!',te:'Bahut mehenga hai!'}];document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🗣️ Local Lingo</div></div><div class="lingo-list">${phrases.map(p=>`<div class="lingo-card"><div><div class="lingo-en">${p.en}</div><div class="lingo-te">${p.te}</div></div><button class="lingo-speak" onclick="speak('${p.te}')">🔊</button></div>`).join('')}</div>`;}
-function renderSafety(){const cityQuery=encodeURIComponent(`${currentCityName} hospitals`);const nearbyQuery=encodeURIComponent(cLat&&cLon?`${cLat},${cLon} hospitals`:`hospitals near ${currentCityName}`);document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🚨 Emergency Safety</div></div><div class="emergency-block"><div class="emergency-block-title">Urgent Help</div><div class="emergency-list"><a href="tel:112" class="emer-card"><div class="emer-left"><span class="emer-ico">🚓</span><span class="emer-name">National Emergency</span></div><span class="emer-num">112</span></a><a href="tel:100" class="emer-card"><div class="emer-left"><span class="emer-ico">🚓</span><span class="emer-name">Police</span></div><span class="emer-num">100</span></a><a href="tel:108" class="emer-card"><div class="emer-left"><span class="emer-ico">🚑</span><span class="emer-name">Ambulance</span></div><span class="emer-num">108</span></a><a href="tel:101" class="emer-card"><div class="emer-left"><span class="emer-ico">🚒</span><span class="emer-name">Fire</span></div><span class="emer-num">101</span></a><a href="tel:1091" class="emer-card"><div class="emer-left"><span class="emer-ico">👩</span><span class="emer-name">Women Helpline</span></div><span class="emer-num">1091</span></a></div></div><div class="emergency-block"><div class="emergency-block-title">Hospitals</div><div class="emergency-list"><a href="https://www.google.com/maps/search/?api=1&query=${nearbyQuery}" target="_blank" class="emer-card"><div class="emer-left"><span class="emer-ico">🏥</span><span class="emer-name">Nearby Hospitals</span></div><span class="emer-num">Open</span></a><a href="https://www.google.com/maps/search/?api=1&query=${cityQuery}" target="_blank" class="emer-card"><div class="emer-left"><span class="emer-ico">🩺</span><span class="emer-name">${escapeHtml(currentCityName)} Hospitals</span></div><span class="emer-num">Maps</span></a></div></div><button class="emer-share-btn" onclick="shareEmergency()">📍 Share My Live Location</button>`;}
-function renderBudget(){document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">💸 Budget Splitter</div></div><div class="budget-card"><div class="budget-row"><div class="bud-field-wrap"><div class="inp-lbl">Total Budget</div><div class="bud-currency"><span class="bud-sym">₹</span><input type="number" class="bud-inp" id="bud-limit" value="5000" oninput="updateBudget()"></div></div><div class="bud-field-wrap"><div class="inp-lbl">Group Size</div><div class="bud-currency"><span style="font-size:18px">👥</span><input type="number" class="bud-inp" id="grp-sz" value="1" min="1" style="width:50px" oninput="updateBudget()"></div></div><div class="bud-field-wrap" style="text-align:right"><div class="inp-lbl">Remaining</div><div class="bud-rem" id="bud-rem">₹5000</div></div></div><div class="prog-bar"><div class="prog-fill" id="bud-bar" style="width:0%"></div></div><div class="bud-meta"><span>Spent: <strong id="bud-spent">₹0</strong></span><span style="color:var(--purple);font-weight:700">Per person: <strong id="bud-pp">₹0.00</strong></span></div></div><div class="exp-add-row"><input type="text" id="exp-name" class="inp-field" placeholder="What did you buy?"><input type="number" id="exp-cost" class="inp-field small" placeholder="₹"><button class="btn-add-exp" onclick="addExpense()">+</button></div><div class="exp-list" id="exp-list"><p style="text-align:center;color:var(--text-muted);font-size:11px;padding:12px;font-style:italic">No expenses yet.</p></div><button class="btn-ai-budget" onclick="analyzeBudget()">✨ AI Budget Analyzer</button>`;updateBudget();}
-function renderPassport(){const catIcon={beach:'🏖️',temple:'🛕',food:'🍛',scenic:'⛰️'};document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button onclick="renderToolsHome()" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🛂 Passport — ${stamps.size} Stamps</div></div><p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;text-align:center">Visit places to collect stamps!</p><div class="passport-grid">${LOCS.map(loc=>{const u=stamps.has(loc.id);return`<div class="passport-stamp${u?' unlocked':''}" onclick="${u?`chatAbout('${loc.name.replace(/'/g,"\\'")}')`:''}" style="${!u?'opacity:0.55;filter:grayscale(1)':''}"><div class="stamp-icon">${u?catIcon[loc.cat]||'📍':'🔒'}</div><div class="stamp-name${u?' unlocked':''}">${escapeHtml(loc.name)}</div>${u?'<div class="stamp-badge">✓</div>':''}</div>`;}).join('')}</div>`;}
+function renderLingo(){const phrases=[{en:'How much is this?',te:'Bhaiya, kitne ka hai?'},{en:'Where is the washroom?',te:'Washroom kahan hai?'},{en:'Stop the auto here',te:'Yahan rok do'},{en:'No spicy please',te:'Mirchi kam daalna'},{en:'Yes / No',te:'Haan / Nahi'},{en:'Too expensive!',te:'Bahut mehenga hai!'}];document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🗣️ Local Lingo</div></div><div class="lingo-list">${phrases.map(p=>`<div class="lingo-card"><div><div class="lingo-en">${p.en}</div><div class="lingo-te">${p.te}</div></div><button class="lingo-speak" data-action="speak" data-text="${escapeHtml(p.te || '')}">🔊</button></div>`).join('')}</div>`;}
+function renderSafety(){const cityQuery=encodeURIComponent(`${currentCityName} hospitals`);const nearbyQuery=encodeURIComponent(cLat&&cLon?`${cLat},${cLon} hospitals`:`hospitals near ${currentCityName}`);document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🚨 Emergency Safety</div></div><div class="emergency-block"><div class="emergency-block-title">Urgent Help</div><div class="emergency-list"><a href="tel:112" class="emer-card"><div class="emer-left"><span class="emer-ico">🚓</span><span class="emer-name">National Emergency</span></div><span class="emer-num">112</span></a><a href="tel:100" class="emer-card"><div class="emer-left"><span class="emer-ico">🚓</span><span class="emer-name">Police</span></div><span class="emer-num">100</span></a><a href="tel:108" class="emer-card"><div class="emer-left"><span class="emer-ico">🚑</span><span class="emer-name">Ambulance</span></div><span class="emer-num">108</span></a><a href="tel:101" class="emer-card"><div class="emer-left"><span class="emer-ico">🚒</span><span class="emer-name">Fire</span></div><span class="emer-num">101</span></a><a href="tel:1091" class="emer-card"><div class="emer-left"><span class="emer-ico">👩</span><span class="emer-name">Women Helpline</span></div><span class="emer-num">1091</span></a></div></div><div class="emergency-block"><div class="emergency-block-title">Hospitals</div><div class="emergency-list"><a href="https://www.google.com/maps/search/?api=1&query=${nearbyQuery}" target="_blank" class="emer-card"><div class="emer-left"><span class="emer-ico">🏥</span><span class="emer-name">Nearby Hospitals</span></div><span class="emer-num">Open</span></a><a href="https://www.google.com/maps/search/?api=1&query=${cityQuery}" target="_blank" class="emer-card"><div class="emer-left"><span class="emer-ico">🩺</span><span class="emer-name">${escapeHtml(currentCityName)} Hospitals</span></div><span class="emer-num">Maps</span></a></div></div><button class="emer-share-btn" data-action="shareEmergency">📍 Share My Live Location</button>`;}
+function renderBudget(){document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">💸 Budget Splitter</div></div><div class="budget-card"><div class="budget-row"><div class="bud-field-wrap"><div class="inp-lbl">Total Budget</div><div class="bud-currency"><span class="bud-sym">₹</span><input type="number" class="bud-inp" id="bud-limit" value="5000" oninput="updateBudget()"></div></div><div class="bud-field-wrap"><div class="inp-lbl">Group Size</div><div class="bud-currency"><span style="font-size:18px">👥</span><input type="number" class="bud-inp" id="grp-sz" value="1" min="1" style="width:50px" oninput="updateBudget()"></div></div><div class="bud-field-wrap" style="text-align:right"><div class="inp-lbl">Remaining</div><div class="bud-rem" id="bud-rem">₹5000</div></div></div><div class="prog-bar"><div class="prog-fill" id="bud-bar" style="width:0%"></div></div><div class="bud-meta"><span>Spent: <strong id="bud-spent">₹0</strong></span><span style="color:var(--purple);font-weight:700">Per person: <strong id="bud-pp">₹0.00</strong></span></div></div><div class="exp-add-row"><input type="text" id="exp-name" class="inp-field" placeholder="What did you buy?"><input type="number" id="exp-cost" class="inp-field small" placeholder="₹"><button class="btn-add-exp" data-action="addExpense">+</button></div><div class="exp-list" id="exp-list"><p style="text-align:center;color:var(--text-muted);font-size:11px;padding:12px;font-style:italic">No expenses yet.</p></div><button class="btn-ai-budget" data-action="analyzeBudget">✨ AI Budget Analyzer</button>`;updateBudget();}
+function renderPassport(){const catIcon={beach:'🏖️',temple:'🛕',food:'🍛',scenic:'⛰️'};document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🛂 Passport — ${stamps.size} Stamps</div></div><p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;text-align:center">Visit places to collect stamps!</p><div class="passport-grid">${LOCS.map(loc=>{const u=stamps.has(loc.id);return`<div class="passport-stamp${u?' unlocked':''}" data-action="${u?'chatAbout':''}" data-name="${escapeHtml(loc.name)}" role="button" tabindex="${u?0:-1}" style="${!u?'opacity:0.55;filter:grayscale(1)':''}"><div class="stamp-icon">${u?catIcon[loc.cat]||'📍':'🔒'}</div><div class="stamp-name${u?' unlocked':''}">${escapeHtml(loc.name)}</div>${u?'<div class="stamp-badge">✓</div>':''}</div>`;}).join('')}</div>`;}
 
 // ── View switching ────────────────────────────────────────────────────────────
 const viewIds=['map-view','plan-view','chat-view','tools-view'];
 function switchToView(viewId,idx){
   viewIds.forEach(v=>{const el=document.getElementById(v);el.classList.remove('active');el.style.display='none';});
   const target=document.getElementById(viewId);target.classList.add('active');target.style.display=viewId==='tools-view'?'block':'flex';
-  document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===idx||i===3&&idx>=3));
+  document.querySelectorAll('.nav-item').forEach((n,i)=>{const on=i===idx||i===3&&idx>=3;n.classList.toggle('active',on);if(on)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
   if(viewId==='map-view'&&map){map.invalidateSize();setTimeout(()=>map.invalidateSize(),50);setTimeout(()=>map.invalidateSize(),300);}
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
@@ -4013,7 +4048,7 @@ function updateItinUI(){
     }
     const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
 
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button onclick="aiFoodCard('${loc.name.replace(/'/g,"\\'")}','${loc.cat}')" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
@@ -4524,7 +4559,10 @@ function closeAiDrawer() {
 
 function drawerBtn(icon, name, desc, action, accentColor='') {
   const border = accentColor ? `border-color:${accentColor};` : '';
-  return `<div class="drawer-item" style="${border}" onclick="closeAiDrawer();${action}">
+  // action is a function name string (e.g. "prepGuide") — dispatched via data-action
+  // after closing the drawer. No inline onclick= (CSP script-src-attr safe).
+  const actionName = String(action || '').replace(/\(\)$/, '');
+  return `<div class="drawer-item" style="${border}" role="button" tabindex="0" data-action="drawerRun" data-run="${actionName}">
     <div class="drawer-item-icon">${icon}</div>
     <div class="drawer-item-body">
       <div class="drawer-item-name">${name}</div>
@@ -4536,7 +4574,7 @@ function drawerBtn(icon, name, desc, action, accentColor='') {
 
 function drawerFileBtn(icon, name, desc, inputId, accentColor='') {
   const border = accentColor ? `border-color:${accentColor};` : '';
-  return `<div class="drawer-item" style="${border}" onclick="closeAiDrawer();setTimeout(()=>document.getElementById('${inputId}').click(),350)">
+  return `<div class="drawer-item" style="${border}" role="button" tabindex="0" data-action="drawerFile" data-input-id="${inputId}">
     <div class="drawer-item-icon">${icon}</div>
     <div class="drawer-item-body">
       <div class="drawer-item-name">${name}</div>
@@ -4553,26 +4591,26 @@ function renderDrawerContent() {
   el.innerHTML = [
     // ── TRIP TOOLS ──
     '<div class="drawer-sec">Trip Tools</div>',
-    drawerBtn('🎒','Prep Guide','What to pack for this trip','prepGuide()'),
-    drawerBtn('📸','Postcard','Generate a trip postcard','postcard()'),
-    drawerBtn('📷','Insta-Spots','Best photo angles at each stop','getInstaSpots()'),
-    drawerBtn('🛍️','Souvenir Guide','What to buy locally','getSouvenirGuide()'),
-    drawerBtn('⭐','Rate My Trip','AI trip report & score','showTripRating()'),
-    drawerBtn('💬','App Feedback','Tell us what to improve','showAppFeedback()'),
-    drawerBtn('🧭','Smart Replanner','Running late? Reschedule now','showReplanner()'),
-    drawerBtn('🌦️','Weather Alerts','Per-stop weather forecast','showWeatherAlerts()'),
-    drawerBtn('📄','Download PDF','Full trip summary PDF','generateTripPDF()'),
-    drawerBtn('🔔','Closing Alerts','Get notified before stops close','setupNotifications()'),
-    drawerBtn('🎤','Voice AI','Talk to assistant hands-free','startVoiceInput()'),
+    drawerBtn('🎒','Prep Guide','What to pack for this trip','prepGuide'),
+    drawerBtn('📸','Postcard','Generate a trip postcard','postcard'),
+    drawerBtn('📷','Insta-Spots','Best photo angles at each stop','getInstaSpots'),
+    drawerBtn('🛍️','Souvenir Guide','What to buy locally','getSouvenirGuide'),
+    drawerBtn('⭐','Rate My Trip','AI trip report & score','showTripRating'),
+    drawerBtn('💬','App Feedback','Tell us what to improve','showAppFeedback'),
+    drawerBtn('🧭','Smart Replanner','Running late? Reschedule now','showReplanner'),
+    drawerBtn('🌦️','Weather Alerts','Per-stop weather forecast','showWeatherAlerts'),
+    drawerBtn('📄','Download PDF','Full trip summary PDF','generateTripPDF'),
+    drawerBtn('🔔','Closing Alerts','Get notified before stops close','setupNotifications'),
+    drawerBtn('🎤','Voice AI','Talk to assistant hands-free','startVoiceInput'),
 
     // ── EXCLUSIVE ──
     '<div class="drawer-sec">🚀 Exclusive — Not on Google Maps</div>',
-    drawerBtn('⏰','Time Intelligence Engine','When should I visit — for the best experience?','showCrowdPredictor()','rgba(0,180,255,.5)'),
-    drawerBtn('🎪','Festival Radar','Events & festivals happening TODAY','showFestivalRadar()','rgba(255,165,0,.4)'),
-    drawerBtn('💎','Hidden Gems','Verified spots Google Maps buries','showHiddenGems()','rgba(168,85,247,.4)'),
-    drawerBtn('⚡','Strike Alert','Power cuts & bandh warnings','showHartaalAlert()','rgba(255,80,80,.4)'),
-    drawerBtn('💸','Fare Negotiator','Exact auto price + Hindi script','showFareNegotiator()','rgba(50,200,150,.4)'),
-    drawerBtn('👥','Trip Tribe','Find travel buddies nearby','showTripTribe()','rgba(200,100,255,.4)'),
+    drawerBtn('⏰','Time Intelligence Engine','When should I visit — for the best experience?','showCrowdPredictor','rgba(0,180,255,.5)'),
+    drawerBtn('🎪','Festival Radar','Events & festivals happening TODAY','showFestivalRadar','rgba(255,165,0,.4)'),
+    drawerBtn('💎','Hidden Gems','Verified spots Google Maps buries','showHiddenGems','rgba(168,85,247,.4)'),
+    drawerBtn('⚡','Strike Alert','Power cuts & bandh warnings','showHartaalAlert','rgba(255,80,80,.4)'),
+    drawerBtn('💸','Fare Negotiator','Exact auto price + Hindi script','showFareNegotiator','rgba(50,200,150,.4)'),
+    drawerBtn('👥','Trip Tribe','Find travel buddies nearby','showTripTribe','rgba(200,100,255,.4)'),
 
     // ── CAMERA AI ──
     '<div class="drawer-sec">📸 Camera AI</div>',
@@ -4594,29 +4632,29 @@ function renderAiToolsGrid() {
 /*
   grid.innerHTML = [
     // Row 1 — compact 3-col
-    '<div class="ai-card ai-accent-gold" onclick="prepGuide()"><div class="ai-card-icon">🎒</div><div class="ai-card-label">Prep Guide</div></div>',
-    '<div class="ai-card ai-accent-teal" onclick="postcard()"><div class="ai-card-icon">📸</div><div class="ai-card-label">Postcard</div></div>',
+    '<div class="ai-card ai-accent-gold" data-action="prepGuide"><div class="ai-card-icon">🎒</div><div class="ai-card-label">Prep Guide</div></div>',
+    '<div class="ai-card ai-accent-teal" data-action="postcard"><div class="ai-card-icon">📸</div><div class="ai-card-label">Postcard</div></div>',
     '<label class="ai-card ai-accent-ocean"><div class="ai-card-icon">🔍</div><div class="ai-card-label">AI Lens</div><input type="file" id="lens-in" accept="image/*" style="display:none" onchange="handleAiLens(event)"></label>',
     // Row 2
-    '<div class="ai-card ai-accent-purple" onclick="getInstaSpots()"><div class="ai-card-icon">📷</div><div class="ai-card-label">Insta Spots</div></div>',
-    '<div class="ai-card ai-accent-jade" onclick="showTripRating()"><div class="ai-card-icon">⭐</div><div class="ai-card-label">Rate Trip</div></div>',
-    '<div class="ai-card ai-accent-rose" onclick="showReplanner()"><div class="ai-card-icon">🧭</div><div class="ai-card-label">Replanner</div></div>',
+    '<div class="ai-card ai-accent-purple" data-action="getInstaSpots"><div class="ai-card-icon">📷</div><div class="ai-card-label">Insta Spots</div></div>',
+    '<div class="ai-card ai-accent-jade" data-action="showTripRating"><div class="ai-card-icon">⭐</div><div class="ai-card-label">Rate Trip</div></div>',
+    '<div class="ai-card ai-accent-rose" data-action="showReplanner"><div class="ai-card-icon">🧭</div><div class="ai-card-label">Replanner</div></div>',
     // Wide — existing
-    '<div class="ai-card ai-card-wide ai-accent-gold" onclick="getSouvenirGuide()"><div class="ai-card-icon">🛍️</div><div class="ai-card-label">Souvenir Guide — What to buy locally</div></div>',
-    '<div class="ai-card ai-card-wide ai-accent-teal" onclick="showWeatherAlerts()"><div class="ai-card-icon">🌦️</div><div class="ai-card-label">Weather Alerts — Per stop forecast</div></div>',
-    '<div class="ai-card ai-card-wide ai-accent-ocean" onclick="generateTripPDF()"><div class="ai-card-icon">📄</div><div class="ai-card-label">Download Trip PDF — Full summary</div></div>',
-    '<div class="ai-card ai-card-wide ai-accent-purple" onclick="setupNotifications()"><div class="ai-card-icon">🔔</div><div class="ai-card-label">Closing Time Alerts — Get reminders</div></div>',
+    '<div class="ai-card ai-card-wide ai-accent-gold" data-action="getSouvenirGuide"><div class="ai-card-icon">🛍️</div><div class="ai-card-label">Souvenir Guide — What to buy locally</div></div>',
+    '<div class="ai-card ai-card-wide ai-accent-teal" data-action="showWeatherAlerts"><div class="ai-card-icon">🌦️</div><div class="ai-card-label">Weather Alerts — Per stop forecast</div></div>',
+    '<div class="ai-card ai-card-wide ai-accent-ocean" data-action="generateTripPDF"><div class="ai-card-icon">📄</div><div class="ai-card-label">Download Trip PDF — Full summary</div></div>',
+    '<div class="ai-card ai-card-wide ai-accent-purple" data-action="setupNotifications"><div class="ai-card-icon">🔔</div><div class="ai-card-label">Closing Time Alerts — Get reminders</div></div>',
     '<label class="ai-card ai-card-wide ai-accent-jade"><div class="ai-card-icon">📸</div><div class="ai-card-label">AI Photo Captions — Instagram ready</div><input type="file" id="caption-in" accept="image/*" style="display:none" onchange="handleCaption(event)"></label>',
     '<label class="ai-card ai-card-wide ai-accent-rose"><div class="ai-card-icon">🌐</div><div class="ai-card-label">Translate Sign / Menu — Any language</div><input type="file" id="translate-in" accept="image/*" style="display:none" onchange="handleTranslate(event)"></label>',
     // ── 8 NEW EXCLUSIVE FEATURES ──
-    '<div class="ai-card ai-card-wide" style="border-color:rgba(255,165,0,.3);background:rgba(255,165,0,.05)" onclick="showFestivalRadar()"><div class="ai-card-icon">🎪</div><div class="ai-card-label" style="color:var(--text-primary)">Festival & Event Radar — What\'s happening TODAY</div></div>',
-    '<div class="ai-card ai-card-wide" style="border-color:rgba(100,220,100,.3);background:rgba(100,220,100,.05)" onclick="showHiddenGems()"><div class="ai-card-icon">💎</div><div class="ai-card-label" style="color:var(--text-primary)">Hidden Gem Detector — Secret local spots</div></div>',
+    '<div class="ai-card ai-card-wide" style="border-color:rgba(255,165,0,.3);background:rgba(255,165,0,.05)" data-action="showFestivalRadar"><div class="ai-card-icon">🎪</div><div class="ai-card-label" style="color:var(--text-primary)">Festival & Event Radar — What\'s happening TODAY</div></div>',
+    '<div class="ai-card ai-card-wide" style="border-color:rgba(100,220,100,.3);background:rgba(100,220,100,.05)" data-action="showHiddenGems"><div class="ai-card-icon">💎</div><div class="ai-card-label" style="color:var(--text-primary)">Hidden Gem Detector — Secret local spots</div></div>',
     '<label class="ai-card ai-card-wide" style="border-color:rgba(150,100,255,.3);background:rgba(150,100,255,.05)"><div class="ai-card-icon">🔮</div><div class="ai-card-label" style="color:var(--text-primary)">AR Overlay — Point at any building</div><input type="file" id="ar-in" accept="image/*" style="display:none" onchange="handleArOverlay(event)"></label>',
-    '<div class="ai-card ai-card-wide" style="border-color:rgba(255,80,80,.3);background:rgba(255,80,80,.05)" onclick="showHartaalAlert()"><div class="ai-card-icon">⚡</div><div class="ai-card-label" style="color:var(--text-primary)">Power & Strike Alert — Safe to travel today?</div></div>',
+    '<div class="ai-card ai-card-wide" style="border-color:rgba(255,80,80,.3);background:rgba(255,80,80,.05)" data-action="showHartaalAlert"><div class="ai-card-icon">⚡</div><div class="ai-card-label" style="color:var(--text-primary)">Power & Strike Alert — Safe to travel today?</div></div>',
     '<label class="ai-card ai-card-wide" style="border-color:rgba(255,200,50,.3);background:rgba(255,200,50,.05)"><div class="ai-card-icon">🍡</div><div class="ai-card-label" style="color:var(--text-primary)">Street Food Safety Scanner — Is it safe to eat?</div><input type="file" id="food-safety-in" accept="image/*" style="display:none" onchange="handleFoodSafety(event)"></label>',
-    '<div class="ai-card ai-card-wide" style="border-color:rgba(0,180,255,.3);background:rgba(0,180,255,.05)" onclick="showCrowdPredictor()"><div class="ai-card-icon">🧠</div><div class="ai-card-label" style="color:var(--text-primary)">Crowd Predictor — Best time to visit</div></div>',
-    '<div class="ai-card ai-card-wide" style="border-color:rgba(50,200,150,.3);background:rgba(50,200,150,.05)" onclick="showFareNegotiator()"><div class="ai-card-icon">💸</div><div class="ai-card-label" style="color:var(--text-primary)">Auto Fare Negotiator — Exact price + script</div></div>',
-    '<div class="ai-card ai-card-wide" style="border-color:rgba(200,100,255,.3);background:rgba(200,100,255,.05)" onclick="showTripTribe()"><div class="ai-card-icon">👥</div><div class="ai-card-label" style="color:var(--text-primary)">Trip Tribe — Find travel buddies</div></div>',
+    '<div class="ai-card ai-card-wide" style="border-color:rgba(0,180,255,.3);background:rgba(0,180,255,.05)" data-action="showCrowdPredictor"><div class="ai-card-icon">🧠</div><div class="ai-card-label" style="color:var(--text-primary)">Crowd Predictor — Best time to visit</div></div>',
+    '<div class="ai-card ai-card-wide" style="border-color:rgba(50,200,150,.3);background:rgba(50,200,150,.05)" data-action="showFareNegotiator"><div class="ai-card-icon">💸</div><div class="ai-card-label" style="color:var(--text-primary)">Auto Fare Negotiator — Exact price + script</div></div>',
+    '<div class="ai-card ai-card-wide" style="border-color:rgba(200,100,255,.3);background:rgba(200,100,255,.05)" data-action="showTripTribe"><div class="ai-card-icon">👥</div><div class="ai-card-label" style="color:var(--text-primary)">Trip Tribe — Find travel buddies</div></div>',
   ].join('');
 }
 

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gemini Usage — India In-Time Admin</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b1220; color: #e2e8f0; margin: 0; padding: 24px; }
+    h1 { font-size: 1.25rem; margin: 0 0 16px; }
+    .card { background: #141c2e; border: 1px solid #243049; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+    input { background: #0b1220; border: 1px solid #334155; color: #e2e8f0; padding: 8px 10px; border-radius: 8px; width: 100%; max-width: 320px; }
+    button { background: #10b981; color: #041016; border: 0; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #243049; }
+    th { color: #94a3b8; font-weight: 500; }
+    .muted { color: #94a3b8; font-size: 12px; }
+    .stat { font-size: 1.5rem; font-weight: 700; color: #34d399; }
+    .err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>Gemini usage &amp; cost</h1>
+  <div class="card">
+    <label for="key">Admin key (x-admin-key)</label>
+    <input id="key" type="password" autocomplete="off" placeholder="ADMIN_FEEDBACK_KEY" />
+    <label for="hours" style="margin-top:12px">Hours</label>
+    <input id="hours" type="number" value="24" min="1" max="168" />
+    <button type="button" id="load">Load</button>
+    <p class="muted" id="status">Enter admin key and load.</p>
+  </div>
+  <div class="card">
+    <div>Estimated cost (window)</div>
+    <div class="stat" id="cost">—</div>
+    <p class="muted" id="note"></p>
+  </div>
+  <div class="card">
+    <h2 style="font-size:1rem;margin:0 0 12px">By model</h2>
+    <table>
+      <thead><tr><th>Model</th><th>Calls</th><th>Success</th><th>Cached</th><th>Tokens in</th><th>Tokens out</th><th>Avg ms</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="7" class="muted">No data yet</td></tr></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2 style="font-size:1rem;margin:0 0 12px">Live process stats</h2>
+    <pre id="live" class="muted" style="white-space:pre-wrap">—</pre>
+  </div>
+  <script>
+    document.getElementById('load').onclick = async () => {
+      const key = document.getElementById('key').value.trim();
+      const hours = document.getElementById('hours').value || 24;
+      const status = document.getElementById('status');
+      status.textContent = 'Loading…';
+      status.className = 'muted';
+      try {
+        const res = await fetch('/api/analytics/gemini?hours=' + encodeURIComponent(hours), {
+          headers: { 'x-admin-key': key }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        document.getElementById('cost').textContent = '$' + (data.estimatedCostUsd ?? 0);
+        document.getElementById('note').textContent = data.note || '';
+        document.getElementById('live').textContent = JSON.stringify(data.live || {}, null, 2);
+        const rows = (data.byModel || []).map(r =>
+          `<tr><td>${r.model || '—'}</td><td>${r.calls}</td><td>${r.successes}</td><td>${r.cached}</td><td>${r.tokens_in}</td><td>${r.tokens_out}</td><td>${r.avg_latency_ms ?? '—'}</td></tr>`
+        ).join('') || '<tr><td colspan="7" class="muted">No DB rows yet (table populates as calls are logged)</td></tr>';
+        document.getElementById('rows').innerHTML = rows;
+        status.textContent = 'Updated ' + new Date().toLocaleString();
+      } catch (e) {
+        status.textContent = e.message || String(e);
+        status.className = 'err';
+      }
+    };
+  </script>
+</body>
+</html>

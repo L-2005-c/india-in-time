@@ -37,6 +37,20 @@ router.post('/place', optionalAuth, async (req, res) => {
     }
 
     await submitPlaceFeedback({ userId, placeName, city, rating: r, accurate, comment });
+
+    // Online ML update — enterprise feedback loop (fail-open)
+    try {
+      const crowdModel = require('../services/ml/crowdModel');
+      await crowdModel.learnFromSingleFeedback({
+        rating: r,
+        accurate,
+        cat: req.body.category || req.body.cat || 'default',
+        daypart: req.body.daypart,
+        isWeekend: !!req.body.isWeekend,
+        month: new Date().getMonth() + 1,
+      });
+    } catch (_ml) { /* non-blocking */ }
+
     res.status(201).json({ message: 'Feedback recorded', placeName, city });
   } catch (err) {
     console.error('[feedback:place:add]', err.message);

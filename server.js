@@ -25,16 +25,22 @@ const logger  = require('./lib/logger');
 // as-is — each worker independently guarding itself against Gemini failures
 // is a reasonable resilience pattern, not a correctness bug like the rate
 // limiter split was.) Set CLUSTER_WORKERS to override either way.
+// Production recommendation: set REDIS_URL so rate limits and optional
+// shared caches are process-safe. Without Redis we force a single worker
+// so in-memory rate-limit buckets cannot be silently multiplied.
 let numCPUs = parseInt(process.env.CLUSTER_WORKERS, 10)
   || (process.env.REDIS_URL ? os.cpus().length : 1);
 if (numCPUs > 1 && !process.env.REDIS_URL) {
-  const msg = 'CLUSTER_WORKERS>1 without REDIS_URL multiplies per-worker rate-limit buckets; refusing in production. Set REDIS_URL or CLUSTER_WORKERS=1.';
+  const msg = 'CLUSTER_WORKERS>1 without REDIS_URL multiplies per-worker rate-limit buckets; refusing in production. Set REDIS_URL (recommended default for multi-worker) or CLUSTER_WORKERS=1.';
   if (process.env.NODE_ENV === 'production') {
     console.error('❌', msg);
     process.exit(1);
   }
   console.warn('⚠️', msg, '— forcing CLUSTER_WORKERS=1');
   numCPUs = 1;
+}
+if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL && numCPUs === 1) {
+  console.warn('ℹ️  REDIS_URL not set — running single-worker. For multi-core production scale, set REDIS_URL and raise CLUSTER_WORKERS.');
 }
 
 // Vercel serverless functions are a fresh process per invocation — there's
@@ -94,6 +100,10 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { aiLimiter, placesLimiter, weatherLimiter, generalLimiter, timeIntelLimiter } = require('./middleware/rateLimiter');
 const { validateAiRequest, validatePlacesRequest, validateTimeIntelRequest, validateWeatherRequest, validateGeocodeRequest } = require('./middleware/validator');
 const { analyticsMiddleware } = require('./routes/analytics');
+const { apiVersion } = require('./middleware/apiVersion');
+const { maintenanceGuard, listFlags, setFlag, getFlag, requireAiEnabled } = require('./lib/featureFlags');
+const { idempotency } = require('./middleware/idempotency');
+const { writeAudit } = require('./lib/auditLog');
 
 // ── Import routes ────────────────────────────────────────────────────────────
 const geocodeRoutes      = require('./routes/geocode');
@@ -120,6 +130,9 @@ if (config.server.trustProxy) {
 
 // 1. Request logging + ID assignment
 app.use(requestLogger);
+app.use(maintenanceGuard);
+app.use(idempotency);
+app.use('/api', apiVersion);
 
 // 2. CORS
 // (config/index.js already fails fast at boot if CORS_ORIGIN='*' in
@@ -156,7 +169,7 @@ app.use('/api/weather', weatherLimiter, validateWeatherRequest, weatherRoutes);
 app.use('/api/weather-alerts', weatherLimiter, validateWeatherRequest, weatherAlertRoutes);
 
 // AI (most expensive — strictest rate limiting)
-app.use('/api/ai', aiLimiter, validateAiRequest, aiRoutes);
+app.use('/api/ai', requireAiEnabled, aiLimiter, validateAiRequest, aiRoutes);
 
 // Trips (save/load/share)
 app.use('/api/trips', generalLimiter, tripsRoutes);
@@ -199,15 +212,70 @@ app.get('/api/health', (_req, res) => {
 // be wide open — see the technical due-diligence notes on this endpoint).
 // Gated with the same admin auth as the feedback dashboard; not wired into
 // any platform healthcheck path, so this doesn't affect deploy healthchecks.
-app.get('/api/health/ready', requireAdminAuth, (_req, res) => {
+// Kubernetes-style readiness (public, no secrets) — fails if DB unreachable
+app.get('/api/ready', async (_req, res) => {
+  const checks = { db: false, redis: null, maintenance: getFlag('maintenanceMode') };
+  try {
+    const { getDb } = require('./db/init');
+    const pool = getDb();
+    if (pool) {
+      await pool.query('SELECT 1');
+      checks.db = true;
+    }
+  } catch (e) {
+    checks.dbError = e.message;
+  }
+  if (process.env.REDIS_URL) {
+    try {
+      const Redis = require('ioredis');
+      const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
+      await r.connect();
+      await r.ping();
+      checks.redis = true;
+      r.disconnect();
+    } catch (e) {
+      checks.redis = false;
+      checks.redisError = e.message;
+    }
+  }
+  const ok = checks.db && !checks.maintenance && (checks.redis !== false);
+  res.status(ok ? 200 : 503).json({ status: ok ? 'ready' : 'not_ready', checks, ts: Date.now() });
+});
+
+app.get('/api/health/ready', requireAdminAuth, async (_req, res) => {
   const memMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
   const gemini = geminiService.getStats();
+  const checks = { db: false, redis: null };
+  try {
+    const { getDb } = require('./db/init');
+    const pool = getDb();
+    if (pool) {
+      await pool.query('SELECT 1');
+      checks.db = true;
+    }
+  } catch (e) {
+    checks.dbError = e.message;
+  }
+  if (process.env.REDIS_URL) {
+    try {
+      const Redis = require('ioredis');
+      const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
+      await r.connect();
+      await r.ping();
+      checks.redis = true;
+      r.disconnect();
+    } catch (e) {
+      checks.redis = false;
+    }
+  }
 
   res.json({
-    status:   'ready',
+    status:   checks.db ? 'ready' : 'degraded',
     ts:       Date.now(),
     uptime:   Math.round(process.uptime()),
     memory:   `${memMB}MB`,
+    checks,
+    flags: listFlags(),
     gemini: {
       circuitState: gemini.circuitState,
       totalCalls:   gemini.total,
@@ -222,9 +290,82 @@ app.get('/api/health/ready', requireAdminAuth, (_req, res) => {
   });
 });
 
+// Feature flag admin
+app.get('/api/admin/flags', requireAdminAuth, (_req, res) => {
+  res.json({ flags: listFlags() });
+});
+app.post('/api/admin/flags', requireAdminAuth, (req, res) => {
+  const { name, value } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const v = setFlag(name, value);
+  writeAudit({ action: 'flag.set', actor: 'admin', resource: name, outcome: 'success', meta: { value: v }, ip: req.ip, requestId: req.requestId });
+  res.json({ flags: listFlags() });
+});
+
 // Simple liveness probe
 app.get('/api/health/live', (_req, res) => {
   res.json({ status: 'alive', ts: Date.now() });
+});
+
+// ── Observability: Prometheus-compatible metrics (admin-gated) ───────────────
+// Exposes process, Gemini, and cache counters for scraping by Prometheus,
+// Grafana Agent, or any metrics sidecar. Kept behind admin auth so the
+// detailed internal counters are not a public reconnaissance surface.
+app.get('/api/metrics', requireAdminAuth, (_req, res) => {
+  const mem = process.memoryUsage();
+  const gemini = geminiService.getStats();
+  const lines = [
+    '# HELP process_uptime_seconds Process uptime in seconds',
+    '# TYPE process_uptime_seconds gauge',
+    `process_uptime_seconds ${process.uptime().toFixed(1)}`,
+    '# HELP process_heap_bytes Node.js heap used bytes',
+    '# TYPE process_heap_bytes gauge',
+    `process_heap_bytes ${mem.heapUsed}`,
+    '# HELP process_rss_bytes Resident set size bytes',
+    '# TYPE process_rss_bytes gauge',
+    `process_rss_bytes ${mem.rss}`,
+    '# HELP gemini_requests_total Total Gemini API attempts',
+    '# TYPE gemini_requests_total counter',
+    `gemini_requests_total ${gemini.total || 0}`,
+    '# HELP gemini_success_total Successful Gemini responses',
+    '# TYPE gemini_success_total counter',
+    `gemini_success_total ${gemini.success || 0}`,
+    '# HELP gemini_failure_total Failed Gemini attempts',
+    '# TYPE gemini_failure_total counter',
+    `gemini_failure_total ${gemini.failure || 0}`,
+    '# HELP gemini_cached_total Responses served from cache',
+    '# TYPE gemini_cached_total counter',
+    `gemini_cached_total ${gemini.cached || 0}`,
+    '# HELP gemini_circuit_trips_total Circuit breaker open events',
+    '# TYPE gemini_circuit_trips_total counter',
+    `gemini_circuit_trips_total ${gemini.circuitTrips || 0}`,
+    '# HELP gemini_circuit_state Circuit state (0=CLOSED,1=HALF_OPEN,2=OPEN)',
+    '# TYPE gemini_circuit_state gauge',
+    `gemini_circuit_state ${{ CLOSED: 0, HALF_OPEN: 1, OPEN: 2 }[gemini.circuitState] ?? -1}`,
+  ];
+  for (const [name, cache] of [
+    ['places', placesCache],
+    ['gemini', geminiCache],
+    ['weather', weatherCache],
+    ['geocode', geocodeCache],
+  ]) {
+    const s = cache.getStats ? cache.getStats() : {};
+    lines.push(`# HELP cache_${name}_size Current entries in ${name} cache`);
+    lines.push(`# TYPE cache_${name}_size gauge`);
+    lines.push(`cache_${name}_size ${s.size ?? s.entries ?? 0}`);
+    if (s.hits != null) {
+      lines.push(`# HELP cache_${name}_hits_total Cache hits`);
+      lines.push(`# TYPE cache_${name}_hits_total counter`);
+      lines.push(`cache_${name}_hits_total ${s.hits}`);
+    }
+    if (s.misses != null) {
+      lines.push(`# HELP cache_${name}_misses_total Cache misses`);
+      lines.push(`# TYPE cache_${name}_misses_total counter`);
+      lines.push(`cache_${name}_misses_total ${s.misses}`);
+    }
+  }
+  res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(lines.join('\n') + '\n');
 });
 
 // Public, minimal client config. Only ever add values here that are safe to
@@ -233,6 +374,20 @@ app.get('/api/health/live', (_req, res) => {
 // either way, and they're meant to be restricted by domain in the MapTiler
 // dashboard, not kept secret. Do NOT add GEMINI_API_KEY,
 // FIREBASE_SERVICE_ACCOUNT, or ADMIN_FEEDBACK_KEY here.
+app.get('/api/openapi.json', (_req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const yaml = fs.readFileSync(path.join(__dirname, 'docs', 'openapi.yaml'), 'utf8');
+    // Minimal YAML→JSON for the subset we ship (avoid adding a YAML dep):
+    // serve raw YAML with correct content-type for Swagger UI / redoc.
+    res.type('text/yaml').send(yaml);
+  } catch (e) {
+    res.status(404).json({ error: 'OpenAPI spec not found' });
+  }
+});
+app.get('/api/openapi', (_req, res) => res.redirect(302, '/api/openapi.json'));
+
 app.get('/api/config', (_req, res) => {
   res.json({
     maptilerKeys: config.maptilerKeys,

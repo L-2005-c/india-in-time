@@ -76,7 +76,64 @@ router.get('/summary', requireAdminKey, async (req, res) => {
   }
 });
 
+// Gemini cost / usage dashboard data
+router.get('/gemini', requireAdminKey, async (req, res) => {
+  try {
+    const hours = Math.min(parseInt(req.query.hours, 10) || 24, 168);
+    const { getGeminiUsageSummary } = require('../db/queries');
+    const usage = await getGeminiUsageSummary(hours);
+    const live = geminiService.getStats();
+    const USD_PER_1K_IN = 0.000075;
+    const USD_PER_1K_OUT = 0.0003;
+    let estUsd = 0;
+    for (const row of usage.byModel || []) {
+      estUsd += (row.tokens_in / 1000) * USD_PER_1K_IN + (row.tokens_out / 1000) * USD_PER_1K_OUT;
+    }
+    res.json({
+      hours,
+      byModel: usage.byModel,
+      live,
+      estimatedCostUsd: Math.round(estUsd * 10000) / 10000,
+      note: 'Estimated cost uses approximate Gemini Flash rates; verify against Google Cloud billing.',
+    });
+  } catch (err) {
+    console.error('[analytics/gemini]', err.message);
+    res.status(500).json({ error: 'Failed to fetch Gemini usage' });
+  }
+});
+
+router.get('/ml/crowd', requireAdminKey, async (_req, res) => {
+  try {
+    const crowdModel = require('../services/ml/crowdModel');
+    await crowdModel.ensureLoaded();
+    res.json(crowdModel.getModelInfo());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/ml/crowd/train', requireAdminKey, async (req, res) => {
+  try {
+    const crowdModel = require('../services/ml/crowdModel');
+    const limit = Math.min(parseInt(req.body?.limit || req.query.limit, 10) || 500, 2000);
+    const result = await crowdModel.trainFromFeedback(limit);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/providers', requireAdminKey, (_req, res) => {
+  try {
+    const { listProviders } = require('../services/ai/provider');
+    res.json({ providers: listProviders() });
+  } catch (e) {
+    res.json({ providers: [{ name: 'gemini', primary: true }], error: e.message });
+  }
+});
+
 function formatUptime(seconds) {
+
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);

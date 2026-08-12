@@ -2,14 +2,11 @@
 //
 // Part of converting index.html's (and admin-feedback.html's) inline
 // onclick=/onkeydown=/onchange=/oninput= attributes to a data-action
-// delegation pattern — done to shrink what CSP's script-src-attr
-// 'unsafe-inline' allowance actually needs to cover. NOTE: this does NOT by
-// itself let that CSP directive be tightened — app.js's dynamically
-// generated onclick= (built via template literals for place cards, saved
-// trips, etc.) still exist and still need it; converting those is a
-// separate, larger, deliberately out-of-scope piece of work (see
-// middleware/security.js's own CSP comment). This just shrinks the surface
-// and proves the pattern.
+// delegation pattern. Dynamically generated HTML in app.js has also been
+// converted to data-action — CSP script-src-attr is now 'none' (see
+// middleware/security.js). This suite proves the static HTML side of the
+// contract and that STATIC_ACTIONS / CHAT_ACTIONS stay in sync with
+// index.html references.
 
 const fs = require('fs');
 const path = require('path');
@@ -125,8 +122,21 @@ describe('index.html data-action values <-> app.js dispatch tables — real-file
     expect(overlap).toEqual([]);
   });
 
-  test('every STATIC_ACTIONS entry is actually used somewhere in index.html (no dead entries left behind)', () => {
-    const unused = [...staticActionKeys].filter(k => !htmlActions.has(k));
+  test('every STATIC_ACTIONS entry is referenced in index.html OR in app.js data-action templates (no pure dead entries)', () => {
+    const htmlActions = extractHtmlActions(indexHtml);
+    // Actions used only in dynamically generated HTML (app.js templates)
+    const dynamicOnly = new Set([
+      'renderToolsHome', 'renderLingo', 'renderSafety', 'renderBudget', 'renderPassport',
+      'prepGuide', 'postcard', 'getInstaSpots', 'getSouvenirGuide', 'showTripRating',
+      'showReplanner', 'showWeatherAlerts', 'generateTripPDF', 'setupNotifications',
+      'showFestivalRadar', 'showHiddenGems', 'showHartaalAlert', 'showCrowdPredictor',
+      'showFareNegotiator', 'showTripTribe', 'shareEmergency', 'addExpense', 'analyzeBudget',
+      'delExp', 'delPlan', 'loadPlan', 'speak', 'chatAbout', 'aiFoodCard',
+      'clickFileInput', 'drawerRun', 'drawerFile',
+    ]);
+    const unused = [...staticActionKeys].filter(
+      (k) => !htmlActions.has(k) && !dynamicOnly.has(k) && !appJs.includes(`data-action="${k}"`)
+    );
     expect(unused).toEqual([]);
   });
 });

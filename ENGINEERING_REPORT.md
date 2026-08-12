@@ -108,3 +108,73 @@ Base 55 + bonuses for weather, coords, hours, category rules, traffic, historica
 2. Default `resolveIndexHtmlPath()` to **source** `index.html` (`/app.js` + `/styles.css`) so UI cannot blank
 3. Vite `base: '/dist/'` so future dist builds emit `/dist/assets/...`
 4. Opt into dist with env `USE_DIST_FRONTEND=1`
+
+---
+
+## Technical Debt Remediation (2026-08-11)
+
+### Critical
+1. **CSP onclick= eliminated** — All dynamically generated `onclick=` attributes in `app.js` converted to `data-action` delegation. `STATIC_ACTIONS` extended with tools/AI/drawer/arg-bearing handlers. CSP `script-src-attr` tightened from `'unsafe-inline'` → `'none'`. JS property assignment (`el.onclick =`) for day tabs remains (does not violate script-src-attr).
+2. **Observability** — Added admin-gated `/api/metrics` (Prometheus text format) with process uptime/heap/RSS, Gemini counters, circuit state, and per-cache size/hit metrics. Existing `/api/health` + `/api/health/ready` retained.
+
+### High Priority
+3. **Frontend modularization** — `app-src` remains source of truth; `public/app.js` and `core/app.js` kept in sync after CSP fix. Full further split of `core/app.js` (~state object refactor) remains follow-up.
+4. **Accessibility** — Skip-to-content link (CSS `:focus` only, CSP-safe), `role="main"` on `#app`, `lang` present, `role="button"` + `tabindex` on drawer items and passport stamps.
+5. **Redis as recommended default** — Production logs explicit recommendation; multi-worker without `REDIS_URL` still refused. `.env.example` documents Redis as the path to multi-core scale.
+6. **Durable analytics + historical crowd pipeline** — Soft-delete columns (`deleted_at`) on trips/favorites; `historical_crowd` table + indexes; `lookupHistoricalCrowdAsync` DB path (fails open to JSON). Analytics buffer already flushes on interval and shutdown.
+
+### Medium Priority
+7. **API versioning** — `middleware/apiVersion.js` negotiates v1 via `X-API-Version`, `Accept: application/vnd.indiaintime.v1+json`, or `?api_version=`. Wired under `/api`. Tests added.
+8. **Soft-delete** — Schema + queries for trips/favorites use soft-delete; list paths filter `deleted_at IS NULL`.
+9. e2e suite / Gemini cost dashboards / full OpenAPI — scaffolded partially (versioning + metrics); full coverage remains backlog.
+
+### Low Priority
+10. Multi-provider AI, advanced GIS, learned ML models — documented as future work in original report; not in scope of this remediation pass.
+
+### Validation notes
+- Syntax: run `node --check server.js` and `node --check frontend/public/app.js`
+- Tests: security CSP expectation updated; static-actions dead-entry test allows dynamic-only keys; new `middleware.apiVersion.test.js`
+- CSP: `script-src-attr 'none'` is now the intended production posture
+
+---
+
+## Remaining debt completion pass (2026-08-12)
+
+| Item | Deliverable |
+|------|-------------|
+| Frontend modularization | `state/appState.js`, `a11y/helpers.js`, `modules/chatActions.js`, main.js bootstrap |
+| Accessibility | focus-visible CSS, live-region announce on toasts, skip-link, roles |
+| Durable analytics | retry re-queue + JSONL spill file under `data/analytics-spill.jsonl` |
+| e2e | Jest critical-path smoke + Playwright config/specs |
+| Gemini cost dashboard | `/api/analytics/gemini`, `admin-gemini.html`, `gemini_usage` table |
+| OpenAPI | `docs/openapi.yaml` + `/api/openapi.json` |
+| Multi-provider AI | `services/ai/provider.js` (Gemini + optional OpenAI) |
+| Advanced GIS | `utils/spatial.js` (bbox, radius filter, bearing, grid, NN order) |
+| Learned crowd | `crowdLearner.js` blended in `getTravelIntelligenceAsync` |
+
+Run: `npm test`, `npm run migrate:up`, optional `npx playwright test --config __tests__/e2e/playwright.config.js`.
+
+---
+
+## Enterprise readiness pass (2026-08-12)
+
+### UI modularization (enterprise boundaries)
+- Domain modules: `modules/budget.js`, `auth.js`, `planner.js`, `chatActions.js`, registry `modules/index.js`
+- Shared `state/appState.js` + `window.__modules` for progressive adoption
+- `core/app.js` remains runtime orchestrator; pure math/planner/auth shapes extracted
+
+### Exhaustive accessibility
+- Landmarks: banner, main, navigation, region labels (map/plan/chat/tools)
+- Skip link, live regions, labeled controls, focus-visible, reduced-motion, 44px targets
+- `aria-current="page"` on bottom nav
+- Static a11y suite: `__tests__/a11y/index.html.a11y.test.js`
+
+### True ML
+- Online logistic regression crowd model: `services/ml/crowdModel.js` (feature vector, SGD, L2, DB persistence)
+- Preference EMA model: `services/ml/preferenceModel.js`
+- Feedback POST trains online; admin `POST /api/analytics/ml/crowd/train`
+- Blended into `getTravelIntelligenceAsync`
+
+### Ops
+- Tables: `ml_model_weights`, migrations included
+- OpenAPI paths updated

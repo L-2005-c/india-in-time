@@ -126,7 +126,36 @@ function suggestOpenAlternatives(closedPlace, allPlaces, now = new Date(), weath
 }
 async function getTravelIntelligenceAsync(place, now = new Date(), weather = null, options = {}) {
   const { estimateTravelAsync } = require('./trafficEngine');
+  // Prefer DB historical crowd when available
+  try {
+    const hist = await historicalCrowdStore.lookupHistoricalCrowdAsync(place, options.region || options.city || null);
+    if (hist) place = { ...place, historicalCrowd: hist };
+  } catch (_e) { /* keep sync JSON path inside getTravelIntelligence */ }
+
   const base = getTravelIntelligence(place, now, weather, { ...options, liveTraffic: options.liveTraffic || null });
+
+  // Blend feedback-trained ML logistic model (or rating prior if under-trained)
+  try {
+    const learner = require('./crowdLearner');
+    const histScore = place.historicalCrowd?.avgScore ?? place.historicalCrowd?.score;
+    const learned = await learner.getMlOrPriorCrowd(
+      place.name,
+      options.city || place.city || options.region || '',
+      {
+        daypart: base.daypart || base.time?.daypart,
+        isWeekend: base.isWeekend,
+        isPeakHourNow: base.isPeakHourNow,
+        month: new Date(now).getMonth() + 1,
+        cat: place.cat || 'default',
+        historicalScore: histScore,
+      }
+    );
+    if (learned && learned.score != null) {
+      base.crowd = learner.blendLearnedCrowd(base.crowd, learned);
+      if (learned.source) base.crowd.mlSource = learned.source;
+    }
+  } catch (_e) { /* learner is optional */ }
+
   // Refresh traffic with live routing when origin provided
   if (options.fromCoords && place.coords && options.enableLiveRouting !== false) {
     try {

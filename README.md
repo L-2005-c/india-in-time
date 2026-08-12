@@ -414,3 +414,14 @@ current state):
       `overrides` to force every transitive dependency onto a patched `uuid`
       without touching `firebase-admin`'s major version at all. Full test
       suite (190/190) re-run and passing after this change.
+
+
+## Enterprise operations
+
+- **Readiness:** `GET /api/ready` (public, DB/Redis checks) — use for K8s/Render health
+- **Metrics:** `GET /api/metrics` (admin) Prometheus text
+- **Feature flags:** `GET/POST /api/admin/flags` (admin) — `aiEnabled`, `maintenanceMode`, etc.
+- **Idempotency:** send `Idempotency-Key` on POST mutations
+- **Audit:** `audit_log` table + structured `audit:*` logs
+- **Runbook / SLOs:** see `docs/RUNBOOK.md` and `docs/SLO.md`
+- **OpenAPI:** `GET /api/openapi.json`

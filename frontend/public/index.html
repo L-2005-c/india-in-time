@@ -40,6 +40,11 @@
 
 </head>
 <body>
+<a href="#app" class="skip-link">Skip to content</a>
+<style>
+.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999}
+.skip-link:focus{left:8px;top:8px;width:auto;height:auto;padding:8px 12px;background:#10b981;color:#000;overflow:visible}
+</style>
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
@@ -74,7 +79,7 @@
 </div>
 
 <!-- NOTIFICATION TOAST -->
-<div id="notif-toast">
+<div id="notif-toast" role="status" aria-live="polite" aria-atomic="true">
   <div class="notif-inner">
     <span class="notif-icon" id="notif-icon">🔔</span>
     <div class="notif-body">
@@ -116,7 +121,7 @@
   Back
 </div>
 
-<div id="app">
+<div id="app" role="main">
   <!-- HEADER -->
   <header id="header">
     <div class="header-inner">
@@ -144,7 +149,7 @@
 
     <!-- ═══ MAP VIEW ═══ -->
     <div id="map-view" class="view active">
-      <div id="map"></div>
+      <div id="map" role="region" aria-label="Interactive trip map"></div>
 
       <button id="locate-me-btn" data-action="locateMe" aria-label="Find my location" title="Find my location">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -217,7 +222,7 @@
     </div>
 
     <!-- ═══ PLAN VIEW ═══ -->
-    <div id="plan-view" class="view">
+    <div id="plan-view" role="region" aria-label="Trip plan" class="view">
       <div id="phase1-section" class="plan-section">
         <section class="plan-hero">
           <div class="hero-grid">
@@ -284,7 +289,7 @@
         </div>
 
         <div class="sec-label">Popular Destinations</div>
-        <select class="city-select" id="city-select" data-action="switchCity">
+        <select class="city-select" id="city-select" aria-label="Select city" data-action="switchCity">
           <optgroup label="Andhra Pradesh"><option value="vizag">🌴 Visakhapatnam</option></optgroup>
           <optgroup label="Telangana"><option value="hyderabad">🕌 Hyderabad</option></optgroup>
           <optgroup label="Delhi"><option value="delhi">🏛️ New Delhi</option></optgroup>
@@ -514,7 +519,7 @@
     </div>
 
     <!-- ═══ CHAT VIEW ═══ -->
-    <div id="chat-view" class="view">
+    <div id="chat-view" role="region" aria-label="AI chat" class="view">
       <div class="chat-topbar">
         <div class="chat-topbar-left">
           <button class="back-btn" data-action="goBack">
@@ -546,7 +551,7 @@
     </div>
 
     <!-- ═══ TOOLS VIEW ═══ -->
-    <div id="tools-view" class="view" style="display:none">
+    <div id="tools-view" role="region" aria-label="Travel tools" class="view" style="display:none">
       <div style="padding:10px 14px 4px;border-bottom:1px solid var(--border-subtle);background:var(--sidebar-bg);display:flex;align-items:center;gap:10px;flex-shrink:0;">
         <button class="back-btn" data-action="goBack">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>

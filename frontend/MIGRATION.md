@@ -105,3 +105,16 @@ back to the old path with zero other changes.
   cache-first for everything else, so Vite's hashed `dist/assets/*` filenames
   are naturally cache-safe without any changes — but worth a look if you
   change the caching strategy later.
+
+## Further modularization (2026-08-12)
+
+Added:
+
+- `src/state/appState.js` — shared state object for progressive extraction
+- `src/a11y/helpers.js` — focus styles, live-region announce, ARIA helpers
+- `src/modules/chatActions.js` — action table helpers
+- `src/main.js` boots a11y + exposes `window.__appState` / `window.__a11yAnnounce`
+
+`core/app.js` remains the large orchestration module; new domains should import
+from `state/` and `a11y/` rather than adding more bare `let`s. Toast messages
+now announce to screen readers via `__a11yAnnounce`.
