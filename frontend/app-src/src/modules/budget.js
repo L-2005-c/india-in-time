@@ -20,24 +20,30 @@ export function calculateStopBudget(stop, prevCoords, cityId, helpers = {}) {
 export function calculateDayBudget(dayStops, cityId, startCoords, helpers = {}) {
   let prev = startCoords;
   const items = [];
-  let total = 0;
+  let transport = 0, entry = 0, food = 0, total = 0;
   for (const stop of dayStops || []) {
     const b = calculateStopBudget(stop, prev, cityId, helpers);
     items.push({ stop, ...b });
+    transport += b.transport;
+    entry += b.entry;
+    food += b.food;
     total += b.total;
     if (stop.coords) prev = stop.coords;
   }
-  return { items, total };
+  return { items, transport, entry, food, total };
 }
 
 export function calculateTripBudget(plan, cityId, startCoords, helpers = {}) {
   const days = (plan || []).map((day, i) =>
     calculateDayBudget(Array.isArray(day) ? day : [day], cityId, i === 0 ? startCoords : null, helpers)
   );
-  return {
-    days,
-    total: days.reduce((s, d) => s + d.total, 0),
-  };
+  const grandTotal = days.reduce((s, d) => ({
+    transport: s.transport + d.transport,
+    entry: s.entry + d.entry,
+    food: s.food + d.food,
+    total: s.total + d.total,
+  }), { transport: 0, entry: 0, food: 0, total: 0 });
+  return { days, grandTotal };
 }
 
 export function formatInr(n) {
