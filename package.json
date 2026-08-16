@@ -1,6 +1,6 @@
 {
   "name": "india-in-time-backend",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "description": "Backend API server for India In-Time travel app \u2014 production-grade fullstack",
   "main": "server.js",
   "engines": {
@@ -18,7 +18,7 @@
     "migrate:up": "node-pg-migrate up",
     "migrate:down": "node-pg-migrate down",
     "migrate:create": "node-pg-migrate create",
-    "build:frontend": "node scripts/build-frontend.js",
+    "build:frontend": "node scripts/check-frontend-imports.js && node scripts/build-frontend.js",
     "dev:frontend": "vite --config frontend/app-src/vite.config.js",
     "loadtest:redis-ratelimit": "node scripts/redis-loadtest/run.js",
     "loadtest:redis-failopen": "node scripts/redis-loadtest/fail-open-check.js",
