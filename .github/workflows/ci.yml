@@ -45,7 +45,7 @@ jobs:
       GEMINI_API_KEY: test-key
       FIREBASE_SERVICE_ACCOUNT: '{}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-test-security
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build Docker image
         run: docker build --pull -t india-in-time:ci-check .
       - name: Inspect image user and healthcheck
@@ -114,7 +114,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-test-security
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
@@ -168,7 +168,7 @@ jobs:
       LOADTEST_MAX_P95_MS: 1000
       ACCEPTANCE_REQUIRE_READY: 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
@@ -230,7 +230,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
