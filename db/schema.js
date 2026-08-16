@@ -99,7 +99,6 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_usage_time    ON api_usage(created_at);
   CREATE INDEX IF NOT EXISTS idx_usage_ep      ON api_usage(endpoint);
   CREATE INDEX IF NOT EXISTS idx_cache_expires ON place_cache(expires_at);
-  CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at);
   CREATE INDEX IF NOT EXISTS idx_place_fb_place ON place_feedback(place_name, city);
   CREATE INDEX IF NOT EXISTS idx_app_fb_time    ON app_feedback(created_at);
 
@@ -123,6 +122,10 @@ const SCHEMA_SQL = `
   UPDATE ai_cache SET expires_at = created_at + INTERVAL '10 minutes' WHERE expires_at IS NULL;
   ALTER TABLE ai_cache ALTER COLUMN expires_at SET DEFAULT (CURRENT_TIMESTAMP + INTERVAL '10 minutes');
   ALTER TABLE ai_cache ALTER COLUMN expires_at SET NOT NULL;
+
+  -- The AI-cache expiry column may be absent on databases created before the
+  -- persistent-cache TTL hardening. Add/repair it before creating its index.
+  CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at);
 
   -- Historical crowd observations (pipeline target; engines blend when present)
   CREATE TABLE IF NOT EXISTS historical_crowd (
