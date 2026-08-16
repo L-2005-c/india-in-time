@@ -32,7 +32,21 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false # set to your real frontend origin in production; defaults to * otherwise
-      - key: ADMIN_FEEDBACK_KEY
+      - key: REDIS_URL
         sync: false
-      # REDIS_URL: only add this (and a Redis instance) if you actually
-      # raise CLUSTER_WORKERS above 1 — see the comment in server.js.
+      - key: REQUIRE_REDIS_IN_PROD
+        value: 'true'
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: 'true'
+      - key: CLUSTER_WORKERS
+        value: '1'
+      - key: LIVE_ROUTING_CONCURRENCY
+        value: '5'
+      - key: REQUEST_TIMEOUT_MS
+        value: '30000'
+      - key: SHUTDOWN_TIMEOUT_MS
+        value: '15000'
+      - key: USE_DIST_FRONTEND
+        value: '1'
+      - key: BACKUP_RETENTION_DAYS
+        value: '7'

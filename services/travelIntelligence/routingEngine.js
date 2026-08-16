@@ -61,9 +61,10 @@ async function fetchOsrmRoute(fromCoords, toCoords, opts = {}) {
     const data = {
       durationSec: Math.round(route.duration),
       distanceM: Math.round(route.distance),
-      source: 'live',
+      source: 'route_estimate',
       provider: 'osrm',
-      congestion: 1.0, // OSRM public demo has limited live congestion; treat as free-flow baseline
+      freshness: new Date().toISOString(),
+      congestion: 1.0, // OSRM route duration is not live traffic
     };
     setCache(key, data);
     return data;
@@ -115,8 +116,9 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
     return {
       durationSec: Math.round(durationSec),
       distanceM: distanceM != null ? Math.round(distanceM) : null,
-      source: 'live',
+      source: 'live_traffic',
       provider: 'google',
+      freshness: new Date().toISOString(),
       congestion,
     };
   } catch (_e) {

@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // db/init.js — PostgreSQL database setup & migrations
 
 const { Pool, neonConfig } = require('@neondatabase/serverless');
@@ -18,7 +20,7 @@ async function initDatabase() {
   }
 
   if (!/-pooler\./.test(process.env.DATABASE_URL) && !/pgbouncer=true/.test(process.env.DATABASE_URL)) {
-    console.warn(
+    appLogger.warn(
       '⚠️  [db] DATABASE_URL does not look like a Neon POOLED connection string ' +
       '(no "-pooler" in the hostname). If you raise CLUSTER_WORKERS above 1, each ' +
       'worker opens its own connection pool — without the pooler endpoint you will ' +
@@ -31,12 +33,15 @@ async function initDatabase() {
   // mode (see server.js) there can be one of these pools per CPU core, so the
   // effective total is (max * numCPUs). Override via DB_POOL_MAX if you know
   // your Neon plan's connection ceiling.
+  const sslRejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
+  if (process.env.NODE_ENV === 'production' && !sslRejectUnauthorized) {
+    throw new Error('DATABASE_SSL_REJECT_UNAUTHORIZED=false is not allowed in production.');
+  }
+
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false
-    },
-    max: parseInt(process.env.DB_POOL_MAX, 10) || 8,
+    ssl: { rejectUnauthorized: sslRejectUnauthorized },
+    max: Math.max(2, parseInt(process.env.DB_POOL_MAX, 10) || 8),
     idleTimeoutMillis: 30000,       // release idle clients back after 30s
     connectionTimeoutMillis: 8000,  // fail fast instead of queuing forever if the pool is exhausted
     statement_timeout: 15000,       // kill any single query running >15s so it can't hold a connection hostage under load
@@ -44,8 +49,8 @@ async function initDatabase() {
   });
 
   pool.on('error', (err) => {
-    // Idle client errors (e.g. connection dropped by Neon) shouldn't crash the process
-    console.error('[db] Unexpected error on idle client:', err.message);
+    // Idle client errors should be observable but should not crash the process.
+    appLogger.error('[db] Unexpected error on idle client:', err.message);
   });
 
   // ── Create tables ──────────────────────────────────────────────────────────
@@ -57,9 +62,9 @@ async function initDatabase() {
   try {
     await pool.query(SCHEMA_SQL);
 
-    console.log('📦  PostgreSQL Database initialized');
+    appLogger.info('📦  PostgreSQL Database initialized');
   } catch (error) {
-    console.error('Failed to initialize PostgreSQL tables:', error);
+    appLogger.error('Failed to initialize PostgreSQL tables:', error);
     throw error;
   }
   
@@ -81,7 +86,7 @@ async function closeDatabase() {
   if (pool) {
     await pool.end();
     pool = null;
-    console.log('📦  PostgreSQL Database closed');
+    appLogger.info('📦  PostgreSQL Database closed');
   }
 }
 

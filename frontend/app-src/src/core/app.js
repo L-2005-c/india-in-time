@@ -1,3 +1,4 @@
+import { browserLogger } from '../utils/browser-logger.js';
 // Resolve window.API at call-time. Capturing `const API = window.API` at module
 // init freezes `undefined` if client-api.js failed or ordered after the bundle.
 const API = new Proxy({}, {
@@ -11,128 +12,7 @@ const API = new Proxy({}, {
   },
 });
 
-// ══════════════════════════════════════════════════
-// FIREBASE CONFIG — PASTE YOUR VALUES BELOW
-// ══════════════════════════════════════════════════
-import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { initializeFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-import {
-  getTrafficMultiplier as _ttTrafficMult,
-  getTrafficLevel as _ttTrafficLevel,
-  getCrowdMultiplier as _ttCrowdMult,
-  getCrowdLevel as _ttCrowdLevel,
-  getSmartTravelTime as _ttSmartTravel,
-  getSmartVisitTime as _ttSmartVisit,
-} from '../utils/travel-time.js';
-import { getSunTimesClient as _sunTimesClient, placeSunTimes as _placeSunTimes } from '../utils/sun-times.js';
-import {
-  calculateExperienceScorePure,
-  getOpeningStatusPure,
-  getCrowdPredictionPure,
-  getDaypartClient as _getDaypartClient,
-  timeToMinutes as _timeToMinutes,
-  CROWD_BASE_BY_DAYPART as _CROWD_BASE,
-  CROWD_WEEKEND_MULT as _CROWD_WEEKEND,
-  CROWD_PEAK_MULT as _CROWD_PEAK,
-} from '../utils/experience-score.js';
-import { getTimeBadgesHtml as _getTimeBadgesHtml } from '../utils/time-badges.js';
-import {
-  isPlausibleGpsFix as _isPlausibleGpsFix,
-  GPS_MAX_ACCURACY_M as _GPS_MAX_ACCURACY_M,
-  GPS_MAX_PLAUSIBLE_SPEED_MS as _GPS_MAX_PLAUSIBLE_SPEED_MS,
-  createGpsFixCoordinator as _createGpsFixCoordinator,
-} from '../utils/gps.js';
-import {
-  detectWeatherChange as _detectWeatherChange,
-  shouldRetryWeather as _shouldRetryWeather,
-  weatherRetryDelayMs as _weatherRetryDelayMs,
-  formatWeatherDisplay as _formatWeatherDisplay,
-} from '../utils/weather-ui.js';
-import {
-  turnArrowForInstruction as _turnArrowForInstruction,
-  shouldSpeakNavInstruction as _shouldSpeakNavInstruction,
-} from '../utils/nav-route.js';
-import {
-  normalizeFetchedPlaces as _normalizeFetchedPlaces,
-  placesLoadCacheKey as _placesLoadCacheKey,
-  shouldRefetchPlaces as _shouldRefetchPlaces,
-  pickNearestCityId as _pickNearestCityId,
-} from '../utils/city-load.js';
-
-
-import {
-  hvKm as _geoHvKm,
-  hasValidCoords as _geoHasValidCoords,
-  isFiniteLatLon as _geoIsFiniteLatLon,
-  normalizeLatLon as _geoNormalizeLatLon,
-  significantWords as _geoSignificantWords,
-  dedupePlacesByProximity as _geoDedupe,
-  withHiddenGems as _geoWithHiddenGems,
-  mergePlacePools as _geoMergePools,
-  sortNearestNeighbor as _geoSortNN,
-  routeDistanceKm as _geoRouteKm,
-  centroidOfStops as _geoCentroid,
-  clusterStopsByArea as _geoCluster,
-  orderStopsAreaWise as _geoOrderArea,
-  estimateTimeFitPenaltyKm as _geoTimeFit,
-  optimizeStopOrder as _geoOptimize,
-  bearingBetween as _geoBearing,
-  keepNearbyCluster as _geoKeepNearby,
-  famousPlaceScore as _geoFamous,
-  prioritizePlanStops as _geoPrioritize,
-  getRouteStopsForDay as _geoRouteStops,
-  estimateStopLoadMinutes as _geoLoadMins,
-} from '../utils/geo.js';
-import {
-  dayPartForMinutes as _dayPart,
-  climateMode as _climateMode,
-  tripModeBonus as _tripModeBonus,
-  personaBonus as _personaBonus,
-  stopTimeScore as _stopTimeScore,
-  stopClimateNote as _stopClimateNote,
-} from '../utils/stop-scoring.js';
-import {
-  calculateStopBudget as _modStopBudget,
-  calculateDayBudget as _modDayBudget,
-  calculateTripBudget as _modTripBudget,
-} from '../modules/budget.js';
-
-
-
-const firebaseConfig = {
-  apiKey:            "AIzaSyDdFpaAOXT2DcniMoh2jJGlReMYLZy8DDM",
-  authDomain:        "india-in-time.firebaseapp.com",
-  projectId:         "india-in-time",
-  storageBucket:     "india-in-time.firebasestorage.app",
-  messagingSenderId: "954365212663",
-  appId:             "1:954365212663:web:f2ad8db463026fad5920f2",
-};
-// ══════════════════════════════════════════════════
-
-const fbApp     = initializeApp(firebaseConfig);
-const auth      = getAuth(fbApp);
-// Render (like many reverse proxies / corporate networks) doesn't reliably
-// pass through the bidirectional WebChannel stream Firestore's default
-// transport needs, which surfaces as "400 Bad Request" on the
-// Firestore/Listen endpoint from webchannel_blob_es2018.js. Auto-detecting
-// long-polling falls back to plain HTTP long-polling only when the
-// streaming handshake fails, so it's a no-op in environments where
-// WebChannel works fine.
-const db        = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true });
-const gProvider = new GoogleAuthProvider();
-let currentUser = null;
-
-// Resolves once Firebase's first onAuthStateChanged callback has fired —
-// i.e. once we actually know whether the visitor is logged in or not.
-// The splash screen (see window.onload below) waits on this instead of a
-// fixed timer, so a logged-in user never sees the login screen flash while
-// that check is still in flight.
-let resolveAuthChecked;
-const authCheckedPromise = new Promise(res => { resolveAuthChecked = res; });
+// Firebase initialization is isolated in core/firebase.js.
 
 // ── Expose functions to HTML onclick ─────────────────────────────────────────
 Object.assign(window, {
@@ -163,404 +43,7 @@ Object.assign(window, {
   showAppFeedback,
 });
 
-// ══════════════════════════════════════════════════
-// CURATED CITIES DATABASE
-// ══════════════════════════════════════════════════
-const CITIES = {
-  vizag:     {id:"vizag",     name:"Visakhapatnam", emoji:"🌴", lat:17.6868, lon:83.2185, locs:[]},
-  hyderabad: {id:"hyderabad", name:"Hyderabad",      emoji:"🕌", lat:17.3850, lon:78.4867, locs:[]},
-  goa:       {id:"goa",       name:"Goa",            emoji:"🏖️", lat:15.4909, lon:73.8278, locs:[]},
-  jaipur:    {id:"jaipur",    name:"Jaipur",         emoji:"🏰", lat:26.9124, lon:75.7873, locs:[]},
-  udaipur:   {id:"udaipur",   name:"Udaipur",        emoji:"🌅", lat:24.5854, lon:73.7125, locs:[]},
-  delhi:     {id:"delhi",     name:"New Delhi",      emoji:"🏛️", lat:28.6139, lon:77.2090, locs:[]},
-  mumbai:    {id:"mumbai",    name:"Mumbai",         emoji:"🎬", lat:18.9220, lon:72.8347, locs:[]},
-  bengaluru: {id:"bengaluru", name:"Bengaluru",      emoji:"🌳", lat:12.9716, lon:77.5946, locs:[]},
-  kochi:     {id:"kochi",     name:"Kochi",          emoji:"🛶", lat:9.9312,  lon:76.2673, locs:[]},
-  agra:      {id:"agra",      name:"Agra",           emoji:"🕌", lat:27.1767, lon:78.0081, locs:[]},
-  varanasi:  {id:"varanasi",  name:"Varanasi",       emoji:"🛕", lat:25.3176, lon:82.9739, locs:[]},
-  kolkata:   {id:"kolkata",   name:"Kolkata",        emoji:"🚊", lat:22.5726, lon:88.3639, locs:[]},
-};
-
-const LOCAL_PLACE_SEEDS = {
-  vizag: [
-    ['Ramakrishna Beach','beach',17.7142,83.3237,90,'05:30','21:00'],
-    ['INS Kursura Submarine Museum','scenic',17.7172,83.3301,60,'10:00','20:00'],
-    ['Kailasagiri','scenic',17.7492,83.3418,75,'06:00','20:00'],
-    ['Rushikonda Beach','beach',17.7825,83.3851,90,'05:30','21:00'],
-    ['Tenneti Park','scenic',17.7484,83.3495,45,'06:00','20:00'],
-    ['Simhachalam Temple','temple',17.7666,83.2501,75,'06:00','20:30'],
-    ['Yarada Beach','beach',17.6549,83.2691,90,'06:00','19:00'],
-    ['Venkatadri Vantillu','food',17.7251,83.3205,45,'11:00','23:00'],
-    ['TU 142 Aircraft Museum','scenic',17.718,83.3299,50,'10:00','20:00'],
-    ['Matsyadarshini Aquarium','scenic',17.7127,83.3199,45,'09:00','20:30'],
-    ['VUDA Park','scenic',17.7241,83.3395,45,'08:30','20:30'],
-    ['Ross Hill Church','temple',17.6904,83.2871,45,'06:00','19:00'],
-    ['Dolphins Nose Lighthouse','scenic',17.6765,83.2926,60,'10:00','17:00'],
-    ['Bheemili Beach','beach',17.8903,83.4559,90,'06:00','20:00'],
-    ['Thotlakonda Buddhist Complex','scenic',17.8285,83.4092,60,'09:00','18:00'],
-    ['Bavikonda Buddhist Complex','scenic',17.8177,83.3910,60,'09:00','18:00'],
-    ['Bojjana Konda','scenic',17.7103,83.016,75,'09:00','18:00'],
-    ['Indira Gandhi Zoological Park','scenic',17.7657,83.3488,120,'09:00','17:00'],
-    ['Kambalakonda Wildlife Sanctuary','scenic',17.7784,83.3349,90,'09:00','17:30'],
-    ['Appikonda Beach','beach',17.5681,83.1714,75,'06:00','19:00'],
-    ['Gangavaram Beach','beach',17.6192,83.2329,75,'06:00','19:00'],
-    ['Victory at Sea War Memorial','scenic',17.7187,83.3322,35,'06:00','21:00'],
-    ['Sri Kanaka Mahalakshmi Temple','temple',17.6998,83.2971,45,'05:00','21:00'],
-    ['ISKCON Temple Visakhapatnam','temple',17.7678,83.3667,50,'07:30','20:30'],
-    ['VMRDA City Central Park','scenic',17.7218,83.3055,45,'05:00','21:00'],
-    ['Sagar Nagar Beach','beach',17.7618,83.3604,60,'06:00','20:00'],
-    ['Mangamaripeta Beach','beach',17.8252,83.4163,75,'06:00','19:30'],
-    ['Lawsons Bay Beach','beach',17.7338,83.3424,60,'06:00','20:00'],
-    ['Daspalla Restaurant','food',17.7106,83.3003,45,'11:00','23:00'],
-    ['Ramakrishna Beach Food Court','food',17.7142,83.3224,45,'11:00','22:30'],
-    ['Sea Inn Raju Gari Dhaba','food',17.7839,83.383,50,'11:00','23:00'],
-    ['Sai Priya Beach Restaurant','food',17.7858,83.3845,50,'11:00','23:00'],
-    ['Alpha Hotel Vizag','food',17.7122,83.3018,40,'07:00','22:30'],
-  ],
-  hyderabad: [
-    ['Charminar','scenic',17.3616,78.4747,60,'09:00','17:30'],
-    ['Golconda Fort','scenic',17.3833,78.4011,90,'09:00','17:30'],
-    ['Salar Jung Museum','scenic',17.3713,78.4804,90,'10:00','17:00'],
-    ['Hussain Sagar Lake','scenic',17.4239,78.4738,60,'06:00','21:00'],
-    ['Birla Mandir','temple',17.4062,78.4691,60,'07:00','21:00'],
-    ['Chowmahalla Palace','scenic',17.3578,78.4717,75,'10:00','17:00'],
-    ['Paradise Biryani','food',17.4416,78.4870,45,'11:00','23:00'],
-    ['Cafe Niloufer','food',17.3991,78.4624,40,'07:00','23:00'],
-  ],
-  goa: [
-    ['Baga Beach','beach',15.5553,73.7517,90,'06:00','22:00'],
-    ['Calangute Beach','beach',15.5494,73.7535,90,'06:00','22:00'],
-    ['Fort Aguada','scenic',15.4922,73.7730,75,'09:30','18:00'],
-    ['Basilica of Bom Jesus','temple',15.5009,73.9116,60,'09:00','18:30'],
-    ['Dona Paula View Point','scenic',15.4527,73.8036,45,'06:00','20:00'],
-    ['Miramar Beach','beach',15.4827,73.8074,60,'06:00','21:00'],
-    ['Thalassa','food',15.6164,73.7555,60,'12:00','23:30'],
-    ['Ritz Classic Panaji','food',15.4989,73.8278,45,'11:00','23:00'],
-  ],
-  jaipur: [
-    ['Amber Fort','scenic',26.9855,75.8513,90,'08:00','18:00'],
-    ['Hawa Mahal','scenic',26.9239,75.8267,45,'09:00','16:30'],
-    ['City Palace Jaipur','scenic',26.9258,75.8237,75,'09:30','17:00'],
-    ['Jantar Mantar Jaipur','scenic',26.9248,75.8246,60,'09:00','16:30'],
-    ['Nahargarh Fort','scenic',26.9402,75.8170,75,'10:00','18:00'],
-    ['Birla Mandir Jaipur','temple',26.8923,75.8155,45,'06:00','21:00'],
-    ['Lassiwala','food',26.9166,75.8102,35,'08:00','16:00'],
-    ['Rawat Mishthan Bhandar','food',26.9213,75.7967,45,'08:00','22:30'],
-  ],
-  udaipur: [
-    ['City Palace Udaipur','scenic',24.5764,73.6835,90,'09:30','17:30'],
-    ['Lake Pichola','scenic',24.5720,73.6790,75,'06:00','20:00'],
-    ['Jag Mandir','scenic',24.5675,73.6775,75,'10:00','18:00'],
-    ['Saheliyon Ki Bari','scenic',24.6032,73.6868,45,'09:00','19:00'],
-    ['Fateh Sagar Lake','scenic',24.6015,73.6748,60,'06:00','20:00'],
-    ['Jagdish Temple','temple',24.5799,73.6823,45,'05:00','22:00'],
-    ['Ambrai Restaurant','food',24.5781,73.6814,60,'11:00','23:00'],
-    ['Natraj Dining Hall','food',24.5724,73.6997,45,'11:00','22:30'],
-  ],
-  delhi: [
-    ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
-    ['Red Fort','scenic',28.6562,77.2410,90,'09:30','16:30'],
-    ['Qutub Minar','scenic',28.5245,77.1855,75,'07:00','17:00'],
-    ['Humayun Tomb','scenic',28.5933,77.2507,75,'06:00','18:00'],
-    ['Lotus Temple','temple',28.5535,77.2588,60,'09:00','17:30'],
-    ['Akshardham Temple','temple',28.6127,77.2773,90,'10:00','20:00'],
-    ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
-    ['Paranthe Wali Gali','food',28.6560,77.2307,45,'09:00','22:00'],
-  ],
-  mumbai: [
-    ['Gateway of India','scenic',18.9220,72.8347,45,'06:00','22:00'],
-    ['Marine Drive','scenic',18.9430,72.8238,60,'06:00','23:00'],
-    ['Chhatrapati Shivaji Maharaj Vastu Sangrahalaya','scenic',18.9269,72.8326,75,'10:15','18:00'],
-    ['Siddhivinayak Temple','temple',19.0169,72.8305,60,'05:30','21:50'],
-    ['Haji Ali Dargah','temple',18.9827,72.8089,60,'05:30','22:00'],
-    ['Juhu Beach','beach',19.0988,72.8267,75,'06:00','22:00'],
-    ['Leopold Cafe','food',18.9220,72.8317,45,'07:30','23:30'],
-    ['Bademiya','food',18.9217,72.8324,45,'12:00','23:30'],
-  ],
-  bengaluru: [
-    ['Bangalore Palace','scenic',13.0035,77.5891,75,'10:00','17:30'],
-    ['Lalbagh Botanical Garden','scenic',12.9507,77.5848,75,'06:00','19:00'],
-    ['Cubbon Park','scenic',12.9763,77.5929,60,'06:00','18:00'],
-    ['ISKCON Temple Bangalore','temple',13.0098,77.5511,60,'07:15','20:30'],
-    ['Tipu Sultan Summer Palace','scenic',12.9596,77.5736,60,'08:30','17:30'],
-    ['Ulsoor Lake','scenic',12.9824,77.6199,45,'06:00','20:00'],
-    ['Vidyarthi Bhavan','food',12.9450,77.5714,40,'06:30','20:00'],
-    ['MTR Lalbagh','food',12.9551,77.5856,45,'06:30','21:30'],
-  ],
-  kochi: [
-    ['Fort Kochi Beach','beach',9.9637,76.2375,75,'06:00','21:00'],
-    ['Chinese Fishing Nets','scenic',9.9667,76.2420,45,'06:00','18:30'],
-    ['Mattancherry Palace','scenic',9.9576,76.2592,60,'10:00','17:00'],
-    ['Paradesi Synagogue','temple',9.9570,76.2596,45,'10:00','18:00'],
-    ['St Francis Church','temple',9.9653,76.2417,45,'09:00','17:00'],
-    ['Marine Drive Kochi','scenic',9.9772,76.2773,60,'06:00','22:00'],
-    ['Kashi Art Cafe','food',9.9650,76.2425,45,'08:30','22:00'],
-    ['Kayees Rahmathulla Cafe','food',9.9627,76.2547,45,'11:00','22:00'],
-  ],
-  agra: [
-    ['Taj Mahal','scenic',27.1751,78.0421,120,'06:00','18:30'],
-    ['Agra Fort','scenic',27.1795,78.0211,90,'06:00','18:00'],
-    ['Mehtab Bagh','scenic',27.1797,78.0419,60,'06:00','18:00'],
-    ['Itmad-ud-Daulah','scenic',27.1929,78.0310,60,'06:00','18:00'],
-    ['Akbar Tomb Sikandra','scenic',27.2207,77.9506,75,'06:00','18:00'],
-    ['Jama Masjid Agra','temple',27.1837,78.0179,45,'06:00','20:00'],
-    ['Pinch of Spice','food',27.1596,78.0432,45,'11:00','23:00'],
-    ['Deviram Sweets','food',27.1667,78.0087,35,'08:00','22:00'],
-  ],
-  varanasi: [
-    ['Dashashwamedh Ghat','scenic',25.3062,83.0107,75,'05:00','22:00'],
-    ['Kashi Vishwanath Temple','temple',25.3109,83.0107,75,'04:00','23:00'],
-    ['Assi Ghat','scenic',25.2887,83.0061,60,'05:00','22:00'],
-    ['Sarnath','scenic',25.3716,83.0252,90,'09:00','17:00'],
-    ['Ramnagar Fort','scenic',25.2694,83.0292,75,'10:00','17:00'],
-    ['Manikarnika Ghat','scenic',25.3102,83.0140,45,'05:00','22:00'],
-    ['Kashi Chaat Bhandar','food',25.3094,83.0061,40,'16:00','22:30'],
-    ['Blue Lassi','food',25.3095,83.0088,35,'08:00','22:00'],
-  ],
-  kolkata: [
-    ['Victoria Memorial','scenic',22.5448,88.3426,90,'10:00','17:00'],
-    ['Howrah Bridge','scenic',22.5851,88.3468,45,'06:00','22:00'],
-    ['Indian Museum','scenic',22.5580,88.3507,75,'10:00','17:00'],
-    ['Dakshineswar Kali Temple','temple',22.6550,88.3570,75,'06:00','21:00'],
-    ['Kalighat Kali Temple','temple',22.5204,88.3425,60,'05:00','22:30'],
-    ['Prinsep Ghat','scenic',22.5552,88.3317,60,'06:00','21:00'],
-    ['Peter Cat','food',22.5524,88.3526,45,'11:00','23:00'],
-    ['Arsalan Park Circus','food',22.5415,88.3657,45,'11:00','23:30'],
-  ],
-};
-
-// ══════════════════════════════════════════════════
-// HIDDEN GEMS — genuinely off-the-radar spots, verified real
-// (not LLM guesses). Each one is picked because it has a tiny
-// review count on Google compared to the city's famous spots —
-// that gap IS the product: "found by locals, not by algorithms."
-// reviewGap = approx Google review count, for the pitch narrative.
-// ══════════════════════════════════════════════════
-const HIDDEN_GEM_SEEDS = {
-  vizag: [
-    { name:'Kondakarla Ava Lake', cat:'scenic', coords:[17.6036,82.9979], vt:90, ot:'05:30', ct:'18:30',
-      why:'A freshwater lake & bird sanctuary reached only by hand-paddled wooden catamarans — locals kept motorboats out on purpose to protect it.',
-      reviewGap:'~330 Google reviews vs Kailasagiri\'s 40,000+', bestFor:'Sunrise boat ride, birdwatching' },
-    { name:'Erra Matti Dibbalu', cat:'scenic', coords:[17.8750,83.4308], vt:60, ot:'06:00', ct:'18:00',
-      why:'Million-year-old red sand dune formations — a protected Geo-Heritage site most tour packages skip entirely because there\'s no signage or road markers.',
-      reviewGap:'~34 Google reviews vs RK Beach\'s 60,000+', bestFor:'Sunrise/sunset photography, geology' },
-    { name:'Rama Naidu Studios', cat:'scenic', coords:[17.8092,83.3975], vt:75, ot:'09:00', ct:'17:00',
-      why:'A working film studio on a hilltop above Rushikonda with a full Bay of Bengal view — most visitors drive right past it on the beach road.',
-      reviewGap:'~1,650 Google reviews vs Kailasagiri\'s 40,000+', bestFor:'Film sets, coastal viewpoint, photography' },
-    { name:'NTPC Simhadri Beach', cat:'beach', coords:[17.5483,83.1178], vt:60, ot:'06:00', ct:'19:00',
-      why:'A near-empty stretch of shoreline by the NTPC pump station, 30km south of the city — wedding photographers know it, tourists don\'t.',
-      reviewGap:'~300 Google reviews vs Rushikonda\'s 15,000+', bestFor:'Quiet walks, wedding-style photography' },
-    { name:'Thatipudi Reservoir', cat:'scenic', coords:[18.1722,83.1914],  vt:90, ot:'09:00', ct:'17:30',
-      why:'A migratory-bird reservoir feeding Vizag\'s own drinking water, ~55km out — locals call it the "Jewel of Vizianagaram" but it barely shows up in Vizag trip searches.',
-      reviewGap:'~2,480 Google reviews, but almost never surfaced for "Vizag" searches', bestFor:'Boating, sunset, day trip' },
-    { name:'Gambheeram Gadda Reservoir', cat:'scenic', coords:[17.8761,83.3475], vt:90, ot:'06:00', ct:'18:00',
-      why:'A forest-ringed reservoir just past the city limits, reachable only by unpaved road — reviewers literally say the drive "feels like hell but the view feels like heaven."',
-      reviewGap:'~170 Google reviews for a genuinely camera-worthy reservoir', bestFor:'Camping, fishing, quiet picnic' },
-    { name:'Lambasingi', cat:'scenic', coords:[17.8186,82.4922], vt:180, ot:'05:00', ct:'18:00',
-      why:'Andhra Pradesh\'s only frost-prone village, nicknamed "Kashmir of Andhra Pradesh" — a ~3hr drive out, so most Vizag trip itineraries skip it entirely despite the coffee plantations and misty sunrise views.',
-      reviewGap:'Rarely appears in standard Vizag itineraries despite its unique climate', bestFor:'Winter frost/fog (Dec-Jan), sunrise, coffee plantations — full-day trip' },
-    { name:'Meghadri Gedda Reservoir', cat:'scenic', coords:[17.7812,83.1810], vt:60, ot:'06:00', ct:'18:30',
-      why:'A working drinking-water reservoir on the west side of the city with floating solar panels and a small Durga temple nearby — locals use it as their evening-walk spot, tourists don\'t know it exists.',
-      reviewGap:'~480 Google reviews for a reservoir that\'s actually inside city limits', bestFor:'Evening walks, birdwatching (Jan-Feb migratory season)' },
-    { name:'Konam Dam', cat:'scenic', coords:[17.9663,82.8545], vt:90, ot:'07:00', ct:'18:00',
-      why:'A hill-ringed reservoir with cheap boating and waterfalls nearby — reviewers say it just needs better roads to become a proper tourist spot, which is exactly why it\'s still peaceful.',
-      reviewGap:'~270 Google reviews for a genuinely scenic reservoir', bestFor:'Boating, picnics, photography' },
-    { name:'Seethapalem Beach', cat:'beach', coords:[17.4751,82.9938], vt:120, ot:'06:00', ct:'18:00',
-      why:'One of Vizag\'s highest-rated beaches (4.7★) and almost nobody has heard of it — you reach it via a backwater boat ride through muddy access roads, which is exactly what keeps it pristine.',
-      reviewGap:'4.7★ rating with only ~670 Google reviews vs RK Beach\'s 60,000+', bestFor:'Backwater boat ride, sunrise, genuinely uncrowded sand' },
-    { name:'Katiki Waterfalls', cat:'scenic', coords:[18.2792,82.9988], vt:150, ot:'08:00', ct:'17:00',
-      why:'A multi-stage waterfall near Araku you can walk right up to and stand under — most Vizag-to-Araku day trips stop at Borra Caves and never make the short detour here.',
-      reviewGap:'~1,180 Google reviews for a genuinely stand-under-it waterfall', bestFor:'Waterfall trekking, photography — pair with Araku Valley day trip' },
-    { name:'Araku Anantagiri Coffee Plantations', cat:'scenic', coords:[18.2577,82.9893], vt:90, ot:'06:00', ct:'18:00',
-      why:'Misty, working coffee estates planted by the British in the 1920s — reviewers call the early-morning walk "magical," and it\'s a five-minute stop most Araku day-trippers drive straight past.',
-      reviewGap:'~2,260 Google reviews for a working plantation most itineraries skip', bestFor:'Early morning mist, coffee-harvest season (Dec-Jan), photography' },
-  ],
-  hyderabad: [
-    { name:'Paigah Tombs', cat:'scenic', coords:[17.3440,78.5042], vt:45, ot:'09:00', ct:'17:30',
-      why:'Intricately carved marble-and-stucco tombs of the Nizams\' most powerful noble family, in a quiet corner most tourists skip entirely for Charminar.',
-      reviewGap:'Barely any Google reviews vs Charminar\'s 200,000+', bestFor:'Architecture, quiet photography' },
-    { name:'Durgam Cheruvu', cat:'scenic', coords:[17.4300,78.3895], vt:60, ot:'06:00', ct:'21:00',
-      why:'A 400-year-old "Secret Lake" that once fed Golconda Fort — now ringed by granite cliffs and a glass cable bridge, still missing from most first-timer itineraries.',
-      reviewGap:'~4,760 Google reviews vs Golconda Fort\'s 60,000+', bestFor:'Evening boating, cable bridge views' },
-    { name:'Sudha Car Museum', cat:'scenic', coords:[17.3570,78.4543], vt:45, ot:'09:30', ct:'18:00',
-      why:'A Guinness-listed collection of drivable cars shaped like a burger, a lipstick, a cricket bat — the quirkiest 40 minutes in Hyderabad, and almost never on a tour itinerary.',
-      reviewGap:'Rarely appears alongside Charminar/Golconda on standard tours', bestFor:'Families, quirky photography' },
-    { name:'Ameenpur Lake', cat:'scenic', coords:[17.5225,78.3344], vt:60, ot:'06:00', ct:'19:00',
-      why:'An officially notified Biodiversity Heritage Site — over 170 bird species on a lake most Hyderabad first-timers have never heard of.',
-      reviewGap:'~1,270 Google reviews vs Hussain Sagar\'s far heavier footfall', bestFor:'Sunrise/sunset birdwatching, photography' },
-  ],
-  goa: [
-    { name:'Tambdi Surla Temple', cat:'temple', coords:[15.4390,74.2526], vt:60, ot:'08:30', ct:'17:30',
-      why:'Goa\'s oldest surviving temple (13th-century Kadamba-style basalt), tucked inside the Bhagwan Mahavir Wildlife Sanctuary — most Goa trips never leave the coast to find it.',
-      reviewGap:'~5,680 Google reviews vs Baga Beach\'s 30,000+', bestFor:'Architecture, monsoon greenery, quiet reflection' },
-    { name:'Reis Magos Fort', cat:'scenic', coords:[15.4964,73.8091], vt:60, ot:'09:30', ct:'17:00',
-      why:'A restored 16th-century fort with sweeping Mandovi River views — most tourists drive straight past it on the way to the far more crowded Fort Aguada.',
-      reviewGap:'~11,300 Google reviews vs Fort Aguada\'s 40,000+', bestFor:'Sunset views, history, photography' },
-    { name:'Divar Island', cat:'scenic', coords:[15.5277,73.9066], vt:120, ot:'07:00', ct:'18:00',
-      why:'A ferry-only island of paddy fields and Portuguese-era villages on the Mandovi River — reviewers call it "still not ruined by the invasion of tourists."',
-      reviewGap:'~870 Google reviews vs Baga Beach\'s 30,000+', bestFor:'Cycling, village life, ferry ride' },
-    { name:'Cabo de Rama Fort', cat:'scenic', coords:[15.0888,73.9216], vt:60, ot:'09:30', ct:'17:30',
-      why:'Clifftop ruins with a still-active chapel and panoramic Arabian Sea views — far quieter than the North Goa forts most itineraries default to.',
-      reviewGap:'Considerably less crowded than Fort Aguada despite similar sea views', bestFor:'Sunset, cliffside photography, quiet ruins' },
-  ],
-  jaipur: [
-    { name:'Panna Meena ka Kund', cat:'scenic', coords:[26.9912,75.8513], vt:30, ot:'07:00', ct:'18:00',
-      why:'A perfectly symmetrical 16th-century stepwell right near Amber Fort — everyone drives past it straight to the fort gate and misses it.',
-      reviewGap:'~6,380 Google reviews vs Amber Fort\'s 100,000+', bestFor:'Photography, architecture' },
-    { name:'Gaitor Ki Chhatriyan', cat:'scenic', coords:[26.9431,75.8247], vt:45, ot:'09:30', ct:'17:00',
-      why:'The royal cremation ground of Jaipur\'s Kachwaha kings — marble cenotaphs as detailed as the City Palace, but almost silent compared to it.',
-      reviewGap:'~6,170 Google reviews vs City Palace\'s 70,000+', bestFor:'Quiet heritage walks, photography' },
-    { name:'Isarlat Sargasooli', cat:'scenic', coords:[26.9244,75.8208], vt:30, ot:'09:00', ct:'16:30',
-      why:'A 7-storey "Victory Tower" in the old city with a 360° view of the Pink City — most visitors rush to Hawa Mahal a few streets away and never climb it.',
-      reviewGap:'~7,160 Google reviews vs Hawa Mahal\'s 90,000+', bestFor:'Panoramic views, sunset' },
-    { name:'Sisodia Rani ka Bagh', cat:'scenic', coords:[26.8994,75.8587], vt:60, ot:'08:00', ct:'20:00',
-      why:'A terraced 1728 royal garden built as a gift for Jaipur\'s queen — multi-level fountains and Krishna-Radha murals that most visitors never make time for.',
-      reviewGap:'~6,500 Google reviews vs City Palace\'s 70,000+', bestFor:'Evening walks, Mughal-style gardens, peacocks' },
-    { name:'Vidyadhar Bagh', cat:'scenic', coords:[26.8998,75.8536], vt:60, ot:'08:00', ct:'20:00',
-      why:'A cascading terraced garden honoring Jaipur\'s chief architect, right next to Sisodia Rani ka Bagh — reviewers describe having it entirely to themselves even in peak season.',
-      reviewGap:'~1,060 Google reviews for an Italianate garden most tourists never find', bestFor:'Quiet evenings, photography, architecture' },
-  ],
-  udaipur: [
-    { name:'Ahar Museum', cat:'scenic', coords:[24.5864,73.7211], vt:45, ot:'10:00', ct:'17:00',
-      why:'A Chalcolithic archaeological site and royal cenotaph complex 2km from the centre — overshadowed completely by City Palace and Lake Pichola.',
-      reviewGap:'~1,900 Google reviews vs City Palace\'s 30,000+', bestFor:'History, quiet exploration' },
-    { name:'Badi Lake', cat:'scenic', coords:[24.6173,73.6227], vt:60, ot:'05:00', ct:'19:00',
-      why:'A still, hill-ringed lake locals call "Tiger Lake" — 12km out, with none of Fateh Sagar\'s crowds and better sunsets.',
-      reviewGap:'Far fewer visitors than Fateh Sagar Lake despite similar views', bestFor:'Sunset, Bahubali Hills trek nearby' },
-    { name:'Nehru Garden', cat:'scenic', coords:[24.5963,73.6734], vt:75, ot:'09:00', ct:'18:00',
-      why:'A boat-only island garden in the middle of Fateh Sagar Lake — reaching it is half the experience, and it stays far less crowded than the lakeside itself.',
-      reviewGap:'~1,860 Google reviews vs Lake Pichola\'s far heavier footfall', bestFor:'Boat ride, sunset, musical fountain (evenings)' },
-    { name:'Neemach Mata Mandir', cat:'temple', coords:[24.6132,73.6758], vt:60, ot:'05:00', ct:'21:00',
-      why:'A hilltop temple with a ropeway and 360° views over Fateh Sagar Lake — reviewers repeatedly say it\'s "much less crowded than Karni Mata" for the same views.',
-      reviewGap:'~1,790 Google reviews for a temple most itineraries skip for the more famous Karni Mata', bestFor:'Sunrise, ropeway views, quiet darshan' },
-  ],
-  delhi: [
-    { name:'Agrasen ki Baoli', cat:'scenic', coords:[28.6261,77.2250], vt:30, ot:'09:00', ct:'17:30',
-      why:'A 108-step stepwell hidden a block from Connaught Place — free entry, eerily photogenic, and still missed by most first-time visitors.',
-      reviewGap:'~46,800 Google reviews vs India Gate\'s 200,000+', bestFor:'Photography, quick heritage stop' },
-    { name:'Mehrauli Archaeological Park', cat:'scenic', coords:[28.5202,77.1877], vt:75, ot:'06:00', ct:'18:30',
-      why:'Over 1,000 years of Delhi\'s history — including the Jamali Kamali tomb — spread through a quiet park right next to Qutub Minar, yet far less crowded.',
-      reviewGap:'~3,900 Google reviews vs Qutub Minar\'s 100,000+', bestFor:'History, peaceful walks, photography' },
-    { name:'Sunder Nursery', cat:'scenic', coords:[28.5956,77.2452], vt:60, ot:'06:00', ct:'21:00',
-      why:'A restored Mughal-era heritage garden right next to Humayun\'s Tomb — locals treat it as their favourite picnic spot; tourists mostly don\'t know it exists.',
-      reviewGap:'~21,900 Google reviews vs Humayun\'s Tomb\'s 60,000+', bestFor:'Picnics, gardens, golden-hour photography' },
-    { name:'Rajon Ki Baoli', cat:'scenic', coords:[28.5203,77.1834], vt:30, ot:'10:00', ct:'17:30',
-      why:'A 1506 Lodi-era stepwell inside Mehrauli Archaeological Park — reviewers call it "far less crowded" than the famous Agrasen ki Baoli, with the same dramatic symmetry.',
-      reviewGap:'~690 Google reviews vs Agrasen ki Baoli\'s 46,800', bestFor:'Photography, quiet architecture' },
-    { name:'Sanjay Van', cat:'scenic', coords:[28.5329,77.1813], vt:75, ot:'05:00', ct:'19:00',
-      why:'A genuine forest inside Delhi, with hidden ruins scattered through the trails — reviewers say it has "the healthiest air in Delhi."',
-      reviewGap:'~2,170 Google reviews for a forest most tourists never realize exists', bestFor:'Morning walks, birdwatching, jogging' },
-  ],
-  mumbai: [
-    { name:'Banganga Tank', cat:'scenic', coords:[18.9455,72.7936], vt:30, ot:'06:00', ct:'20:00',
-      why:'A 12th-century freshwater tank ringed by temples, tucked into Malabar Hill just steps from the sea — most tourists never leave the Gateway/Marine Drive loop to find it.',
-      reviewGap:'~920 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Photography, quiet heritage walk' },
-    { name:'Gilbert Hill', cat:'scenic', coords:[19.1206,72.8402], vt:30, ot:'06:00', ct:'19:00',
-      why:'A 66-million-year-old volcanic rock column — one of only two like it on Earth — rising straight out of an Andheri neighbourhood, and almost nobody visits it.',
-      reviewGap:'~460 Google reviews for a genuine geological rarity', bestFor:'Sunset views, unique photography' },
-    { name:'Sewri Mud-flats', cat:'scenic', coords:[18.9984,72.8611], vt:60, ot:'06:00', ct:'18:00',
-      why:'Thousands of flamingos gather on these mudflats every winter (Nov–May) and most of Mumbai has no idea it happens inside the city.',
-      reviewGap:'~110 Google reviews for a genuine flamingo migration spot', bestFor:'Flamingo season (Nov-May), check tide timings before visiting' },
-    { name:'Bandra Fort', cat:'scenic', coords:[19.0419,72.8184], vt:60, ot:'06:00', ct:'18:30',
-      why:'A ruined 17th-century fort with the best view of the Bandra-Worli Sea Link in the city — most itineraries stop at Marine Drive and never make it here.',
-      reviewGap:'~28,400 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Sunset, sea-link views, Bollywood filming spot' },
-    { name:'Global Vipassana Pagoda', cat:'scenic', coords:[19.2282,72.8059], vt:90, ot:'09:00', ct:'19:00',
-      why:'The world\'s largest stone dome built without a single supporting pillar — reached by ferry from Borivali, and almost never on a first-timer\'s Mumbai list.',
-      reviewGap:'~21,600 Google reviews vs Gateway of India\'s 90,000+', bestFor:'Architecture, meditation, ferry ride' },
-  ],
-  bengaluru: [
-    { name:'Turahalli Forest', cat:'scenic', coords:[12.8832,77.5250], vt:60, ot:'05:30', ct:'18:30',
-      why:'Bengaluru\'s last surviving forest — sunrise treks and cycling trails just past the edge of the city, still missing from most "things to do" lists.',
-      reviewGap:'~10,200 Google reviews vs Lalbagh\'s 90,000+', bestFor:'Sunrise trekking, cycling, birdwatching' },
-    { name:'National Gallery of Modern Art (Bengaluru)', cat:'scenic', coords:[12.9894,77.5881], vt:60, ot:'10:00', ct:'18:00',
-      why:'A colonial mansion turned modern-art gallery on Palace Road — steps from Bangalore Palace, but almost nobody stops in.',
-      reviewGap:'~1,970 Google reviews vs Bangalore Palace\'s 30,000+', bestFor:'Art, quiet indoor escape from the heat' },
-    { name:'Manchanabele Dam', cat:'scenic', coords:[12.8749,77.3361], vt:120, ot:'06:00', ct:'18:00',
-      why:'A rock-and-forest-ringed dam on the Arkavathi River ~40km out — reviewers call the sunset here "magical" and the crowd nonexistent compared to Nandi Hills.',
-      reviewGap:'~2,720 Google reviews for a genuinely scenic dam most day-trippers overlook', bestFor:'Sunset, picnics, kayaking' },
-    { name:'Hesaraghatta Lake', cat:'scenic', coords:[13.1500,77.4900], vt:75, ot:'06:00', ct:'18:00',
-      why:'A birdwatcher\'s paradise on Bengaluru\'s edge — raptors, migratory flocks, and open grassland skies that most city visitors never realize exist this close.',
-      reviewGap:'~2,120 Google reviews vs Lalbagh\'s 90,000+', bestFor:'Birdwatching, scenic drives, sunrise' },
-  ],
-  kochi: [
-    { name:'Kumbalangi Village', cat:'scenic', coords:[9.8761,76.2871], vt:90, ot:'07:00', ct:'18:00',
-      why:'Kerala\'s first model eco-tourism village — mangroves, fishing canals, and Chinese-net demonstrations by actual fishermen, 20 minutes from Fort Kochi and still overlooked.',
-      reviewGap:'A fraction of Fort Kochi\'s foot traffic despite being minutes away', bestFor:'Canoeing, village life, Chinese fishing nets' },
-    { name:'Puthenthodu Beach', cat:'beach', coords:[9.8695,76.2629], vt:60, ot:'06:00', ct:'19:00',
-      why:'A quiet crescent beach in Chellanam, past Kumbalangi — clean sand, no beach shacks, and none of Fort Kochi Beach\'s crowds.',
-      reviewGap:'~1,490 Google reviews vs Fort Kochi Beach\'s much heavier footfall', bestFor:'Sunset, peaceful swimming' },
-  ],
-  agra: [
-    { name:'Chini Ka Rauza', cat:'scenic', coords:[27.2008,78.0343], vt:45, ot:'08:00', ct:'17:00',
-      why:'A Persian-tiled Mughal tomb on the Yamuna, glazed in turquoise and green — reviewers call it a "hidden gem" outright, and it sees a fraction of Taj Mahal\'s crowds.',
-      reviewGap:'~1,130 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Photography, riverside quiet, Mughal architecture' },
-    { name:'Soor Sarovar Bird Sanctuary', cat:'scenic', coords:[27.2360,77.8526], vt:90, ot:'08:00', ct:'18:00',
-      why:'A Ramsar-listed wetland (Keetham Lake) 20km from the city with migratory Siberian cranes — most Agra itineraries never make time for it.',
-      reviewGap:'~960 Google reviews for a globally recognised wetland', bestFor:'Birdwatching, winter migratory season' },
-    { name:'Mankameshwar Temple, Agra', cat:'temple', coords:[27.1837,78.0175], vt:30, ot:'05:00', ct:'22:00',
-      why:'One of Agra\'s oldest Shiva temples, tucked in a narrow old-city lane — locals swear by the evening aarti, tourists rarely find it.',
-      reviewGap:'~6,970 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Evening aarti, local culture' },
-    { name:'Wildlife SOS Elephant Conservation and Care Center', cat:'scenic', coords:[27.3000,77.7940], vt:120, ot:'10:00', ct:'17:00',
-      why:'A real rescue sanctuary for elephants retired from decades of abuse — no riding, no touching, just watching them roam free. Reviewers call it one of the most moving experiences in Agra, and most Taj-focused itineraries never hear about it.',
-      reviewGap:'~710 Google reviews vs the Taj Mahal\'s 200,000+', bestFor:'Ethical wildlife experience, families, a genuinely emotional stop' },
-  ],
-  varanasi: [
-    { name:'Bharat Kala Bhavan Museum', cat:'scenic', coords:[25.2715,82.9960], vt:60, ot:'10:30', ct:'16:30',
-      why:'A 100,000-artifact museum inside BHU with a world-class Mughal miniature painting collection — reviewers repeatedly call it Varanasi\'s best-kept secret.',
-      reviewGap:'~1,690 Google reviews vs Kashi Vishwanath Temple\'s 40,000+', bestFor:'Art, miniature paintings, quiet indoor culture' },
-    { name:'Panchganga Ghat', cat:'scenic', coords:[25.3150,83.0182], vt:30, ot:'05:00', ct:'20:00',
-      why:'Believed to be the confluence of five sacred rivers, with the same golden-hour ghat views as Dashashwamedh — minus the crowds and touts.',
-      reviewGap:'~1,360 Google reviews vs Dashashwamedh Ghat\'s far heavier footfall', bestFor:'Sunrise boat rides, quiet reflection' },
-  ],
-  kolkata: [
-    { name:'Marble Palace', cat:'scenic', coords:[22.5822,88.3602], vt:60, ot:'10:00', ct:'16:00',
-      why:'A 19th-century mansion crammed with Western sculpture and art, in North Kolkata — barely on any tourist itinerary despite rivaling Victoria Memorial\'s grandeur.',
-      reviewGap:'Rarely appears on Google review counts at all vs Victoria Memorial\'s 100,000+', bestFor:'Art, colonial-era architecture' },
-    { name:'Kumartuli Potter\'s Lane', cat:'scenic', coords:[22.5994,88.3635], vt:60, ot:'08:00', ct:'19:00',
-      why:'The narrow lanes where Kolkata\'s idol-makers hand-craft every Durga Puja idol in the city — most tourists never wander past College Street to find it.',
-      reviewGap:'~310 Google reviews for the artisan heart of the city\'s biggest festival', bestFor:'Craft, photography, especially pre-Durga Puja' },
-    { name:'South Park Street Cemetery', cat:'scenic', coords:[22.5466,88.3602], vt:60, ot:'10:00', ct:'17:00',
-      why:'One of the world\'s oldest non-church cemeteries (1767) — moss-covered obelisks and colonial mausoleums that reviewers describe as "stepping into a quiet conversation with history."',
-      reviewGap:'~1,720 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'History, colonial architecture, quiet reflection' },
-    { name:'Rabindra Sarovar Lake', cat:'scenic', coords:[22.5110,88.3561], vt:60, ot:'05:00', ct:'19:00',
-      why:'South Kolkata\'s favourite lake for a morning walk — locals call it "the lungs of Kolkata," and it barely registers with visiting tourists.',
-      reviewGap:'~4,710 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'Morning walks, birdwatching, jogging' },
-  ],
-};
-
-function getHiddenGems(cityId){
-  return (HIDDEN_GEM_SEEDS[cityId] || []).map(g => ({
-    id: `gem_${cityId}_${g.name.toLowerCase().replace(/[^a-z0-9]/g,'')}`,
-    name:g.name, cat:g.cat, coords:g.coords, vt:g.vt, ot:g.ot, ct:g.ct,
-    isHiddenGem:true, why:g.why, reviewGap:g.reviewGap, bestFor:g.bestFor,
-    importance:'must_see', importanceScore:88, fallbackSource:'curated_hidden_gem',
-  }));
-}
-
-// ══════════════════════════════════════════════════
-// CITY TRANSPORT CONFIG — Per-city fare rates & modes
-// ══════════════════════════════════════════════════
-const CITY_TRANSPORT_CONFIG = {
-  vizag:     { hasMetro:false, hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:10, cabBase:50,  cabPerKm:14, trainFare:[10,40], congestion:0.9  },
-  hyderabad: { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:12, cabBase:50,  cabPerKm:15, trainFare:[10,30], metroFare:[10,60], congestion:1.15 },
-  goa:       { hasMetro:false, hasTrain:false, busFare:[10,25],  autoBase:30, autoPerKm:14, cabBase:80,  cabPerKm:18, congestion:0.75 },
-  jaipur:    { hasMetro:true,  hasTrain:true,  busFare:[10,25],  autoBase:25, autoPerKm:11, cabBase:50,  cabPerKm:14, trainFare:[10,25], metroFare:[10,30], congestion:1.0  },
-  udaipur:   { hasMetro:false, hasTrain:false, busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:50,  cabPerKm:14, congestion:0.85 },
-  delhi:     { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:25, autoPerKm:11, cabBase:50,  cabPerKm:16, trainFare:[10,30], metroFare:[10,60], congestion:1.3  },
-  mumbai:    { hasMetro:true,  hasTrain:true,  busFare:[5,25],   autoBase:23, autoPerKm:14, cabBase:50,  cabPerKm:18, trainFare:[5,15],  metroFare:[10,50], congestion:1.35 },
-  bengaluru: { hasMetro:true,  hasTrain:true,  busFare:[10,30],  autoBase:30, autoPerKm:13, cabBase:50,  cabPerKm:16, trainFare:[10,25], metroFare:[10,55], congestion:1.25 },
-  kochi:     { hasMetro:true,  hasTrain:true,  busFare:[8,25],   autoBase:25, autoPerKm:12, cabBase:50,  cabPerKm:15, trainFare:[10,20], metroFare:[10,40], congestion:0.9  },
-  agra:      { hasMetro:false, hasTrain:true,  busFare:[10,25],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,25], congestion:1.0  },
-  varanasi:  { hasMetro:false, hasTrain:true,  busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,20], congestion:1.05 },
-  kolkata:   { hasMetro:true,  hasTrain:true,  busFare:[7,25],   autoBase:25, autoPerKm:12, cabBase:40,  cabPerKm:14, trainFare:[5,15],  metroFare:[5,30],  congestion:1.2  },
-};
-const DEFAULT_TRANSPORT_CONFIG = { hasMetro:false, hasTrain:false, busFare:[10,30], autoBase:25, autoPerKm:12, cabBase:50, cabPerKm:15, congestion:1.0 };
-
-const ENTRY_FEE_ESTIMATES = { scenic:50, temple:0, beach:0, food:0, break:0 };
-
 // ── Transport & Traffic Intelligence ──────────────────────────────────────────
-function getTransportConfig(cityId){ return CITY_TRANSPORT_CONFIG[cityId] || CITY_TRANSPORT_CONFIG[currentCityId] || DEFAULT_TRANSPORT_CONFIG; }
-
 function getTrafficMultiplier(cityId, minuteOfDay){
   const config = getTransportConfig(cityId);
   return _ttTrafficMult(config.congestion || 1.0, minuteOfDay);
@@ -794,13 +277,11 @@ const t2m=(s,fallback=0)=>{
 };
 const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
 const sync=()=>{if(mdPlan.length>0)mdPlan[dayIdx]=itin;};
-const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
 // Shared guard against NaN/undefined/malformed coordinate pairs. Any place
 // with bad coords (missing geocode, failed AI hydration, etc.) must never
 // reach a Leaflet L.marker()/L.polyline() call — Leaflet throws "Invalid
 // LatLng object" and that throw was reaching production because several
 // call sites only checked `coords.length`, which [NaN, NaN] still passes.
-const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
 
 // ── Global Leaflet safety net ───────────────────────────────────────────────
 // hasValidCoords() above fixed the call sites we could find (renderMapMarkers,
@@ -813,95 +294,6 @@ const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => N
 // so an invalid pair is skipped (with a console.warn identifying it) instead
 // of throwing. It's a last line of defense, not a fix for the bad data
 // itself — the warnings it logs point at exactly which place/coords are bad.
-(function installLeafletCoordGuard(){
-  if (typeof L === 'undefined' || L.__coordGuardInstalled) return;
-  L.__coordGuardInstalled = true;
-  const isFiniteLatLngPair = v => {
-    if (Array.isArray(v)) return v.length >= 2 && Number.isFinite(+v[0]) && Number.isFinite(+v[1]);
-    if (v && typeof v === 'object') return Number.isFinite(+v.lat) && Number.isFinite(+(v.lng ?? v.lon));
-    return false;
-  };
-  const noopLayer = () => {
-    const stub = {};
-    ['addTo','bindPopup','bindTooltip','setLatLng','setStyle','setIcon','setLatLngs','on','off','remove','removeFrom']
-      .forEach(m => { stub[m] = () => stub; });
-    stub.getBounds = () => L.latLngBounds([[20.5937,78.9629],[20.5937,78.9629]]);
-    stub.getLatLngs = () => [];
-    stub.getElement = () => null;
-    return stub;
-  };
-  const origMarker = L.marker;
-  L.marker = function(coords, opts){
-    if (!isFiniteLatLngPair(coords)) { console.warn('[map guard] skipped L.marker — invalid coords:', coords, opts?.icon?.options?.className || ''); return noopLayer(); }
-    return origMarker.call(L, coords, opts);
-  };
-  const origPolyline = L.polyline;
-  L.polyline = function(latlngs, opts){
-    const clean = (Array.isArray(latlngs) ? latlngs : []).filter(isFiniteLatLngPair);
-    if (clean.length < 2) { console.warn('[map guard] skipped L.polyline — fewer than 2 valid points out of', (latlngs||[]).length); return noopLayer(); }
-    if (clean.length !== latlngs.length) console.warn('[map guard] dropped', latlngs.length - clean.length, 'invalid point(s) from a polyline');
-    return origPolyline.call(L, clean, opts);
-  };
-})();
-// ── Global Leaflet view-movement safety net ─────────────────────────────────
-// Companion to installLeafletCoordGuard() above. flyTo()/setView() being
-// interrupted by another flyTo()/setView() before their animation finishes
-// corrupts Leaflet's internal easing state and can throw a NaN LatLng error
-// asynchronously, from inside Leaflet's own requestAnimationFrame callback —
-// after the call that triggered it has already returned, so a try/catch
-// around the call site can't catch it. map.stop() before each call (added at
-// every known flyTo/setView call site) prevents the corruption in the first
-// place; this patches flyTo/setView/panTo themselves to call it automatically
-// too, so this can't regress at a call site someone adds later without
-// remembering the pattern.
-(function installLeafletMoveGuard(){
-  if (typeof L === 'undefined' || !L.Map || L.Map.prototype.__moveGuardInstalled) return;
-  L.Map.prototype.__moveGuardInstalled = true;
-  const origSetView = L.Map.prototype.setView; // captured once, used as the shared fallback below
-  // Only flyTo/panTo run multi-frame animations that can be left mid-flight
-  // and need a pre-emptive stop(). setView must NOT call stop() itself:
-  // Leaflet's own stop() calls setZoom(), and setZoom() calls setView() —
-  // if setView() also called stop() first, that's mutual recursion
-  // (setView -> stop -> setZoom -> setView -> stop -> ...) that overflows
-  // the stack. setView already cancels any in-flight animation internally
-  // via its own private _stop(), so it doesn't need this anyway.
-  ['flyTo','panTo','setView'].forEach(fnName => {
-    const orig = L.Map.prototype[fnName];
-    if (typeof orig !== 'function') return;
-    const needsStop = fnName !== 'setView';
-    L.Map.prototype[fnName] = function(target, ...rest){
-      const lat = Array.isArray(target) ? target[0] : target?.lat;
-      const lng = Array.isArray(target) ? target[1] : (target?.lng ?? target?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        console.warn(`[map guard] skipped ${fnName} — invalid target:`, target);
-        return this;
-      }
-      // flyTo()'s internal easing-path math divides by Math.max(size.x,
-      // size.y) (the container's current pixel size). On a hidden container
-      // (display:none — e.g. the map tab isn't the active one) that's 0,
-      // producing NaN/Infinity that throws synchronously inside flyTo()
-      // itself. setView has no such size-dependent math, so use it directly
-      // instead of even attempting the animation — this still correctly
-      // updates the stored center/zoom for whenever the map becomes visible
-      // and invalidateSize() runs, just without the animation.
-      if (fnName === 'flyTo') {
-        const sz = this.getSize ? this.getSize() : null;
-        if (!sz || !(sz.x > 0) || !(sz.y > 0)) {
-          console.warn('[map guard] flyTo on a hidden/zero-size map — using instant setView instead');
-          return origSetView.call(this, target, rest[0]);
-        }
-      }
-      if (needsStop) this.stop(); // cancel any in-flight animation so this one starts clean
-      try {
-        return orig.call(this, target, ...rest);
-      } catch (e) {
-        console.warn(`[map guard] ${fnName} threw, falling back to instant setView`, e);
-        try { return origSetView.call(this, target, rest[0]); }
-        catch (e2) { console.warn('[map guard] fallback setView also threw', e2); return this; }
-      }
-    };
-  });
-})();
 const m2t=m=>{const safe=((m%(24*60))+(24*60))%(24*60);const hh=String(Math.floor(safe/60)).padStart(2,'0');const mm=String(safe%60).padStart(2,'0');return `${hh}:${mm}`;};
 
 // --- TIME BASED BEHAVIOUR HELPERS ---
@@ -1130,6 +522,10 @@ function getCityCenter(){
   if(city?.lat&&city?.lon) return [city.lat,city.lon];
   return null;
 }
+function getRouteStart(){
+  if(cLat&&cLon) return [cLat,cLon];
+  return getCityCenter();
+}
 
 function getPreviewRouteStart(){
   // Only trust live GPS as the route start once a trip is actually live —
@@ -1144,26 +540,6 @@ function getPreviewRouteStart(){
   return getCityCenter() || ((cLat && cLon) ? [cLat, cLon] : null);
 }
 
-function getLocalPlaces(cityId, cityName){
-  const key=String(cityId||'').toLowerCase();
-  const byName=Object.entries(CITIES).find(([,city])=>String(city.name||'').toLowerCase()===String(cityName||'').toLowerCase())?.[0];
-  const seeds=LOCAL_PLACE_SEEDS[key] || LOCAL_PLACE_SEEDS[byName] || [];
-  return seeds.map((seed,i)=>{
-    const [name,cat,lat,lon,vt,ot,ct]=seed;
-    return {
-      id:`local_${key||byName||'city'}_${i}`,
-      name,cat,coords:[lat,lon],vt,ot,ct,
-      fallbackSource:'local_seed',
-      importance:cat==='food'?'famous':i<6?'must_see':i<8?'famous':'local',
-      importanceScore:cat==='food'?70:Math.max(35,100-i*6),
-    };
-  });
-}
-
-// Geometry / routing pure helpers live in utils/geo.js
-
-function significantWords(n){ return _geoSignificantWords(n); }
-function dedupePlacesByProximity(list){ return _geoDedupe(list); }
 function withHiddenGems(cityId, list){ return _geoWithHiddenGems(list, getHiddenGems(cityId)); }
 function mergePlacePools(...pools){ return _geoMergePools(...pools); }
 function sortNearestNeighbor(arr,sLat,sLon){ return _geoSortNN(arr,sLat,sLon); }
@@ -1192,7 +568,7 @@ function updateFollowButton(){
 // close to half the map, so let the user shrink it down to just the top
 // badge/weather row and bring it back with the same tap.
 const NAV_CARD_COLLAPSED_KEY='iit_nav_card_collapsed';
-window.toggleNavCardCollapsed=function(forceState){
+function toggleNavCardCollapsed(forceState){
   const card=document.getElementById('nav-card');
   const btn=document.getElementById('nav-card-collapse-btn');
   if(!card) return;
@@ -1203,7 +579,9 @@ window.toggleNavCardCollapsed=function(forceState){
     btn.setAttribute('aria-label',collapsed?'Expand live navigation':'Minimize live navigation');
   }
   try{ localStorage.setItem(NAV_CARD_COLLAPSED_KEY, collapsed?'1':'0'); }catch(_e){}
-};
+}
+// Exposed for compatibility with the browser action bridge and debugging.
+window.toggleNavCardCollapsed=toggleNavCardCollapsed;
 function restoreNavCardCollapsed(){
   let wasCollapsed=false;
   try{ wasCollapsed=localStorage.getItem(NAV_CARD_COLLAPSED_KEY)==='1'; }catch(_e){}
@@ -1248,7 +626,7 @@ function followLivePosition(force=false){
       easeLinearity:0.25,
     });
   }catch(e){
-    console.warn('[followLivePosition] flyTo threw, falling back to setView', e);
+    browserLogger.warn('[followLivePosition] flyTo threw, falling back to setView', e);
     map.stop();
     map.setView([tLat,tLon],zoom);
   }
@@ -1383,14 +761,9 @@ function updateQuestLevel(){
 function turnArrowForInstruction(text){ return _turnArrowForInstruction(text); }
 
 
-function dayPartForMinutes(mins){ return _dayPart(mins); }
-function climateMode(temp){ return _climateMode(temp); }
-function tripModeBonus(stop, tripMode){ return _tripModeBonus(stop, tripMode); }
-function personaBonus(stop, personas){ return _personaBonus(stop, personas); }
 function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null, tripMode=null){
   return _stopTimeScore(stop, arriveMin, temp, priorityIndex, wind, personas, tripMode);
 }
-function stopClimateNote(stop, arriveMin, temp){ return _stopClimateNote(stop, arriveMin, temp); }
 
 function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=0, breakDuration=0){
   let currentMin = startMin;
@@ -1754,166 +1127,38 @@ function updateStreetQuestProgress(){
 function applyTheme(){document.documentElement.setAttribute('data-theme','dark');localStorage.setItem('tt_theme','dark');}
 function toggleTheme(){isDark=!isDark;applyTheme();}
 
-// ── Firebase Auth ─────────────────────────────────────────────────────────────
-onAuthStateChanged(auth,async user=>{
-  resolveAuthChecked();
-  if(user){
-    currentUser=user;
-    window.currentUser=user; // client-api.js reads this to attach auth headers — was missing before, so it was always undefined
-    document.getElementById('login-screen').style.display='none';
-    const av=document.getElementById('user-avatar');
-    if(user.photoURL){av.src=user.photoURL;av.style.display='block';}
-    document.getElementById('um-name').textContent=user.displayName||'Traveller';
-    document.getElementById('um-email').textContent=user.email||'';
-    // Load user cloud data silently in background — no chat message spam
-    loadUserData().catch(()=>{});
-    const firstName = user.displayName?.split(' ')[0] || 'Traveller';
-    addMsg(`👋 Welcome, <strong>${firstName}</strong>! Your data is synced ☁️ — pick a city and tap Generate to start!`);
-  } else {
-    currentUser=null;
-    window.currentUser=null;
-    document.getElementById('login-screen').style.display='flex';
-    document.getElementById('user-avatar').style.display='none';
-  }
+// ── Firebase Auth / Firestore session boundary ────────────────────────────────
+const authSession = createAuthSession({
+  auth,
+  provider: gProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut: fbSignOut,
+  db,
+  firestore: { doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp },
+  getUser: () => currentUser,
+  setUser: user => { currentUser = user; },
+  getStamps: () => stamps,
+  setStamps: value => { stamps = value; },
+  getExpenses: () => expenses,
+  setExpenses: value => { expenses = value; },
+  resetTripData: () => { mdPlan=[]; itin=[]; expenses=[]; stamps=new Set(); },
+  onAuthChecked: () => resolveAuthChecked(),
+  addMessage: (message, options = {}) => {
+    if (options.resetUi) {
+      document.getElementById('plan-list').innerHTML = '<div class="empty-state"><div class="empty-icon">🗺️</div><p class="empty-txt">Sign in to access your saved trips</p></div>';
+    } else if (message) {
+      addMsg(message);
+    }
+  },
 });
 
-// Module-level guard — lives outside signInWithGoogle() so it persists
-// across calls. This is what actually stops auth/cancelled-popup-request:
-// that error fires when a second signInWithPopup() call cancels the first
-// one still in flight, so the fix is to never make that second call at all.
-let isSigningIn = false;
-
-async function signInWithGoogle(event){
-  // Ignore any click that arrives while a sign-in is already in progress —
-  // this must be the very first thing that runs, before any DOM changes or
-  // Firebase calls, so a rapid second click is a true no-op.
-  if (isSigningIn) return;
-  isSigningIn = true;
-
-  // Locate the actual button so it can be disabled, not just the loading
-  // indicator. event.currentTarget is the <button> itself (see the
-  // onclick="signInWithGoogle(event)" wiring in index.html); fall back to
-  // a selector in case this is ever invoked without an event.
-  const btn = event?.currentTarget || document.querySelector('.btn-google');
-  const loadingEl = document.getElementById('login-loading');
-
-  if (btn) btn.disabled = true;
-  if (loadingEl) loadingEl.style.display = 'block';
-
-  try {
-    // Unchanged — same call, same provider, same auth instance as before.
-    await signInWithPopup(auth, gProvider);
-    // No success-path UI here by design: onAuthStateChanged (registered
-    // elsewhere in this file) already handles the post-login UI update,
-    // so this stays untouched to avoid duplicating that flow.
-  } catch (e) {
-    // These two codes are expected, user-driven outcomes, not real
-    // failures — a double-click racing two popups, or the user closing
-    // the Google popup themselves. Don't alert for either.
-    const expected = e?.code === 'auth/cancelled-popup-request'
-                   || e?.code === 'auth/popup-closed-by-user';
-    if (!expected) {
-      console.error('[signInWithGoogle] Unexpected auth error:', e);
-      alert('Sign-in failed: ' + e.message);
-    } else {
-      console.warn('[signInWithGoogle] Expected popup race, ignored:', e.code);
-    }
-  } finally {
-    // Guaranteed to run on success, expected-error, or unexpected-error
-    // (including network failures, which surface here as a caught
-    // exception too) — so the button and loading state can never get
-    // stuck, and the guard flag always releases for the next click.
-    isSigningIn = false;
-    if (btn) btn.disabled = false;
-    if (loadingEl) loadingEl.style.display = 'none';
-  }
-}
-
-async function doSignOut(){
-  await saveUserData();
-  await fbSignOut(auth);
-  document.getElementById('user-menu').classList.remove('open');
-  mdPlan=[];itin=[];expenses=[];stamps=new Set();
-  document.getElementById('plan-list').innerHTML='<div class="empty-state"><div class="empty-icon">🗺️</div><p class="empty-txt">Sign in to access your saved trips</p></div>';
-}
-
-function toggleUserMenu(){document.getElementById('user-menu').classList.toggle('open');}
-document.addEventListener('click',e=>{const m=document.getElementById('user-menu');const av=document.getElementById('user-avatar');if(!m.contains(e.target)&&e.target!==av)m.classList.remove('open');});
-
-// ── Firestore sync ────────────────────────────────────────────────────────────
-async function saveUserData(){
-  if(!currentUser)return;
-  const uid=currentUser.uid;
-  try{
-    await setDoc(doc(db,'users',uid,'data','stamps'),{stamps:[...stamps],updatedAt:serverTimestamp()});
-    await setDoc(doc(db,'users',uid,'data','expenses'),{expenses,updatedAt:serverTimestamp()});
-  }catch(e){console.warn('[fb save]',e.message);}
-}
-
-async function loadUserData(){
-  if(!currentUser)return;
-  const uid=currentUser.uid;
-  // Each read is independent and wrapped separately — previously all three
-  // shared one try/catch, so a permission denial on the *first* read
-  // (stamps) silently prevented expenses/plans from ever being attempted,
-  // and the shared catch gave no way to tell which of the three actually
-  // failed (seen live as an unspecific "[fb load] Missing or insufficient
-  // permissions" warning with no indication of which document).
-  try{
-    const sd=await getDoc(doc(db,'users',uid,'data','stamps'));
-    if(sd.exists())stamps=new Set(sd.data().stamps||[]);
-  }catch(e){console.warn('[fb load] stamps:',e.message);}
-  try{
-    const ed=await getDoc(doc(db,'users',uid,'data','expenses'));
-    if(ed.exists())expenses=ed.data().expenses||[];
-  }catch(e){console.warn('[fb load] expenses:',e.message);}
-  try{
-    const ps=await getDocs(collection(db,'users',uid,'plans'));
-    if(!ps.empty)window._fbPlans=ps.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.warn('[fb load] plans:',e.message);}
-}
-
-async function saveIt(){
-  if(!mdPlan.length)return;
-  const planId=Date.now().toString();
-  const planData={
-    name:`${currentCityName} ${new Date().toLocaleDateString()}`,
-    ts:Date.now(),
-    data:JSON.stringify(mdPlan),
-    st:document.getElementById('s-time').value,
-    et:document.getElementById('e-time').value,
-    tm:getTripMinutes(),
-    city:currentCityName
-  };
-  if(currentUser){
-    try{
-      await setDoc(doc(db,'users',currentUser.uid,'plans',planId),planData);
-      if(!window._fbPlans)window._fbPlans=[];
-      window._fbPlans.push({id:planId,...planData});
-      addMsg('☁️ <strong>Plan saved to your account!</strong> Access it from any device.');
-    }catch(e){_saveLocally(planData,planId);}
-  }else{_saveLocally(planData,planId);}
-}
-
-function _saveLocally(d,id){
-  try{let s=JSON.parse(localStorage.getItem('tt_plans')||'[]');s.push({id,...d});localStorage.setItem('tt_plans',JSON.stringify(s));addMsg('💾 Plan saved locally!');}
-  catch(e){addMsg('⚠️ Save failed.');}
-}
-
-async function delPlan(id){
-  if(currentUser){try{await deleteDoc(doc(db,'users',currentUser.uid,'plans',id));}catch(e){}if(window._fbPlans)window._fbPlans=window._fbPlans.filter(p=>p.id!==id);}
-  let s=JSON.parse(localStorage.getItem('tt_plans')||'[]');localStorage.setItem('tt_plans',JSON.stringify(s.filter(p=>p.id!==id)));
-  renderLoadPanel();
-}
-
-function renderLoadPanel(){
-  let local=[];try{local=JSON.parse(localStorage.getItem('tt_plans')||'[]');}catch(e){}
-  const cloud=window._fbPlans||[];
-  const seen=new Set();
-  const all=[...cloud,...local].filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return true;}).sort((a,b)=>b.ts-a.ts);
-  document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">📂 My Saved Plans ${currentUser?'☁️':''}</div></div>${all.length===0?'<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:24px;font-style:italic">No saved plans yet.</p>':all.map(d=>`<div class="saved-plan-item"><div><div class="sp-name">${escapeHtml(d.name)}</div><div class="sp-date">${new Date(d.ts).toLocaleString()} ${cloud.find(c=>c.id===d.id)?'☁️':''}</div></div><div class="sp-btns"><button class="sp-load" data-action="loadPlan" data-plan="${encodeURIComponent(JSON.stringify(d))}">Load</button><button class="sp-del" data-action="delPlan" data-id="${d.id}">×</button></div></div>`).join('')}`;
-}
-function toggleLoadPanel(){switchToView('tools-view',3);renderLoadPanel();}
+const { saveUserData, loadUserData, signInWithGoogle, doSignOut, toggleUserMenu } = authSession;
+document.addEventListener('click', event => {
+  const menu = document.getElementById('user-menu');
+  const avatar = document.getElementById('user-avatar');
+  if (menu && !menu.contains(event.target) && event.target !== avatar) menu.classList.remove('open');
+});
 
 // ── Weather ───────────────────────────────────────────────────────────────────
 window.realWind = window.realWind || 0;
@@ -2068,7 +1313,7 @@ function switchCity(cityId, silent=false){
       map.stop();
       map.flyTo([city.lat,city.lon],12,{duration:1.1});
     } else {
-      console.warn('[switchCity] skipped flyTo — invalid coordinates for city:', cityId, city.lat, city.lon);
+      browserLogger.warn('[switchCity] skipped flyTo — invalid coordinates for city:', cityId, city.lat, city.lon);
     }
     setTimeout(()=>map.invalidateSize(),100);
   }
@@ -2139,7 +1384,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
     return result;
   } catch(e) {
     placeLoadPromises.delete(cacheKey);
-    console.error('loadCityPlaces error:', e);
+    browserLogger.error('loadCityPlaces error:', e);
     if(!silent){
       addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`);
       showToast('⚠️','Couldn\'t refresh places',`Showing what we have for ${cityName} — will retry automatically.`,4500);
@@ -2182,7 +1427,7 @@ async function searchCity(q){
     if(!nd.length){typing.remove();addMsg(`❌ Could not find "${q}". Check spelling and try again.`);return;}
     const lat=parseFloat(nd[0].lat),lon=parseFloat(nd[0].lon);
     if(!isFiniteLatLon(lat,lon)){
-      console.warn('[searchCity] geocode result had invalid coordinates for query:', q, nd[0]);
+      browserLogger.warn('[searchCity] geocode result had invalid coordinates for query:', q, nd[0]);
       typing.remove();
       addMsg(`❌ Got an unexpected result while looking up "${q}". Try a different spelling or a nearby major city.`);
       return;
@@ -2211,7 +1456,7 @@ async function searchCity(q){
       addMsg(`⚠️ Could not find enough tourist spots in ${currentCityName}. Try again or search a nearby larger city.`);
     }
   }catch(e){
-    console.error('searchCity error:',e);
+    browserLogger.error('searchCity error:',e);
     addMsg(`❌ Error: ${e.message}. Please try again.`);
   }
 }
@@ -2263,9 +1508,9 @@ async function generatePlan(){
         const ready = await ensureCityPlaces(city, minPlacePool);
         if(!ready){
           // ensureCityPlaces already tried force-refresh internally; just log
-          console.warn('generatePlan: ensureCityPlaces returned false for', city.name);
+          browserLogger.warn('generatePlan: ensureCityPlaces returned false for', city.name);
         }
-      }catch(_e){ console.error('generatePlan load error:', _e); }
+      }catch(_e){ browserLogger.error('generatePlan load error:', _e); }
       loadTyping.remove();
     }
     if(!LOCS.length){
@@ -2331,15 +1576,59 @@ async function generatePlan(){
   }else{avail=prioritizePlanStops(avail,routeStart,prefs);}
   mdPlan=[];let rem=[...avail];
   const startMin=t2m(si);
-  for(let d=0;d<nDays;d++){
-    const remainingDays = nDays - d;
-    const adaptiveTarget = d === nDays - 1
-      ? maxT
-      : Math.max(180, Math.min(maxT, Math.ceil(estimateStopLoadMinutes(rem) / Math.max(1, remainingDays))));
-    const dayStart = d===0 ? routeStart : (CITIES[currentCityId]?.lat&&CITIES[currentCityId]?.lon ? [CITIES[currentCityId].lat,CITIES[currentCityId].lon] : routeStart);
-    const planned = buildTimeAwareDay(rem, startMin, adaptiveTarget, dayStart, realTemp || 28, breakEvery, breakDuration);
-    if(planned.day.length) mdPlan.push(planned.day);
-    rem = planned.remaining;
+  // Prefer the backend GeoAI time-optimization engine. It evaluates each
+  // candidate at projected arrival time, reserves high-value experience
+  // windows, and balances route efficiency, weather, crowd, scenic quality
+  // and opening feasibility. The legacy client planner remains a safe
+  // fallback if the backend is unavailable.
+  try{
+    const wx={ tempC: typeof realTemp==='number' ? realTemp : null, condition: realWeatherMain || null, windKph: window.realWind };
+    const optimized=await API.timeIntelligenceOptimize(rem,{
+      weather:wx,
+      at:new Date().toISOString(),
+      fromCoords:routeStart,
+      personas:Array.from(document.querySelectorAll('.pref:checked')).map(c=>c.value),
+      tripMode:window.selectedTripMode||null,
+      startMin,
+      endMin:startMin+maxT,
+      maxStops:Math.min(10,Math.max(1,Math.ceil(maxT/45))),
+      bufferMin:Math.max(10,breakDuration||15),
+      region:currentCityName||null,
+    });
+    if(Array.isArray(optimized?.stops) && optimized.stops.length){
+      mdPlan=[optimized.stops.map(stop=>({
+        ...stop,
+        id:stop.id||stop.name,
+        cat:stop.category||'default',
+        coords:stop.coords,
+        vt:stop.stayMinutes||45,
+        tt:stop.travelMinutes||0,
+        temporalScore:stop.timingFit,
+        slotLabel:dayPartForMinutes(t2m(stop.arriveAt)),
+        climateNote:stop.weather?.suitability||'',
+        bestWindow:stop.bestWindow||null,
+        optimizationScore:stop.optimizationScore,
+        waitingMinutes:stop.waitingMinutes||0,
+        geoOptimized:true,
+        bestWindow:stop.bestWindow||null,
+      }))];
+      window.__iitLastGeoAIPlan=optimized;
+      addMsg(`🧠 <strong>GeoAI Time Intelligence optimized your itinerary</strong> — ${optimized.stopCount} stops, arrival-time scoring, scenic windows, weather/crowd context and route efficiency applied.`);
+    }
+  }catch(e){
+    browserLogger.warn('[GeoAI optimizer] backend unavailable, using local planner:',e);
+  }
+  if(!mdPlan.length){
+    for(let d=0;d<nDays;d++){
+      const remainingDays = nDays - d;
+      const adaptiveTarget = d === nDays - 1
+        ? maxT
+        : Math.max(180, Math.min(maxT, Math.ceil(estimateStopLoadMinutes(rem) / Math.max(1, remainingDays))));
+      const dayStart = d===0 ? routeStart : (CITIES[currentCityId]?.lat&&CITIES[currentCityId]?.lon ? [CITIES[currentCityId].lat,CITIES[currentCityId].lon] : routeStart);
+      const planned = buildTimeAwareDay(rem, startMin, adaptiveTarget, dayStart, realTemp || 28, breakEvery, breakDuration);
+      if(planned.day.length) mdPlan.push(planned.day);
+      rem = planned.remaining;
+    }
   }
   if(!mdPlan.length){
     mdPlan=[];rem=[...avail];
@@ -2362,7 +1651,7 @@ async function generatePlan(){
   }
 }
 
-function renderTabs(){const c=document.getElementById('day-tabs');if(mdPlan.length<=1){c.style.display='none';return;}c.style.display='flex';c.innerHTML='';mdPlan.forEach((_,i)=>{const b=document.createElement('div');b.textContent=`Day ${i+1}`;b.className='day-tab'+(i===0?' active':'');b.onclick=()=>switchDay(i);c.appendChild(b);});}
+function renderTabs(){const c=document.getElementById('day-tabs');if(mdPlan.length<=1){c.style.display='none';return;}c.style.display='flex';c.innerHTML='';mdPlan.forEach((_,i)=>{const b=document.createElement('div');b.textContent=`Day ${i+1}`;b.className='day-tab'+(i===0?' active':'');b.addEventListener('click', () => switchDay(i));c.appendChild(b);});}
 function switchDay(idx,init=false){dayIdx=idx;itin=mdPlan[dayIdx]||[];document.querySelectorAll('.day-tab').forEach((b,i)=>b.classList.toggle('active',i===idx));document.getElementById('btn-start').textContent='🚀 Start Live Tracking';document.getElementById('btn-start').disabled=false;tripActive=false;tripStart=null;lastHeading=null;lastSpokenNavInstruction='';autoFollowLive=true;streetQuestActive=false;clearStreetQuestLayers();applyMapHeadingRotation();updateStreetQuestUI();updateFollowButton();document.getElementById('trip-st').textContent=`DAY ${idx+1}`;optimizeRoute(true);}
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -2415,7 +1704,7 @@ function sanitizeChatHtml(html){
       ALLOW_DATA_ATTR: false,
     });
   }
-  console.warn('[security] DOMPurify unavailable \u2014 falling back to plain-text rendering for chat messages.');
+  browserLogger.warn('[security] DOMPurify unavailable \u2014 falling back to plain-text rendering for chat messages.');
   return escapeHtml(str);
 }
 function formatAiText(str){
@@ -2572,6 +1861,18 @@ document.addEventListener('input', (e) => {
   const el = e.target.closest('[data-action="onTimeSliderChange"]');
   if (el) onTimeSliderChange(el.value);
 });
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-file-action]');
+  if (!el) return;
+  const handlers = { handleArOverlay, handleFoodSafety, handleCaption, handleTranslate, handleAiLens };
+  const fn = handlers[el.dataset.fileAction];
+  if (typeof fn === 'function') fn(e);
+});
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-input-action]');
+  if (!el) return;
+  if (el.dataset.inputAction === 'updateBudget') updateBudget();
+});
 
 function addTypingIndicator(){return addMsg('<span style="display:flex;gap:4px;align-items:center"><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .2s infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1s ease .4s infinite"></span></span>');}
 function getRecentBotText(){const rows=[...document.querySelectorAll('#chat-messages .msg-row')].reverse();for(const row of rows){if(row.classList.contains('from-user')) continue;const bubble=row.querySelector('.bubble');const text=String(bubble?.textContent||'').trim();if(text) return text.toLowerCase();}return '';}
@@ -2685,7 +1986,7 @@ async function enrichPlacesWithTravelIntel(places, limit = 30) {
     const byName = Object.fromEntries(states.map(s => [s.name, s]));
     places.forEach(p => { if (byName[p.name]) p._ti = byName[p.name]; });
   } catch (e) {
-    console.warn('[TI enrich]', e.message || e);
+    browserLogger.warn('[TI enrich]', e.message || e);
   }
 }
 
@@ -2732,10 +2033,12 @@ async function bestTimeToVisit(query){
   const weather={tempC:realTemp, condition:realWeatherMain};
   if(place){
     try{
-      const {places}=await API.timeIntelligenceStatus([ti_placePayload(place)], weather);
-      return ti_renderState(place, places[0]);
+      const profile=await API.timeIntelligenceTemporalProfile(ti_placePayload(place), { weather, at:new Date().toISOString(), stepMin:30, horizonHours:24, personas:Array.from(document.querySelectorAll('.pref:checked')).map(c=>c.value), tripMode:window.selectedTripMode||null });
+      const top=(profile.windows||[]).slice(0,3).map(w=>`<strong>${w.start}–${w.end}</strong> (${w.score}/100, ${w.confidence}% confidence)`).join('<br>');
+      const base=`⏰ <strong>${place.name}</strong><br>Best future windows:<br>${top||'No strong window available from current data.'}`;
+      return base + (profile.bestWindow?.reasons?.length ? `<br><small>Why: ${escapeHtml(profile.bestWindow.reasons.join(' · '))}</small>` : '');
     }catch(e){
-      return `⏰ <strong>${place.name}</strong> is usually best early morning or just before sunset, avoiding the midday heat. (Live reading unavailable right now — try again in a moment.)`;
+      try{ const {places}=await API.timeIntelligenceStatus([ti_placePayload(place)], weather); return ti_renderState(place, places[0]); }catch(_e){ return `⏰ <strong>${escapeHtml(place.name)}</strong> — future timing data unavailable right now.`; }
     }
   }
   const pool=(LOCS.length?LOCS:itin).slice(0,8);
@@ -2932,11 +2235,11 @@ function renderToolsHome(){
       '<div class="tool-card" data-action="showTripTribe"><div class="tool-icon">👥</div><div class="tool-name">Trip Tribe</div><div class="tool-desc">Find travel buddies</div></div>',
       '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="ar-in2">',
         '<div class="tool-icon">🔮</div><div><div class="tool-name">AR Overlay</div><div class="tool-desc">Point at any building for history & tips</div></div>',
-        '<input type="file" id="ar-in2" accept="image/*" style="display:none" onchange="handleArOverlay(event)">',
+        '<input type="file" id="ar-in2" accept="image/*" style="display:none" data-file-action="handleArOverlay">',
       '</div>',
       '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="food-safety-in2">',
         '<div class="tool-icon">🍡</div><div><div class="tool-name">Food Safety Scanner</div><div class="tool-desc">Is it safe to eat?</div></div>',
-        '<input type="file" id="food-safety-in2" accept="image/*" style="display:none" onchange="handleFoodSafety(event)">',
+        '<input type="file" id="food-safety-in2" accept="image/*" style="display:none" data-file-action="handleFoodSafety">',
       '</div>',
     '</div>',
 
@@ -2951,22 +2254,22 @@ function renderToolsHome(){
       '<div class="tool-card" data-action="startVoiceInput"><div class="tool-icon">🎤</div><div class="tool-name">Voice AI</div><div class="tool-desc">Talk to assistant</div></div>',
       '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="caption-in2">',
         '<div class="tool-icon">📸</div><div><div class="tool-name">AI Photo Captions</div><div class="tool-desc">Instagram captions</div></div>',
-        '<input type="file" id="caption-in2" accept="image/*" style="display:none" onchange="handleCaption(event)">',
+        '<input type="file" id="caption-in2" accept="image/*" style="display:none" data-file-action="handleCaption">',
       '</div>',
       '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="translate-in2">',
         '<div class="tool-icon">🌐</div><div><div class="tool-name">Translate Sign / Menu</div><div class="tool-desc">Any language</div></div>',
-        '<input type="file" id="translate-in2" accept="image/*" style="display:none" onchange="handleTranslate(event)">',
+        '<input type="file" id="translate-in2" accept="image/*" style="display:none" data-file-action="handleTranslate">',
       '</div>',
       '<div class="tool-card" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:12px" data-action="clickFileInput" data-input-id="lens-in2">',
         '<div class="tool-icon">🔍</div><div><div class="tool-name">AI Lens</div><div class="tool-desc">Identify landmarks</div></div>',
-        '<input type="file" id="lens-in2" accept="image/*" style="display:none" onchange="handleAiLens(event)">',
+        '<input type="file" id="lens-in2" accept="image/*" style="display:none" data-file-action="handleAiLens">',
       '</div>',
     '</div>'
   ].join('');
 }
 function renderLingo(){const phrases=[{en:'How much is this?',te:'Bhaiya, kitne ka hai?'},{en:'Where is the washroom?',te:'Washroom kahan hai?'},{en:'Stop the auto here',te:'Yahan rok do'},{en:'No spicy please',te:'Mirchi kam daalna'},{en:'Yes / No',te:'Haan / Nahi'},{en:'Too expensive!',te:'Bahut mehenga hai!'}];document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🗣️ Local Lingo</div></div><div class="lingo-list">${phrases.map(p=>`<div class="lingo-card"><div><div class="lingo-en">${p.en}</div><div class="lingo-te">${p.te}</div></div><button class="lingo-speak" data-action="speak" data-text="${escapeHtml(p.te || '')}">🔊</button></div>`).join('')}</div>`;}
 function renderSafety(){const cityQuery=encodeURIComponent(`${currentCityName} hospitals`);const nearbyQuery=encodeURIComponent(cLat&&cLon?`${cLat},${cLon} hospitals`:`hospitals near ${currentCityName}`);document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🚨 Emergency Safety</div></div><div class="emergency-block"><div class="emergency-block-title">Urgent Help</div><div class="emergency-list"><a href="tel:112" class="emer-card"><div class="emer-left"><span class="emer-ico">🚓</span><span class="emer-name">National Emergency</span></div><span class="emer-num">112</span></a><a href="tel:100" class="emer-card"><div class="emer-left"><span class="emer-ico">🚓</span><span class="emer-name">Police</span></div><span class="emer-num">100</span></a><a href="tel:108" class="emer-card"><div class="emer-left"><span class="emer-ico">🚑</span><span class="emer-name">Ambulance</span></div><span class="emer-num">108</span></a><a href="tel:101" class="emer-card"><div class="emer-left"><span class="emer-ico">🚒</span><span class="emer-name">Fire</span></div><span class="emer-num">101</span></a><a href="tel:1091" class="emer-card"><div class="emer-left"><span class="emer-ico">👩</span><span class="emer-name">Women Helpline</span></div><span class="emer-num">1091</span></a></div></div><div class="emergency-block"><div class="emergency-block-title">Hospitals</div><div class="emergency-list"><a href="https://www.google.com/maps/search/?api=1&query=${nearbyQuery}" target="_blank" class="emer-card"><div class="emer-left"><span class="emer-ico">🏥</span><span class="emer-name">Nearby Hospitals</span></div><span class="emer-num">Open</span></a><a href="https://www.google.com/maps/search/?api=1&query=${cityQuery}" target="_blank" class="emer-card"><div class="emer-left"><span class="emer-ico">🩺</span><span class="emer-name">${escapeHtml(currentCityName)} Hospitals</span></div><span class="emer-num">Maps</span></a></div></div><button class="emer-share-btn" data-action="shareEmergency">📍 Share My Live Location</button>`;}
-function renderBudget(){document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">💸 Budget Splitter</div></div><div class="budget-card"><div class="budget-row"><div class="bud-field-wrap"><div class="inp-lbl">Total Budget</div><div class="bud-currency"><span class="bud-sym">₹</span><input type="number" class="bud-inp" id="bud-limit" value="5000" oninput="updateBudget()"></div></div><div class="bud-field-wrap"><div class="inp-lbl">Group Size</div><div class="bud-currency"><span style="font-size:18px">👥</span><input type="number" class="bud-inp" id="grp-sz" value="1" min="1" style="width:50px" oninput="updateBudget()"></div></div><div class="bud-field-wrap" style="text-align:right"><div class="inp-lbl">Remaining</div><div class="bud-rem" id="bud-rem">₹5000</div></div></div><div class="prog-bar"><div class="prog-fill" id="bud-bar" style="width:0%"></div></div><div class="bud-meta"><span>Spent: <strong id="bud-spent">₹0</strong></span><span style="color:var(--purple);font-weight:700">Per person: <strong id="bud-pp">₹0.00</strong></span></div></div><div class="exp-add-row"><input type="text" id="exp-name" class="inp-field" placeholder="What did you buy?"><input type="number" id="exp-cost" class="inp-field small" placeholder="₹"><button class="btn-add-exp" data-action="addExpense">+</button></div><div class="exp-list" id="exp-list"><p style="text-align:center;color:var(--text-muted);font-size:11px;padding:12px;font-style:italic">No expenses yet.</p></div><button class="btn-ai-budget" data-action="analyzeBudget">✨ AI Budget Analyzer</button>`;updateBudget();}
+function renderBudget(){document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">💸 Budget Splitter</div></div><div class="budget-card"><div class="budget-row"><div class="bud-field-wrap"><div class="inp-lbl">Total Budget</div><div class="bud-currency"><span class="bud-sym">₹</span><input type="number" class="bud-inp" id="bud-limit" value="5000" data-input-action="updateBudget"></div></div><div class="bud-field-wrap"><div class="inp-lbl">Group Size</div><div class="bud-currency"><span style="font-size:18px">👥</span><input type="number" class="bud-inp" id="grp-sz" value="1" min="1" style="width:50px" data-input-action="updateBudget"></div></div><div class="bud-field-wrap" style="text-align:right"><div class="inp-lbl">Remaining</div><div class="bud-rem" id="bud-rem">₹5000</div></div></div><div class="prog-bar"><div class="prog-fill" id="bud-bar" style="width:0%"></div></div><div class="bud-meta"><span>Spent: <strong id="bud-spent">₹0</strong></span><span style="color:var(--purple);font-weight:700">Per person: <strong id="bud-pp">₹0.00</strong></span></div></div><div class="exp-add-row"><input type="text" id="exp-name" class="inp-field" placeholder="What did you buy?"><input type="number" id="exp-cost" class="inp-field small" placeholder="₹"><button class="btn-add-exp" data-action="addExpense">+</button></div><div class="exp-list" id="exp-list"><p style="text-align:center;color:var(--text-muted);font-size:11px;padding:12px;font-style:italic">No expenses yet.</p></div><button class="btn-ai-budget" data-action="analyzeBudget">✨ AI Budget Analyzer</button>`;updateBudget();}
 function renderPassport(){const catIcon={beach:'🏖️',temple:'🛕',food:'🍛',scenic:'⛰️'};document.getElementById('tools-content').innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🛂 Passport — ${stamps.size} Stamps</div></div><p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;text-align:center">Visit places to collect stamps!</p><div class="passport-grid">${LOCS.map(loc=>{const u=stamps.has(loc.id);return`<div class="passport-stamp${u?' unlocked':''}" data-action="${u?'chatAbout':''}" data-name="${escapeHtml(loc.name)}" role="button" tabindex="${u?0:-1}" style="${!u?'opacity:0.55;filter:grayscale(1)':''}"><div class="stamp-icon">${u?catIcon[loc.cat]||'📍':'🔒'}</div><div class="stamp-name${u?' unlocked':''}">${escapeHtml(loc.name)}</div>${u?'<div class="stamp-badge">✓</div>':''}</div>`;}).join('')}</div>`;}
 
 // ── View switching ────────────────────────────────────────────────────────────
@@ -3100,7 +2403,7 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
         applyMapHeadingRotation();
         return true;
       }catch(e){
-        console.warn(`Road routing failed (mirror ${mirrorIdx}, attempt ${attempt+1}):`,e);
+        browserLogger.warn(`Road routing failed (mirror ${mirrorIdx}, attempt ${attempt+1}):`,e);
       }
     }
   }
@@ -3200,6 +2503,15 @@ function recalcTimes(opts={}){
   const kept=[];
   let dropped=0;
   for(const loc of itin){
+    if(!tripActive && loc.geoOptimized && loc.arriveAt && loc.leaveAt){
+      const startBase = getScheduleStart();
+      const arriveMin = t2m(loc.arriveAt, startMin);
+      const leaveMin = t2m(loc.leaveAt, arriveMin + Math.max(1, parseInt(loc.vt, 10) || 45));
+      const arrive = new Date(startBase); arrive.setHours(Math.floor(arriveMin/60), arriveMin%60, 0, 0);
+      const depart = new Date(startBase); depart.setHours(Math.floor(leaveMin/60), leaveMin%60, 0, 0);
+      loc.sts=fmt12(arrive); loc.std=arrive; loc.ets=fmt12(depart); loc.etd=depart;
+      kept.push(loc); t=depart; continue;
+    }
     const travel=Math.max(0,parseInt(loc.tt,10)||0);
     const visit=Math.max(0,parseInt(loc.vt,10)||0);
     const arrive=new Date(t.getTime()+travel*60000);
@@ -3282,8 +2594,13 @@ function updateItinUI(){
     }
     const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
 
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}" onerror="this.style.display='none'"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot} – ${loc.ct}</div><div class="sc-times"><span class="time-tag">${loc.sts||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    const timingWindow = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
+    const waitNote = loc.waitingMinutes ? `🧘 ${loc.waitingMinutes} min held to protect the higher-value experience window` : '';
+    const advancedMeta = [timingWindow, waitNote].filter(Boolean).join('<br>');
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
+    const failedImg = div.querySelector('.sc-img');
+    if (failedImg) failedImg.addEventListener('error', () => { failedImg.style.display = 'none'; }, { once: true });
     const nextStop=itin[i+1];
     if(nextStop && !nextStop.isBreak){const c=document.createElement('div');c.className='drive-connector';c.innerHTML=`↓ 🚗 ${fmtM(nextStop.tt)} drive`;list.appendChild(c);}
   });
@@ -3369,7 +2686,7 @@ async function locateMe(){
     map.stop();
     map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { animate: true, duration: 0.8 });
   } catch (e) {
-    console.warn('[locateMe] GPS fix unavailable:', e);
+    browserLogger.warn('[locateMe] GPS fix unavailable:', e);
     alert('Could not get your location. Please check that location access is allowed for this site and try again.');
   } finally {
     isLocating = false;
@@ -3593,7 +2910,7 @@ async function rateStop(placeId, placeName, rating, row){
   try{
     await API.submitPlaceFeedback(placeName, currentCityName, rating);
     showToast('⭐','Thanks for rating it!','Real feedback like this shapes future recommendations.',3000);
-  }catch(e){ console.error('rateStop error', e); }
+  }catch(e){ browserLogger.error('rateStop error', e); }
 }
 
 const APP_FEEDBACK_CATS = [['love_it','Loving it 😍'],['bug','Found a bug 🐛'],['feature_request','Missing something 💡'],['confusing','Confusing 🤔'],['general','Just general 💭']];
@@ -3748,9 +3065,28 @@ async function runReplanner(lateStr) {
   reoptimizeRemainingPlan(`you're running ${minutesLate} minutes late`, delayedNowMin);
 
   try {
-    const text = await API.aiReplanner(currentCityName, completed.map(s => s.name), remaining, minutesLate, now);
-    typing.remove();
-    if (text) addMsg(`🧭 <strong>Updated Plan</strong><br><br>${formatAiText(text)}`);
+    const candidates = (typeof LOCS !== 'undefined' ? LOCS : []).filter(p => !completed.some(c => c.name === p.name));
+    const wx = { tempC: typeof realTemp === 'number' ? realTemp : null, condition: realWeatherMain || null, windKph: window.realWind };
+    const geo = await API.timeIntelligenceReplan(candidates.length ? candidates : itin, {
+      weather: wx, at: new Date().toISOString(),
+      fromCoords: (Number.isFinite(cLat) && Number.isFinite(cLon)) ? [cLat, cLon] : getCityCenter(),
+      startMin: delayedNowMin, endMin: 23 * 60, maxStops: Math.min(8, Math.max(3, remaining.length || 5)),
+      personas: Array.from(document.querySelectorAll('.pref:checked')).map(c => c.value),
+      tripMode: window.selectedTripMode || null, trigger: 'delay',
+      reason: `User is running ${minutesLate} minutes late`, region: currentCityName || null,
+    });
+    if (geo?.stops?.length) {
+      mdPlan[dayIdx] = geo.stops.map(stop => ({ ...stop, id: stop.id || stop.name, cat: stop.category || 'default', vt: stop.stayMinutes || 45, tt: stop.travelMinutes || 0, slotLabel: dayPartForMinutes(t2m(stop.arriveAt)), temporalScore: stop.timingFit }));
+      itin = mdPlan[dayIdx];
+      renderTabs();
+      switchDay(dayIdx, true);
+      typing.remove();
+      addMsg(`🧭 <strong>GeoAI itinerary updated</strong><br>Replanned from your current position using projected arrival time, weather, crowd, traffic, scenic windows and opening constraints.`);
+    } else {
+      const text = await API.aiReplanner(currentCityName, completed.map(s => s.name), remaining, minutesLate, now);
+      typing.remove();
+      if (text) addMsg(`🧭 <strong>Updated Plan</strong><br><br>${formatAiText(text)}`);
+    }
   } catch { typing.remove(); addMsg('⚠️ Could not generate reroute. Try again!'); }
 }
 
@@ -3868,7 +3204,7 @@ function renderAiToolsGrid() {
     // Row 1 — compact 3-col
     '<div class="ai-card ai-accent-gold" data-action="prepGuide"><div class="ai-card-icon">🎒</div><div class="ai-card-label">Prep Guide</div></div>',
     '<div class="ai-card ai-accent-teal" data-action="postcard"><div class="ai-card-icon">📸</div><div class="ai-card-label">Postcard</div></div>',
-    '<label class="ai-card ai-accent-ocean"><div class="ai-card-icon">🔍</div><div class="ai-card-label">AI Lens</div><input type="file" id="lens-in" accept="image/*" style="display:none" onchange="handleAiLens(event)"></label>',
+    '<label class="ai-card ai-accent-ocean"><div class="ai-card-icon">🔍</div><div class="ai-card-label">AI Lens</div><input type="file" id="lens-in" accept="image/*" style="display:none" data-file-action="handleAiLens"></label>',
     // Row 2
     '<div class="ai-card ai-accent-purple" data-action="getInstaSpots"><div class="ai-card-icon">📷</div><div class="ai-card-label">Insta Spots</div></div>',
     '<div class="ai-card ai-accent-jade" data-action="showTripRating"><div class="ai-card-icon">⭐</div><div class="ai-card-label">Rate Trip</div></div>',
@@ -3878,14 +3214,14 @@ function renderAiToolsGrid() {
     '<div class="ai-card ai-card-wide ai-accent-teal" data-action="showWeatherAlerts"><div class="ai-card-icon">🌦️</div><div class="ai-card-label">Weather Alerts — Per stop forecast</div></div>',
     '<div class="ai-card ai-card-wide ai-accent-ocean" data-action="generateTripPDF"><div class="ai-card-icon">📄</div><div class="ai-card-label">Download Trip PDF — Full summary</div></div>',
     '<div class="ai-card ai-card-wide ai-accent-purple" data-action="setupNotifications"><div class="ai-card-icon">🔔</div><div class="ai-card-label">Closing Time Alerts — Get reminders</div></div>',
-    '<label class="ai-card ai-card-wide ai-accent-jade"><div class="ai-card-icon">📸</div><div class="ai-card-label">AI Photo Captions — Instagram ready</div><input type="file" id="caption-in" accept="image/*" style="display:none" onchange="handleCaption(event)"></label>',
-    '<label class="ai-card ai-card-wide ai-accent-rose"><div class="ai-card-icon">🌐</div><div class="ai-card-label">Translate Sign / Menu — Any language</div><input type="file" id="translate-in" accept="image/*" style="display:none" onchange="handleTranslate(event)"></label>',
+    '<label class="ai-card ai-card-wide ai-accent-jade"><div class="ai-card-icon">📸</div><div class="ai-card-label">AI Photo Captions — Instagram ready</div><input type="file" id="caption-in" accept="image/*" style="display:none" data-file-action="handleCaption"></label>',
+    '<label class="ai-card ai-card-wide ai-accent-rose"><div class="ai-card-icon">🌐</div><div class="ai-card-label">Translate Sign / Menu — Any language</div><input type="file" id="translate-in" accept="image/*" style="display:none" data-file-action="handleTranslate"></label>',
     // ── 8 NEW EXCLUSIVE FEATURES ──
     '<div class="ai-card ai-card-wide" style="border-color:rgba(255,165,0,.3);background:rgba(255,165,0,.05)" data-action="showFestivalRadar"><div class="ai-card-icon">🎪</div><div class="ai-card-label" style="color:var(--text-primary)">Festival & Event Radar — What\'s happening TODAY</div></div>',
     '<div class="ai-card ai-card-wide" style="border-color:rgba(100,220,100,.3);background:rgba(100,220,100,.05)" data-action="showHiddenGems"><div class="ai-card-icon">💎</div><div class="ai-card-label" style="color:var(--text-primary)">Hidden Gem Detector — Secret local spots</div></div>',
-    '<label class="ai-card ai-card-wide" style="border-color:rgba(150,100,255,.3);background:rgba(150,100,255,.05)"><div class="ai-card-icon">🔮</div><div class="ai-card-label" style="color:var(--text-primary)">AR Overlay — Point at any building</div><input type="file" id="ar-in" accept="image/*" style="display:none" onchange="handleArOverlay(event)"></label>',
+    '<label class="ai-card ai-card-wide" style="border-color:rgba(150,100,255,.3);background:rgba(150,100,255,.05)"><div class="ai-card-icon">🔮</div><div class="ai-card-label" style="color:var(--text-primary)">AR Overlay — Point at any building</div><input type="file" id="ar-in" accept="image/*" style="display:none" data-file-action="handleArOverlay"></label>',
     '<div class="ai-card ai-card-wide" style="border-color:rgba(255,80,80,.3);background:rgba(255,80,80,.05)" data-action="showHartaalAlert"><div class="ai-card-icon">⚡</div><div class="ai-card-label" style="color:var(--text-primary)">Power & Strike Alert — Safe to travel today?</div></div>',
-    '<label class="ai-card ai-card-wide" style="border-color:rgba(255,200,50,.3);background:rgba(255,200,50,.05)"><div class="ai-card-icon">🍡</div><div class="ai-card-label" style="color:var(--text-primary)">Street Food Safety Scanner — Is it safe to eat?</div><input type="file" id="food-safety-in" accept="image/*" style="display:none" onchange="handleFoodSafety(event)"></label>',
+    '<label class="ai-card ai-card-wide" style="border-color:rgba(255,200,50,.3);background:rgba(255,200,50,.05)"><div class="ai-card-icon">🍡</div><div class="ai-card-label" style="color:var(--text-primary)">Street Food Safety Scanner — Is it safe to eat?</div><input type="file" id="food-safety-in" accept="image/*" style="display:none" data-file-action="handleFoodSafety"></label>',
     '<div class="ai-card ai-card-wide" style="border-color:rgba(0,180,255,.3);background:rgba(0,180,255,.05)" data-action="showCrowdPredictor"><div class="ai-card-icon">🧠</div><div class="ai-card-label" style="color:var(--text-primary)">Crowd Predictor — Best time to visit</div></div>',
     '<div class="ai-card ai-card-wide" style="border-color:rgba(50,200,150,.3);background:rgba(50,200,150,.05)" data-action="showFareNegotiator"><div class="ai-card-icon">💸</div><div class="ai-card-label" style="color:var(--text-primary)">Auto Fare Negotiator — Exact price + script</div></div>',
     '<div class="ai-card ai-card-wide" style="border-color:rgba(200,100,255,.3);background:rgba(200,100,255,.05)" data-action="showTripTribe"><div class="ai-card-icon">👥</div><div class="ai-card-label" style="color:var(--text-primary)">Trip Tribe — Find travel buddies</div></div>',
@@ -4113,7 +3449,7 @@ async function openCustomizeModal() {
     try {
       await ensureCityPlaces(city, 35);
     } catch (e) {
-      console.error('Failed to load places for customize modal:', e);
+      browserLogger.error('Failed to load places for customize modal:', e);
     }
     loadTyping.remove();
   }
@@ -4272,7 +3608,7 @@ window.onload=()=>{
         tileErrorCount++;
         if(tileErrorCount > TILE_ERROR_THRESHOLD && tileSourceIdx < TILE_SOURCES.length - 1){
           switchTileLayer(tileSourceIdx + 1);
-          console.warn('[map] Primary tile source struggling, switched to fallback basemap.');
+          browserLogger.warn('[map] Primary tile source struggling, switched to fallback basemap.');
         }
       });
     }
@@ -4319,7 +3655,7 @@ window.onload=()=>{
         // Visible in the browser console so a misconfigured deployment
         // (e.g. only MAPTILER_KEY set, not _2/_3/_4) is obvious at a glance
         // instead of looking like a broken failover.
-        console.info(`[map] MapTiler: ${keys.length} key(s) configured server-side, ${working.length} passed the pre-flight probe. Using ${usableKeys.length} in fallback chain.`);
+        browserLogger.info(`[map] MapTiler: ${keys.length} key(s) configured server-side, ${working.length} passed the pre-flight probe. Using ${usableKeys.length} in fallback chain.`);
         // Unshift in reverse so the final TILE_SOURCES order is
         // key1, key2, key3, key4, then the existing CARTO/OSM fallbacks.
         for(let i = usableKeys.length - 1; i >= 0; i--){
@@ -4330,7 +3666,7 @@ window.onload=()=>{
         }
         if(tileSourceIdx===0) switchTileLayer(0);
       }
-    }).catch(e=>console.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
+    }).catch(e=>browserLogger.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
     // Leaflet computes its tile grid from the container's size at creation
     // time. If #map-view is still display:none (its default state on load),
     // the container has zero width/height and the map renders as gray/blank
@@ -4352,7 +3688,7 @@ window.onload=()=>{
     // failed (CSP block, network issue, CDN outage). Contain the damage
     // here instead of letting it kill the rest of startup: GPS, city
     // detection, chat, and the planner below all still need to run.
-    console.error('[map] Failed to initialize — map will be unavailable this session:', mapInitErr);
+    browserLogger.error('[map] Failed to initialize — map will be unavailable this session:', mapInitErr);
     map = null;
     const mapEl = document.getElementById('map');
     if(mapEl){
@@ -4436,4 +3772,4 @@ window.onload=()=>{
 };
 
 // Ensure chat widget actions are bound after all handler declarations.
-try { registerChatActions(); } catch (_e) { console.warn('[feedback] registerChatActions failed', _e); }
+try { registerChatActions(); } catch (_e) { browserLogger.warn('[feedback] registerChatActions failed', _e); }

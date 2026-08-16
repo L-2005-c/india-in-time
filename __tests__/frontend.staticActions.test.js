@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
-const INDEX_HTML_PATH = path.join(__dirname, '../frontend/public/index.html');
-const APP_JS_PATH = path.join(__dirname, '../frontend/public/app.js');
+const INDEX_HTML_PATH = path.join(__dirname, '../frontend/app-src/index.html');
+const APP_JS_PATH = path.join(__dirname, '../frontend/app-src/src/core/app.js');
 const ADMIN_HTML_PATH = path.join(__dirname, '../frontend/public/admin-feedback.html');
 
 const indexHtml = fs.readFileSync(INDEX_HTML_PATH, 'utf8');
@@ -201,7 +201,7 @@ describe('app.js dispatch pattern — behavioral verification via jsdom', () => 
       signInWithGoogle: (btn) => calls.push(['signInWithGoogle', btn]),
     };
 
-    // Verbatim copy of the pattern in frontend/public/app.js
+    // Verbatim copy of the delegation pattern in the canonical Vite frontend
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;

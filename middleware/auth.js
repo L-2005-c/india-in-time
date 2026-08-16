@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // middleware/auth.js — Firebase ID token verification
 //
 // Your frontend already signs users in with Firebase Google Auth, but the
@@ -34,7 +36,7 @@ function ensureInitialized() {
       'FIREBASE_SERVICE_ACCOUNT env var is not set — auth-protected routes will reject all requests. ' +
       'See middleware/auth.js header comment for setup steps.'
     );
-    console.error('❌ ', initError.message);
+    appLogger.error('❌ ', initError.message);
     return;
   }
 
@@ -49,10 +51,10 @@ function ensureInitialized() {
       credential: admin.credential.cert(serviceAccount),
     });
     initialized = true;
-    console.log('🔐  Firebase Admin initialized — auth verification is active');
+    appLogger.info('🔐  Firebase Admin initialized — auth verification is active');
   } catch (err) {
     initError = err;
-    console.error('❌  Failed to initialize Firebase Admin:', err.message);
+    appLogger.error('❌  Failed to initialize Firebase Admin:', err.message);
   }
 }
 
@@ -82,7 +84,7 @@ async function requireAuth(req, res, next) {
     req.userEmail = decoded.email || null;
     next();
   } catch (err) {
-    console.warn('[auth] token verification failed:', err.message);
+    appLogger.warn('[auth] token verification failed:', err.message);
     return res.status(401).json({ error: 'Invalid or expired session — please sign in again.', code: 'AUTH_INVALID' });
   }
 }
@@ -109,7 +111,7 @@ async function optionalAuth(req, res, next) {
     req.uid = decoded.uid;
     req.userEmail = decoded.email || null;
   } catch (err) {
-    console.warn('[auth] optional token verification failed (continuing as anonymous):', err.message);
+    appLogger.warn('[auth] optional token verification failed (continuing as anonymous):', err.message);
   }
   next();
 }

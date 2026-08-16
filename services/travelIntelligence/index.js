@@ -4,7 +4,7 @@ const { t2m, m2t, getISTParts, getSeason, computeSunTimes, getDaypart, computeGo
 const { getOpeningStatus, categoryRules } = require('./openingHoursEngine');
 const { computeCrowd, predictCrowdLegacy } = require('./crowdEngine');
 const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier } = require('./trafficEngine');
-const { computeWeatherIntelligence } = require('./weatherEngine');
+const { computeWeatherIntelligence, buildWeatherExperienceWindows } = require('./weatherEngine');
 const { computeScenic } = require('./scenicEngine');
 const { computeVisitScore, computeTimeScore, openingToScore, trafficToScore, computePreferenceScore } = require('./scoringEngine');
 const { computeConfidence } = require('./confidenceEngine');
@@ -12,6 +12,7 @@ const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
 const itineraryEngine = require('./itineraryEngine');
 const festivalEngine = require('./festivalEngine');
 const historicalCrowdStore = require('./historicalCrowdStore');
+const { generateExperienceWindows } = require('./experienceWindows');
 
 function getTravelIntelligence(place, now = new Date(), weather = null, options = {}) {
   // Attach historical crowd hints when not already provided on the place object
@@ -38,7 +39,8 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   const opening = getOpeningStatus(place, now, sun);
   const crowd = computeCrowd({ daypart, isWeekend, isPeakHourNow, cat, month: ist.month, publicHoliday: !!options.publicHoliday, weather, historicalObservations: place.historicalCrowd || null, date: now, region: options.region || place.region || place.city || null });
   const weatherIntel = computeWeatherIntelligence(weather, place, daypart);
-  const scenic = computeScenic(place, { nowMin, sun, golden, weatherIntel });
+  const weatherWindows = buildWeatherExperienceWindows(weather, place);
+  const scenic = computeScenic(place, { nowMin, sun, golden, weatherIntel, now });
   let traffic = null;
   if (options.fromCoords || options.liveTraffic) {
     traffic = estimateTravel({ fromCoords: options.fromCoords, toCoords: place.coords, departMin: nowMin, liveTraffic: options.liveTraffic || null, isFirstStop: !!options.isFirstStop });
@@ -84,6 +86,34 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   if (weather && weather.windKph != null && weather.windKph >= 30 && (cat === 'beach' || cat === 'scenic' || place.is_sunset_spot)) badges.push('💨 Strong Wind');
   if (isBestTimeNow && opening.isOpenNow) badges.push('✨ Best Time Now');
   if (scored.visitScore >= 85) badges.push('⭐ Top Recommendation');
+  const experienceWindows = options.disableExperienceWindows ? { windows: [], source: 'suppressed' } : generateExperienceWindows({
+    referenceDate: now,
+    referenceStartMin: nowMin,
+    currentMin: nowMin,
+    startMin: Math.max(6 * 60, nowMin - 2 * 60),
+    endMin: Math.min(22 * 60, nowMin + 8 * 60),
+    stepMin: 60,
+    weatherResolver: (at) => {
+      const hourly = Array.isArray(weather?.hourly) ? weather.hourly : [];
+      if (!hourly.length) return null;
+      const target = at.getTime();
+      let best = null;
+      let bestDelta = Infinity;
+      for (const item of hourly) {
+        const t = new Date(item.time || item.timestamp || item.datetime || NaN);
+        const delta = Math.abs(t.getTime() - target);
+        if (!Number.isNaN(t.getTime()) && delta < bestDelta) {
+          best = item;
+          bestDelta = delta;
+        }
+      }
+      return bestDelta <= 90 * 60 * 1000 ? best : null;
+    },
+    evaluate: (at, forecastWeather) => getTravelIntelligence(place, at, forecastWeather || null, {
+      ...options,
+      disableExperienceWindows: true,
+    }),
+  });
   const notifications = [];
   if (opening.isOpenNow && opening.minutesToClose != null && opening.minutesToClose <= 60) notifications.push(`This attraction closes in ${opening.minutesToClose} minutes.`);
   if (place.is_sunset_spot && nowMin < sun.sunsetMin && sun.sunsetMin - nowMin <= 30) notifications.push(`Golden hour starts in ${sun.sunsetMin - nowMin} minutes.`);
@@ -110,9 +140,26 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
     sunrise: sun.sunrise, sunset: sun.sunset, daypart, isBestTimeNow, isPeakHourNow, goldenHours: golden, inGoldenHour: ghState,
     season, bestSeason, seasonalNote, nightAvailable: opening.nightAvailable, weeklyHoliday: opening.weeklyHoliday,
     crowdLevel: crowd.level, crowd: { level: crowd.level, score: crowd.crowdScore, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
-    weather: weatherIntel, traffic, scenic, arrival, preferenceScore, confidence, explanation, recommendations,
-    weatherWarnings: weatherIntel.warnings || [], badges, notifications,
-    dataQuality: { opening: opening.dataQuality, crowd: crowd.source, weather: weatherIntel.source, traffic: traffic?.source || 'unavailable', scenic: 'rule-based' },
+    weather: { ...weatherIntel, experienceWindows: weatherWindows }, traffic, scenic, arrival, preferenceScore, confidence, explanation, recommendations,
+    weatherWarnings: weatherIntel.warnings || [], badges, notifications, experienceWindows,
+    dataQuality: {
+      opening: opening.dataQuality,
+      crowd: crowd.source,
+      weather: weatherIntel.source,
+      traffic: traffic?.source || 'unavailable',
+      scenic: 'rule-based',
+      dataFreshness: {
+        computedAt: now.toISOString(),
+        weather: weatherIntel.source === 'forecast' ? 'forecast' : weatherIntel.source,
+        traffic: traffic?.freshness || (traffic?.source === 'live_traffic' ? 'request_time' : traffic?.source || 'unavailable'),
+      },
+    },
+    dataSources: {
+      crowd: crowd.source,
+      weather: weatherIntel.source,
+      traffic: traffic?.provider || traffic?.source || 'unavailable',
+      scenic: 'astronomical_rules',
+    },
     computedAt: now.toISOString(),
   };
 }

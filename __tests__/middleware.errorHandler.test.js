@@ -15,9 +15,9 @@ describe('errorHandler (production mode)', () => {
   beforeEach(() => {
     jest.resetModules();
     process.env.NODE_ENV = 'production';
-    process.env.GEMINI_API_KEY = 'test-key'; // avoid process.exit(1) in config's requireEnv
-    process.env.CORS_ORIGIN = 'https://example.com'; // avoid process.exit(1) in config's CORS guard
-    // avoid process.exit(1) in config's production Firebase guard — a valid-shaped
+    process.env.GEMINI_API_KEY = 'test-key'; // avoid production configuration validation failure in config's requireEnv
+    process.env.CORS_ORIGIN = 'https://example.com'; // avoid production configuration validation failure in config's CORS guard
+    // avoid production configuration validation failure in config's production Firebase guard — a valid-shaped
     // (but fake) service account is enough since nothing here actually initializes
     // firebase-admin against it.
     process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({
@@ -141,7 +141,7 @@ describe('errorHandler — optional error-reporting webhook', () => {
     process.env.NODE_ENV = 'production';
     process.env.GEMINI_API_KEY = 'test-key';
     process.env.CORS_ORIGIN = 'https://example.com';
-    // avoid process.exit(1) in config's production Firebase guard — see the
+    // avoid production configuration validation failure in config's production Firebase guard — see the
     // matching comment in the 'errorHandler (production mode)' describe block above.
     process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({
       project_id: 'test-project',

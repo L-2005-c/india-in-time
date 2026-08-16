@@ -22,6 +22,15 @@ jest.mock('../services/gemini', () => ({
   getStats: jest.fn(() => ({ total: 5, success: 4, circuitState: 'CLOSED' })),
 }));
 
+jest.mock('../middleware/auth', () => ({
+  verifyToken: jest.fn(async () => ({
+    uid: 'admin-uid',
+    email: 'admin@example.com',
+    admin: true,
+    role: 'admin',
+  })),
+}));
+
 const express = require('express');
 const request = require('supertest');
 const { router: analyticsRouter, analyticsMiddleware } = require('../routes/analytics');
@@ -38,27 +47,24 @@ function buildApp() {
 let app;
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
   getApiUsageSummary.mockResolvedValue({ totalRequests: 42 });
   app = buildApp();
 });
+afterEach(() => {
+  delete process.env.FIREBASE_SERVICE_ACCOUNT;
+});
 
 describe('GET /api/analytics/summary — admin-gated', () => {
-  const ORIGINAL_KEY = process.env.ADMIN_FEEDBACK_KEY;
-  afterEach(() => {
-    if (ORIGINAL_KEY === undefined) delete process.env.ADMIN_FEEDBACK_KEY;
-    else process.env.ADMIN_FEEDBACK_KEY = ORIGINAL_KEY;
-  });
 
   test('rejects an unauthenticated request (regression: this endpoint used to be fully public)', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-key';
-    const res = await request(app).get('/api/analytics/summary');
+        const res = await request(app).get('/api/analytics/summary');
     expect(res.status).toBe(401);
     expect(res.body.server).toBeUndefined();
   });
 
   test('returns server/cache/gemini/usage stats with a valid admin key', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-key';
-    const res = await request(app).get('/api/analytics/summary').set('x-admin-key', 'test-key');
+        const res = await request(app).get('/api/analytics/summary').set('Authorization', 'Bearer test-admin-token');
     expect(res.status).toBe(200);
     expect(res.body.apiUsage).toEqual({ totalRequests: 42 });
     expect(res.body.caches.places).toEqual({ size: 3, hits: 10, misses: 2 });
@@ -67,14 +73,12 @@ describe('GET /api/analytics/summary — admin-gated', () => {
   });
 
   test('caps the ?hours= param at 168 (7 days) even if a larger value is requested', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-key';
-    await request(app).get('/api/analytics/summary?hours=99999').set('x-admin-key', 'test-key');
+        await request(app).get('/api/analytics/summary?hours=99999').set('Authorization', 'Bearer test-admin-token');
     expect(getApiUsageSummary).toHaveBeenCalledWith(168);
   });
 
   test('defaults to 24 hours when ?hours= is not provided', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-key';
-    await request(app).get('/api/analytics/summary').set('x-admin-key', 'test-key');
+        await request(app).get('/api/analytics/summary').set('Authorization', 'Bearer test-admin-token');
     expect(getApiUsageSummary).toHaveBeenCalledWith(24);
   });
 });
@@ -90,10 +94,8 @@ describe('analyticsMiddleware', () => {
   });
 
   test('does NOT log requests to /api/analytics itself (would otherwise log-loop)', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-key';
-    await request(app).get('/api/analytics/summary').set('x-admin-key', 'test-key');
+        await request(app).get('/api/analytics/summary').set('Authorization', 'Bearer test-admin-token');
     await new Promise(r => setImmediate(r));
     expect(logApiUsage).not.toHaveBeenCalled();
-    delete process.env.ADMIN_FEEDBACK_KEY;
   });
 });

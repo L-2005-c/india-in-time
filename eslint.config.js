@@ -62,6 +62,28 @@ module.exports = [
         URL: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
+        navigator: 'readonly',
+        alert: 'readonly',
+        FileReader: 'readonly',
+        CSS: 'readonly',
+        ResizeObserver: 'readonly',
+        L: 'readonly', // Leaflet, loaded globally via <script> tag in index.html
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearTimeout: 'readonly',
+        clearInterval: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
+        performance: 'readonly',
+        Notification: 'readonly',
+        SpeechSynthesisUtterance: 'readonly',
+        // Never assigned anywhere in this codebase (old or new frontend) —
+        // read defensively via `typeof realSunsetMin === 'number'` as a
+        // placeholder for a "real" sunset time that could one day be
+        // supplied by a weather/astronomy integration. Always falls back
+        // to the hardcoded approximate sunset time today; harmless but
+        // pre-existing (not introduced by the app-src migration).
+        realSunsetMin: 'readonly',
       },
     },
     rules: {

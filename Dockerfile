@@ -41,7 +41,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Minified, content-hashed frontend bundle — overwrites the empty/absent
 # frontend/public/dist/ from the plain `COPY . .` above with the real build
-# output. Source frontend/public/index.html itself is never modified by the
+# output. The source frontend under frontend/app-src is never modified by the
 # build (see scripts/build-frontend.js), so this is purely additive.
 COPY --from=frontend-build /app/frontend/public/dist ./frontend/public/dist
 

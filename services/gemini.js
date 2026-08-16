@@ -23,7 +23,7 @@ const stats = { total: 0, success: 0, failure: 0, cached: 0, retries: 0, circuit
 
 function hashPrompt(parts) {
   const serialised = JSON.stringify(parts);
-  return crypto.createHash('md5').update(serialised).digest('hex');
+  return crypto.createHash('sha256').update(serialised).digest('hex');
 }
 
 function sleep(ms) {

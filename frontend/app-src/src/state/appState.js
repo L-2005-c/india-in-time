@@ -1,7 +1,7 @@
 /**
  * Shared app state — single source of truth for mutable UI/session data.
- * core/app.js still owns most logic; this module centralizes the variables
- * that were previously bare module-level `let`s so further extraction
+ * The remaining core orchestration still has legacy logic; this module is the
+ * single source of truth for shared mutable UI/session state so further extraction
  * (chat, budget, nav, street-quest) can import state instead of closing over
  * a 5k-line file.
  *

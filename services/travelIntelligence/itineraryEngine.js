@@ -49,14 +49,16 @@ function buildDayPlan(places, opts = {}) {
   let cursor = Number.isFinite(opts.startMin) ? opts.startMin : Math.max(ist.minutesOfDay, 8 * 60);
   const endMin = Number.isFinite(opts.endMin) ? opts.endMin : 21 * 60;
 
-  // Score every place at "now" for ranking priority
   const getTI = opts.getTravelIntelligence;
   if (typeof getTI !== 'function') {
     throw new Error('itineraryEngine.buildDayPlan requires opts.getTravelIntelligence');
   }
+  // Initial score is used only as a candidate-priority hint. The actual
+  // selection is re-scored at each projected arrival time below.
   const scored = (places || []).map((p) => {
     const intel = getTI(p, now, weather, {
       fromCoords: origin, personas, tripMode,
+      disableExperienceWindows: true,
     });
     return { place: p, intel, score: intel.visitScore };
   });
@@ -96,33 +98,55 @@ function buildDayPlan(places, opts = {}) {
       const openAtCursor = overnight ? (cursor >= ot || cursor < ct) : (cursor >= ot && cursor < ct);
       if (!openAtCursor && item.intel.opening?.dataQuality === 'provided') continue;
 
-      let boost = priorityBoost(item, cursor);
-      // Prefer nearby places to reduce travel
+      // Evaluate the candidate at the projected arrival time, not merely at `now`.
+      let previewTravel = { travelMinutes: plan.length === 0 ? 10 : 20, source: 'estimated', trafficLevel: 'Unknown' };
+      if (prevCoords && item.place.coords) {
+        previewTravel = estimateTravel({
+          fromCoords: prevCoords,
+          toCoords: item.place.coords,
+          departMin: cursor,
+          isFirstStop: plan.length === 0,
+        });
+      }
+      const projectedArrivalMin = cursor + (previewTravel.travelMinutes || 15);
+      const projectedDate = new Date(now.getTime() + ((projectedArrivalMin - ist.minutesOfDay) * 60 * 1000));
+      const arrivalIntel = getTI(item.place, projectedDate, weather, {
+        fromCoords: prevCoords,
+        personas,
+        tripMode,
+        isFirstStop: plan.length === 0,
+        disableExperienceWindows: true,
+      });
+
+      let boost = arrivalIntel.visitScore;
+      const p = item.place;
+      if (p.is_sunrise_spot && projectedArrivalMin < 9 * 60) boost += 15;
+      if (p.is_sunset_spot && projectedArrivalMin >= 16 * 60 && projectedArrivalMin <= 19 * 60) boost += 15;
+      if (p.cat === 'food') {
+        const slot = mealSlot(projectedArrivalMin);
+        if (slot) boost += 20;
+        else boost -= 10;
+      }
+      if (arrivalIntel.isOpenNow === false) boost -= 80;
+      if (arrivalIntel.opening?.status === 'CLOSED') boost -= 100;
       if (prevCoords && item.place.coords) {
         const km = distKm(prevCoords[0], prevCoords[1], item.place.coords[0], item.place.coords[1]);
-        if (km > 25) continue; // skip unrealistic jumps without explicit long-day mode
+        if (km > 25) continue;
         if (km < 3) boost += 5;
         else if (km > 12) boost -= 8;
       }
       if (boost > bestBoost) {
         bestBoost = boost;
-        best = item;
+        best = { ...item, intel: arrivalIntel, projectedArrivalMin, previewTravel };
       }
     }
     if (!best) break;
 
-    // Travel time from previous
-    let travel = { travelMinutes: plan.length === 0 ? 10 : 20, source: 'estimated', trafficLevel: 'Unknown' };
-    if (prevCoords && best.place.coords) {
-      travel = estimateTravel({
-        fromCoords: prevCoords,
-        toCoords: best.place.coords,
-        departMin: cursor,
-        isFirstStop: plan.length === 0,
-      });
-    }
+    // Use the same travel estimate used for projected-arrival scoring so
+    // selection and emitted itinerary timings cannot diverge.
+    const travel = best.previewTravel || { travelMinutes: plan.length === 0 ? 10 : 20, source: 'estimated', trafficLevel: 'Unknown' };
     const departMin = cursor;
-    const arriveMin = cursor + (travel.travelMinutes || 15);
+    const arriveMin = best.projectedArrivalMin || (cursor + (travel.travelMinutes || 15));
     const stay = visitDurationMin(best.place);
     const leaveMin = arriveMin + stay;
 
@@ -137,10 +161,6 @@ function buildDayPlan(places, opts = {}) {
       break;
     }
 
-    // Recompute intel around arrival for fresher signals
-    // arrival intel uses batch score at plan start
-    // Approximate: set hours/minutes in IST terms via offset from midnight is hard;
-    // use the batch intel already computed at `now` for scoring consistency.
     const stopIntel = best.intel;
 
     plan.push({
@@ -156,6 +176,7 @@ function buildDayPlan(places, opts = {}) {
       trafficLevel: travel.trafficLevel,
       distanceKm: travel.distanceKm,
       visitScore: stopIntel.visitScore,
+      scoringReference: 'projected_arrival',
       visitLabel: stopIntel.visitLabel,
       crowdLevel: stopIntel.crowdLevel,
       statusLabel: stopIntel.statusLabel,
@@ -196,7 +217,7 @@ function buildDayPlan(places, opts = {}) {
     alternatives,
     warnings,
     bufferMin,
-    optimizer: refined.length >= 3 ? '2-opt' : 'greedy',
+    optimizer: refined.length >= 3 ? 'projected-arrival + 2-opt' : 'projected-arrival greedy',
     summary: refined.length
       ? `${refined.length}-stop day plan from ${refined[0].departAt} to ${refined[refined.length - 1].leaveAt}`
       : 'No feasible stops for the selected window',

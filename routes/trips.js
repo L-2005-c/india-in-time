@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // routes/trips.js — Save, load, share trips API
 // POST /api/trips       — Save trip                         (auth required)
 // GET  /api/trips       — List MY trips                      (auth required)
@@ -34,7 +36,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     res.status(201).json({ id, message: 'Trip saved successfully' });
   } catch (err) {
-    console.error('[trips:save]', err.message);
+    appLogger.error('[trips:save]', err.message);
     res.status(500).json({ error: 'Failed to save trip' });
   }
 });
@@ -56,7 +58,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     res.json({ trips: formatted, count: formatted.length });
   } catch (err) {
-    console.error('[trips:list]', err.message);
+    appLogger.error('[trips:list]', err.message);
     res.status(500).json({ error: 'Failed to list trips' });
   }
 });
@@ -81,7 +83,7 @@ router.get('/shared/:token', async (req, res) => {
       // only ever reveal the trip content, not other internal identifiers.
     });
   } catch (err) {
-    console.error('[trips:shared]', err.message);
+    appLogger.error('[trips:shared]', err.message);
     res.status(500).json({ error: 'Failed to load shared trip' });
   }
 });
@@ -111,7 +113,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       createdAt: trip.created_at,
     });
   } catch (err) {
-    console.error('[trips:get]', err.message);
+    appLogger.error('[trips:get]', err.message);
     res.status(500).json({ error: 'Failed to load trip' });
   }
 });
@@ -126,7 +128,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     res.json({ message: 'Trip deleted' });
   } catch (err) {
-    console.error('[trips:delete]', err.message);
+    appLogger.error('[trips:delete]', err.message);
     res.status(500).json({ error: 'Failed to delete trip' });
   }
 });
@@ -150,7 +152,7 @@ router.post('/:id/share', requireAuth, async (req, res) => {
 
     res.json({ shareToken: token, shareUrl: `/api/trips/shared/${token}` });
   } catch (err) {
-    console.error('[trips:share]', err.message);
+    appLogger.error('[trips:share]', err.message);
     res.status(500).json({ error: 'Failed to generate share link' });
   }
 });

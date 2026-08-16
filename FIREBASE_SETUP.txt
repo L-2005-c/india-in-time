@@ -85,8 +85,9 @@ those endpoints will respond with 503 "AUTH_NOT_CONFIGURED".
      Key:   FIREBASE_SERVICE_ACCOUNT
      Value: paste the entire JSON contents
 6. Also set (in the same Environment tab, if not already there):
-     ADMIN_FEEDBACK_KEY = <make up a long random string — this protects the
-                            /admin-feedback.html dashboard and /api/analytics>
+     Admin access: grant the Firebase custom claim { admin: true } to the
+     authorized account. Shared admin-key credentials are not used by
+     deployed admin endpoints.
      CORS_ORIGIN        = https://your-app-name.onrender.com  (your real URL —
                             leaving this unset allows requests from any site)
 7. Save → Render will redeploy automatically. Check the deploy logs for:

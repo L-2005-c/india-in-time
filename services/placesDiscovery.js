@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // services/placesDiscovery.js
 // All external-source discovery for places: Gemini (AI place names),
 // Wikipedia geosearch, and Nominatim (geocoding + fallback search).
@@ -52,7 +54,7 @@ async function callGemini(prompt) {
       }
     }
   });
-  console.log('[places] Response length:', (text||'').length, '| First 200:', (text||'').slice(0,200));
+  appLogger.info('[places] Response length:', (text||'').length, '| First 200:', (text||'').slice(0,200));
   return text || '';
 }
 
@@ -122,11 +124,11 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   }
 
   if (!parsed || !Array.isArray(parsed.places)) {
-    console.error('[places] Parse failed. Raw:', raw.slice(0,500));
+    appLogger.error('[places] Parse failed. Raw:', raw.slice(0,500));
     return [];
   }
 
-  console.log('[places] Parsed', parsed.places.length, 'places');
+  appLogger.info('[places] Parsed', parsed.places.length, 'places');
 
   return parsed.places.map((p, i) => {
     const rawCat = String(p.category || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
@@ -232,7 +234,7 @@ async function geocodePlaceViaNominatimOnly(placeName, cityName, cityLat, cityLo
   // If the best match is too far from the city, likely wrong entity.
   if (!best) return null;
   const maxDistKm = category === 'food' ? 15 : 40;
-  if (best.distKm > maxDistKm) { console.warn(`[geocode] "${placeName}" rejected — ${best.distKm.toFixed(1)}km from city (limit ${maxDistKm}km)`); return null; }
+  if (best.distKm > maxDistKm) { appLogger.warn(`[geocode] "${placeName}" rejected — ${best.distKm.toFixed(1)}km from city (limit ${maxDistKm}km)`); return null; }
   return { lat: best.lat, lon: best.lon };
 }
 
@@ -335,7 +337,7 @@ async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
     if (i + CONCURRENCY < unique.length) await new Promise(r => setTimeout(r, 1100));
   }
 
-  console.log(`[places] Nominatim geocoded ${fixed}/${unique.length} AI places`);
+  appLogger.info(`[places] Nominatim geocoded ${fixed}/${unique.length} AI places`);
   return out;
 }
 
@@ -374,7 +376,7 @@ async function fetchCuratedFoodFallback(lat, lon, cityName) {
     } catch (_e) {}
   }
 
-  console.log(`[places] Curated food fallback produced ${out.length} places`);
+  appLogger.info(`[places] Curated food fallback produced ${out.length} places`);
   return out;
 }
 
@@ -441,7 +443,7 @@ async function fetchCuratedCityFallback(lat, lon, cityName) {
     } catch (_e) {}
   }
 
-  console.log(`[places] Curated city fallback produced ${out.length} places`);
+  appLogger.info(`[places] Curated city fallback produced ${out.length} places`);
   return out;
 }
 
@@ -548,7 +550,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
     } catch (_e) {}
   }
 
-  console.log(`[places] Nominatim fallback produced ${out.length} places`);
+  appLogger.info(`[places] Nominatim fallback produced ${out.length} places`);
 
   // ── Photon fallback for the broad search too ────────────────────────────
   // If Nominatim produced little/nothing (blocked/rate-limited — see the
@@ -623,7 +625,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
         }
       } catch (_e) {}
     }
-    console.log(`[places] Photon fallback brought total to ${out.length} places`);
+    appLogger.info(`[places] Photon fallback brought total to ${out.length} places`);
   }
 
   return out;

@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // middleware/security.js — Security headers (helmet + CSP config)
 // Extracted from server.js so this can be unit-tested in isolation —
 // server.js has clustering/DB-init side effects at module load time that
@@ -8,22 +10,11 @@ function buildHelmetOptions() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        // 'unsafe-inline' is still required for now. index.html and
-        // admin-feedback.html's own inline onclick=/onkeydown=/onchange=/
-        // oninput= attributes are gone — converted to a data-action
-        // delegation pattern, see the STATIC_ACTIONS table + delegated
-        // listeners near the end of frontend/public/app.js, verified in
-        // __tests__/frontend.staticActions.test.js. What's NOT done: app.js
-        // still dynamically generates onclick= attributes inside template-
-        // literal HTML strings when rendering place cards, saved trips,
-        // etc. (e.g. `<button onclick="delExp(${e.id})">`). Converting
-        // those is materially riskier — the arguments come from live data,
-        // not fixed literals, and there's no browser/e2e test coverage in
-        // this environment to catch a subtle breakage. Until that's done,
-        // this directive can't be tightened; this at least blocks loading
-        // script from any origin NOT listed below.
+        // Script execution is restricted to trusted origins. Inline handlers are
+        // already blocked with script-src-attr 'none'. Dynamic UI uses delegated
+        // listeners rather than executable HTML attributes.
         scriptSrc: [
-          "'self'", "'unsafe-inline'",
+          "'self'",
           'https://www.googletagmanager.com',
           'https://www.gstatic.com',        // Firebase SDK (ES module imports)
           'https://apis.google.com',        // Firebase Auth's Google sign-in loads apis.google.com/js/api.js
@@ -39,7 +30,7 @@ function buildHelmetOptions() {
         scriptSrcAttr: ["'none'"],
         styleSrcAttr: ["'unsafe-inline'"],
         styleSrc: [
-          "'self'", "'unsafe-inline'",
+          "'self'",
           'https://fonts.googleapis.com', 'https://unpkg.com',
         ],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
@@ -134,7 +125,7 @@ function buildSecurityMiddleware() {
     const helmet = require('helmet');
     return helmet(buildHelmetOptions());
   } catch (_e) {
-    console.warn('⚠️  helmet package not installed — skipping security headers');
+    appLogger.warn('⚠️  helmet package not installed — skipping security headers');
     return (_req, _res, next) => next();
   }
 }

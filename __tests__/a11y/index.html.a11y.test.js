@@ -6,8 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
-const html = fs.readFileSync(path.join(__dirname, '../../frontend/public/index.html'), 'utf8');
-const css = fs.readFileSync(path.join(__dirname, '../../frontend/public/styles.css'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '../../frontend/app-src/index.html'), 'utf8');
+const css = fs.readFileSync(path.join(__dirname, '../../frontend/app-src/styles.css'), 'utf8');
 
 describe('enterprise a11y — index.html', () => {
   let document;

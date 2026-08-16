@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // routes/favorites.js — Bookmark / favorite places API
 // POST   /api/favorites       — Add favorite            (auth required)
 // GET    /api/favorites       — List MY favorites (optional ?city= filter)  (auth required)
@@ -25,7 +27,7 @@ router.post('/', requireAuth, async (req, res) => {
     await addFavorite({ userId: req.uid, placeName, city, lat, lon, category, notes });
     res.status(201).json({ message: 'Added to favorites', placeName, city });
   } catch (err) {
-    console.error('[favorites:add]', err.message);
+    appLogger.error('[favorites:add]', err.message);
     res.status(500).json({ error: 'Failed to add favorite' });
   }
 });
@@ -38,7 +40,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     res.json({ favorites, count: favorites.length });
   } catch (err) {
-    console.error('[favorites:list]', err.message);
+    appLogger.error('[favorites:list]', err.message);
     res.status(500).json({ error: 'Failed to list favorites' });
   }
 });
@@ -53,7 +55,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     res.json({ message: 'Removed from favorites' });
   } catch (err) {
-    console.error('[favorites:remove]', err.message);
+    appLogger.error('[favorites:remove]', err.message);
     res.status(500).json({ error: 'Failed to remove favorite' });
   }
 });

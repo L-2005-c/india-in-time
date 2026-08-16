@@ -1,6 +1,7 @@
 jest.mock('../middleware/auth', () => ({
   verifyToken: jest.fn(),
 }));
+
 jest.mock('../lib/logger', () => ({
   warn: jest.fn(),
   info: jest.fn(),
@@ -8,8 +9,7 @@ jest.mock('../lib/logger', () => ({
 }));
 
 const { verifyToken } = require('../middleware/auth');
-const logger = require('../lib/logger');
-const { requireAdminAuth, requireAdminKey } = require('../middleware/adminAuth');
+const { requireAdminAuth, requireAdminRole } = require('../middleware/adminAuth');
 
 function mockRes() {
   const res = {};
@@ -18,18 +18,13 @@ function mockRes() {
   return res;
 }
 
-describe('requireAdminAuth — legacy shared-key path', () => {
-  const ORIGINAL_KEY = process.env.ADMIN_FEEDBACK_KEY;
-
+describe('requireAdminAuth — Firebase-only administrator authentication', () => {
   afterEach(() => {
-    if (ORIGINAL_KEY === undefined) delete process.env.ADMIN_FEEDBACK_KEY;
-    else process.env.ADMIN_FEEDBACK_KEY = ORIGINAL_KEY;
+    delete process.env.FIREBASE_SERVICE_ACCOUNT;
     jest.clearAllMocks();
   });
 
-  test('returns 503 when neither Firebase nor the shared key is configured', async () => {
-    delete process.env.ADMIN_FEEDBACK_KEY;
-    delete process.env.FIREBASE_SERVICE_ACCOUNT;
+  test('returns 503 when Firebase admin authentication is not configured', async () => {
     const req = { headers: {} };
     const res = mockRes();
     const next = jest.fn();
@@ -40,9 +35,9 @@ describe('requireAdminAuth — legacy shared-key path', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  test('returns 401 when the provided key does not match', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    const req = { headers: { 'x-admin-key': 'wrong-secret' } };
+  test('returns 401 when Firebase is configured but credentials are missing', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    const req = { headers: {} };
     const res = mockRes();
     const next = jest.fn();
 
@@ -52,218 +47,76 @@ describe('requireAdminAuth — legacy shared-key path', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  test('calls next() and tags the request when the correct key is provided', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
+  test('rejects legacy x-admin-key even in test environments', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    const req = { headers: { 'x-admin-key': 'legacy-secret' } };
     const res = mockRes();
     const next = jest.fn();
 
     await requireAdminAuth(req, res, next);
 
-    expect(next).toHaveBeenCalled();
-    expect(req.adminAuthMethod).toBe('legacy-shared-key');
-  });
-
-  test('logs a deprecation warning (with the endpoint) every time the legacy key path succeeds, so usage is visible before removal', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    const req = {
-      headers: { 'x-admin-key': 'correct-secret' },
-      originalUrl: '/api/analytics/summary?hours=24',
-      method: 'GET',
-    };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ path: '/api/analytics/summary?hours=24', method: 'GET' }),
-      expect.stringContaining('DEPRECATED')
-    );
-  });
-
-  test('does NOT log the deprecation warning on a failed legacy-key attempt (nothing succeeded to deprecate)', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    const req = { headers: { 'x-admin-key': 'wrong-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(logger.warn).not.toHaveBeenCalledWith(
-      expect.anything(),
-      expect.stringContaining('DEPRECATED')
-    );
-  });
-
-  test('ADMIN_LEGACY_KEY_DISABLED=true rejects a correct key — a real kill switch, not just observability', async () => {
-    const ORIGINAL_DISABLED = process.env.ADMIN_LEGACY_KEY_DISABLED;
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    process.env.ADMIN_LEGACY_KEY_DISABLED = 'true';
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(next).not.toHaveBeenCalled();
-    expect(logger.warn).not.toHaveBeenCalledWith(
-      expect.anything(),
-      expect.stringContaining('DEPRECATED')
-    );
-
-    if (ORIGINAL_DISABLED === undefined) delete process.env.ADMIN_LEGACY_KEY_DISABLED;
-    else process.env.ADMIN_LEGACY_KEY_DISABLED = ORIGINAL_DISABLED;
-  });
-
-  test('any value other than the literal string "true" leaves the legacy path enabled (fails safe/open toward the existing behavior, not silently locking admins out on a typo)', async () => {
-    const ORIGINAL_DISABLED = process.env.ADMIN_LEGACY_KEY_DISABLED;
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    process.env.ADMIN_LEGACY_KEY_DISABLED = 'yes'; // not the exact string 'true'
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(next).toHaveBeenCalled();
-
-    if (ORIGINAL_DISABLED === undefined) delete process.env.ADMIN_LEGACY_KEY_DISABLED;
-    else process.env.ADMIN_LEGACY_KEY_DISABLED = ORIGINAL_DISABLED;
-  });
-
-  test('ADMIN_LEGACY_KEY_EXPIRES in the past rejects a correct key — a deadline, not just a manual switch', async () => {
-    const ORIGINAL_EXPIRES = process.env.ADMIN_LEGACY_KEY_EXPIRES;
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    process.env.ADMIN_LEGACY_KEY_EXPIRES = '2020-01-01';
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ expiresAt: expect.any(String) }),
-      expect.stringContaining('ADMIN_LEGACY_KEY_EXPIRES has passed')
-    );
-
-    if (ORIGINAL_EXPIRES === undefined) delete process.env.ADMIN_LEGACY_KEY_EXPIRES;
-    else process.env.ADMIN_LEGACY_KEY_EXPIRES = ORIGINAL_EXPIRES;
-  });
-
-  test('ADMIN_LEGACY_KEY_EXPIRES in the future still allows a correct key', async () => {
-    const ORIGINAL_EXPIRES = process.env.ADMIN_LEGACY_KEY_EXPIRES;
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    process.env.ADMIN_LEGACY_KEY_EXPIRES = '2099-01-01';
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(next).toHaveBeenCalled();
-
-    if (ORIGINAL_EXPIRES === undefined) delete process.env.ADMIN_LEGACY_KEY_EXPIRES;
-    else process.env.ADMIN_LEGACY_KEY_EXPIRES = ORIGINAL_EXPIRES;
-  });
-
-  test('an unparseable ADMIN_LEGACY_KEY_EXPIRES is ignored (fails safe/open, not a silent lockout on a typo)', async () => {
-    const ORIGINAL_EXPIRES = process.env.ADMIN_LEGACY_KEY_EXPIRES;
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    process.env.ADMIN_LEGACY_KEY_EXPIRES = 'not-a-real-date';
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(next).toHaveBeenCalled();
-
-    if (ORIGINAL_EXPIRES === undefined) delete process.env.ADMIN_LEGACY_KEY_EXPIRES;
-    else process.env.ADMIN_LEGACY_KEY_EXPIRES = ORIGINAL_EXPIRES;
-  });
-
-  // Regression test: query-string ?key= support was deliberately removed
-  // (secrets in URLs leak via access logs/browser history/proxies).
-  test('does NOT accept the key via query string', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    const req = { headers: {}, query: { key: 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
     expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(401);
   });
 
-  test('requireAdminKey is a backward-compatible alias for requireAdminAuth', () => {
-    expect(requireAdminKey).toBe(requireAdminAuth);
-  });
-});
+  test('accepts a verified Firebase admin token', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    verifyToken.mockResolvedValue({
+      uid: 'admin-uid',
+      email: 'admin@example.com',
+      admin: true,
+      role: 'owner',
+    });
 
-describe('requireAdminAuth — Firebase custom-claim path', () => {
-  const ORIGINAL_KEY = process.env.ADMIN_FEEDBACK_KEY;
-
-  afterEach(() => {
-    if (ORIGINAL_KEY === undefined) delete process.env.ADMIN_FEEDBACK_KEY;
-    else process.env.ADMIN_FEEDBACK_KEY = ORIGINAL_KEY;
-    jest.clearAllMocks();
-  });
-
-  test('grants access and attributes the request to a real uid when the token has admin:true', async () => {
-    verifyToken.mockResolvedValue({ uid: 'admin-user-1', email: 'admin@example.com', admin: true });
-    const req = { headers: { authorization: 'Bearer valid-token' } };
+    const req = { headers: { authorization: 'Bearer verified-token' } };
     const res = mockRes();
     const next = jest.fn();
 
     await requireAdminAuth(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.uid).toBe('admin-user-1');
+    expect(req.uid).toBe('admin-uid');
     expect(req.adminEmail).toBe('admin@example.com');
+    expect(req.adminRole).toBe('owner');
     expect(req.adminAuthMethod).toBe('firebase-claim');
   });
 
-  test('denies a valid Firebase token that lacks the admin custom claim', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'some-key'; // configured, but not provided in this request
-    verifyToken.mockResolvedValue({ uid: 'regular-user', email: 'user@example.com' }); // no admin: true
-    const req = { headers: { authorization: 'Bearer valid-but-not-admin' } };
+  test('rejects a valid Firebase token without the admin claim', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    verifyToken.mockResolvedValue({
+      uid: 'user-uid',
+      email: 'user@example.com',
+      admin: false,
+    });
+
+    const req = { headers: { authorization: 'Bearer user-token' } };
     const res = mockRes();
     const next = jest.fn();
 
     await requireAdminAuth(req, res, next);
 
-    expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
-  test('falls through to the legacy key check if the Firebase token is invalid', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    verifyToken.mockRejectedValue(new Error('token expired'));
-    const req = {
-      headers: { authorization: 'Bearer expired-token', 'x-admin-key': 'correct-secret' },
-    };
+  test('enforces roles through requireAdminRole', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    verifyToken.mockResolvedValue({
+      uid: 'analytics-uid',
+      email: 'analytics@example.com',
+      admin: true,
+      role: 'analytics',
+    });
+
+    const req = { headers: { authorization: 'Bearer analytics-token' } };
     const res = mockRes();
     const next = jest.fn();
 
-    await requireAdminAuth(req, res, next);
-
+    await requireAdminRole('analytics')(req, res, next);
     expect(next).toHaveBeenCalled();
-    expect(req.adminAuthMethod).toBe('legacy-shared-key');
-  });
 
-  test('does not attempt Firebase verification when no Authorization header is present', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'correct-secret';
-    const req = { headers: { 'x-admin-key': 'correct-secret' } };
-    const res = mockRes();
-    const next = jest.fn();
-
-    await requireAdminAuth(req, res, next);
-
-    expect(verifyToken).not.toHaveBeenCalled();
-    expect(next).toHaveBeenCalled();
+    jest.clearAllMocks();
+    await requireAdminRole('owner')(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });

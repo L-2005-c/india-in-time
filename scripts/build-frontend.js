@@ -7,16 +7,10 @@
 // dist/index.html. That's wired into the serving path via
 // config.resolveIndexHtmlPath() (see config/index.js and server.js): in
 // production, if this script has been run, the server serves that
-// dist/index.html instead of the source frontend/public/index.html. If
-// this script hasn't been run, or NODE_ENV isn't production, the server
-// transparently falls back to the source index.html — so running this
-// step is opt-in, but it's no longer inert once it has been run.
+// dist/index.html is the only production frontend entry point. Development
+// uses a minimal shell unless the Vite dev server is running.
 //
-// This replaced an earlier version of this script that minified the old
-// single-file frontend/public/app.js directly with esbuild. That source
-// file has since been split into frontend/app-src/ (see MIGRATION.md) —
-// frontend/public/app.js is kept only as a frozen fallback and is no
-// longer what this script builds.
+// The retired monolithic frontend is not part of the production build path.
 //
 // Usage:
 //   npm run build:frontend
@@ -55,8 +49,13 @@ function main() {
     }
   }
 
-  console.log('Done. Output in frontend/public/dist/ (content-hashed, served automatically in');
-  console.log('production — see config.resolveIndexHtmlPath()/server.js).');
+  if (!fs.existsSync(distIndex)) {
+    throw new Error('Production frontend build failed: frontend/public/dist/index.html was not generated.');
+  }
+  if (!/assets\//.test(html)) {
+    throw new Error('Production frontend build failed: dist/index.html does not reference Vite assets.');
+  }
+  console.log('Done. Output in frontend/public/dist/ (content-hashed and required in production).');
 }
 
 main();

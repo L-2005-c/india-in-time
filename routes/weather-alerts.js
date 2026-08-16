@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // routes/weather-alerts.js
 // Returns detailed weather + best time to visit for each stop in the itinerary
 // POST /api/weather-alerts   { lat, lon, stops: [{name, cat, ot, ct}] }
@@ -105,7 +107,7 @@ router.post('/', async (req, res) => {
       stops: stopAlerts,
     });
   } catch (err) {
-    console.error('[weather-alerts]', err.message);
+    appLogger.error('[weather-alerts]', err.message);
     res.status(500).json({ error: 'Weather alerts fetch failed' });
   }
 });

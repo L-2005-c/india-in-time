@@ -86,6 +86,18 @@
   async function timeIntelligenceDayPlan(places = [], opts = {}) {
     return post('/api/time-intelligence/day-plan', { places, ...opts }, 20000);
   }
+  async function timeIntelligenceTemporalProfile(place, opts = {}) {
+    return post('/api/time-intelligence/temporal-profile', { place, ...opts }, 20000);
+  }
+
+  async function timeIntelligenceOptimize(places = [], opts = {}) {
+    return post('/api/time-intelligence/optimize', { places, ...opts }, 30000);
+  }
+
+  async function timeIntelligenceReplan(places = [], opts = {}) {
+    return post('/api/time-intelligence/replan', { places, ...opts }, 30000);
+  }
+
 
   async function timeIntelligenceAdvice(place, opts = {}) {
     return post('/api/time-intelligence/advice', { place, ...opts }, 12000);
@@ -282,7 +294,7 @@
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
-    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice,
+    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

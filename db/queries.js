@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // db/queries.js — PostgreSQL queries for all database operations
 // All DB access goes through these functions.
 
@@ -123,7 +125,7 @@ async function flushAnalyticsBuffer() {
   } catch (err) {
     // Durable fallback: re-queue the batch (cap to avoid unbounded memory)
     // and spill to a local JSONL file so operators can recover after outages.
-    console.warn('[analytics] Failed to batch log:', err.message);
+    appLogger.warn('[analytics] Failed to batch log:', err.message);
     const retry = batch.slice(0, 500);
     analyticsBuffer = retry.concat(analyticsBuffer).slice(0, 2000);
     try {
@@ -133,7 +135,7 @@ async function flushAnalyticsBuffer() {
       fs.mkdirSync(path.dirname(spill), { recursive: true });
       fs.appendFileSync(spill, retry.map((r) => JSON.stringify({ ...r, spilledAt: Date.now() })).join('\n') + '\n');
     } catch (spillErr) {
-      console.warn('[analytics] spill file write failed:', spillErr.message);
+      appLogger.warn('[analytics] spill file write failed:', spillErr.message);
     }
   }
 }
@@ -222,7 +224,10 @@ async function deleteCachedPlaces(cacheKey) {
 
 async function purgeExpiredCache() {
   const pool = getDb();
-  const result = await pool.query(`DELETE FROM place_cache WHERE expires_at <= CURRENT_TIMESTAMP`);
+  const result = await pool.query(`
+    DELETE FROM place_cache WHERE expires_at <= CURRENT_TIMESTAMP;
+    DELETE FROM ai_cache WHERE expires_at <= CURRENT_TIMESTAMP;
+  `);
   return result.rowCount;
 }
 
@@ -233,20 +238,23 @@ async function purgeExpiredCache() {
 async function getCachedAiResponse(promptHash) {
   const pool = getDb();
   const { rows } = await pool.query(`
-    SELECT response_txt FROM ai_cache WHERE prompt_hash = $1
+    SELECT response_txt FROM ai_cache
+    WHERE prompt_hash = $1 AND expires_at > CURRENT_TIMESTAMP
   `, [promptHash]);
   return rows.length > 0 ? rows[0].response_txt : null;
 }
 
-async function setCachedAiResponse(promptHash, responseTxt) {
+async function setCachedAiResponse(promptHash, responseTxt, ttlMs = 10 * 60 * 1000) {
   const pool = getDb();
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
   await pool.query(`
-    INSERT INTO ai_cache (prompt_hash, response_txt, created_at)
-    VALUES ($1, $2, CURRENT_TIMESTAMP)
-    ON CONFLICT (prompt_hash) DO UPDATE SET 
+    INSERT INTO ai_cache (prompt_hash, response_txt, created_at, expires_at)
+    VALUES ($1, $2, CURRENT_TIMESTAMP, $3)
+    ON CONFLICT (prompt_hash) DO UPDATE SET
       response_txt = EXCLUDED.response_txt,
-      created_at = CURRENT_TIMESTAMP
-  `, [promptHash, responseTxt]);
+      created_at = CURRENT_TIMESTAMP,
+      expires_at = EXCLUDED.expires_at
+  `, [promptHash, responseTxt, expiresAt]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,7 +320,7 @@ async function logGeminiUsage({ endpoint, model, tokensIn, tokensOut, latencyMs,
   } catch (e) {
     // Table may not exist yet on older deploys — fail open
     if (!/does not exist|relation/i.test(e.message)) {
-      console.warn('[gemini_usage]', e.message);
+      appLogger.warn('[gemini_usage]', e.message);
     }
   }
 }

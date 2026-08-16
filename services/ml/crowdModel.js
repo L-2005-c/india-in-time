@@ -16,6 +16,7 @@
 const { getDb } = require('../../db/init');
 
 const FEATURE_DIM = 12;
+const MODEL_VERSION = 2;
 const LR = 0.05;
 const L2 = 0.001;
 
@@ -52,7 +53,7 @@ function buildFeatures({ daypart, isWeekend, isPeakHourNow, month, cat, historic
   x[7] = Math.sin((2 * Math.PI * m) / 12);
   x[8] = Math.cos((2 * Math.PI * m) / 12);
   x[9] = hashBucket(cat);
-  x[10] = historicalScore != null ? Math.min(1, Math.max(0, historicalScore / 100)) : 0.5;
+  x[10] = historicalScore != null ? Math.min(1, Math.max(0, historicalScore / 100)) : 0;
   x[11] = 1; // bias
   return x;
 }
@@ -79,7 +80,8 @@ function predictCrowd(ctx) {
     score,
     probability: Math.round(p * 1000) / 1000,
     source: 'ml-logistic',
-    modelVersion: 1,
+    modelVersion: MODEL_VERSION,
+    featureAvailability: { historicalScore: ctx.historicalScore != null, category: !!ctx.cat && ctx.cat !== 'unknown', temporal: !!ctx.daypart && ctx.month != null },
     trainedN,
   };
 }
@@ -114,7 +116,7 @@ async function ensureLoaded() {
     const pool = getDb();
     if (!pool) return;
     const { rows } = await pool.query(
-      `SELECT weights_json, trained_n FROM ml_model_weights WHERE model_key = 'crowd_v1' LIMIT 1`
+      `SELECT weights_json, trained_n FROM ml_model_weights WHERE model_key = 'crowd_v2' LIMIT 1`
     );
     if (rows[0]?.weights_json) {
       const arr = JSON.parse(rows[0].weights_json);
@@ -134,7 +136,7 @@ async function persist() {
     if (!pool) return;
     await pool.query(
       `INSERT INTO ml_model_weights (model_key, weights_json, trained_n, updated_at)
-       VALUES ('crowd_v1', $1, $2, CURRENT_TIMESTAMP)
+       VALUES ('crowd_v2', $1, $2, CURRENT_TIMESTAMP)
        ON CONFLICT (model_key) DO UPDATE SET
          weights_json = EXCLUDED.weights_json,
          trained_n = EXCLUDED.trained_n,
@@ -156,7 +158,13 @@ async function trainFromFeedback(limit = 500) {
     if (!pool) return { updated: 0 };
     const { rows } = await pool.query(
       `SELECT rating, accurate, place_name, city, created_at
-       FROM place_feedback
+       FROM (
+         SELECT rating, accurate, place_name, city, created_at,
+                ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+         FROM place_feedback
+         WHERE user_id IS NOT NULL
+       ) recent
+       WHERE rn <= 20
        ORDER BY created_at DESC
        LIMIT $1`,
       [limit]
@@ -165,14 +173,17 @@ async function trainFromFeedback(limit = 500) {
     for (const row of rows) {
       const label = feedbackToLabel(row.rating, row.accurate);
       // Weak context when historical features unknown
+      const created = new Date(row.created_at);
+      const hour = created.getHours();
+      const daypart = hour < 9 ? 'earlyMorning' : hour < 12 ? 'morning' : hour < 16 ? 'afternoon' : hour < 19 ? 'evening' : 'night';
       updateOnline(
         {
-          daypart: 'afternoon',
-          isWeekend: false,
+          daypart,
+          isWeekend: created.getDay() === 0 || created.getDay() === 6,
           isPeakHourNow: false,
-          month: new Date(row.created_at).getMonth() + 1,
-          cat: 'default',
-          historicalScore: 50,
+          month: created.getMonth() + 1,
+          cat: 'unknown',
+          historicalScore: null,
         },
         label
       );
@@ -195,7 +206,7 @@ async function learnFromSingleFeedback({ rating, accurate, daypart, isWeekend, c
       isPeakHourNow: false,
       month: month || new Date().getMonth() + 1,
       cat: cat || 'default',
-      historicalScore: 50,
+      historicalScore: null,
     },
     label
   );
@@ -206,7 +217,8 @@ async function learnFromSingleFeedback({ rating, accurate, daypart, isWeekend, c
 
 function getModelInfo() {
   return {
-    model: 'crowd_v1',
+    model: 'crowd_v2',
+    modelVersion: MODEL_VERSION,
     type: 'online_logistic_regression',
     featureDim: FEATURE_DIM,
     trainedN,

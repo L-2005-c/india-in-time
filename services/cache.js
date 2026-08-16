@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // services/cache.js — LRU Cache with TTL
 // Replaces bare Map caches throughout the app with a proper LRU implementation.
 
@@ -201,10 +203,10 @@ if (process.env.REDIS_URL) {
     lazyConnect: false,
   });
   redis.on('error', (err) => {
-    console.warn('[cache] Redis error (falling back to in-memory-only for this operation):', err.message);
+    appLogger.warn('[cache] Redis error (falling back to in-memory-only for this operation):', err.message);
   });
 } else {
-  console.log('[cache] REDIS_URL not set — per-process in-memory caching only (no cross-instance sharing).');
+  appLogger.info('[cache] REDIS_URL not set — per-process in-memory caching only (no cross-instance sharing).');
 }
 
 const placesCache = new LRUCache({

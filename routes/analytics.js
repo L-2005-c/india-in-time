@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // routes/analytics.js — API usage analytics
 // GET /api/analytics/summary — Usage summary (last 24h by default)
 
@@ -6,7 +8,9 @@ const router  = express.Router();
 const { getApiUsageSummary } = require('../db/queries');
 const { placesCache, geminiCache, weatherCache, geocodeCache } = require('../services/cache');
 const geminiService = require('../services/gemini');
-const { requireAdminKey } = require('../middleware/adminAuth');
+const { requireAdminRole } = require('../middleware/adminAuth');
+const analyticsRead = requireAdminRole('owner', 'admin', 'analytics');
+const analyticsWrite = requireAdminRole('owner', 'admin');
 
 // ── Analytics middleware — log all API requests ──────────────────────────────
 function analyticsMiddleware(req, res, next) {
@@ -40,7 +44,7 @@ function analyticsMiddleware(req, res, next) {
 // ── Summary endpoint ─────────────────────────────────────────────────────────
 // Was previously public — exposed server memory, node version, Gemini
 // success rate and cache internals to anyone. Now gated like /api/feedback.
-router.get('/summary', requireAdminKey, async (req, res) => {
+router.get('/summary', analyticsRead, async (req, res) => {
   try {
     const hours = parseInt(req.query.hours, 10) || 24;
     const usage = await getApiUsageSummary(Math.min(hours, 168)); // max 7 days
@@ -71,13 +75,13 @@ router.get('/summary', requireAdminKey, async (req, res) => {
       gemini: geminiStats,
     });
   } catch (err) {
-    console.error('[analytics]', err.message);
+    appLogger.error('[analytics]', err.message);
     res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
 
 // Gemini cost / usage dashboard data
-router.get('/gemini', requireAdminKey, async (req, res) => {
+router.get('/gemini', analyticsRead, async (req, res) => {
   try {
     const hours = Math.min(parseInt(req.query.hours, 10) || 24, 168);
     const { getGeminiUsageSummary } = require('../db/queries');
@@ -97,12 +101,12 @@ router.get('/gemini', requireAdminKey, async (req, res) => {
       note: 'Estimated cost uses approximate Gemini Flash rates; verify against Google Cloud billing.',
     });
   } catch (err) {
-    console.error('[analytics/gemini]', err.message);
+    appLogger.error('[analytics/gemini]', err.message);
     res.status(500).json({ error: 'Failed to fetch Gemini usage' });
   }
 });
 
-router.get('/ml/crowd', requireAdminKey, async (_req, res) => {
+router.get('/ml/crowd', analyticsRead, async (_req, res) => {
   try {
     const crowdModel = require('../services/ml/crowdModel');
     await crowdModel.ensureLoaded();
@@ -112,7 +116,7 @@ router.get('/ml/crowd', requireAdminKey, async (_req, res) => {
   }
 });
 
-router.post('/ml/crowd/train', requireAdminKey, async (req, res) => {
+router.post('/ml/crowd/train', analyticsWrite, async (req, res) => {
   try {
     const crowdModel = require('../services/ml/crowdModel');
     const limit = Math.min(parseInt(req.body?.limit || req.query.limit, 10) || 500, 2000);
@@ -123,7 +127,7 @@ router.post('/ml/crowd/train', requireAdminKey, async (req, res) => {
   }
 });
 
-router.get('/providers', requireAdminKey, (_req, res) => {
+router.get('/providers', analyticsRead, (_req, res) => {
   try {
     const { listProviders } = require('../services/ai/provider');
     res.json({ providers: listProviders() });

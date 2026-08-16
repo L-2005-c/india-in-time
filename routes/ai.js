@@ -19,6 +19,7 @@
 const express = require('express');
 const router  = express.Router();
 const { callGeminiText, callGeminiVision } = require('../services/gemini');
+const logger = require('../lib/logger');
 
 // ── Generic wrapper to handle errors uniformly ───────────────────────────────
 // IMPORTANT: this used to send err.message straight to the client on every
@@ -49,6 +50,21 @@ const TRIP_MODE_GUIDANCE = {
   group:  'The traveler is in a GROUP (4+ people). Favor spots with group seating/capacity, group discounts, and easy group logistics.',
 };
 
+function buildFactContract(facts = {}) {
+  const safe = {
+    time: facts.time ?? null,
+    openingStatus: facts.openingStatus ?? null,
+    etaMinutes: Number.isFinite(facts.etaMinutes) ? facts.etaMinutes : null,
+    weatherScore: Number.isFinite(facts.weatherScore) ? facts.weatherScore : null,
+    crowdScore: Number.isFinite(facts.crowdScore) ? facts.crowdScore : null,
+    scenicScore: Number.isFinite(facts.scenicScore) ? facts.scenicScore : null,
+    experienceScore: Number.isFinite(facts.experienceScore) ? facts.experienceScore : null,
+    confidence: Number.isFinite(facts.confidence) ? facts.confidence : null,
+    source: typeof facts.source === 'string' ? facts.source : null,
+  };
+  return `FACT CONTRACT (do not override or invent): ${JSON.stringify(safe)}`;
+}
+
 function tripModeLine(tripMode) {
   return TRIP_MODE_GUIDANCE[tripMode] || '';
 }
@@ -59,7 +75,7 @@ function handler(fn) {
       const result = await fn(req.body);
       res.json({ text: result });
     } catch (err) {
-      console.error(`[ai:${req.path}]`, err.message);
+      logger.error({ path: req.path, err: { message: err.message, status: err.statusCode || err.status || 503 } }, 'AI endpoint failed');
       const statusCode = err.statusCode && err.statusCode < 500 ? err.statusCode : 503;
       const clientMessage = USER_SAFE_MESSAGES.includes(err.message)
         ? err.message
@@ -72,16 +88,17 @@ function handler(fn) {
 // ── /api/ai/chat ─────────────────────────────────────────────────────────────
 // General travel Q&A chatbot
 
-router.post('/chat', handler(({ message, city, plan, currentTime, tripMode }) => {
+router.post('/chat', handler(({ message, city, plan, currentTime, tripMode, facts }) => {
   const planStr = Array.isArray(plan) && plan.length
     ? plan.join(', ')
     : 'none';
 
-  return callGeminiText(`You are a friendly India travel assistant.
+  return callGeminiText(`You are a friendly India travel assistant. Never invent live traffic, weather, opening, crowd, ETA, or geospatial facts. Use the FACT CONTRACT when provided and say when a value is unavailable.
 Tourist in ${city || 'India'} asked: "${message}"
 Current itinerary stops: ${planStr}.
 Current Local Time: ${currentTime || 'Unknown'}
 ${tripModeLine(tripMode)}
+${buildFactContract(facts)}
 
 If the user is asking about their current plan or next stop, give real-time time-based advice (e.g. "Golden hour is starting soon!", "That place closes in 45 mins", "It's too hot for an outdoor walk right now").
 Answer in max 3 short lines. Use emojis. Be specific and helpful.`, { cache: true });

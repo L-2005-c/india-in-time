@@ -52,4 +52,28 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
   if ((place.is_sunrise_spot || place.is_sunset_spot) && score >= 70) notes.push('Favourable for photography');
   return { score, suitability, activityNotes: notes, warnings, source: weather.forecast ? 'forecast' : 'observed', confidence: weather.tempC != null ? 75 : 50, reason: warnings.length ? warnings[0] : notes[0] || `${suitability} weather for this place type`, tempC: temp, condition: weather.condition || null, windKph: wind };
 }
-module.exports = { computeWeatherIntelligence };
+
+function buildWeatherExperienceWindows(weather, place = {}) {
+  const hourly = Array.isArray(weather?.hourly) ? weather.hourly : [];
+  if (!hourly.length) {
+    return { source: 'unavailable', windows: [], reason: 'No hourly forecast data supplied.' };
+  }
+  const windows = hourly.map((h) => {
+    const score = computeWeatherIntelligence(h, place, h.daypart || 'afternoon');
+    return {
+      start: h.time || h.timestamp || null,
+      score: score.score,
+      suitability: score.suitability,
+      warnings: score.warnings,
+      source: 'forecast',
+      confidence: score.confidence,
+    };
+  }).filter((w) => w.start);
+  return {
+    source: 'forecast',
+    windows,
+    best: windows.slice().sort((a, b) => b.score - a.score)[0] || null,
+  };
+}
+
+module.exports = { computeWeatherIntelligence, buildWeatherExperienceWindows };

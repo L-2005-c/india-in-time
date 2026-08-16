@@ -1,65 +1,250 @@
 name: CI
 
 on:
+  schedule:
+    - cron: '17 3 * * 1'
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  lint-and-test:
+  lint-test-security:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: ['20.x', '22.x']
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: india_in_time_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres -d india_in_time_test"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/india_in_time_test
+      REDIS_URL: redis://localhost:6379
+      DATABASE_SSL_REJECT_UNAUTHORIZED: 'false'
+      REQUIRE_REDIS_IN_PROD: 'false'
+      CORS_ORIGIN: http://localhost:3000
+      GEMINI_API_KEY: test-key
+      FIREBASE_SERVICE_ACCOUNT: '{}'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: npm
       - name: Install dependencies
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Inline event-handler security gate
+        run: npm run check:inline-handlers
       - name: Syntax-check frontend
-        run: node --check frontend/public/app.js
-      - name: Frontend modular structure
+        run: find frontend/app-src/src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Frontend modular structure and build
         run: |
           test -f frontend/app-src/src/utils/experience-score.js
           test -f frontend/app-src/src/utils/travel-time.js
           test -f frontend/app-src/src/utils/sun-times.js
           test -f frontend/app-src/src/utils/stop-scoring.js
-          test -f frontend/app-src/src/utils/travel-intel-ui.js
           test -f frontend/app-src/src/core/app.js
           test -f frontend/app-src/src/modules/index.js
+          npm run check:inline-handlers
           npm run build:frontend
           test -d frontend/public/dist/assets
-      - name: Unit tests
-        run: npm test
+      - name: Production configuration smoke
+        run: npm run test:production-config
+      - name: Production configuration checks
+        run: npm run check:production
+      - name: Architecture regression gate
+        run: npm run check:architecture
+      - name: Deployment structure checks
+        run: node scripts/verify-deployment.js
+      - name: Unit tests + coverage gate
+        run: npm run test:ci
       - name: Security audit (high+)
-        run: npm audit --audit-level=high
+        run: npm run security:audit
+      - name: Security audit JSON (artifact)
+        run: npm run security:audit:json
+      - name: Production dependency audit
+        run: npm run security:audit:prod
+      - name: Production dependency audit JSON (artifact)
+        run: npm run security:audit:prod:json
+      - name: Upload dependency audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ matrix.node-version }}
+          path: |
+            security-audit.json
+            security-audit-prod.json
+            if-no-files-found: error
+      - name: Bundle budget
+        run: npm run check:bundle
 
   docker-build:
     runs-on: ubuntu-latest
-    needs: lint-and-test
+    needs: lint-test-security
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
-        run: docker build -t india-in-time:ci-check .
+        run: docker build --pull -t india-in-time:ci-check .
+      - name: Inspect image user and healthcheck
+        run: |
+          test "$(docker inspect -f '{{.Config.User}}' india-in-time:ci-check)" = "appuser"
+          docker inspect -f '{{json .Config.Healthcheck}}' india-in-time:ci-check | grep -q 'api/health'
 
   security-headers:
     runs-on: ubuntu-latest
-    needs: lint-and-test
+    needs: lint-test-security
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          cache: 'npm'
+          cache: npm
       - run: npm ci
       - name: Security middleware present
         run: |
           test -f middleware/security.js
-          test -f SECURITY_AUDIT.md || test -f SECURITY_AUDIT.md
+          test -f docs/DEPENDENCY_SECURITY.md
           node -e "require('./middleware/security')"
+      - name: Enforce no unsafe inline scripts
+        run: |
+          ! grep -R "'unsafe-inline'" middleware/security.js
+
+  staging-acceptance:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    needs: [lint-test-security, docker-build]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: india_in_time_staging
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres -d india_in_time_staging"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/india_in_time_staging
+      DATABASE_SSL_REJECT_UNAUTHORIZED: 'false'
+      REDIS_URL: redis://localhost:6379
+      REQUIRE_REDIS_IN_PROD: 'false'
+      CORS_ORIGIN: http://127.0.0.1:3000
+      GEMINI_API_KEY: test-key
+      FIREBASE_SERVICE_ACCOUNT: '{}'
+      PORT: 3000
+      LOADTEST_URL: http://127.0.0.1:3000
+      STAGING_URL: http://127.0.0.1:3000
+      LOADTEST_DURATION_SEC: 10
+      LOADTEST_CONCURRENCY: 10
+      LOADTEST_MAX_ERROR_RATE: 0.01
+      LOADTEST_MAX_P95_MS: 1000
+      ACCEPTANCE_REQUIRE_READY: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Migrate staging database
+        run: npm run migrate:up
+      - name: Build production frontend
+        run: npm run build:frontend
+      - name: Install pinned browser E2E tooling
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.55.0 @axe-core/playwright@4.10.1
+      - name: Verify pinned E2E dependencies
+        run: npm ls --depth=0 @playwright/test @axe-core/playwright
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start staging application
+        run: |
+          nohup npm start > /tmp/india-in-time-staging.log 2>&1 &
+          echo $! > /tmp/india-in-time-staging.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health/live >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/india-in-time-staging.log
+          exit 1
+      - name: Run staging acceptance suite
+        run: npm run test:smoke
+        env:
+          RUN_LOAD_SMOKE: 'true'
+      - name: Run browser E2E, accessibility and performance suites
+        run: |
+          npm run test:e2e
+          npm run test:accessibility
+          npm run test:performance
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3000
+          E2E_MAX_TTFB_MS: 1500
+          E2E_MAX_LOAD_MS: 5000
+      - name: Run database and Redis failover readiness checks
+        run: npm run test:failover
+      - name: Create backup and verify integrity
+        run: |
+          rm -rf backups
+          npm run backup
+          npm run backup:verify
+          npm run backup:restore-verify
+      - name: Final deployment verification
+        run: node scripts/verify-deployment.js
+      - name: Dump staging logs on failure
+        if: failure()
+        run: cat /tmp/india-in-time-staging.log || true
+
+  dependency-security-monitor:
+    if: ${{ github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - run: npm ci
+      - name: Run dependency security audit
+        run: |
+          npm audit --audit-level=high --json > security-audit-scheduled.json
+          npm audit --omit=dev --audit-level=high --json > security-audit-prod-scheduled.json
+      - name: Upload scheduled audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-dependency-audit
+          path: |
+            security-audit-scheduled.json
+            security-audit-prod-scheduled.json
+            docs/DEPENDENCY_SECURITY.md

@@ -16,6 +16,12 @@ jest.mock('../middleware/auth', () => ({
     if (req.headers['x-test-uid']) req.uid = req.headers['x-test-uid'];
     next();
   },
+  verifyToken: jest.fn(async () => ({
+    uid: 'admin-uid',
+    email: 'admin@example.com',
+    admin: true,
+    role: 'admin',
+  })),
 }));
 
 const express = require('express');
@@ -31,15 +37,13 @@ function buildApp() {
 }
 
 let app;
-const ORIGINAL_KEY = process.env.ADMIN_FEEDBACK_KEY;
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.ADMIN_FEEDBACK_KEY = 'test-key';
+  process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
   app = buildApp();
 });
 afterEach(() => {
-  if (ORIGINAL_KEY === undefined) delete process.env.ADMIN_FEEDBACK_KEY;
-  else process.env.ADMIN_FEEDBACK_KEY = ORIGINAL_KEY;
+  delete process.env.FIREBASE_SERVICE_ACCOUNT;
 });
 
 describe('POST /api/feedback/place', () => {
@@ -96,7 +100,7 @@ describe('GET /api/feedback/place — admin-gated', () => {
   });
 
   test('rejects a request missing placeName/city even with a valid key', async () => {
-    const res = await request(app).get('/api/feedback/place').set('x-admin-key', 'test-key');
+    const res = await request(app).get('/api/feedback/place').set('Authorization', 'Bearer test-admin-token');
     expect(res.status).toBe(400);
   });
 
@@ -104,7 +108,7 @@ describe('GET /api/feedback/place — admin-gated', () => {
     queries.getPlaceFeedbackSummary.mockResolvedValue({ count: 3, avg_rating: 4.5 });
     const res = await request(app)
       .get('/api/feedback/place?placeName=Hawa+Mahal&city=Jaipur')
-      .set('x-admin-key', 'test-key');
+      .set('Authorization', 'Bearer test-admin-token');
     expect(res.status).toBe(200);
     expect(res.body.avg_rating).toBe(4.5);
   });
@@ -113,7 +117,7 @@ describe('GET /api/feedback/place — admin-gated', () => {
 describe('GET /api/feedback/place/all — admin-gated, capped limit', () => {
   test('caps the limit at 500 even if a larger value is requested', async () => {
     queries.getAllPlaceFeedback.mockResolvedValue([]);
-    await request(app).get('/api/feedback/place/all?limit=99999').set('x-admin-key', 'test-key');
+    await request(app).get('/api/feedback/place/all?limit=99999').set('Authorization', 'Bearer test-admin-token');
     expect(queries.getAllPlaceFeedback).toHaveBeenCalledWith(500);
   });
 });
@@ -145,7 +149,7 @@ describe('GET /api/feedback/app — admin-gated', () => {
 
   test('caps the limit at 200', async () => {
     queries.getAppFeedbackSummary.mockResolvedValue({ count: 0, avg_rating: null, recent: [] });
-    await request(app).get('/api/feedback/app?limit=99999').set('x-admin-key', 'test-key');
+    await request(app).get('/api/feedback/app?limit=99999').set('Authorization', 'Bearer test-admin-token');
     expect(queries.getAppFeedbackSummary).toHaveBeenCalledWith(200);
   });
 });

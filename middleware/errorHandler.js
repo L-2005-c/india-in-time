@@ -6,11 +6,10 @@ const logger = require('../lib/logger');
 const apm = require('../lib/apm');
 
 // ── Optional error-reporting webhook (lightweight APM/alerting hook) ───────
-// This project has no APM/error-tracking integration (Sentry, Datadog,
-// OpenTelemetry, etc.) — production 5xx incidents are otherwise diagnosed
-// from logs alone. Adding a specific vendor SDK is a real dependency and
-// config decision an operator should make deliberately, not something to
-// bake in silently — so instead this is a generic, zero-dependency hook:
+// Sentry integration is available through lib/apm.js. This generic webhook
+// remains as an optional secondary alerting/ingestion hook so operators can
+// forward 5xx events to their existing incident system without coupling the
+// core error path to a single vendor:
 // if ERROR_REPORTING_WEBHOOK_URL is set, every 5xx error is POSTed there
 // as JSON (compatible with a Slack/Discord incoming webhook, a serverless
 // function that forwards to Sentry/Datadog, or any custom ingestion
@@ -73,11 +72,11 @@ function errorHandler(err, req, res, _next) {
 
   if (statusCode >= 500) {
     logData.stack = err.stack;
-    console.error('[ERROR]', JSON.stringify(logData, null, 2));
+    logger.error('[ERROR]', JSON.stringify(logData, null, 2));
     reportErrorAsync(err, logData);
     try { apm.captureException(err, logData); } catch (_e) {}
   } else {
-    console.warn('[WARN]', JSON.stringify(logData));
+    logger.warn('[WARN]', JSON.stringify(logData));
   }
 
   // Build response

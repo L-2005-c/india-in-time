@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // routes/geocode.js
 // Proxies Nominatim city-search so the frontend never hits third-party APIs directly.
 // GET /api/geocode?q=Kurnool
@@ -103,7 +105,7 @@ router.get('/', async (req, res) => {
         return upstream.json();
       });
     } catch (nominatimErr) {
-      console.warn('[geocode] Nominatim failed, falling back to Photon:', nominatimErr.message);
+      appLogger.warn('[geocode] Nominatim failed, falling back to Photon:', nominatimErr.message);
       data = null;
     }
 
@@ -114,7 +116,7 @@ router.get('/', async (req, res) => {
       try {
         data = await geocodeViaPhoton(q);
       } catch (photonErr) {
-        console.warn('[geocode] Photon fallback also failed:', photonErr.message);
+        appLogger.warn('[geocode] Photon fallback also failed:', photonErr.message);
         data = [];
       }
     }
@@ -127,7 +129,7 @@ router.get('/', async (req, res) => {
     }
     res.json(data);
   } catch (err) {
-    console.error('[geocode]', err.message);
+    appLogger.error('[geocode]', err.message);
     if (err.upstreamStatus) {
       return res.status(502).json({ error: 'Nominatim upstream error', status: err.upstreamStatus });
     }

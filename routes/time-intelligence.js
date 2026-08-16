@@ -4,7 +4,11 @@ const express = require('express');
 const router = express.Router();
 const { getBatchState, personalizeScore, suggestOpenAlternatives, getTravelIntelligence } = require('../services/timeIntelligence');
 const { rankPlacesForDay, buildDayPlan, dynamicAdvice, multiDayAdvice, getTravelIntelligenceAsync } = require('../services/travelIntelligence');
-const MAX_PLACES = 50; // lowered for CPU safety (was 200)
+const { mapWithConcurrency } = require('../utils/concurrency');
+const { buildTemporalProfile } = require('../services/travelIntelligence/temporalEngine');
+const { optimizeItinerary, replanItinerary } = require('../services/travelIntelligence/geoTemporalOptimizer');
+const MAX_PLACES = 50;
+const LIVE_ROUTING_CONCURRENCY = Math.max(1, parseInt(process.env.LIVE_ROUTING_CONCURRENCY, 10) || 5);
 
 router.post('/status', (req, res) => {
   try {
@@ -63,11 +67,12 @@ router.post('/recommend', async (req, res) => {
 
     let ranked;
     if (options.enableLiveRouting && options.fromCoords) {
-      // Parallel live routing (capped concurrency via Promise.all on sliced set)
-      const scored = await Promise.all(places.map(async (p) => {
+      // Bound external routing fan-out so one request cannot create 50
+      // simultaneous upstream calls under load.
+      const scored = await mapWithConcurrency(places, LIVE_ROUTING_CONCURRENCY, async (p) => {
         const intel = await getTravelIntelligenceAsync(p, now, weather || null, options);
         return { place: p, intel, score: intel.visitScore };
-      }));
+      });
       scored.sort((a, b) => b.score - a.score);
       ranked = scored;
     } else {
@@ -94,16 +99,38 @@ router.post('/recommend', async (req, res) => {
 
 
 // ── Day plan (timed multi-stop itinerary) ───────────────────────────────────
-router.post('/day-plan', (req, res) => {
+
+// ── Advanced temporal profile ────────────────────────────────────────────────
+router.post('/temporal-profile', (req, res) => {
   try {
-    const { weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops, bufferMin } = req.body || {};
-    const rawPlaces = req.body?.places;
-    if (!Array.isArray(rawPlaces) || !rawPlaces.length) {
-      return res.status(400).json({ error: 'places[] is required' });
-    }
-    const places = rawPlaces.slice(0, MAX_PLACES);
+    const { place, weather, at, stepMin, horizonHours, startOffsetMin, personas, tripMode, region } = req.body || {};
+    if (!place || typeof place !== 'object') return res.status(400).json({ error: 'place object is required' });
     const now = at ? new Date(at) : new Date();
-    const plan = buildDayPlan(places, {
+    if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
+    const profile = buildTemporalProfile(place, {
+      referenceDate: now,
+      weather: weather || null,
+      stepMin,
+      horizonMin: Number(horizonHours || 48) * 60,
+      startOffsetMin,
+      intelOptions: { personas: Array.isArray(personas) ? personas : [], tripMode: tripMode || null, region: region || null },
+    });
+    res.json(profile);
+  } catch (err) {
+    logger.error('[time-intelligence:temporal-profile]', err.message);
+    res.status(500).json({ error: 'Failed to compute temporal profile' });
+  }
+});
+
+// ── Advanced GeoAI itinerary optimizer ─────────────────────────────────────
+router.post('/optimize', async (req, res) => {
+  try {
+    const { weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops, bufferMin, beamWidth, region } = req.body || {};
+    const rawPlaces = req.body?.places;
+    if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
+    const now = at ? new Date(at) : new Date();
+    if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
+    const result = await optimizeItinerary(rawPlaces.slice(0, MAX_PLACES), {
       now,
       weather: weather || null,
       originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
@@ -111,10 +138,67 @@ router.post('/day-plan', (req, res) => {
       tripMode: tripMode || null,
       startMin: Number.isFinite(startMin) ? startMin : undefined,
       endMin: Number.isFinite(endMin) ? endMin : undefined,
-      maxStops: Number.isFinite(maxStops) ? maxStops : 8,
+      maxStops: Number.isFinite(maxStops) ? maxStops : undefined,
       bufferMin: Number.isFinite(bufferMin) ? bufferMin : undefined,
+      beamWidth: Number.isFinite(beamWidth) ? beamWidth : undefined,
+      region: region || null,
     });
-    res.json(plan);
+    res.json(result);
+  } catch (err) {
+    logger.error('[time-intelligence:optimize]', err.message);
+    res.status(500).json({ error: 'Failed to optimize itinerary' });
+  }
+});
+
+// ── Dynamic re-planning from current state ──────────────────────────────────
+router.post('/replan', async (req, res) => {
+  try {
+    const { weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops, bufferMin, region, trigger, reason } = req.body || {};
+    const rawPlaces = req.body?.places;
+    if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
+    const now = at ? new Date(at) : new Date();
+    if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
+    const result = await replanItinerary(rawPlaces.slice(0, MAX_PLACES), {
+      now,
+      weather: weather || null,
+      originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
+      personas: Array.isArray(personas) ? personas : [],
+      tripMode: tripMode || null,
+      startMin: Number.isFinite(startMin) ? startMin : undefined,
+      endMin: Number.isFinite(endMin) ? endMin : undefined,
+      maxStops: Number.isFinite(maxStops) ? maxStops : undefined,
+      bufferMin: Number.isFinite(bufferMin) ? bufferMin : undefined,
+      region: region || null,
+      trigger: trigger || 'dynamic_replan',
+      reason: reason || 'Plan recalculated from the current state.',
+    });
+    res.json(result);
+  } catch (err) {
+    logger.error('[time-intelligence:replan]', err.message);
+    res.status(500).json({ error: 'Failed to replan itinerary' });
+  }
+});
+
+router.post('/day-plan', async (req, res) => {
+  try {
+    const { weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops, bufferMin, region } = req.body || {};
+    const rawPlaces = req.body?.places;
+    if (!Array.isArray(rawPlaces) || !rawPlaces.length) {
+      return res.status(400).json({ error: 'places[] is required' });
+    }
+    const now = at ? new Date(at) : new Date();
+    if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
+    const optimized = await optimizeItinerary(rawPlaces.slice(0, MAX_PLACES), {
+      now, weather: weather || null,
+      originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
+      personas: Array.isArray(personas) ? personas : [], tripMode: tripMode || null,
+      startMin: Number.isFinite(startMin) ? startMin : undefined,
+      endMin: Number.isFinite(endMin) ? endMin : undefined,
+      maxStops: Number.isFinite(maxStops) ? maxStops : 8,
+      bufferMin: Number.isFinite(bufferMin) ? bufferMin : undefined, region: region || null,
+    });
+    // Backwards-compatible response shape with the advanced optimizer attached.
+    res.json({ ...optimized, advanced: true, stops: optimized.stops });
   } catch (err) {
     logger.error('[time-intelligence:day-plan]', err.message);
     res.status(500).json({ error: 'Failed to build day plan' });

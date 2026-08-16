@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // routes/feedback.js — User feedback API
 // POST /api/feedback/place   — Rate a specific stop (post-visit)
 // GET  /api/feedback/place   — Aggregate rating for a place (?placeName=&city=)
@@ -10,7 +12,8 @@ const {
   submitPlaceFeedback, getPlaceFeedbackSummary, getAllPlaceFeedback,
   submitAppFeedback, getAppFeedbackSummary,
 } = require('../db/queries');
-const { requireAdminKey } = require('../middleware/adminAuth');
+const { requireAdminRole } = require('../middleware/adminAuth');
+const feedbackRead = requireAdminRole('owner', 'admin', 'analytics');
 const { optionalAuth } = require('../middleware/auth');
 
 // ── Per-place feedback ───────────────────────────────────────────────────────
@@ -38,8 +41,10 @@ router.post('/place', optionalAuth, async (req, res) => {
 
     await submitPlaceFeedback({ userId, placeName, city, rating: r, accurate, comment });
 
-    // Online ML update — enterprise feedback loop (fail-open)
-    try {
+    // Anonymous feedback remains analytics-only. Only verified users may train
+    // the production crowd model, preventing unauthenticated model poisoning.
+    if (req.uid) {
+      try {
       const crowdModel = require('../services/ml/crowdModel');
       await crowdModel.learnFromSingleFeedback({
         rating: r,
@@ -49,35 +54,36 @@ router.post('/place', optionalAuth, async (req, res) => {
         isWeekend: !!req.body.isWeekend,
         month: new Date().getMonth() + 1,
       });
-    } catch (_ml) { /* non-blocking */ }
+      } catch (_ml) { /* non-blocking */ }
+    }
 
     res.status(201).json({ message: 'Feedback recorded', placeName, city });
   } catch (err) {
-    console.error('[feedback:place:add]', err.message);
+    appLogger.error('[feedback:place:add]', err.message);
     res.status(500).json({ error: 'Failed to save feedback' });
   }
 });
 
-router.get('/place', requireAdminKey, async (req, res) => {
+router.get('/place', feedbackRead, async (req, res) => {
   try {
     const { placeName, city } = req.query;
     if (!placeName || !city) return res.status(400).json({ error: 'Missing placeName or city query param' });
     const summary = await getPlaceFeedbackSummary(placeName, city);
     res.json(summary);
   } catch (err) {
-    console.error('[feedback:place:summary]', err.message);
+    appLogger.error('[feedback:place:summary]', err.message);
     res.status(500).json({ error: 'Failed to load feedback summary' });
   }
 });
 
 // All raw place-feedback rows, for the admin dashboard.
-router.get('/place/all', requireAdminKey, async (req, res) => {
+router.get('/place/all', feedbackRead, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 200, 500);
     const rows = await getAllPlaceFeedback(limit);
     res.json({ count: rows.length, rows });
   } catch (err) {
-    console.error('[feedback:place:all]', err.message);
+    appLogger.error('[feedback:place:all]', err.message);
     res.status(500).json({ error: 'Failed to load feedback' });
   }
 });
@@ -105,18 +111,18 @@ router.post('/app', optionalAuth, async (req, res) => {
     });
     res.status(201).json({ message: 'Thanks for the feedback!' });
   } catch (err) {
-    console.error('[feedback:app:add]', err.message);
+    appLogger.error('[feedback:app:add]', err.message);
     res.status(500).json({ error: 'Failed to save feedback' });
   }
 });
 
-router.get('/app', requireAdminKey, async (req, res) => {
+router.get('/app', feedbackRead, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const summary = await getAppFeedbackSummary(limit);
     res.json(summary);
   } catch (err) {
-    console.error('[feedback:app:summary]', err.message);
+    appLogger.error('[feedback:app:summary]', err.message);
     res.status(500).json({ error: 'Failed to load feedback summary' });
   }
 });

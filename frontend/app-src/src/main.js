@@ -1,3 +1,4 @@
+import { browserLogger } from '../utils/browser-logger.js';
 // Entry point — Vite module graph starts here.
 import { ensureFocusVisibleStyles, announce } from './a11y/helpers.js';
 import { state } from './state/appState.js';
@@ -15,7 +16,7 @@ if (typeof document !== 'undefined') {
       window.__travelTime = modules.travelTime || null;
       window.__sunTimes = modules.sunTimes || null;
     } catch (e) {
-      console.warn('[enterprise-boot] failed', e);
+      browserLogger.warn('[enterprise-boot] failed', e);
     }
   };
   if (document.readyState === 'loading') {

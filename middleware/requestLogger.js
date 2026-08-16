@@ -1,3 +1,5 @@
+'use strict';
+const appLogger = require('../lib/logger');
 // middleware/requestLogger.js — Structured request logging
 // Logs every request with method, path, status, response time, IP.
 
@@ -47,7 +49,7 @@ function requestLogger(req, res, next) {
 
     if (config.isProd) {
       // Structured JSON log for production
-      console.log(JSON.stringify({
+      appLogger.info(JSON.stringify({
         ts:        new Date().toISOString(),
         rid:       requestId,
         method:    req.method,
@@ -64,7 +66,7 @@ function requestLogger(req, res, next) {
       const method = req.method.padEnd(6);
       const path = req.path.length > 50 ? req.path.slice(0, 47) + '...' : req.path.padEnd(50);
       const ms = `${duration}ms`.padStart(7);
-      console.log(`  ${color}${method}${RESET} ${path} ${color}${status}${RESET} ${ms}  ${requestId}`);
+      appLogger.info(`  ${color}${method}${RESET} ${path} ${color}${status}${RESET} ${ms}  ${requestId}`);
     }
   });
 

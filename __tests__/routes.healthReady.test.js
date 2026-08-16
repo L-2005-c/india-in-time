@@ -9,7 +9,12 @@
 // in isolation.
 
 jest.mock('../middleware/auth', () => ({
-  verifyToken: jest.fn(),
+  verifyToken: jest.fn(async () => ({
+    uid: 'admin-uid',
+    email: 'admin@example.com',
+    admin: true,
+    role: 'admin',
+  })),
 }));
 
 const express = require('express');
@@ -25,40 +30,35 @@ function buildTestApp() {
 }
 
 describe('GET /api/health/ready — admin-gated', () => {
-  const ORIGINAL_KEY = process.env.ADMIN_FEEDBACK_KEY;
   let app;
 
   beforeEach(() => {
     app = buildTestApp();
   });
 
-  afterEach(() => {
-    if (ORIGINAL_KEY === undefined) delete process.env.ADMIN_FEEDBACK_KEY;
-    else process.env.ADMIN_FEEDBACK_KEY = ORIGINAL_KEY;
-  });
+  afterEach(() => { delete process.env.FIREBASE_SERVICE_ACCOUNT; });
 
   test('rejects unauthenticated requests (regression: this used to be fully public)', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-admin-key';
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
     const res = await request(app).get('/api/health/ready');
     expect(res.status).toBe(401);
     expect(res.body.caches).toBeUndefined();
   });
 
   test('rejects an incorrect admin key', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-admin-key';
-    const res = await request(app).get('/api/health/ready').set('x-admin-key', 'wrong');
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    const res = await request(app).get('/api/health/ready').set('Authorization', 'Bearer wrong-token');
     expect(res.status).toBe(401);
   });
 
   test('allows access with the correct admin key and returns internal state', async () => {
-    process.env.ADMIN_FEEDBACK_KEY = 'test-admin-key';
-    const res = await request(app).get('/api/health/ready').set('x-admin-key', 'test-admin-key');
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    const res = await request(app).get('/api/health/ready').set('Authorization', 'Bearer test-admin-token');
     expect(res.status).toBe(200);
     expect(res.body.caches.places.size).toBe(3);
   });
 
   test('returns 503 (not a silent 200) if admin auth is completely unconfigured', async () => {
-    delete process.env.ADMIN_FEEDBACK_KEY;
     delete process.env.FIREBASE_SERVICE_ACCOUNT;
     const res = await request(app).get('/api/health/ready');
     expect(res.status).toBe(503);

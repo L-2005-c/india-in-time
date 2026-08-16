@@ -1,6 +1,7 @@
 // config/index.js — Centralized configuration
 // All environment variables are validated and typed here.
-// Fail-fast if critical vars are missing in production.
+// Production validation is explicit via validateProductionConfig() so merely
+// importing config in a unit test can never terminate a Jest worker.
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
@@ -10,37 +11,18 @@ const isProd   = NODE_ENV === 'production';
 // ── Validate critical vars ──────────────────────────────────────────────────
 function requireEnv(key) {
   const val = process.env[key];
-  if (!val || !val.trim()) {
-    console.error(`❌  Missing required environment variable: ${key}`);
-    if (isProd) process.exit(1);
-  }
   return (val || '').trim();
 }
 
-// ── Config object ───────────────────────────────────────────────────────────
-// CORS_ORIGIN='*' in production means ANY website can call this API with
-// credentials-adjacent requests. server.js used to only console.warn about
-// this; that's easy to miss in deploy logs. Fail fast instead, the same way
-// requireEnv() does for other critical vars, unless explicitly opted out
-// via CORS_ALLOW_WILDCARD=true (e.g. for a short-lived preview deploy).
+function configError(message) {
+  const err = new Error(`Production configuration error: ${message}`);
+  err.code = 'PRODUCTION_CONFIG_INVALID';
+  return err;
+}
+
 const corsOrigin = process.env.CORS_ORIGIN || '*';
-if (isProd && corsOrigin === '*' && process.env.CORS_ALLOW_WILDCARD !== 'true') {
-  console.error(
-    '❌  CORS_ORIGIN is not set (or is "*") in production. This allows any website ' +
-    'to call this API. Set CORS_ORIGIN to your real frontend origin (e.g. ' +
-    'https://indiaintime.com), or explicitly set CORS_ALLOW_WILDCARD=true if this ' +
-    'is intentional (e.g. a public read-only API).'
-  );
-  process.exit(1);
-}
 
-
-// Enterprise: require Firebase service account in production (auth is mandatory)
-if (isProd && !process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error('❌  FIREBASE_SERVICE_ACCOUNT is required in production for verified user auth.');
-  process.exit(1);
-}
-
+// ── Config object ───────────────────────────────────────────────────────────
 const config = {
   env:  NODE_ENV,
   port: parseInt(process.env.PORT, 10) || 3000,
@@ -107,9 +89,10 @@ const config = {
 
   // Server
   server: {
-    bodyLimit:          process.env.BODY_LIMIT || '5mb',
-    shutdownTimeoutMs:  10000,
+    bodyLimit:          process.env.BODY_LIMIT || '2mb',
+    shutdownTimeoutMs:  parseInt(process.env.SHUTDOWN_TIMEOUT_MS, 10) || 15000,
     trustProxy:         isProd,
+    requestTimeoutMs:   parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 30000,
   },
 
   // Paths
@@ -147,7 +130,7 @@ const config = {
 
 // ── Frontend index.html resolution ──────────────────────────────────────────
 // Frontend shell resolution:
-// - Default: source frontend/public/index.html (loads /app.js + /styles.css).
+// - Development fallback: frontend/public/dev-index.html. Production is dist-only.
 // - Opt-in dist: set USE_DIST_FRONTEND=1 in production after verifying
 //   /dist/assets/* paths resolve (Vite base is /dist/).
 // This default was chosen after a production blank-page incident where
@@ -157,10 +140,13 @@ const path = require('path');
 
 config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
   const distIndex = path.join(config.publicDir, 'dist', 'index.html');
-  const sourceIndex = path.join(config.publicDir, 'index.html');
+  const sourceIndex = path.join(config.publicDir, 'dev-index.html');
   const forceSource = process.env.USE_SOURCE_FRONTEND === '1' || process.env.USE_SOURCE_FRONTEND === 'true';
   const forceDist = process.env.USE_DIST_FRONTEND === '1' || process.env.USE_DIST_FRONTEND === 'true';
 
+  if (forceSource && config.isProd) {
+    throw configError('USE_SOURCE_FRONTEND is forbidden in production; deploy the verified Vite dist build');
+  }
   if (forceSource) return sourceIndex;
 
   function distIsHealthy() {
@@ -192,23 +178,43 @@ config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
     }
   }
 
-  if (config.isProd || forceDist) {
-    if (forceDist && fs.existsSync(distIndex)) return distIndex;
+  if (config.isProd) {
     if (distIsHealthy()) return distIndex;
+    throw configError('Production frontend build is missing or unhealthy: run npm run build:frontend before startup');
   }
+  if (forceDist && fs.existsSync(distIndex)) return distIndex;
   return sourceIndex;
 };
 
 // Enterprise runtime toggles (also see lib/featureFlags.js)
 config.enterprise = {
-  requireRedisInProd: process.env.REQUIRE_REDIS_IN_PROD === 'true',
+  requireRedisInProd: process.env.REQUIRE_REDIS_IN_PROD !== 'false',
   auditEnabled: process.env.AUDIT_LOG_ENABLED !== 'false',
+  // Shared admin keys are never enabled in runtime development or production.
+  // The compatibility path exists only inside automated test fixtures so the
+  // production application has no standing shared-secret admin credential.
 };
 
-if (config.isProd && config.enterprise.requireRedisInProd && !process.env.REDIS_URL) {
-  console.error('❌  REQUIRE_REDIS_IN_PROD=true but REDIS_URL is not set.');
-  process.exit(1);
+function validateProductionConfig() {
+  if (!config.isProd) return config;
+
+  const missing = [];
+  if (!config.gemini.apiKey) missing.push('GEMINI_API_KEY');
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) missing.push('FIREBASE_SERVICE_ACCOUNT');
+  if (config.enterprise.requireRedisInProd && !process.env.REDIS_URL) missing.push('REDIS_URL');
+
+  const cors = config.corsOrigin;
+  if (cors === '*' && process.env.CORS_ALLOW_WILDCARD !== 'true') {
+    missing.push('CORS_ORIGIN (must be a real frontend origin)');
+  }
+
+  if (missing.length) {
+    throw configError(`missing/invalid: ${missing.join(', ')}`);
+  }
+  return config;
 }
+
+config.validateProductionConfig = validateProductionConfig;
 
 module.exports = config;
 

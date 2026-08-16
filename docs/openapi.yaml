@@ -1,213 +1,911 @@
 openapi: 3.0.3
 info:
   title: India In-Time API
-  version: "1.0.0"
+  version: "3.6.0"
   description: |
-    Travel intelligence API for India In-Time.
-    Version negotiation: `X-API-Version: 1`, `?api_version=1`, or
-    `Accept: application/vnd.indiaintime.v1+json`.
+    Production API contract for India In-Time. Request and response schemas are
+    intentionally explicit so frontend, mobile, QA, and third-party clients can
+    validate payloads without reverse-engineering route implementations.
 servers:
   - url: /api
-    description: Relative to deployment origin
+    description: Deployment-relative API root
+tags:
+  - name: Health
+  - name: Places
+  - name: Weather
+  - name: Geocode
+  - name: AI
+  - name: Trips
+  - name: Favorites
+  - name: Time Intelligence
+  - name: Feedback
+  - name: Analytics
 paths:
   /health:
     get:
-      summary: Liveness health check
-      operationId: getHealth
+      tags: [Health]
+      summary: Public liveness check
       responses:
-        "200":
+        '200':
           description: Service is up
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Dependency readiness probe
+      responses:
+        '200':
+          description: Dependencies ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Prometheus metrics
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Prometheus exposition format
+          content:
+            text/plain: { schema: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /config:
+    get:
+      tags: [Health]
+      summary: Public browser configuration
+      responses:
+        '200':
+          description: Safe client configuration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicConfig' }
+  /openapi.json:
+    get:
+      tags: [Health]
+      summary: Download the API OpenAPI document
+      responses:
+        '200':
+          description: OpenAPI document
+          content:
+            text/yaml: { schema: { type: string } }
+  /geocode:
+    get:
+      tags: [Geocode]
+      summary: Geocode a place name
+      parameters:
+        - { $ref: '#/components/parameters/QueryQ' }
+      responses:
+        '200':
+          description: Geocoding result set
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: ok }
-                  ts: { type: integer }
-                  uptime: { type: number }
-                  version: { type: string }
-  /health/live:
-    get:
-      summary: Simple liveness probe
-      operationId: getHealthLive
-      responses:
-        "200":
-          description: Alive
-  /health/ready:
-    get:
-      summary: Readiness with cache + Gemini circuit state
-      operationId: getHealthReady
-      security: [{ adminKey: [] }]
-      responses:
-        "200":
-          description: Ready
-        "401":
-          description: Admin auth required
-  /metrics:
-    get:
-      summary: Prometheus metrics
-      operationId: getMetrics
-      security: [{ adminKey: [] }]
-      responses:
-        "200":
-          description: Prometheus text exposition format
-          content:
-            text/plain:
-              schema: { type: string }
-  /config:
-    get:
-      summary: Public client config (MapTiler keys etc.)
-      operationId: getConfig
-      responses:
-        "200":
-          description: Public config
-  /geocode:
-    get:
-      summary: Geocode a place name
-      operationId: geocode
-      parameters:
-        - in: query
-          name: q
-          schema: { type: string }
-          required: true
-      responses:
-        "200":
-          description: Geocoding results
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/GeocodeResult' }
+                required: [results]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /places:
     get:
+      tags: [Places]
       summary: Discover places for a city
-      operationId: listPlaces
       parameters:
-        - in: query
-          name: city
-          schema: { type: string }
+        - { name: city, in: query, required: false, schema: { type: string, maxLength: 100 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
       responses:
-        "200":
+        '200':
           description: Place list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  city: { type: string }
+                  places:
+                    type: array
+                    items: { $ref: '#/components/schemas/Place' }
+                required: [places]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /weather:
     get:
+      tags: [Weather]
       summary: Weather proxy
-      operationId: getWeather
       parameters:
-        - in: query
-          name: lat
-          schema: { type: number }
-        - in: query
-          name: lon
-          schema: { type: number }
+        - { name: lat, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lon, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
       responses:
-        "200":
+        '200':
           description: Weather payload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeatherResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /weather/alerts:
+    get:
+      tags: [Weather]
+      summary: Weather and severe-condition alerts
+      parameters:
+        - { name: city, in: query, required: false, schema: { type: string, maxLength: 100 } }
+        - { name: lat, in: query, required: false, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lon, in: query, required: false, schema: { type: number, minimum: -180, maximum: 180 } }
+      responses:
+        '200':
+          description: Alert payload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeatherAlertsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /ai:
     post:
-      summary: AI endpoints (itinerary, lens, etc.)
-      operationId: postAi
+      tags: [AI]
+      summary: Generate an AI response
       security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: AI response
-  /trips:
-    get:
-      summary: List current user trips
-      operationId: listTrips
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: Trip list
-    post:
-      summary: Save a trip
-      operationId: saveTrip
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: Saved
-  /favorites:
-    get:
-      summary: List favorites
-      operationId: listFavorites
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: Favorites
-  /time-intelligence/status:
-    post:
-      summary: Time intelligence status for places
-      operationId: timeIntelStatus
       requestBody:
         required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiRequest' }
+      responses:
+        '200':
+          description: AI response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /trips:
+    get:
+      tags: [Trips]
+      summary: List current user's saved trips
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Saved trips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trips:
+                    type: array
+                    items: { $ref: '#/components/schemas/Trip' }
+                required: [trips]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Trips]
+      summary: Save a trip
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TripCreate' }
+      responses:
+        '201':
+          description: Trip created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Trip' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /trips/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/TripId' }
+    get:
+      tags: [Trips]
+      summary: Get one saved trip owned by the caller
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Trip
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Trip' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Trips]
+      summary: Delete one saved trip owned by the caller
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: List current user's active favorites
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Favorites
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  favorites:
+                    type: array
+                    items: { $ref: '#/components/schemas/Favorite' }
+                required: [favorites]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Favorites]
+      summary: Add or restore a favorite
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FavoriteCreate' }
+      responses:
+        '201':
+          description: Favorite created or restored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Favorite' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /favorites/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/FavoriteId' }
+    delete:
+      tags: [Favorites]
+      summary: Soft-delete a favorite
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /time-intelligence/status:
+    post:
+      tags: [Time Intelligence]
+      summary: Score place status for a planned arrival time
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TimeIntelligenceStatusRequest' }
+      responses:
+        '200':
+          description: Per-place status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/TimeIntelligenceStatus' }
+                required: [results]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /time-intelligence/recommend:
+    post:
+      tags: [Time Intelligence]
+      summary: Rank places for a day
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TimeIntelligenceRecommendRequest' }
+      responses:
+        '200':
+          description: Ranked recommendations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  places:
+                    type: array
+                    items: { $ref: '#/components/schemas/RecommendedPlace' }
+                required: [places]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /time-intelligence/day-plan:
+    post:
+      tags: [Time Intelligence]
+      summary: Build a timed day plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DayPlanRequest' }
+      responses:
+        '200':
+          description: Planned itinerary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayPlanResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /time-intelligence/temporal-profile:
+    post:
+      tags: [Time Intelligence]
+      summary: Build a future time-dependent experience profile for a place
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemporalProfileRequest' }
+      responses:
+        '200':
+          description: Temporal experience windows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemporalProfileResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /time-intelligence/optimize:
+    post:
+      tags: [Time Intelligence]
+      summary: Optimize an itinerary using projected-arrival GeoAI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GeoAIOptimizeRequest' }
+      responses:
+        '200':
+          description: Geo-temporally optimized itinerary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeoAIOptimizeResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /time-intelligence/replan:
+    post:
+      tags: [Time Intelligence]
+      summary: Replan the remaining itinerary from current state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GeoAIReplanRequest' }
+      responses:
+        '200':
+          description: Updated itinerary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeoAIOptimizeResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /feedback/place:
+    post:
+      tags: [Feedback]
+      summary: Submit place feedback
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaceFeedbackCreate' }
+      responses:
+        '201':
+          description: Feedback recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedbackCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      tags: [Feedback]
+      summary: Admin place feedback summary
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Feedback summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedbackSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /feedback/app:
+    post:
+      tags: [Feedback]
+      summary: Submit app feedback
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppFeedbackCreate' }
+      responses:
+        '201':
+          description: Feedback recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedbackCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      tags: [Feedback]
+      summary: Admin app feedback summary
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Feedback summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedbackSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /analytics/gemini:
+    get:
+      tags: [Analytics]
+      summary: Gemini usage and estimated cost
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: hours, in: query, schema: { type: integer, minimum: 1, maximum: 720, default: 24 } }
+      responses:
+        '200':
+          description: Usage summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeminiAnalytics' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /analytics/ml/crowd:
+    get:
+      tags: [Analytics]
+      summary: Crowd ML model information
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Model information
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CrowdModelInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /analytics/ml/crowd/train:
+    post:
+      tags: [Analytics]
+      summary: Train crowd model from authenticated feedback
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
         content:
           application/json:
             schema:
               type: object
               properties:
-                places:
-                  type: array
-                  items: { type: object }
+                maxRows: { type: integer, minimum: 1, maximum: 100000, default: 10000 }
       responses:
-        "200":
-          description: Status array
-  /time-intelligence/recommend:
-    post:
-      summary: Rank places for a day
-      operationId: timeIntelRecommend
-      responses:
-        "200":
-          description: Ranked places
-  /time-intelligence/day-plan:
-    post:
-      summary: Build a timed day plan
-      operationId: timeIntelDayPlan
-      responses:
-        "200":
-          description: Day plan
-  /feedback:
-    post:
-      summary: Submit place or app feedback
-      operationId: postFeedback
-      responses:
-        "200":
-          description: Accepted
-  /analytics/gemini:
-    get:
-      summary: Gemini usage / cost summary
-      operationId: geminiUsage
-      security: [{ adminKey: [] }]
-      parameters:
-        - in: query
-          name: hours
-          schema: { type: integer, default: 24 }
-      responses:
-        "200":
-          description: Usage by model
+        '200':
+          description: Training result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrainingResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: Training already running }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: Firebase ID token
-    adminKey:
-      type: apiKey
-      in: header
-      name: x-admin-key
-
-  /analytics/ml/crowd:
-    get:
-      summary: Crowd ML model weights and training stats
-      security: [{ adminKey: [] }]
-      responses:
-        "200":
-          description: Model info
-  /analytics/ml/crowd/train:
-    post:
-      summary: Batch-train crowd model from place_feedback
-      security: [{ adminKey: [] }]
-      responses:
-        "200":
-          description: Training result
-  /analytics/gemini:
-    get:
-      summary: Gemini usage and estimated cost
-      security: [{ adminKey: [] }]
-      responses:
-        "200":
-          description: Usage summary
+  parameters:
+    QueryQ:
+      name: q
+      in: query
+      required: true
+      schema: { type: string, minLength: 2, maxLength: 120 }
+    TripId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    FavoriteId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceUnavailable:
+      description: Dependency not ready
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    BadGateway:
+      description: Upstream provider unavailable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        code: { type: string }
+        requestId: { type: string }
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok, alive] }
+        timestamp: { type: string, format: date-time }
+    ReadinessResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ready] }
+        checks:
+          type: object
+          additionalProperties: { type: string, enum: [ok, degraded, unavailable] }
+    PublicConfig:
+      type: object
+      properties:
+        maptilerKeys:
+          type: array
+          items: { type: string }
+    Coordinates:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items: { type: number }
+      example: [17.6868, 83.2185]
+    GeocodeResult:
+      type: object
+      properties:
+        display_name: { type: string }
+        lat: { type: number }
+        lon: { type: number }
+        type: { type: string }
+    Place:
+      type: object
+      required: [id, name, category, coords]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        coords: { $ref: '#/components/schemas/Coordinates' }
+        visitTimeMinutes: { type: integer, minimum: 0 }
+        openTime: { type: string, pattern: '^\\d{2}:\\d{2}$' }
+        closeTime: { type: string, pattern: '^\\d{2}:\\d{2}$' }
+        rating: { type: number, minimum: 0, maximum: 5 }
+        importance: { type: string }
+    WeatherResponse:
+      type: object
+      properties:
+        temperature: { type: number }
+        feelsLike: { type: number }
+        humidity: { type: number, minimum: 0, maximum: 100 }
+        weather: { type: string }
+        description: { type: string }
+        windSpeed: { type: number }
+        observedAt: { type: string, format: date-time }
+    WeatherAlertsResponse:
+      type: object
+      required: [alerts]
+      properties:
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              severity: { type: string, enum: [info, watch, warning, emergency] }
+              title: { type: string }
+              message: { type: string }
+              startsAt: { type: string, format: date-time }
+    AiRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 10000 }
+        system: { type: string, maxLength: 5000 }
+        model: { type: string, maxLength: 100 }
+        temperature: { type: number, minimum: 0, maximum: 2, default: 0.4 }
+        maxOutputTokens: { type: integer, minimum: 1, maximum: 8192, default: 2048 }
+    AiResponse:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+        model: { type: string }
+        cached: { type: boolean }
+        requestId: { type: string }
+    TripCreate:
+      type: object
+      required: [city, plan]
+      properties:
+        city: { type: string, minLength: 1, maxLength: 100 }
+        startTime: { type: string, pattern: '^\\d{2}:\\d{2}$' }
+        durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        plan:
+          type: array
+          maxItems: 30
+          items:
+            type: array
+            items: { $ref: '#/components/schemas/TripStop' }
+        budget: { type: number, minimum: 0 }
+        metadata: { type: object, additionalProperties: true }
+    Trip:
+      allOf:
+        - $ref: '#/components/schemas/TripCreate'
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string }
+            userId: { type: string }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    TripStop:
+      type: object
+      required: [name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        coords: { $ref: '#/components/schemas/Coordinates' }
+        startTime: { type: string }
+        endTime: { type: string }
+        visitMinutes: { type: integer, minimum: 0 }
+    FavoriteCreate:
+      type: object
+      required: [placeName, city]
+      properties:
+        placeName: { type: string, minLength: 1, maxLength: 200 }
+        city: { type: string, minLength: 1, maxLength: 100 }
+        category: { type: string, maxLength: 50 }
+        coords: { $ref: '#/components/schemas/Coordinates' }
+        notes: { type: string, maxLength: 2000 }
+    Favorite:
+      allOf:
+        - $ref: '#/components/schemas/FavoriteCreate'
+        - type: object
+          required: [id]
+          properties:
+            id: { type: integer, format: int64 }
+            createdAt: { type: string, format: date-time }
+    TimeIntelligenceStatusRequest:
+      type: object
+      required: [places]
+      properties:
+        city: { type: string, maxLength: 100 }
+        arrivalMinutes: { type: integer, minimum: 0, maximum: 1439, default: 600 }
+        dayOfWeek: { type: integer, minimum: 0, maximum: 6 }
+        places:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Place' }
+    TimeIntelligenceStatus:
+      type: object
+      required: [placeId, status]
+      properties:
+        placeId: { type: string }
+        status: { type: string }
+        score: { type: number }
+        crowdLevel: { type: string }
+        weatherImpact: { type: number }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        reason: { type: string }
+    TimeIntelligenceRecommendRequest:
+      type: object
+      required: [places]
+      properties:
+        city: { type: string, maxLength: 100 }
+        places:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Place' }
+        startMinutes: { type: integer, minimum: 0, maximum: 1439, default: 540 }
+        durationMinutes: { type: integer, minimum: 30, maximum: 1440, default: 480 }
+        liveRouting: { type: boolean, default: false }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lon: { type: number, minimum: -180, maximum: 180 }
+    RecommendedPlace:
+      allOf:
+        - $ref: '#/components/schemas/Place'
+        - type: object
+          properties:
+            score: { type: number }
+            confidence: { type: number, minimum: 0, maximum: 1 }
+            why: { type: string }
+            etaMinutes: { type: integer, minimum: 0 }
+    DayPlanRequest:
+      allOf:
+        - $ref: '#/components/schemas/TimeIntelligenceRecommendRequest'
+      properties:
+        maxStops: { type: integer, minimum: 1, maximum: 20, default: 8 }
+        includeMeals: { type: boolean, default: true }
+    DayPlanResponse:
+      type: object
+      required: [stops]
+      properties:
+        stops:
+          type: array
+          items: { $ref: '#/components/schemas/RecommendedPlace' }
+        totalTravelMinutes: { type: integer, minimum: 0 }
+        totalVisitMinutes: { type: integer, minimum: 0 }
+        finishMinutes: { type: integer, minimum: 0, maximum: 1439 }
+    TemporalProfileRequest:
+      type: object
+      required: [place]
+      properties:
+        place: { $ref: '#/components/schemas/Place' }
+        weather: { $ref: '#/components/schemas/WeatherInput' }
+        at: { type: string, format: date-time }
+        stepMin: { type: integer, minimum: 15, maximum: 120, default: 30 }
+        horizonHours: { type: integer, minimum: 1, maximum: 36, default: 18 }
+        personas: { type: array, items: { type: string, maxLength: 40 }, maxItems: 10 }
+        tripMode: { type: string, maxLength: 40 }
+    TemporalProfileResponse:
+      type: object
+      properties:
+        place: { type: string }
+        resolutionMinutes: { type: integer }
+        horizonHours: { type: integer }
+        windows: { type: array, items: { $ref: '#/components/schemas/ExperienceWindow' } }
+        modes: { type: object, additionalProperties: { $ref: '#/components/schemas/ExperienceWindow' } }
+        bestWindow: { $ref: '#/components/schemas/ExperienceWindow' }
+        confidence: { type: number, minimum: 0, maximum: 100 }
+    ExperienceWindow:
+      type: object
+      properties:
+        start: { type: string, pattern: '^\d{2}:\d{2}$' }
+        end: { type: string, pattern: '^\d{2}:\d{2}$' }
+        peakTime: { type: string, pattern: '^\d{2}:\d{2}$' }
+        score: { type: number, minimum: 0, maximum: 100 }
+        confidence: { type: number, minimum: 0, maximum: 100 }
+        reasons: { type: array, items: { type: string } }
+    GeoAIOptimizeRequest:
+      type: object
+      required: [places]
+      properties:
+        places: { type: array, minItems: 1, maxItems: 50, items: { $ref: '#/components/schemas/Place' } }
+        weather: { $ref: '#/components/schemas/WeatherInput' }
+        at: { type: string, format: date-time }
+        fromCoords: { type: array, minItems: 2, maxItems: 2, items: { type: number } }
+        startMin: { type: integer, minimum: 0, maximum: 1439 }
+        endMin: { type: integer, minimum: 1, maximum: 1439 }
+        maxStops: { type: integer, minimum: 1, maximum: 12, default: 8 }
+        bufferMin: { type: integer, minimum: 0, maximum: 120, default: 15 }
+        beamWidth: { type: integer, minimum: 3, maximum: 12, default: 8 }
+        personas: { type: array, items: { type: string, maxLength: 40 }, maxItems: 10 }
+        tripMode: { type: string, maxLength: 40 }
+    GeoAIReplanRequest:
+      allOf:
+        - $ref: '#/components/schemas/GeoAIOptimizeRequest'
+      properties:
+        trigger: { type: string, maxLength: 40 }
+        reason: { type: string, maxLength: 300 }
+    GeoAIOptimizeResponse:
+      type: object
+      required: [algorithm, stops]
+      properties:
+        algorithm: { type: string }
+        objective: { type: string }
+        stopCount: { type: integer, minimum: 0 }
+        totalScore: { type: number }
+        totalTravelMinutes: { type: integer, minimum: 0 }
+        temporalResolutionMinutes: { type: integer }
+        stops:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptimizedStop'
+        warnings: { type: array, items: { type: string } }
+    OptimizedStop:
+      allOf:
+        - $ref: '#/components/schemas/Place'
+        - type: object
+          properties:
+            departAt: { type: string }
+            arriveAt: { type: string }
+            leaveAt: { type: string }
+            rawArrivalAt: { type: string }
+            waitingMinutes: { type: integer, minimum: 0 }
+            stayMinutes: { type: integer, minimum: 0 }
+            travelMinutes: { type: integer, minimum: 0 }
+            travelSource: { type: string }
+            timingFit: { type: number, minimum: 0, maximum: 100 }
+            optimizationScore: { type: number }
+            bestWindow: { $ref: '#/components/schemas/ExperienceWindow' }
+    WeatherInput:
+      type: object
+      additionalProperties: true
+      description: Current/future weather data supplied by the weather provider.
+    PlaceFeedbackCreate:
+      type: object
+      required: [placeName, rating]
+      properties:
+        placeName: { type: string, minLength: 1, maxLength: 200 }
+        city: { type: string, maxLength: 100 }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        tags:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 50 }
+        comment: { type: string, maxLength: 2000 }
+    AppFeedbackCreate:
+      type: object
+      required: [rating]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        category: { type: string, maxLength: 50 }
+        comment: { type: string, maxLength: 2000 }
+    FeedbackCreated:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+        id: { type: string }
+    FeedbackSummary:
+      type: object
+      properties:
+        count: { type: integer, minimum: 0 }
+        averageRating: { type: number, minimum: 0, maximum: 5 }
+        items:
+          type: array
+          items: { type: object, additionalProperties: true }
+    GeminiAnalytics:
+      type: object
+      properties:
+        hours: { type: integer, minimum: 1 }
+        requests: { type: integer, minimum: 0 }
+        failures: { type: integer, minimum: 0 }
+        estimatedCostUsd: { type: number, minimum: 0 }
+        cachedResponses: { type: integer, minimum: 0 }
+    CrowdModelInfo:
+      type: object
+      properties:
+        version: { type: string }
+        trainedAt: { type: string, format: date-time, nullable: true }
+        sampleCount: { type: integer, minimum: 0 }
+        features: { type: array, items: { type: string } }
+    TrainingResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        modelVersion: { type: string }
+        samplesUsed: { type: integer, minimum: 0 }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }

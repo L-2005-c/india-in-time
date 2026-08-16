@@ -22,7 +22,7 @@ function estimateTravel(opts = {}) {
     const km = liveTraffic.distanceM != null ? liveTraffic.distanceM / 1000 : (fromCoords && toCoords ? distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) : null);
     const mult = liveTraffic.congestion ?? 1.0;
     const level = trafficLevelFromMult(mult);
-    return { travelMinutes: minutes, distanceKm: km != null ? Math.round(km * 10) / 10 : null, congestionFactor: mult, trafficLevel: level.level, trafficRisk: level.risk, source: 'live', label: level.label, confidence: 85 };
+    return { travelMinutes: minutes, distanceKm: km != null ? Math.round(km * 10) / 10 : null, congestionFactor: mult, trafficLevel: level.level, trafficRisk: level.risk, source: liveTraffic.provider === 'google' ? 'live_traffic' : 'route_estimate', provider: liveTraffic.provider || 'unknown', freshness: liveTraffic.freshness || 'request_time', label: liveTraffic.provider === 'google' ? level.label : `${level.label} (routing estimate; not live traffic)`, confidence: liveTraffic.provider === 'google' ? 85 : 65 };
   }
   if (!fromCoords || !toCoords || !Number.isFinite(fromCoords[0]) || !Number.isFinite(toCoords[0])) {
     return { travelMinutes: isFirstStop ? 10 : 20, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30 };

@@ -14,3 +14,7 @@
 {"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786520155126}
 {"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786520274458}
 {"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786520333470}
+{"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786817172728}
+{"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786817365610}
+{"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786817550775}
+{"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1786818500769}

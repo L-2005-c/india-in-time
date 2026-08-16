@@ -1,7 +1,6 @@
-// Regression tests for the CORS_ORIGIN='*' production guard added to
-// config/index.js. Because config/index.js has top-level side effects
-// (it may call process.exit), we mock process.exit and re-require the
-// module fresh for each scenario.
+// Regression tests for the production configuration guard. Config validation
+// is now explicit and throws a typed error instead of terminating the process
+// during module import, so Jest workers remain isolated and testable.
 
 function loadConfigFresh() {
   jest.resetModules();
@@ -10,22 +9,19 @@ function loadConfigFresh() {
 
 describe('config CORS wildcard guard', () => {
   const ORIGINAL_ENV = { ...process.env };
-  let exitSpy;
 
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV };
     process.env.GEMINI_API_KEY = 'test-key';
     // avoid tripping config's *separate* production Firebase guard in the
-    // tests below that expect NOT to exit — this suite only cares about the
-    // CORS wildcard guard specifically. See middleware.errorHandler.test.js
+    // tests below that require a complete production configuration. This suite
+    // only cares about the CORS wildcard guard specifically. See
+    // middleware.errorHandler.test.js
     // for the matching comment on that guard.
     process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({
       project_id: 'test-project',
       client_email: 'test@test-project.iam.gserviceaccount.com',
       private_key: 'test-key',
-    });
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((code) => {
-      throw new Error(`process.exit(${code}) called`);
     });
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -35,37 +31,34 @@ describe('config CORS wildcard guard', () => {
     jest.restoreAllMocks();
   });
 
-  test('exits the process if CORS_ORIGIN is wildcard in production', () => {
+  test('rejects invalid wildcard CORS configuration in production without exiting the test worker', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.CORS_ORIGIN;
     delete process.env.CORS_ALLOW_WILDCARD;
 
-    expect(() => loadConfigFresh()).toThrow('process.exit(1) called');
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    const config = loadConfigFresh();
+    expect(() => config.validateProductionConfig()).toThrow(/Production configuration error/);
   });
 
-  test('does NOT exit if CORS_ORIGIN is explicitly set to a real origin', () => {
+  test('accepts a real CORS origin in production config', () => {
     process.env.NODE_ENV = 'production';
     process.env.CORS_ORIGIN = 'https://indiaintime.com';
 
     expect(() => loadConfigFresh()).not.toThrow();
-    expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  test('allows wildcard in production if explicitly opted in via CORS_ALLOW_WILDCARD', () => {
+  test('accepts an explicitly opted-in wildcard in production config', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.CORS_ORIGIN;
     process.env.CORS_ALLOW_WILDCARD = 'true';
 
     expect(() => loadConfigFresh()).not.toThrow();
-    expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  test('does NOT exit on wildcard outside of production (development)', () => {
+  test('does not validate the production CORS guard outside production', () => {
     process.env.NODE_ENV = 'development';
     delete process.env.CORS_ORIGIN;
 
     expect(() => loadConfigFresh()).not.toThrow();
-    expect(exitSpy).not.toHaveBeenCalled();
   });
 });

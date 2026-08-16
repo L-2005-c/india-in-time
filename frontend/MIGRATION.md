@@ -8,7 +8,7 @@ by the browser with no build step. It's now a proper Vite project at
 
 ```
 frontend/
-  public/            ← UNCHANGED. Old monolithic app.js/index.html/styles.css
+  public/            ← static runtime assets only; legacy app/index/styles were retired
                        still here and still fully functional — see "Safety net"
                        below. Also holds true static assets (icons, manifest.json,
                        sw.js, admin-feedback.html) which the new build still
@@ -74,7 +74,7 @@ the core planner/navigation logic last (most interconnected).
   Open `http://localhost:5173`.
 
 - **Old workflow, unchanged:** `npm run dev` alone still serves the original
-  `frontend/public/index.html` + `app.js` exactly as before — nothing about
+  `frontend/app-src/index.html` + the Vite module graph — the production runtime is now canonical and single-source.
   that path was touched. Useful as a fallback or for comparing behavior.
 
 **Production:** `npm run build:frontend` now runs `vite build` (previously
@@ -86,7 +86,7 @@ Static assets (icons, manifest.json, sw.js) keep being served straight from
 
 ## Safety net
 
-`frontend/public/app.js`, `index.html`, and `styles.css` are untouched and
+The old `frontend/public` application shell was retired; static assets that remain there are deployment assets only.
 still fully working — they're just no longer built by `npm run build:frontend`.
 If anything about the new build ever needs to be rolled back in production,
 reverting `scripts/build-frontend.js` (or just not running it) falls straight

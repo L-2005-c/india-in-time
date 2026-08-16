@@ -13,6 +13,22 @@ function computeConfidence(flags = {}) {
   if (flags.hasLiveTraffic) { score += 10; sources.push('liveTraffic'); }
   score = Math.max(15, Math.min(cfg.max ?? 95, Math.round(score)));
   const level = score >= 80 ? 'High' : score >= 60 ? 'Medium' : score >= 40 ? 'Low' : 'Very Low';
-  return { confidence: score, level, sources, note: score >= 80 ? 'Most key signals available' : score >= 60 ? 'Core signals present; some estimates used' : 'Limited data — recommendation relies more on rules' };
+  const confidenceReasons = [];
+  if (!flags.hasWeather) confidenceReasons.push('weather unavailable');
+  if (!flags.hasCoords) confidenceReasons.push('coordinates unavailable');
+  if (!flags.hasOpeningHours) confidenceReasons.push('opening hours not verified');
+  if (!flags.hasHistoricalHint) confidenceReasons.push('limited historical crowd observations');
+  if (!flags.hasLiveTraffic) confidenceReasons.push('live traffic unavailable');
+  return {
+    confidenceScore: score,
+    confidence: score,
+    confidenceLevel: level,
+    level,
+    confidenceReasons,
+    sources,
+    dataSources: sources,
+    dataFreshness: flags.dataFreshness || null,
+    note: score >= 80 ? 'Most key signals available' : score >= 60 ? 'Core signals present; some estimates used' : 'Limited data — recommendation relies more on rules',
+  };
 }
 module.exports = { computeConfidence };
