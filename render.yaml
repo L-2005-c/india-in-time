@@ -1,0 +1,52 @@
+# Render deployment blueprint.
+# The codebase's own comments (middleware/auth.js, scripts/backup-db.js)
+# confirm Render as the actual deployment target, so this uses Render's
+# native Node runtime rather than assuming the Dockerfile is the deploy
+# path — both are available; pick whichever this service is actually
+# configured to use in the Render dashboard.
+services:
+  - type: web
+    name: india-in-time-api
+    runtime: node
+    plan: starter
+    region: singapore # closest Render region to India as of writing; change if a closer one exists by the time you deploy
+    # Full `npm ci` (not --omit=dev) because build:frontend needs esbuild/
+    # clean-css-cli (devDependencies) to produce frontend/public/dist/ —
+    # config.resolveIndexHtmlPath() already serves that automatically in
+    # production when present (see config/index.js), but nothing previously
+    # ran the build itself as part of a real deploy. `npm prune --omit=dev`
+    # afterward drops the devDependencies from node_modules before
+    # startCommand runs, so the running process's dependency footprint is
+    # unchanged from before.
+    buildCommand: npm ci && npm run build:frontend && npm prune --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # set manually — Neon connection string, use the pooled one
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false # set to your real frontend origin in production; defaults to * otherwise
+      - key: REDIS_URL
+        sync: false
+      - key: REQUIRE_REDIS_IN_PROD
+        value: 'true'
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: 'true'
+      - key: CLUSTER_WORKERS
+        value: '1'
+      - key: LIVE_ROUTING_CONCURRENCY
+        value: '5'
+      - key: REQUEST_TIMEOUT_MS
+        value: '30000'
+      - key: SHUTDOWN_TIMEOUT_MS
+        value: '15000'
+      - key: USE_DIST_FRONTEND
+        value: '1'
+      - key: BACKUP_RETENTION_DAYS
+        value: '7'

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Feedback — India In-Time Admin</title>
+<style>
+  :root{
+    --bg:#0d0d16; --bg-card:#15151f; --bg-card2:#1a1a27; --border:#2a2a3a;
+    --text:#e8e8f0; --text-muted:#8888a0; --gold:#c9a961; --purple:#a855f7;
+    --green:#34d399; --red:#f87171; --amber:#fbbf24;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px;}
+  h1{font-family:Georgia,serif;font-size:26px;margin:0 0 4px;}
+  .sub{color:var(--text-muted);font-size:13px;margin:0 0 28px;}
+
+  /* Gate */
+  #gate{max-width:380px;margin:120px auto;text-align:center;}
+  #gate input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;margin:14px 0;}
+  #gate button{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--gold),#a8863f);color:#1a1200;font-weight:700;font-size:14px;cursor:pointer;}
+  #gate-err{color:var(--red);font-size:12px;min-height:16px;margin-top:8px;}
+
+  /* Dashboard */
+  #dash{display:none;}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+  .stat{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .stat .num{font-size:26px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);}
+  .tab{padding:10px 16px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  table{width:100%;border-collapse:collapse;background:var(--bg-card);border-radius:12px;overflow:hidden;}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);padding:10px 12px;background:var(--bg-card2);}
+  td{padding:10px 12px;font-size:13px;border-top:1px solid var(--border);vertical-align:top;}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .stars{color:var(--gold);white-space:nowrap;}
+  .cat{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:rgba(168,85,247,.15);color:var(--purple);}
+  .acc-yes{color:var(--green);font-size:11px;}
+  .acc-no{color:var(--red);font-size:11px;}
+  .acc-unk{color:var(--text-muted);font-size:11px;}
+  .comment{color:var(--text-muted);font-style:italic;max-width:280px;}
+  .empty{padding:40px;text-align:center;color:var(--text-muted);font-size:13px;}
+  .refresh{float:right;background:var(--bg-card2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;}
+  .refresh:hover{border-color:var(--gold);}
+  .time{color:var(--text-muted);font-size:11px;white-space:nowrap;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .filters select,.filters input{background:var(--bg-card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px;}
+  .filters input{flex:1;min-width:160px;}
+  .cat-breakdown{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .cat-chip{font-size:11px;padding:4px 10px;border-radius:20px;background:var(--bg-card2);border:1px solid var(--border);color:var(--text-muted);}
+  .cat-chip b{color:var(--text);}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>🔒 Feedback Admin</h1>
+  <p class="sub">India In-Time — internal dashboard</p>
+  <button id="admin-sign-in">Sign in with Google</button>
+  <p class="sub" id="admin-auth-status">Checking administrator access…</p>
+  <div id="gate-err"></div>
+</div>
+
+<div class="wrap" id="dash">
+  <h1>💬 Feedback Dashboard</h1>
+  <p class="sub">Real user feedback — the data flywheel behind the GeoAI Time Intelligence Engine.</p>
+  <button class="refresh" data-action="loadAll">↻ Refresh</button>
+
+  <div class="stat-row" id="stats"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="app" data-action="showTab">App Experience</div>
+    <div class="tab" data-tab="place" data-action="showTab">Place Ratings</div>
+  </div>
+
+  <div class="panel active" id="panel-app">
+    <div class="filters">
+      <select id="f-cat" data-filter-action="renderApp">
+        <option value="">All categories</option>
+        <option value="love_it">Loving it 😍</option>
+        <option value="bug">Found a bug 🐛</option>
+        <option value="feature_request">Missing something 💡</option>
+        <option value="confusing">Confusing 🤔</option>
+        <option value="general">Just general 💭</option>
+      </select>
+      <select id="f-rating" data-filter-action="renderApp">
+        <option value="">Any rating</option>
+        <option value="5">★★★★★ only</option>
+        <option value="4">4★ and up</option>
+        <option value="3">3★ and up</option>
+        <option value="2">2★ and below</option>
+        <option value="1">1★ only</option>
+      </select>
+      <input type="text" id="f-search" placeholder="Search message…" data-filter-action="renderApp">
+    </div>
+    <div class="cat-breakdown" id="cat-breakdown"></div>
+    <table id="tbl-app"><thead><tr><th>When</th><th>Rating</th><th>Category</th><th>Message</th><th>Screen</th></tr></thead><tbody></tbody></table>
+    <div class="empty" id="empty-app" style="display:none">No app feedback yet — once someone taps "App Feedback" in the drawer, it shows up here.</div>
+  </div>
+
+  <div class="panel" id="panel-place">
+    <table id="tbl-place"><thead><tr><th>When</th><th>Place</th><th>City</th><th>Rating</th><th>Timing accurate?</th><th>Comment</th></tr></thead><tbody></tbody></table>
+    <div class="empty" id="empty-place" style="display:none">No place ratings yet — these appear when someone rates a stop after arriving.</div>
+  </div>
+</div>
+
+<script type="module" src="/admin-feedback.js"></script>
+</body>
+</html>

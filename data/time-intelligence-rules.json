@@ -1,0 +1,564 @@
+{
+  "_comment": "Data-driven rules for the GeoAI Time / Travel Intelligence Engine.",
+  "categories": {
+    "temple": {
+      "peakHours": [
+        [
+          "06:00",
+          "08:30"
+        ],
+        [
+          "17:30",
+          "20:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "06:00",
+          "09:00"
+        ],
+        [
+          "17:30",
+          "19:30"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "any",
+      "indoorFallback": "indoor",
+      "scoringProfile": "temple"
+    },
+    "beach": {
+      "peakHours": [
+        [
+          "16:30",
+          "19:30"
+        ]
+      ],
+      "bestHours": [
+        [
+          "05:30",
+          "07:30"
+        ],
+        [
+          "16:30",
+          "18:30"
+        ]
+      ],
+      "nightAvailable": true,
+      "weeklyHoliday": null,
+      "season": "winter",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "beach"
+    },
+    "scenic": {
+      "peakHours": [
+        [
+          "16:00",
+          "18:30"
+        ]
+      ],
+      "bestHours": [
+        [
+          "06:00",
+          "09:00"
+        ],
+        [
+          "16:00",
+          "18:00"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "any",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "viewpoint"
+    },
+    "museum": {
+      "peakHours": [
+        [
+          "11:00",
+          "14:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "10:00",
+          "12:00"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": "Monday",
+      "season": "any",
+      "indoorFallback": "indoor",
+      "scoringProfile": "indoor"
+    },
+    "fort": {
+      "peakHours": [
+        [
+          "10:00",
+          "13:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "07:00",
+          "09:30"
+        ],
+        [
+          "16:00",
+          "17:30"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "winter",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "monument"
+    },
+    "park": {
+      "peakHours": [
+        [
+          "17:00",
+          "19:30"
+        ]
+      ],
+      "bestHours": [
+        [
+          "06:00",
+          "08:30"
+        ],
+        [
+          "16:30",
+          "18:30"
+        ]
+      ],
+      "nightAvailable": true,
+      "weeklyHoliday": null,
+      "season": "any",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "nature"
+    },
+    "garden": {
+      "peakHours": [
+        [
+          "16:30",
+          "19:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "06:30",
+          "09:00"
+        ],
+        [
+          "16:30",
+          "18:00"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "winter",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "nature"
+    },
+    "waterfall": {
+      "peakHours": [
+        [
+          "11:00",
+          "14:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "09:00",
+          "12:00"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "monsoon",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "nature"
+    },
+    "hill": {
+      "peakHours": [
+        [
+          "10:00",
+          "13:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "06:00",
+          "09:00"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "summer",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "viewpoint"
+    },
+    "market": {
+      "peakHours": [
+        [
+          "18:00",
+          "21:30"
+        ]
+      ],
+      "bestHours": [
+        [
+          "18:00",
+          "21:00"
+        ]
+      ],
+      "nightAvailable": true,
+      "weeklyHoliday": null,
+      "season": "any",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "market"
+    },
+    "food": {
+      "peakHours": [
+        [
+          "12:30",
+          "14:30"
+        ],
+        [
+          "19:30",
+          "22:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "12:30",
+          "14:30"
+        ],
+        [
+          "19:30",
+          "22:00"
+        ]
+      ],
+      "nightAvailable": true,
+      "weeklyHoliday": null,
+      "season": "any",
+      "indoorFallback": "indoor",
+      "scoringProfile": "restaurant"
+    },
+    "monument": {
+      "peakHours": [
+        [
+          "10:00",
+          "13:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "06:30",
+          "09:00"
+        ],
+        [
+          "16:30",
+          "18:00"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": "Friday",
+      "season": "winter",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "monument"
+    },
+    "default": {
+      "peakHours": [
+        [
+          "11:00",
+          "14:00"
+        ],
+        [
+          "17:00",
+          "19:00"
+        ]
+      ],
+      "bestHours": [
+        [
+          "07:00",
+          "09:30"
+        ],
+        [
+          "16:30",
+          "18:30"
+        ]
+      ],
+      "nightAvailable": false,
+      "weeklyHoliday": null,
+      "season": "any",
+      "indoorFallback": "outdoor",
+      "scoringProfile": "default"
+    }
+  },
+  "crowdWeights": {
+    "weekend": 1.4,
+    "publicHoliday": 1.6,
+    "peakHourMultiplier": 1.5,
+    "baseByDaypart": {
+      "earlyMorning": 0.3,
+      "morning": 0.6,
+      "lateMorning": 0.8,
+      "afternoon": 0.9,
+      "evening": 1.1,
+      "night": 0.5
+    },
+    "seasonMultiplier": {
+      "winter": 1.15,
+      "summer": 0.95,
+      "monsoon": 0.85,
+      "autumn": 1.05
+    },
+    "placeTypeMultiplier": {
+      "market": 1.2,
+      "food": 1.15,
+      "temple": 1.1,
+      "beach": 1.1,
+      "scenic": 1.05,
+      "default": 1.0
+    }
+  },
+  "personas": {
+    "photographer": {
+      "sunrise": 2.0,
+      "sunset": 2.0,
+      "scenic": 1.4,
+      "monument": 1.2
+    },
+    "family": {
+      "safety": 1.6,
+      "park": 1.3,
+      "garden": 1.3,
+      "museum": 1.2
+    },
+    "adventure": {
+      "hill": 1.6,
+      "waterfall": 1.5,
+      "fort": 1.3
+    },
+    "food_lover": {
+      "food": 1.8,
+      "market": 1.5
+    },
+    "history": {
+      "monument": 1.7,
+      "fort": 1.6,
+      "museum": 1.6,
+      "temple": 1.2
+    },
+    "nature": {
+      "park": 1.6,
+      "garden": 1.5,
+      "beach": 1.3,
+      "waterfall": 1.4
+    }
+  },
+  "tripModes": {
+    "solo": {
+      "cafe": 1.3,
+      "museum": 1.3,
+      "market": 1.2,
+      "sunrise": 1.3,
+      "sunset": 1.3,
+      "nightlife": 0.85
+    },
+    "duo": {
+      "sunset": 1.6,
+      "sunrise": 1.3,
+      "beach": 1.3,
+      "scenic": 1.4,
+      "garden": 1.3,
+      "food": 1.2
+    },
+    "trio": {
+      "food": 1.4,
+      "market": 1.3,
+      "nightlife": 1.2,
+      "scenic": 1.2
+    },
+    "family": {
+      "park": 1.4,
+      "garden": 1.4,
+      "museum": 1.3,
+      "temple": 1.15,
+      "nightlife": 0.5
+    },
+    "group": {
+      "market": 1.3,
+      "food": 1.4,
+      "nightlife": 1.3,
+      "monument": 1.15
+    }
+  },
+  "scoringWeights": {
+    "default": {
+      "weather": 0.18,
+      "crowd": 0.2,
+      "traffic": 0.12,
+      "scenic": 0.18,
+      "time": 0.12,
+      "opening": 0.12,
+      "preferences": 0.08
+    },
+    "profiles": {
+      "beach": {
+        "weather": 0.25,
+        "crowd": 0.18,
+        "traffic": 0.1,
+        "scenic": 0.22,
+        "time": 0.1,
+        "opening": 0.08,
+        "preferences": 0.07
+      },
+      "viewpoint": {
+        "weather": 0.2,
+        "crowd": 0.15,
+        "traffic": 0.1,
+        "scenic": 0.3,
+        "time": 0.12,
+        "opening": 0.05,
+        "preferences": 0.08
+      },
+      "temple": {
+        "weather": 0.1,
+        "crowd": 0.25,
+        "traffic": 0.12,
+        "scenic": 0.08,
+        "time": 0.15,
+        "opening": 0.2,
+        "preferences": 0.1
+      },
+      "restaurant": {
+        "weather": 0.08,
+        "crowd": 0.22,
+        "traffic": 0.15,
+        "scenic": 0.05,
+        "time": 0.15,
+        "opening": 0.25,
+        "preferences": 0.1
+      },
+      "indoor": {
+        "weather": 0.05,
+        "crowd": 0.22,
+        "traffic": 0.12,
+        "scenic": 0.05,
+        "time": 0.18,
+        "opening": 0.28,
+        "preferences": 0.1
+      },
+      "monument": {
+        "weather": 0.15,
+        "crowd": 0.2,
+        "traffic": 0.12,
+        "scenic": 0.18,
+        "time": 0.12,
+        "opening": 0.13,
+        "preferences": 0.1
+      },
+      "nature": {
+        "weather": 0.22,
+        "crowd": 0.15,
+        "traffic": 0.1,
+        "scenic": 0.25,
+        "time": 0.1,
+        "opening": 0.08,
+        "preferences": 0.1
+      },
+      "market": {
+        "weather": 0.12,
+        "crowd": 0.28,
+        "traffic": 0.12,
+        "scenic": 0.05,
+        "time": 0.15,
+        "opening": 0.18,
+        "preferences": 0.1
+      }
+    }
+  },
+  "visitScoreBands": {
+    "exceptional": [
+      90,
+      100
+    ],
+    "excellent": [
+      75,
+      89
+    ],
+    "good": [
+      60,
+      74
+    ],
+    "fair": [
+      40,
+      59
+    ],
+    "poor": [
+      0,
+      39
+    ]
+  },
+  "confidence": {
+    "base": 55,
+    "hasWeather": 12,
+    "hasCoords": 8,
+    "hasOpeningHours": 10,
+    "hasCategoryRules": 8,
+    "hasTrafficEstimate": 5,
+    "hasHistoricalHint": 5,
+    "max": 95
+  },
+  "trafficPatterns": {
+    "morningPeak": {
+      "start": 480,
+      "end": 600,
+      "mult": 1.55
+    },
+    "midMorning": {
+      "start": 600,
+      "end": 720,
+      "mult": 1.15
+    },
+    "lunch": {
+      "start": 720,
+      "end": 840,
+      "mult": 1.12
+    },
+    "afternoon": {
+      "start": 840,
+      "end": 1020,
+      "mult": 1.08
+    },
+    "eveningPeak": {
+      "start": 1020,
+      "end": 1200,
+      "mult": 1.65
+    },
+    "lateEvening": {
+      "start": 1200,
+      "end": 1320,
+      "mult": 0.95
+    },
+    "night": {
+      "start": 1320,
+      "end": 360,
+      "mult": 0.7
+    },
+    "default": 1.0
+  },
+  "goldenHour": {
+    "morningOffsetMin": 60,
+    "eveningOffsetMin": 45,
+    "blueHourOffsetMin": 20
+  },
+  "buffers": {
+    "arrivalBufferMin": 15,
+    "departureBufferMin": 10,
+    "itineraryBufferMin": 20
+  }
+}
