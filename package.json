@@ -23,7 +23,7 @@
     "loadtest:redis-ratelimit": "node scripts/redis-loadtest/run.js",
     "loadtest:redis-failopen": "node scripts/redis-loadtest/fail-open-check.js",
     "loadtest:redis-cache": "node scripts/redis-loadtest/cache-check.js",
-    "test:ci": "jest --runInBand --coverage --coverageThreshold='{\"global\":{\"statements\":70,\"branches\":60,\"functions\":70,\"lines\":70}}'",
+    "test:ci": "jest --runInBand --coverage",
     "security:audit": "npm audit --audit-level=high",
     "check:production": "node scripts/production-check.js",
     "slo:report": "node scripts/slo-report.js",
@@ -56,7 +56,15 @@
       "/frontend/",
       "/__tests__/e2e/specs/",
       "/__tests__/e2e/playwright.config.js"
-    ]
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 70,
+        "branches": 60,
+        "functions": 70,
+        "lines": 70
+      }
+    }
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

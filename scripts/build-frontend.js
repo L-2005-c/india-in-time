@@ -19,11 +19,11 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 
 const VITE_CONFIG = path.join(__dirname, '..', 'frontend', 'app-src', 'vite.config.js');
-const VITE_BIN = path.join(__dirname, '..', 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite');
+const VITE_BIN = path.join(__dirname, '..', 'node_modules', 'vite', 'bin', 'vite.js');
 
 function main() {
   console.log('Building frontend production bundle (Vite)...');
-  execFileSync(VITE_BIN, ['build', '--config', VITE_CONFIG], { stdio: 'inherit' });
+  execFileSync(process.execPath, [VITE_BIN, 'build', '--config', VITE_CONFIG], { stdio: 'inherit' });
 
   // Safety: public static files live at site root (logo, client-api, manifest,
   // favicons). If any tool rewrote them under /dist/, put them back.
