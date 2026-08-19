@@ -1001,6 +1001,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   const tTime  = parseInt(document.getElementById('t-time')?.value)  || 600;
   const nDaysL = parseInt(document.getElementById('n-days')?.value)  || 1;
   const totalTripMinutesL = tTime * nDaysL;
+  const fetchMinutes = Math.min(totalTripMinutesL, 1800); // cap discovery (server already caps place count)
   const cityKey = String(cityName||'').toLowerCase();
   const cacheKey = `${cityKey}|${totalTripMinutesL}`;
   if(!force && placeCache.has(cacheKey)){
@@ -1009,10 +1010,16 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
     placeCache.delete(cacheKey);
   }
   // Reuse same-city cache when day count changes (avoid slow multi-day re-fetch)
-  if(!force && LOCS.length < 8){
+  if(!force){
     const fb=_placesFromCityCache(cityKey,8);
-    if(fb){ LOCS=fb; placeCache.set(cacheKey,LOCS.map(p=>({...p,coords:[...p.coords]}))); return { places:LOCS, source:'cache-city-fallback' }; }
+    if(fb){
+      if(LOCS.length < 8) LOCS=fb;
+      placeCache.set(cacheKey, (LOCS.length?LOCS:fb).map(p=>({...p,coords:[...p.coords]})));
+      if(LOCS.length >= 8 && !force) return { places:LOCS, source:'cache-city-fallback' };
+    }
   }
+  // Already have a solid pool — skip network unless forced refresh
+  if(!force && LOCS.length >= 16) return { places: LOCS, source: 'existing-pool' };
   if(!force && placeLoadPromises.has(cacheKey)){
     try {
       const pending = await placeLoadPromises.get(cacheKey);
@@ -1023,10 +1030,17 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   const localPlaces=getLocalPlaces(currentCityId, cityName);
   if(localPlaces.length && !LOCS.length){ LOCS=localPlaces; updatePlannerShowcase(); }
   if(!silent && !localPlaces.length && !LOCS.length) addMsg(`🤖 <strong>Finding the best places in ${cityName}...</strong> This usually takes a few seconds.`);
+  const doFetch = () => API.fetchPlaces(lat, lon, cityName, fetchMinutes, { refresh: force });
   try {
-    const request = API.fetchPlaces(lat, lon, cityName, totalTripMinutesL, { refresh: force });
-    placeLoadPromises.set(cacheKey, request);
-    const result = await request;
+    let result;
+    try {
+      const request = doFetch(); placeLoadPromises.set(cacheKey, request); result = await request;
+    } catch (firstErr) {
+      const isTimeout = firstErr?.name==='TimeoutError' || /timed out|timeout|abort/i.test(String(firstErr?.message||''));
+      if(!isTimeout) throw firstErr;
+      browserLogger.warn('loadCityPlaces timeout, retrying once…', firstErr);
+      const retry = doFetch(); placeLoadPromises.set(cacheKey, retry); result = await retry;
+    }
     placeLoadPromises.delete(cacheKey);
     const fetchedPlaces=(result.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
     LOCS = withHiddenGems(currentCityId, mergePlacePools(localPlaces.length ? localPlaces : LOCS, fetchedPlaces));
@@ -1041,14 +1055,16 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
     return result;
   } catch(e) {
     placeLoadPromises.delete(cacheKey);
-    browserLogger.error('loadCityPlaces error:', e);
     if(!LOCS.length && localPlaces.length){ LOCS = localPlaces; updatePlannerShowcase(); }
-    if(!silent){
-      if(LOCS.length) showToast('⚠️','Places refresh timed out',`Using ${LOCS.length} places already loaded for ${cityName}. You can still generate.`,4500);
-      else { addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`); showToast('⚠️','Couldn\'t refresh places',`Showing what we have for ${cityName} — will retry automatically.`,4500); }
+    // Recoverable timeout with existing places → warn, not error (avoids red console noise)
+    if(LOCS.length){
+      browserLogger.warn('loadCityPlaces timed out; using existing places:', e?.message||e);
+      if(!silent) showToast('⚠️','Places refresh timed out',`Using ${LOCS.length} places already loaded for ${cityName}. You can still generate.`,4500);
+      return { places: LOCS, source: 'stale-after-error' };
     }
-    if(!LOCS.length) throw e;
-    return { places: LOCS, source: 'stale-after-error' };
+    browserLogger.error('loadCityPlaces error:', e);
+    if(!silent){ addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`); showToast('⚠️','Couldn\'t refresh places',`Showing what we have for ${cityName} — will retry automatically.`,4500); }
+    throw e;
   }
 }
 
@@ -1348,21 +1364,19 @@ async function generatePlan(){
   ['btn-save','btn-share','btn-replay','btn-ls','btn-wa'].forEach(id=>document.getElementById(id).style.display='inline-flex');
   renderTabs();
   resetTrimNotice(); // fresh plan — allow the "stops didn't fit" notice to fire again if it applies
-  const plannedStopCount = mdPlan.flat().length; // count BEFORE route rendering may trim for time-window fit
-  // Pre-sync every day's reorder + time-window trim up front (not just day 1
-// …
+  const plannedStopCount = mdPlan.flat().length;
   const cityCenterCoords = (CITIES[currentCityId]?.lat && CITIES[currentCityId]?.lon) ? [CITIES[currentCityId].lat, CITIES[currentCityId].lon] : routeStart;
-  for(let d=1; d<mdPlan.length; d++){
+  for(let d=0; d<mdPlan.length; d++){
     const savedItin=itin, savedDayIdx=dayIdx;
     itin=mdPlan[d]; dayIdx=d;
-    itin=applyBreakPlanToCurrentItinerary(optimizeStopOrder(getRouteStopsForDay(itin),cityCenterCoords));
+    const stops=getRouteStopsForDay(itin);
+    const hasFixedSlots=stops.some(s=>s.geoOptimized&&s.arriveAt);
+    itin=applyBreakPlanToCurrentItinerary((!hasFixedSlots && d>0) ? optimizeStopOrder(stops,cityCenterCoords) : stops);
     recalcTimes({trimToWindow:true, dayLabel:`Day ${d+1}`});
-    mdPlan[d]=itin;
-    itin=savedItin; dayIdx=savedDayIdx;
+    itin.forEach(s=>{ if(!s.isBreak){ s.scheduleLocked=true; if(s.std&&!s.arriveAt) s.arriveAt=s.sts; if(s.etd&&!s.leaveAt) s.leaveAt=s.ets; } });
+    mdPlan[d]=itin; itin=savedItin; dayIdx=savedDayIdx;
   }
   await switchDay(0,true);
-  // switchDay()→optimizeRoute()→renderRoute() can drop stops that don't fit
-// …
   mdPlan[dayIdx]=itin;
   const actualStopCount=mdPlan.flat().length;
   const trimmedNote = actualStopCount<plannedStopCount
@@ -1377,7 +1391,18 @@ async function generatePlan(){
 }
 
 function renderTabs(){const c=document.getElementById('day-tabs');if(mdPlan.length<=1){c.style.display='none';return;}c.style.display='flex';c.innerHTML='';mdPlan.forEach((_,i)=>{const b=document.createElement('div');b.textContent=`Day ${i+1}`;b.className='day-tab'+(i===0?' active':'');b.addEventListener('click', () => switchDay(i));c.appendChild(b);});}
-async function switchDay(idx,init=false){dayIdx=idx;itin=mdPlan[dayIdx]||[];document.querySelectorAll('.day-tab').forEach((b,i)=>b.classList.toggle('active',i===idx));document.getElementById('btn-start').textContent='🚀 Start Live Tracking';document.getElementById('btn-start').disabled=false;tripActive=false;tripStart=null;lastHeading=null;lastSpokenNavInstruction='';autoFollowLive=true;streetQuestActive=false;clearStreetQuestLayers();applyMapHeadingRotation();updateStreetQuestUI();updateFollowButton();document.getElementById('trip-st').textContent=`DAY ${idx+1}`;await optimizeRoute(true);}
+async function switchDay(idx,init=false){
+  dayIdx=idx;itin=mdPlan[dayIdx]||[];
+  document.querySelectorAll('.day-tab').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  document.getElementById('btn-start').textContent='🚀 Start Live Tracking';
+  document.getElementById('btn-start').disabled=false;
+  tripActive=false;tripStart=null;lastHeading=null;lastSpokenNavInstruction='';
+  autoFollowLive=true;streetQuestActive=false;clearStreetQuestLayers();
+  applyMapHeadingRotation();updateStreetQuestUI();updateFollowButton();
+  document.getElementById('trip-st').textContent=`DAY ${idx+1}`;
+  // Render only — never re-optimize on tab switch (that shifted timeslots).
+  await renderRoute();
+}
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 function chatAbout(name){switchToView('chat-view',2);setTimeout(()=>{document.getElementById('chat-in').value=`Tell me about ${name}`;handleChat();},200);}
@@ -2129,11 +2154,12 @@ function recalcTimes(opts={}){
   let dropped=0;
   let droppedNames=[];
   for(const loc of itin){
-    if(!tripActive && loc.geoOptimized && loc.arriveAt && loc.leaveAt){
+    // Preserve fixed timeslots (GeoAI / locked after Generate) — no sequential drift.
+    if(!tripActive && (loc.geoOptimized || loc.scheduleLocked) && (loc.arriveAt || loc.sts) && (loc.leaveAt || loc.ets)){
       const startBase = getScheduleStart();
       const startMin = startBase.getHours() * 60 + startBase.getMinutes();
-      const arriveMin = t2m(loc.arriveAt, startMin);
-      const leaveMin = t2m(loc.leaveAt, arriveMin + Math.max(1, parseInt(loc.vt, 10) || 45));
+      const arriveMin = t2m(loc.arriveAt||loc.sts, startMin);
+      const leaveMin = t2m(loc.leaveAt||loc.ets, arriveMin + Math.max(1, parseInt(loc.vt, 10) || 45));
       const arrive = new Date(startBase); arrive.setHours(Math.floor(arriveMin/60), arriveMin%60, 0, 0);
       const depart = new Date(startBase); depart.setHours(Math.floor(leaveMin/60), leaveMin%60, 0, 0);
       loc.sts=fmt12(arrive); loc.std=arrive; loc.ets=fmt12(depart); loc.etd=depart;
@@ -2145,10 +2171,6 @@ function recalcTimes(opts={}){
     const depart=new Date(arrive.getTime()+visit*60000);
     if(trimToWindow && depart>windowEnd){
       dropped=itin.length-kept.length;
-      // Capture what's actually being cut so the caller can tell the user —
-      // previously these stops just vanished from the plan with no
-      // explanation, which is what made a "5 stop" plan silently render as
-      // only 3 in the UI.
       droppedNames=itin.slice(kept.length).filter(l=>!l.isBreak).map(l=>l.name);
       break;
     }
@@ -2296,9 +2318,11 @@ function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(trip
 function skipStop(){const routeStops=getRouteStopsForDay(itin);if(!routeStops.length)return;const sk=routeStops[0];itin=applyBreakPlanToCurrentItinerary(routeStops.slice(1));sync();addMsg(`⏭️ Skipped <strong>${sk.name}</strong>`);renderRoute();}
 async function optimizeRoute(silent=false){
   if(!itin.length){await renderRoute();return;}
-  itin=applyBreakPlanToCurrentItinerary(optimizeStopOrder(getRouteStopsForDay(itin),getPreviewRouteStart()));
-  sync();
-  if(!silent)addMsg('⚡ Route optimized for an easier tourist flow.');
+  const base=getRouteStopsForDay(itin).map(s=>({...s,scheduleLocked:false,geoOptimized:false,arriveAt:undefined,leaveAt:undefined}));
+  itin=applyBreakPlanToCurrentItinerary(optimizeStopOrder(base,getPreviewRouteStart()));
+  recalcTimes({trimToWindow:true});
+  itin.forEach(s=>{ if(!s.isBreak){ s.scheduleLocked=true; if(s.std) s.arriveAt=s.sts; if(s.etd) s.leaveAt=s.ets; } });
+  sync(); if(!silent)addMsg('⚡ Route optimized for an easier tourist flow.');
   await renderRoute();
 }
 function smartExtend(){setTripMinutes(getTripMinutes()+60);syncPlannerTimeFields('duration');const ids=new Set(mdPlan.flat().filter(stop=>!stop?.isBreak).map(stop=>stop.id));const c=LOCS.filter(l=>!ids.has(l.id));if(c.length){const base=getRouteStopsForDay(itin);base.push({...c[0],tt:0});itin=applyBreakPlanToCurrentItinerary(base);sync();addMsg(`✨ Added <strong>${c[0].name}</strong>!`);renderRoute();}else addMsg('No more places available.');}

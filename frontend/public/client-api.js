@@ -53,9 +53,8 @@
 
   async function fetchPlaces(lat, lon, cityName = '', totalMinutes = 600, opts = {}) {
     const { refresh = false, prefs = [] } = opts;
-    // Multi-day totalMinutes can trigger larger Gemini + sequential Nominatim work.
-    // 120s keeps AbortSignal above typical edge latency without hanging forever.
-    return post('/api/places', { lat, lon, cityName, totalMinutes, refresh, prefs }, 120000);
+    // Cold Render + Gemini + sequential Nominatim can exceed 90s; client retries once in loadCityPlaces.
+    return post('/api/places', { lat, lon, cityName, totalMinutes, refresh, prefs }, 90000);
   }
 
   // ── Weather ──────────────────────────────────────────────────────────────────
