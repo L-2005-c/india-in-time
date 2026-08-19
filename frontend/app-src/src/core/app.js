@@ -990,6 +990,13 @@ function switchCity(cityId, silent=false){
 }
 
 // Dynamically fetch places for any city via AI backend
+function _placesFromCityCache(cityKey, minLen=8){
+  for(const [k, places] of placeCache.entries()){
+    if((k===`${cityKey}|any`||k.startsWith(cityKey+'|'))&&Array.isArray(places)&&places.length>=minLen)
+      return places.map(p=>({...p,coords:normalizeLatLon(p.coords)}));
+  }
+  return null;
+}
 async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   const { silent = false, force = false } = opts;
   const tTime  = parseInt(document.getElementById('t-time')?.value)  || 600;
@@ -997,45 +1004,25 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   const totalTripMinutesL = tTime * nDaysL;
   const cityKey = String(cityName||'').toLowerCase();
   const cacheKey = `${cityKey}|${totalTripMinutesL}`;
-
-  // Exact cache hit for this city + total minutes
   if(!force && placeCache.has(cacheKey)){
     const cachedPlaces = (placeCache.get(cacheKey) || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
-    if(cachedPlaces.length){
-      LOCS = cachedPlaces;
-      return { places: LOCS, source: 'cache' };
-    }
+    if(cachedPlaces.length){ LOCS = cachedPlaces; return { places: LOCS, source: 'cache' }; }
     placeCache.delete(cacheKey);
   }
-
-  // Fallback: reuse any previously cached places for the same city (different day count).
-  // Changing 1-day → multi-day should not force a slow re-fetch when we already have a solid pool.
+  // Reuse same-city cache when day count changes (avoid slow multi-day re-fetch)
   if(!force && LOCS.length < 8){
-    for(const [k, places] of placeCache.entries()){
-      if(k.startsWith(cityKey + '|') && Array.isArray(places) && places.length >= 8){
-        LOCS = places.map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
-        placeCache.set(cacheKey, LOCS.map(p => ({ ...p, coords: [...p.coords] })));
-        return { places: LOCS, source: 'cache-city-fallback' };
-      }
-    }
+    const fb=_placesFromCityCache(cityKey,8);
+    if(fb){ LOCS=fb; placeCache.set(cacheKey,LOCS.map(p=>({...p,coords:[...p.coords]}))); return { places:LOCS, source:'cache-city-fallback' }; }
   }
-
   if(!force && placeLoadPromises.has(cacheKey)){
     try {
       const pending = await placeLoadPromises.get(cacheKey);
       LOCS = withHiddenGems(currentCityId, (pending.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
       return pending;
-    } catch (pendingErr) {
-      placeLoadPromises.delete(cacheKey);
-      // fall through to a fresh attempt or local places
-    }
+    } catch (_pe) { placeLoadPromises.delete(cacheKey); }
   }
-
   const localPlaces=getLocalPlaces(currentCityId, cityName);
-  if(localPlaces.length && !LOCS.length){
-    LOCS=localPlaces;
-    updatePlannerShowcase();
-  }
+  if(localPlaces.length && !LOCS.length){ LOCS=localPlaces; updatePlannerShowcase(); }
   if(!silent && !localPlaces.length && !LOCS.length) addMsg(`🤖 <strong>Finding the best places in ${cityName}...</strong> This usually takes a few seconds.`);
   try {
     const request = API.fetchPlaces(lat, lon, cityName, totalTripMinutesL, { refresh: force });
@@ -1045,40 +1032,22 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
     const fetchedPlaces=(result.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
     LOCS = withHiddenGems(currentCityId, mergePlacePools(localPlaces.length ? localPlaces : LOCS, fetchedPlaces));
     if(LOCS.length){
-      placeCache.set(cacheKey, LOCS.map(p => ({ ...p, coords: [...p.coords] })));
-      // Also store under city-only key for future day-count changes
-      placeCache.set(`${cityKey}|any`, LOCS.map(p => ({ ...p, coords: [...p.coords] })));
-    } else {
-      placeCache.delete(cacheKey);
-    }
+      const snap=LOCS.map(p=>({...p,coords:[...p.coords]}));
+      placeCache.set(cacheKey, snap); placeCache.set(`${cityKey}|any`, snap);
+    } else { placeCache.delete(cacheKey); }
     if(LOCS.length >= 3){
       updatePlannerShowcase();
-      if(!silent){
-        addMsg(`✅ Refreshed <strong>${LOCS.length} places</strong> in ${cityName}. Generate when ready ✨`);
-        switchToView('plan-view', 1);
-      }
-    } else {
-      if(!silent) addMsg(`⚠️ AI couldn't find enough places for ${cityName} right now. Please try again in a moment.`);
-    }
+      if(!silent){ addMsg(`✅ Refreshed <strong>${LOCS.length} places</strong> in ${cityName}. Generate when ready ✨`); switchToView('plan-view', 1); }
+    } else if(!silent){ addMsg(`⚠️ AI couldn't find enough places for ${cityName} right now. Please try again in a moment.`); }
     return result;
   } catch(e) {
     placeLoadPromises.delete(cacheKey);
     browserLogger.error('loadCityPlaces error:', e);
-    // Preserve whatever places we already have (local + previous cache). Timeout on
-    // multi-day re-fetch must not wipe a working single-day pool.
-    if(!LOCS.length && localPlaces.length){
-      LOCS = localPlaces;
-      updatePlannerShowcase();
-    }
+    if(!LOCS.length && localPlaces.length){ LOCS = localPlaces; updatePlannerShowcase(); }
     if(!silent){
-      if(LOCS.length){
-        showToast('⚠️','Places refresh timed out',`Using ${LOCS.length} places already loaded for ${cityName}. You can still generate.`,4500);
-      } else {
-        addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`);
-        showToast('⚠️','Couldn\'t refresh places',`Showing what we have for ${cityName} — will retry automatically.`,4500);
-      }
+      if(LOCS.length) showToast('⚠️','Places refresh timed out',`Using ${LOCS.length} places already loaded for ${cityName}. You can still generate.`,4500);
+      else { addMsg(`⚠️ We couldn't load places for ${cityName} right now. Please try again in a moment.`); showToast('⚠️','Couldn\'t refresh places',`Showing what we have for ${cityName} — will retry automatically.`,4500); }
     }
-    // Only rethrow when we have nothing usable — callers that require places will retry.
     if(!LOCS.length) throw e;
     return { places: LOCS, source: 'stale-after-error' };
   }
@@ -1086,33 +1055,20 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
 
 async function ensureCityPlaces(city, minCount=1){
   if(!city) return false;
-  // Cache key must match loadCityPlaces exactly (uses totalTripMinutes = tTime × nDays)
   const tTime  = parseInt(document.getElementById('t-time')?.value)  || 600;
   const nDaysV = parseInt(document.getElementById('n-days')?.value)  || 1;
-  const totalMins = tTime * nDaysV;
   const cityKey = String(city.name||'').toLowerCase();
-  const cacheKey = `${cityKey}|${totalMins}`;
-  // If a load is already in progress, await it instead of launching a new one
+  const cacheKey = `${cityKey}|${tTime * nDaysV}`;
   if(placeLoadPromises.has(cacheKey)){
     try{
       const pending = await placeLoadPromises.get(cacheKey);
       LOCS = withHiddenGems(currentCityId, (pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
     }catch(_e){}
   }
-  // Reuse any city-level cache before hitting the network (1-day → multi-day)
-  if(LOCS.length < minCount){
-    for(const [k, places] of placeCache.entries()){
-      if((k === `${cityKey}|any` || k.startsWith(cityKey + '|')) && Array.isArray(places) && places.length >= minCount){
-        LOCS = places.map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
-        break;
-      }
-    }
-  }
+  if(LOCS.length < minCount){ const fb=_placesFromCityCache(cityKey,minCount); if(fb) LOCS=fb; }
   if(LOCS.length>=minCount) return true;
-  // First try — silent load (uses cache if available)
   try{ await loadCityPlaces(city.lat, city.lon, city.name, { silent:true }); }catch(_e){}
   if(LOCS.length>=minCount) return true;
-  // Second try — force refresh (clears server cache and retries Gemini + Nominatim)
   try{ await loadCityPlaces(city.lat, city.lon, city.name, { silent:false, force:true }); }catch(_e){}
   return LOCS.length >= minCount || LOCS.length > 0;
 }
@@ -1281,15 +1237,8 @@ async function generatePlan(){
   }else{avail=prioritizePlanStops(avail,routeStart,prefs);}
   mdPlan=[];let rem=[...avail];
   const startMin=t2m(si);
-  // Prefer the backend GeoAI time-optimization engine. It evaluates each
-  // candidate at its *projected* arrival time (opening hours, crowd, meal
-  // windows, weather, scenic/golden-hour fit) rather than just at "now".
-  //
-  // IMPORTANT: /optimize only ever plans ONE day. A multi-day trip must call
-  // it once per day, each time excluding places already used on a prior day
-  // and re-centering the route on the city (not the user's original
-  // location) for day 2+ — otherwise every extra day silently collapses
-  // into day 1 and the UI never gets enough days to show tabs for.
+  // GeoAI /optimize plans ONE day per call — loop per day, exclude used stops,
+  // re-center day 2+ on city. Partial results are filled by the local planner.
   const cityCenterForDays = (CITIES[currentCityId]?.lat && CITIES[currentCityId]?.lon)
     ? [CITIES[currentCityId].lat, CITIES[currentCityId].lon] : routeStart;
   try{
@@ -1363,23 +1312,19 @@ async function generatePlan(){
     if(geoDays.length){
       mdPlan=geoDays;
       const totalGeoStops=mdPlan.reduce((s,day)=>s+day.length,0);
-      if(mdPlan.length >= nDays){
-        addMsg(`🧠 <strong>GeoAI Time Intelligence optimized your itinerary</strong> — ${mdPlan.length} day${mdPlan.length>1?'s':''}, ${totalGeoStops} stops, arrival-time scoring, scenic windows, weather/crowd context and route efficiency applied.`);
-      } else {
-        addMsg(`🧠 <strong>GeoAI optimized day${mdPlan.length>1?'s':''} 1${mdPlan.length>1?'–'+mdPlan.length:''}</strong> (${totalGeoStops} stops). Filling remaining day${nDays-mdPlan.length>1?'s':''} with the local planner…`);
-      }
+      const full=mdPlan.length>=nDays;
+      addMsg(full
+        ? `🧠 <strong>GeoAI Time Intelligence optimized your itinerary</strong> — ${mdPlan.length} day${mdPlan.length>1?'s':''}, ${totalGeoStops} stops, arrival-time scoring, scenic windows, weather/crowd context and route efficiency applied.`
+        : `🧠 <strong>GeoAI optimized day${mdPlan.length>1?'s':''} 1${mdPlan.length>1?'–'+mdPlan.length:''}</strong> (${totalGeoStops} stops). Filling remaining day${nDays-mdPlan.length>1?'s':''} with the local planner…`);
     }
   }catch(e){
     browserLogger.warn('[GeoAI optimizer] backend unavailable, using local planner:',e);
   }
-  // Fill any days still missing (full local path, or remainder after partial GeoAI)
+  // Fill missing days (full local path, or remainder after partial GeoAI)
   if(mdPlan.length < nDays){
-    const fillFrom = mdPlan.length;
-    for(let d=fillFrom;d<nDays;d++){
+    for(let d=mdPlan.length;d<nDays;d++){
       const remainingDays = nDays - d;
-      const adaptiveTarget = d === nDays - 1
-        ? maxT
-        : Math.max(180, Math.min(maxT, Math.ceil(estimateStopLoadMinutes(rem || []) / Math.max(1, remainingDays))));
+      const adaptiveTarget = d === nDays - 1 ? maxT : Math.max(180, Math.min(maxT, Math.ceil(estimateStopLoadMinutes(rem || []) / Math.max(1, remainingDays))));
       const dayStart = d===0 ? routeStart : (CITIES[currentCityId]?.lat&&CITIES[currentCityId]?.lon ? [CITIES[currentCityId].lat,CITIES[currentCityId].lon] : routeStart);
       const plannedDay = buildTimeAwareDay(Array.isArray(rem) ? rem : [], startMin, adaptiveTarget, dayStart, realTemp || 28, breakEvery, breakDuration);
       const dayStops = Array.isArray(plannedDay) ? plannedDay : (plannedDay?.day || []);
