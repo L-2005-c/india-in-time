@@ -85,7 +85,13 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
 - Identify if the spot is famous for sunrise (is_sunrise_spot) or sunset (is_sunset_spot).
 - Only real named places a tourist would visit. No coordinates. No duplicate entries.`;
 
-  const raw = await callGemini(prompt);
+  let raw = '';
+  try {
+    raw = await callGemini(prompt);
+  } catch (err) {
+    appLogger.warn(`[placesDiscovery] Gemini places discovery failed: ${err.message}`);
+    return [];
+  }
 
   // Try to parse - handle partial JSON by finding complete objects
   let parsed = null;

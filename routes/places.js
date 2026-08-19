@@ -111,8 +111,12 @@ router.post('/', async (req, res) => {
     // Wikipedia (ground-truth coords) + Nominatim fallback search.
     // ── Fetch sources safely without overloading Nominatim ──────────────────
     // Wikipedia and Gemini API can run concurrently.
-    const pWiki = wantFoodOnly ? Promise.resolve([]) : fetchWiki(lat, lon, cityName);
-    const pAi   = wantFoodOnly ? Promise.resolve([]) : getPlaces(cityName, lat, lon, totalMinutes);
+    const pWiki = wantFoodOnly ? Promise.resolve([]) : fetchWiki(lat, lon, cityName).catch(e => {
+      appLogger.error('[places] Wiki failed:', e.message); return [];
+    });
+    const pAi   = wantFoodOnly ? Promise.resolve([]) : getPlaces(cityName, lat, lon, totalMinutes).catch(e => {
+      appLogger.error('[places] AI discovery failed:', e.message); return [];
+    });
 
     // Nominatim strictly limits to 1 request per second globally per IP.
     // We MUST execute Curated (which geocodes) and Nominatim Fallback sequentially
@@ -128,8 +132,8 @@ router.post('/', async (req, res) => {
       appLogger.error('[places] Nominatim fallback failed:', e.message); return [];
     });
 
-    const wikiResult = await pWiki.catch(e => { appLogger.error('[places] Wiki failed:', e.message); return []; });
-    const aiResult   = await pAi.catch(e => { appLogger.error('[places] AI discovery failed:', e.message); return []; });
+    const wikiResult = await pWiki;
+    const aiResult   = await pAi;
 
     const wiki = Array.isArray(wikiResult) ? wikiResult : [];
     const aiPlacesRaw = Array.isArray(aiResult) ? aiResult : [];
