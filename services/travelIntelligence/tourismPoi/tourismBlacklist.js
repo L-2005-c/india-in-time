@@ -1,166 +1,196 @@
 'use strict';
 
 /**
- * tourismBlacklist.js
- * Comprehensive rejection dictionary and regex patterns for non-tourist geographic entities,
- * residential localities, administrative zones, generic infrastructure, commercial offices,
- * clinics, schools, banks, ATMs, and city-specific neighbourhood names.
+ * Tourism POI Blacklist — reject non-tourist geographic entities.
  *
- * A geographic entity existing on a map does NOT make it a tourist attraction.
+ * A place existing on a map does NOT make it a tourist attraction.
+ * This module hard-rejects localities, residential areas, generic
+ * infrastructure, and other map noise before any ranking or intelligence.
  */
 
-// Universal non-tourist keywords and patterns
-const NON_TOURIST_KEYWORDS = [
-  'colony', 'residential colony', 'housing colony', 'layout', 'enclave', 'nagar',
-  'locality', 'suburb', 'neighbourhood', 'neighborhood', 'residential area',
-  'sector', 'block', 'phase', 'ward', 'zone', 'village', 'mandal', 'panchayat',
-  'junction', 'chowk', 'circle', 'cross', 'cross road', 'flyover', 'signal',
-  'road', 'street', 'lane', 'gali', 'marg', 'rasta', 'highway', 'bypass',
-  'bus stop', 'bus stand', 'bus depot', 'bus terminal', 'auto stand', 'taxi stand',
-  'railway station', 'metro station', 'train station',
-  'hospital', 'clinic', 'nursing home', 'pharmacy', 'medical store', 'diagnostic',
-  'school', 'high school', 'public school', 'college', 'junior college', 'degree college',
-  'university', 'institute', 'academy', 'coaching centre', 'hostel', 'pg hostel',
-  'office', 'corporate office', 'branch office', 'head office', 'bpo', 'it park',
-  'police station', 'police outpost', 'ps', 'traffic ps', 'station',
-  'bank', 'atm', 'branch', 'sub-post office', 'post office',
-  'government office', 'mdo office', 'mro office', 'tehsildar', 'sub-registrar',
-  'court', 'collectorate', 'secretariat', 'municipal corporation', 'municipality',
-  'graveyard', 'crematorium', 'burial ground', 'dump yard', 'substation',
-  'petrol pump', 'petrol bunk', 'fuel station', 'gas station', 'service station',
-  'apartment', 'apartments', 'residency', 'towers', 'heights', 'villas', 'estates',
-  'car wash', 'garage', 'mechanic', 'tyre shop', 'tailor', 'laundry', 'salon',
-  'xerox', 'stationery', 'hardware store', 'timber depot', 'iron store',
-];
-
-// Specific known locality/residential area names by city that map providers frequently return as places
-const CITY_SPECIFIC_LOCALITIES = {
-  visakhapatnam: [
-    'marripalem', 'seethammadhara', 'dwaraka nagar', 'dwarakanagar', 'gajuwaka',
-    'madhurawada', 'mvp colony', 'siripuram', 'pendurthi', 'akkayyapalem',
-    'kurmannapalem', 'nad junction', 'nad kotha road', 'maddilapalem', 'jagadamba junction',
-    'asirvada puram', 'kancharapalem', 'muralinagar', 'isukathota', 'venkojipalem',
-    'pedda waltair', 'chinna waltair', 'waltair uplands', 'maharanipeta', 'allipuram',
-    'poorva market', 'dabagardens', 'daba gardens', 'suryabagh', 'ramnagar',
-    'resapuvanipalem', 'arilova', 'hanumanthawaka', 'scindia', 'mindi',
-    'auto nagar', 'sheela nagar', 'steel plant township', 'ukkunagaram', 'desapatrunipalem',
-    'kanithi', 'vadlapudi', 'anakapalle', 'chittivalasa', 'tagarapuvalasa',
-  ],
-  vizag: [
-    'marripalem', 'seethammadhara', 'dwaraka nagar', 'dwarakanagar', 'gajuwaka',
-    'madhurawada', 'mvp colony', 'siripuram', 'pendurthi', 'akkayyapalem',
-    'kurmannapalem', 'nad junction', 'nad kotha road', 'maddilapalem', 'jagadamba junction',
-    'asirvada puram', 'kancharapalem', 'muralinagar', 'isukathota', 'venkojipalem',
-    'pedda waltair', 'chinna waltair', 'waltair uplands', 'maharanipeta', 'allipuram',
-    'poorva market', 'dabagardens', 'daba gardens', 'suryabagh', 'ramnagar',
-    'resapuvanipalem', 'arilova', 'hanumanthawaka', 'scindia', 'mindi',
-    'auto nagar', 'sheela nagar', 'steel plant township', 'ukkunagaram', 'desapatrunipalem',
-    'kanithi', 'vadlapudi', 'anakapalle', 'chittivalasa', 'tagarapuvalasa',
-  ],
-  hyderabad: [
-    'kukatpally', 'ameerpet', 'dilsukhnagar', 'madhapur', 'gachibowli', 'kondapur',
-    'kothapet', 'lb nagar', 'uppal', 'tarnaka', 'secunderabad', 'begumpet',
-    'panjagutta', 'somajiguda', 'sr nagar', 'sanath nagar', 'miyapur', 'nizampet',
-    'chandanagar', 'hitec city', 'jubilee hills', 'banjara hills', 'mehdipatnam',
-    'tolichowki', 'attapur', 'rajendranagar', 'shamshabad', 'malakpet', 'amberpet',
-  ],
-  delhi: [
-    'rohini', 'dwarka', 'janakpuri', 'pitampura', 'patel nagar', 'lajpat nagar',
-    'karol bagh', 'saket', 'vasant kunj', 'uttam nagar', 'laxmi nagar',
-    'shahdara', 'mayur vihar', 'paschim vihar', 'tilak nagar', 'rajouri garden',
-  ],
-  mumbai: [
-    'andheri', 'borivali', 'kandivali', 'malad', 'goregaon', 'jogeshwari',
-    'vile parle', 'santacruz', 'khar', 'bandra', 'dadar', 'kurla',
-    'ghatkopar', 'bhandup', 'mulund', 'thane', 'vashi', 'nerul', 'belapur',
-  ],
-  bengaluru: [
-    'koramangala', 'indiranagar', 'whitefield', 'electronic city', 'hsr layout',
-    'btm layout', 'jayanagar', 'jp nagar', 'marathahalli', 'bellandur',
-    'hebbal', 'banashankari', 'malleswaram', 'rajajinagar', 'yelahanka',
-  ],
-};
-
-// Regex patterns to identify non-tourist POIs by name
-const NON_TOURIST_REGEX_PATTERNS = [
-  /\b(colony|nagar|layout|enclave|society|apartments?|residency|residential(\s*area|\s*block)?|block|sector|phase|towers?|villas?)\b/i,
-  /\b(junction|circle|chowk|cross\s*roads?|flyover|signal)\b/i,
-  /\b(hospital|clinic|nursing\s*home|dispensary|diagnostic|pharmacy|chemist)\b/i,
-  /\b(school|vidyalaya|academy|college|university|institute\s*of\s*technology)\b/i,
-  /\b(police\s*station|traffic\s*ps|chowki|outpost)\b/i,
-  /\b(bank|atm|branch|post\s*office|sub\s*post)\b/i,
-  /\b(bus\s*stand|bus\s*stop|bus\s*depot|auto\s*stand|metro\s*station)\b/i,
-  /\b(petrol\s*bunk|petrol\s*pump|gas\s*station|cng\s*station)\b/i,
-  /\b(office|corporation|complex|bhavan|bhavanam)\b/i,
-  /\b(store|shop|tailor|xerox|laundry|saloon|salon|hardware|timber)\b/i,
-];
-
-// OpenStreetMap / Nominatim / Map provider type blacklist
-const MAP_PROVIDER_TYPE_BLACKLIST = new Set([
-  'administrative', 'suburb', 'neighbourhood', 'neighborhood', 'locality', 'residential',
-  'city_block', 'quarter', 'hamlet', 'village', 'town', 'county', 'district',
-  'highway', 'road', 'street', 'junction', 'roundabout', 'traffic_signals', 'bus_stop',
-  'railway', 'station', 'platform', 'subway_entrance', 'parking', 'fuel',
+/** OSM / provider place types that are never tourist attractions */
+const REJECT_OSM_TYPES = new Set([
+  'suburb', 'locality', 'neighbourhood', 'neighborhood', 'residential',
+  'administrative', 'boundary', 'hamlet', 'village', 'town', 'city',
+  'county', 'state', 'country', 'quarter', 'borough', 'district',
+  'municipality', 'province', 'region', 'island', 'continent',
+  'house', 'houses', 'apartments', 'building', 'yes',
+  'residential_area', 'industrial', 'commercial', 'retail',
+  'bus_stop', 'bus_station', 'railway', 'station', 'halt',
+  'tram_stop', 'subway_entrance', 'platform',
+  'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+  'unclassified', 'residential', 'living_street', 'service',
+  'pedestrian', 'track', 'path', 'footway', 'cycleway',
+  'junction', 'roundabout', 'crossing',
+  'school', 'university', 'college', 'kindergarten',
   'hospital', 'clinic', 'doctors', 'dentist', 'pharmacy',
-  'school', 'college', 'university', 'kindergarten',
-  'police', 'fire_station', 'post_office', 'bank', 'atm', 'courthouse', 'townhall',
-  'office', 'commercial', 'industrial', 'residential_zone', 'construction',
-  'apartments', 'house', 'detached', 'residential_building',
+  'police', 'fire_station', 'post_office', 'bank', 'atm',
+  'embassy', 'courthouse', 'townhall', 'government',
+  'office', 'company', 'factory', 'warehouse',
+  'parking', 'parking_space', 'fuel', 'charging_station',
+  'toilets', 'bench', 'waste_basket', 'drinking_water',
+  'telephone', 'vending_machine',
+]);
+
+/** OSM classes that are never tourist (unless type is allowlisted elsewhere) */
+const REJECT_OSM_CLASSES = new Set([
+  'highway', 'boundary', 'place', 'building', 'office',
+  'railway', 'aeroway', 'power', 'man_made',
 ]);
 
 /**
- * Checks if a candidate name or type matches the non-tourist blacklist.
- * @param {string} name - Place candidate name
- * @param {object} [metadata] - Optional metadata (city, osmType, osmCategory, placeType)
- * @returns {{ isBlacklisted: boolean, reason: string|null }}
+ * Name patterns that strongly indicate a non-tourist entity.
+ * Applied case-insensitively. Intentionally does NOT block mall names
+ * that are established shopping destinations (those are validated by
+ * whitelist / curated data / positive tourism signals).
  */
-function isBlacklisted(name, metadata = {}) {
-  const cleanName = String(name || '').trim().toLowerCase();
-  if (!cleanName || cleanName.length < 2) {
-    return { isBlacklisted: true, reason: 'Invalid or empty place name' };
+const LOCALITY_NAME_PATTERNS = [
+  // Indian residential / locality suffixes and tokens
+  /\b(nagar|colony|layout|phase|sector|ward|block|extension|enclave)\b/i,
+  /\b(peta|palle|palli|palem|puram|pura|pet|pettah)\b/i,
+  /\b(village|mandal|taluk|tehsil|district|division)\b/i,
+  /\b(mohalla|chowk|galli|gali|basti|slum)\b/i,
+  /\b(apartment|apartments|residency|residences|towers?|flats?)\b/i,
+  /\b(housing\s*society|housing\s*board|hsg\s*board)\b/i,
+  // Infrastructure / roads
+  /\b(road|street|highway|bypass|expressway|ring\s*road)\b/i,
+  /\b(junction|circle|cross|crossing|flyover|underpass)\b/i,
+  /\b(bus\s*stop|bus\s*stand|bus\s*station|railway\s*station|metro\s*station)\b/i,
+  /\b(auto\s*stand|taxi\s*stand|parking\s*lot)\b/i,
+  // Generic administrative / area
+  /\b(locality|suburb|neighbourhood|neighborhood|residential\s*area)\b/i,
+  /\b(area|zone|division|ward\s*\d+)\b/i,
+  // Services that are not tourist attractions
+  /\b(police\s*station|hospital|clinic|school|college|university)\b/i,
+  /\b(government\s*office|municipal|collectorate|court)\b/i,
+  /\b(\batm\b|bank\s*branch|post\s*office)\b/i,
+  // Generic commercial without tourism value
+  /\b(supermarket|kirana|general\s*store|provision\s*store)\b/i,
+  /\b(petrol\s*pump|fuel\s*station|gas\s*station)\b/i,
+];
+
+/**
+ * Known non-tourist locality names for Visakhapatnam / common AP cities.
+ * Explicit list complements regex for high-confidence rejection.
+ */
+const KNOWN_LOCALITY_NAMES = new Set([
+  'marripalem', 'seethammadhara', 'dwaraka nagar', 'dwarakanagar',
+  'maddilapalem', 'gajuwaka', 'pendurthi', 'anakapalle', 'anakapalli',
+  'nad junction', 'nad', 'akuripalli', 'akuripalle',
+  'mvp colony', 'mvp', 'asillmetta', 'asilmetta',
+  'jagadamba junction', 'jagadamba', 'rtc complex',
+  'siripuram', 'waltair', 'waltair uplands',
+  'pendurthi', 'gopalapatnam', 'kancharapalem',
+  'akkayyapalem', 'resapuvanipalem', 'resapuvanipalem',
+  'chinna waltair', 'pedda waltair', 'lawsons bay colony',
+  'daba gardens', 'daba garden', 'suryabagh',
+  'venkojipalem', 'madhurawada', 'yendada',
+  'kommadi', 'pendurthi', 'simhachalam', // area name alone; temple is separate
+  'vizag steel plant', 'steel plant', 'vsp',
+  'naval base', 'dockyard', 'harbour area',
+  'old town', 'new town',
+].map((s) => s.toLowerCase()));
+
+/**
+ * Tokens that alone are insufficient as a tourist stop name.
+ * e.g. "Central area of Marripalem" should not pass.
+ */
+const GENERIC_AREA_PREFIXES = [
+  /^central\s+(area|part|region)\s+of\s+/i,
+  /^near\s+/i,
+  /^area\s+around\s+/i,
+  /^vicinity\s+of\s+/i,
+  /^outskirts\s+of\s+/i,
+  /^neighbourhood\s+of\s+/i,
+  /^neighborhood\s+of\s+/i,
+];
+
+function normalizeName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Returns true if the candidate should be hard-rejected as non-tourist.
+ */
+function isBlacklistedEntity(place) {
+  if (!place || typeof place !== 'object') return { rejected: true, reason: 'invalid_place' };
+
+  const name = normalizeName(place.name);
+  if (!name || name.length < 2) return { rejected: true, reason: 'empty_name' };
+
+  // Explicit known localities
+  if (KNOWN_LOCALITY_NAMES.has(name)) {
+    return { rejected: true, reason: 'known_locality', detail: name };
   }
 
-  const city = String(metadata.city || metadata.cityName || '').trim().toLowerCase();
-
-  // 1. Check exact or direct city-specific locality names
-  const cityLocalities = (city && CITY_SPECIFIC_LOCALITIES[city]) || [];
-  const allKnownLocalities = Object.values(CITY_SPECIFIC_LOCALITIES).flat();
-  const searchLocalities = cityLocalities.length ? cityLocalities : allKnownLocalities;
-
-  for (const loc of searchLocalities) {
-    if (cleanName === loc || cleanName === `${loc} area` || cleanName === `near ${loc}` || cleanName.startsWith(`${loc},`)) {
-      return { isBlacklisted: true, reason: `Exact match for known residential/geographic locality: "${loc}"` };
+  // Generic area prefixes
+  for (const re of GENERIC_AREA_PREFIXES) {
+    if (re.test(String(place.name || ''))) {
+      return { rejected: true, reason: 'generic_area_prefix' };
     }
   }
 
-  // 2. Check OSM / Nominatim provider types
-  const osmType = String(metadata.type || metadata.osmType || metadata.placeType || '').toLowerCase();
-  const osmClass = String(metadata.class || metadata.osmCategory || '').toLowerCase();
-
-  if (MAP_PROVIDER_TYPE_BLACKLIST.has(osmType)) {
-    return { isBlacklisted: true, reason: `Map provider entity type is non-tourist: "${osmType}"` };
-  }
-  if (['highway', 'boundary', 'place', 'landuse', 'office', 'emergency'].includes(osmClass)) {
-    return { isBlacklisted: true, reason: `Map provider entity class is non-tourist: "${osmClass}"` };
-  }
-
-  // 3. Check for specific non-tourist structural patterns unless it has clear tourism markers
-  const hasTourismMarker = /beach|museum|submarine|temple|church|mosque|fort|palace|viewpoint|wildlife|sanctuary|aquarium|waterfall|garden|park|memorial|lighthouse|mall|resort/i.test(cleanName);
-  
-  if (!hasTourismMarker) {
-    for (const pattern of NON_TOURIST_REGEX_PATTERNS) {
-      if (pattern.test(cleanName)) {
-        return { isBlacklisted: true, reason: `Name pattern indicates non-tourist entity: "${cleanName}"` };
+  // Name pattern blocklist
+  for (const re of LOCALITY_NAME_PATTERNS) {
+    if (re.test(name)) {
+      // Exception: if name also contains strong tourism tokens, defer to classifier
+      // e.g. "Kailasagiri Hill Park" should not die on a weak pattern
+      const hasTourismToken = /\b(beach|temple|museum|fort|palace|park|garden|viewpoint|waterfall|zoo|aquarium|monument|memorial|lighthouse|church|mosque|mandir|heritage|sanctuary|wildlife|mall|central|inorbit)\b/i.test(name);
+      if (!hasTourismToken) {
+        return { rejected: true, reason: 'locality_name_pattern', pattern: String(re) };
       }
     }
   }
 
-  return { isBlacklisted: false, reason: null };
+  // OSM type / class rejection
+  const osmType = String(place.osmType || place.type || place.place_type || '').toLowerCase();
+  const osmClass = String(place.osmClass || place.class || place.osm_class || '').toLowerCase();
+
+  if (REJECT_OSM_CLASSES.has(osmClass) && !isAllowedException(osmClass, osmType, name)) {
+    return { rejected: true, reason: 'reject_osm_class', osmClass };
+  }
+  if (REJECT_OSM_TYPES.has(osmType)) {
+    return { rejected: true, reason: 'reject_osm_type', osmType };
+  }
+
+  // Provider-specific locality markers
+  const providerType = String(place.providerType || place.resultType || place.kind || '').toLowerCase();
+  if (/\b(locality|suburb|neighbourhood|neighborhood|residential|administrative)\b/.test(providerType)) {
+    return { rejected: true, reason: 'provider_locality_type', providerType };
+  }
+
+  return { rejected: false };
+}
+
+function isAllowedException(osmClass, osmType, name) {
+  // Rare: historic building marked as building but with tourism name
+  if (osmClass === 'building' && /\b(museum|fort|palace|temple|church|monument)\b/i.test(name)) return true;
+  return false;
+}
+
+/**
+ * Returns true if name looks like a pure administrative/locality label
+ * with no attached attraction.
+ */
+function isLocalityOnlyName(name) {
+  const n = normalizeName(name);
+  if (!n) return true;
+  if (KNOWN_LOCALITY_NAMES.has(n)) return true;
+  // Short pure locality-like tokens
+  if (/^(mvp|nad|vsp|rtc)\s*(colony|junction|complex)?$/.test(n)) return true;
+  return LOCALITY_NAME_PATTERNS.some((re) => re.test(n) && !/\b(beach|temple|museum|fort|park|mall|garden|viewpoint)\b/i.test(n));
 }
 
 module.exports = {
-  isBlacklisted,
-  NON_TOURIST_KEYWORDS,
-  CITY_SPECIFIC_LOCALITIES,
-  MAP_PROVIDER_TYPE_BLACKLIST,
+  isBlacklistedEntity,
+  isLocalityOnlyName,
+  KNOWN_LOCALITY_NAMES,
+  REJECT_OSM_TYPES,
+  REJECT_OSM_CLASSES,
+  LOCALITY_NAME_PATTERNS,
+  normalizeName,
 };

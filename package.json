@@ -1,6 +1,6 @@
 {
   "name": "india-in-time-backend",
-  "version": "5.1.0",
+  "version": "5.2.2",
   "description": "Production-ready adaptive GeoAI itinerary decision engine for India In Time",
   "main": "server.js",
   "engines": {
@@ -23,7 +23,7 @@
     "loadtest:redis-ratelimit": "node scripts/redis-loadtest/run.js",
     "loadtest:redis-failopen": "node scripts/redis-loadtest/fail-open-check.js",
     "loadtest:redis-cache": "node scripts/redis-loadtest/cache-check.js",
-    "test:ci": "jest --runInBand --forceExit --coverage",
+    "test:ci": "jest --runInBand --coverage --coverageThreshold='{\"global\":{\"statements\":70,\"branches\":60,\"functions\":70,\"lines\":70}}'",
     "security:audit": "npm audit --audit-level=high",
     "check:production": "node scripts/production-check.js",
     "slo:report": "node scripts/slo-report.js",
@@ -47,7 +47,9 @@
     "security:audit:prod:json": "npm audit --omit=dev --json > security-audit-prod.json || test $? -eq 1",
     "check:architecture": "node scripts/architecture-check.js",
     "benchmark:time-intelligence": "node scripts/benchmarks/time-intelligence-v37-v38.js",
-    "test:itinerary-regression": "node scripts/itinerary-regression.js"
+    "test:itinerary-regression": "node scripts/itinerary-regression.js",
+    "demo:tourism-eligibility": "node scripts/tourism-eligibility-demo.js",
+    "release:audit": "node scripts/release-audit.js"
   },
   "jest": {
     "testEnvironment": "node",
@@ -56,15 +58,7 @@
       "/frontend/",
       "/__tests__/e2e/specs/",
       "/__tests__/e2e/playwright.config.js"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "statements": 70,
-        "branches": 58,
-        "functions": 70,
-        "lines": 70
-      }
-    }
+    ]
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

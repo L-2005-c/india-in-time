@@ -1,35 +1,51 @@
 'use strict';
 
+/**
+ * Tourism POI module — public API.
+ *
+ * Primary entry: filterEligibleCandidates / evaluateCandidate
+ */
+
 const {
-  evaluateTourismEligibility,
-  filterEligibleTourismCandidates,
-  TOURISM_CATEGORIES,
-  NON_TOURISM_CATEGORIES,
-  TOURISM_TIERS,
+  evaluateCandidate,
+  filterEligibleCandidates,
+  isTourismEligible,
+  tierRank,
+  TIERS,
+  TOURISM_CLASSES,
 } = require('./tourismEligibilityEngine');
 
-const { calculateTourismQuality, calculatePopularityScore } = require('./tourismQualityScore');
-const { classifyCategory } = require('./tourismCategoryClassifier');
-const { resolveSourceAuthority, SOURCE_AUTHORITY } = require('./tourismAuthorityResolver');
-const { validateTourismData } = require('./tourismDataValidator');
-const { isBlacklisted, NON_TOURIST_KEYWORDS, CITY_SPECIFIC_LOCALITIES } = require('./tourismBlacklist');
-const { isWhitelistedLandmark, VERIFIED_TOURISM_EXCEPTIONS } = require('./tourismWhitelist');
+const { isBlacklistedEntity, isLocalityOnlyName } = require('./tourismBlacklist');
+const { resolveWhitelist, isVerifiedShoppingDestination, VIZAG_WHITELIST, getCityWhitelist, listSupportedCities, CITY_WHITELISTS } = require('./tourismWhitelist');
+const {
+  classifyTourismCategory,
+  isRejectClass,
+  toProductCategory,
+} = require('./tourismCategoryClassifier');
+const { computeTourismQualityScore, bayesianRating } = require('./tourismQualityScore');
 
 module.exports = {
-  evaluateTourismEligibility,
-  filterEligibleTourismCandidates,
-  calculateTourismQuality,
-  calculatePopularityScore,
-  classifyCategory,
-  resolveSourceAuthority,
-  validateTourismData,
-  isBlacklisted,
-  isWhitelistedLandmark,
-  TOURISM_CATEGORIES,
-  NON_TOURISM_CATEGORIES,
-  TOURISM_TIERS,
-  SOURCE_AUTHORITY,
-  NON_TOURIST_KEYWORDS,
-  CITY_SPECIFIC_LOCALITIES,
-  VERIFIED_TOURISM_EXCEPTIONS,
+  // Core gate
+  evaluateCandidate,
+  filterEligibleCandidates,
+  isTourismEligible,
+  // Classification & scoring
+  classifyTourismCategory,
+  computeTourismQualityScore,
+  bayesianRating,
+  toProductCategory,
+  isRejectClass,
+  // Lists
+  isBlacklistedEntity,
+  isLocalityOnlyName,
+  resolveWhitelist,
+  isVerifiedShoppingDestination,
+  VIZAG_WHITELIST,
+  getCityWhitelist,
+  listSupportedCities,
+  CITY_WHITELISTS,
+  // Constants
+  TIERS,
+  TOURISM_CLASSES,
+  tierRank,
 };

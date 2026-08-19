@@ -110,13 +110,7 @@ describe('multiDayPlanner.buildMultiDayItinerary', () => {
     expect(result.tripQuality).toBeTruthy();
     expect(typeof result.tripQuality.stopsScored).toBe('number');
     const noCoordsEntry = result.unusedPlaces.find((p) => p.name === 'No Coords Stall');
-    if (noCoordsEntry) {
-      expect(noCoordsEntry.reason).toMatch(/no coordinates|not selected/i);
-    } else {
-      // v5 optimizer can schedule places without coords using estimated travel time
-      const scheduled = result.itinerary.some((day) => (day.stops || []).some((s) => s.name === 'No Coords Stall'));
-      expect(scheduled).toBe(true);
-    }
+    expect(noCoordsEntry?.reason).toMatch(/no coordinates/i);
     if ((result.itinerary[0].stops || []).length) {
       expect(result.itinerary[0].returnToOrigin).toBeTruthy();
     }

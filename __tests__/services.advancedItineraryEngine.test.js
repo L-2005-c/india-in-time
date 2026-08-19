@@ -57,7 +57,7 @@ describe('advanced requirement-aware itinerary', () => {
       preferredCategories: ['beach', 'food', 'scenic', 'museum'],
       personas: ['food_lover'],
     });
-    expect(plan.algorithm).toBe('geo-temporal-beam-search-v5-world-class');
+    expect(plan.algorithm).toBe('requirement-aware-temporal-v1');
     if (plan.stops[0]) {
       const [h] = String(plan.stops[0].arriveAt).split(':').map(Number);
       expect(h).toBeGreaterThanOrEqual(12);

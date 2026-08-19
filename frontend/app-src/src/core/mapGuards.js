@@ -27,44 +27,6 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       return stub;
     };
 
-    // 0. Guard L.LatLng constructor and L.latLng factory against NaN crashes
-    if (Lib.LatLng && !Lib.LatLng.__guarded) {
-      const OriginalLatLng = Lib.LatLng;
-      function SafeLatLng(lat, lng, alt) {
-        let safeLat = +lat;
-        let safeLng = +(lng ?? 0);
-        if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) {
-          safeLat = 20.5937;
-          safeLng = 78.9629;
-        }
-        return new OriginalLatLng(safeLat, safeLng, alt);
-      }
-      SafeLatLng.prototype = OriginalLatLng.prototype;
-      SafeLatLng.__guarded = true;
-      Lib.LatLng = SafeLatLng;
-    }
-
-    if (Lib.latLng) {
-      const originalLatLngFactory = Lib.latLng;
-      Lib.latLng = function safeLatLngFactory(a, b, c) {
-        if (a instanceof Lib.LatLng) return a;
-        if (Array.isArray(a)) {
-          if (!Number.isFinite(+a[0]) || !Number.isFinite(+a[1])) {
-            return new Lib.LatLng(20.5937, 78.9629);
-          }
-        } else if (a && typeof a === 'object') {
-          const lat = a.lat;
-          const lng = a.lng ?? a.lon;
-          if (!Number.isFinite(+lat) || !Number.isFinite(+lng)) {
-            return new Lib.LatLng(20.5937, 78.9629);
-          }
-        } else if (!Number.isFinite(+a) || !Number.isFinite(+b)) {
-          return new Lib.LatLng(20.5937, 78.9629);
-        }
-        return originalLatLngFactory.call(Lib, a, b, c);
-      };
-    }
-
     const originalMarker = Lib.marker;
     Lib.marker = function markerGuard(coords, options) {
       if (!isFiniteLatLngPair(coords)) {
@@ -92,56 +54,33 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
   Lib.Map.prototype.__moveGuardInstalled = true;
   const originalSetView = Lib.Map.prototype.setView;
 
-  ['flyTo', 'panTo', 'setView', 'panBy'].forEach(methodName => {
+  ['flyTo', 'panTo', 'setView'].forEach(methodName => {
     const original = Lib.Map.prototype[methodName];
     if (typeof original !== 'function') return;
     const needsStop = methodName !== 'setView';
 
     Lib.Map.prototype[methodName] = function guardedMapMove(target, ...rest) {
-      if (methodName === 'panBy') {
-        const offset = target;
-        const x = Array.isArray(offset) ? offset[0] : offset?.x;
-        const y = Array.isArray(offset) ? offset[1] : offset?.y;
-        if (!Number.isFinite(+x) || !Number.isFinite(+y)) return this;
-        return original.call(this, target, ...rest);
-      }
-
       const lat = Array.isArray(target) ? target[0] : target?.lat;
       const lng = Array.isArray(target) ? target[1] : (target?.lng ?? target?.lon);
-      if (!Number.isFinite(+lat) || !Number.isFinite(+lng)) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         browserLogger.warn(`[map guard] skipped ${methodName} — invalid target:`, target);
         return this;
       }
 
-      // Check map container size
-      const size = this.getSize ? this.getSize() : null;
-      const hasValidSize = size && size.x > 0 && size.y > 0;
-
-      // Validate zoom argument if passed
-      let zoom = rest[0];
-      if (zoom !== undefined && !Number.isFinite(+zoom)) {
-        zoom = this.getZoom ? (this.getZoom() || 14) : 14;
-        rest[0] = zoom;
-      }
-
-      if (!hasValidSize) {
-        if (typeof this._resetView === 'function' && Number.isFinite(+lat) && Number.isFinite(+lng)) {
-          try {
-            this._zoom = Number.isFinite(+zoom) ? +zoom : (this._zoom || 14);
-            this._lastCenter = Lib.latLng(lat, lng);
-          } catch (_e) {}
+      if (methodName === 'flyTo') {
+        const size = this.getSize ? this.getSize() : null;
+        if (!size || !(size.x > 0) || !(size.y > 0)) {
+          browserLogger.warn('[map guard] flyTo on a hidden/zero-size map — using instant setView instead');
+          return originalSetView.call(this, target, rest[0]);
         }
-        return this;
       }
 
-      if (needsStop) {
-        try { this.stop(); } catch (_e) {}
-      }
+      if (needsStop) this.stop();
       try {
-        return original.call(this, [lat, lng], ...rest);
+        return original.call(this, target, ...rest);
       } catch (error) {
         browserLogger.warn(`[map guard] ${methodName} threw, falling back to instant setView`, error);
-        try { return originalSetView.call(this, [lat, lng], zoom); }
+        try { return originalSetView.call(this, target, rest[0]); }
         catch (fallbackError) {
           browserLogger.warn('[map guard] fallback setView also threw', fallbackError);
           return this;

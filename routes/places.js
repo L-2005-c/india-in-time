@@ -10,7 +10,6 @@ const PLACE_CACHE_TTL_MS = config.cache.placesTtlMs;
 const {
   filterPlacesByPrefs,
 } = require('../utils/placesMerge');
-const { filterEligibleTourismCandidates } = require('../services/travelIntelligence/tourismPoi');
 const {
   getPlaces, fetchWiki, fetchCuratedCityFallback, fetchCuratedFoodFallback,
   fetchNominatimFallback, hydrateAiPlaces,
@@ -111,12 +110,8 @@ router.post('/', async (req, res) => {
     // Wikipedia (ground-truth coords) + Nominatim fallback search.
     // ── Fetch sources safely without overloading Nominatim ──────────────────
     // Wikipedia and Gemini API can run concurrently.
-    const pWiki = wantFoodOnly ? Promise.resolve([]) : fetchWiki(lat, lon, cityName).catch(e => {
-      appLogger.error('[places] Wiki failed:', e.message); return [];
-    });
-    const pAi   = wantFoodOnly ? Promise.resolve([]) : getPlaces(cityName, lat, lon, totalMinutes).catch(e => {
-      appLogger.error('[places] AI discovery failed:', e.message); return [];
-    });
+    const pWiki = wantFoodOnly ? Promise.resolve([]) : fetchWiki(lat, lon, cityName);
+    const pAi   = wantFoodOnly ? Promise.resolve([]) : getPlaces(cityName, lat, lon, totalMinutes);
 
     // Nominatim strictly limits to 1 request per second globally per IP.
     // We MUST execute Curated (which geocodes) and Nominatim Fallback sequentially
@@ -132,8 +127,8 @@ router.post('/', async (req, res) => {
       appLogger.error('[places] Nominatim fallback failed:', e.message); return [];
     });
 
-    const wikiResult = await pWiki;
-    const aiResult   = await pAi;
+    const wikiResult = await pWiki.catch(e => { appLogger.error('[places] Wiki failed:', e.message); return []; });
+    const aiResult   = await pAi.catch(e => { appLogger.error('[places] AI discovery failed:', e.message); return []; });
 
     const wiki = Array.isArray(wikiResult) ? wikiResult : [];
     const aiPlacesRaw = Array.isArray(aiResult) ? aiResult : [];
@@ -198,20 +193,10 @@ router.post('/', async (req, res) => {
       });
       if (!isDup) dedupedMerged.push(place);
     }
-
-    const { eligible, rejected } = filterEligibleTourismCandidates(dedupedMerged, {
-      city: cityName,
-      cityLat: lat,
-      cityLon: lon,
-      prefs,
-    });
-    if (rejected.length > 0) {
-      appLogger.info(`[places] Tourism filter rejected ${rejected.length} non-tourist/locality entities (e.g. ${rejected.slice(0, 3).map(r => r.name).join(', ')})`);
-    }
     merged.length = 0;
-    merged.push(...eligible);
+    merged.push(...dedupedMerged);
 
-    appLogger.info(`[places] Final verified tourism pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
+    appLogger.info(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
     if (merged.length >= 3) {
       const payload = { places: merged, source: 'ranked_sources', count: merged.length };
@@ -236,14 +221,13 @@ router.post('/', async (req, res) => {
       const curatedCity = await fetchCuratedCityFallback(lat, lon, cityName).catch(() => []);
       const nominatimFallback = await fetchNominatimFallback(lat, lon, cityName, { foodOnly: wantFoodOnly }).catch(() => []);
       const curatedFood = wantsFood ? await fetchCuratedFoodFallback(lat, lon, cityName).catch(() => []) : [];
-      const rawAll = filterPlacesByPrefs(
+      const all = filterPlacesByPrefs(
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback, ...curatedFood].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&
           arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
         ),
         prefs
       );
-      const { eligible: all } = filterEligibleTourismCandidates(rawAll, { city: cityName, cityLat: lat, cityLon: lon, prefs });
       const payload = { places: all, source: 'error_fallback', count: all.length };
       setCachedPlaces(key, payload);
       return res.json(payload);

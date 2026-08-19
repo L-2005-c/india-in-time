@@ -1,22 +1,102 @@
 import { browserLogger } from '../utils/browser-logger.js';
-import { createAuthSession } from '../modules/auth-session.js';
-import { calculateStopBudget as _calculateStopBudget, calculateDayBudget as _calculateDayBudget, calculateTripBudget as _calculateTripBudget } from '../modules/budget.js';
-import { getRouteStopsForDay as _getRouteStopsForDay, createBreakStop as _createBreakStop, estimateStopLoadMinutes as _estimateStopLoadMinutes } from '../modules/planner.js';
-import { getTransportOptions as _getTransportOptionsMod, getTrafficMultiplierForCity as _getTrafficMultiplierForCity, getSmartTravelTimeForCity as _getSmartTravelTimeForCity, getTrafficLevel as _modTrafficLevel, getCrowdLevel as _modCrowdLevel, getCrowdMultiplier as _modCrowdMultiplier, getSmartVisitTime as _modSmartVisitTime } from '../modules/transport.js';
+import {
+  createAuthSession,
+} from '../modules/auth-session.js';
+import {
+  calculateStopBudget as _calculateStopBudget,
+  calculateDayBudget as _calculateDayBudget,
+  calculateTripBudget as _calculateTripBudget,
+} from '../modules/budget.js';
+import {
+  getRouteStopsForDay as _getRouteStopsForDay,
+  createBreakStop as _createBreakStop,
+  estimateStopLoadMinutes as _estimateStopLoadMinutes,
+} from '../modules/planner.js';
+
+import {
+  getTransportOptions as _getTransportOptionsMod,
+  getTrafficMultiplierForCity as _getTrafficMultiplierForCity,
+  getSmartTravelTimeForCity as _getSmartTravelTimeForCity,
+  getTrafficLevel as _modTrafficLevel,
+  getCrowdLevel as _modCrowdLevel,
+  getCrowdMultiplier as _modCrowdMultiplier,
+  getSmartVisitTime as _modSmartVisitTime,
+} from '../modules/transport.js';
 import { buildTimeAwareDay as _buildTimeAwareDayMod } from '../modules/timeAwarePlanner.js';
 import { createStreetQuest } from '../modules/streetQuest.js';
-import { escapeHtml as _escapeHtml, sanitizeChatHtml as _sanitizeChatHtml, formatAiText as _formatAiText } from '../utils/html-safe.js';
+import {
+  escapeHtml as _escapeHtml,
+  sanitizeChatHtml as _sanitizeChatHtml,
+  formatAiText as _formatAiText,
+} from '../utils/html-safe.js';
 import { showToast as _showToastMod } from '../modules/notifications.js';
 import { addMsg as _addMsgMod } from '../modules/chatUi.js';
-import { getDaypartClient as _getDaypartClient, getOpeningStatusPure as _getOpeningStatusPure, getCrowdPredictionPure as _getCrowdPredictionPure, calculateExperienceScorePure as _calculateExperienceScorePure, CROWD_BASE_BY_DAYPART, CROWD_WEEKEND_MULT, CROWD_PEAK_MULT } from '../utils/experience-score.js';
-import { isPlausibleGpsFix as _isPlausibleGpsFix, createGpsFixCoordinator as _createGpsFixCoordinator, GPS_MAX_ACCURACY_M, GPS_MAX_PLAUSIBLE_SPEED_MS } from '../utils/gps.js';
-import { closestPointOnSegment as _closestPointOnSegment, snapToRoute as _snapToRoute, turnArrowForInstruction as _turnArrowForInstruction, shouldSpeakNavInstruction as _shouldSpeakNavInstruction } from '../utils/nav-route.js';
-import { shouldRetryWeather as _shouldRetryWeather, weatherRetryDelayMs as _weatherRetryDelayMs, detectWeatherChange as _detectWeatherChange } from '../utils/weather-ui.js';
-import { CITIES, getHiddenGems, getTransportConfig, getLocalPlaces } from '../data/cities.js';
-import { normalizeFetchedPlaces as _normalizeFetchedPlaces, pickNearestCityId as _pickNearestCityId } from '../utils/city-load.js';
-import { hvKm, hasValidCoords, withHiddenGems as _geoWithHiddenGems, mergePlacePools as _geoMergePools, sortNearestNeighbor as _geoSortNN, routeDistanceKm as _geoRouteKm, centroidOfStops as _geoCentroid, clusterStopsByArea as _geoCluster, orderStopsAreaWise as _geoOrderArea, estimateTimeFitPenaltyKm as _geoTimeFit, optimizeStopOrder as _geoOptimize, bearingBetween as _geoBearing, keepNearbyCluster as _geoKeepNearby, famousPlaceScore as _geoFamous, prioritizePlanStops as _geoPrioritize, getRouteStopsForDay as _geoRouteStops, estimateStopLoadMinutes as _geoLoadMins, normalizeLatLon as _geoNormalizeLatLon } from '../utils/geo.js';
-import { dayPartForMinutes as _dayPartForMinutes, stopTimeScore as _stopTimeScore, stopClimateNote as _stopClimateNote } from '../utils/stop-scoring.js';
-import { getSunTimesClient as _getSunTimesClient, placeSunTimes as _placeSunTimes } from '../utils/sun-times.js';
+
+import {
+  getDaypartClient as _getDaypartClient,
+  getOpeningStatusPure as _getOpeningStatusPure,
+  getCrowdPredictionPure as _getCrowdPredictionPure,
+  calculateExperienceScorePure as _calculateExperienceScorePure,
+  CROWD_BASE_BY_DAYPART,
+  CROWD_WEEKEND_MULT,
+  CROWD_PEAK_MULT,
+} from '../utils/experience-score.js';
+import {
+  isPlausibleGpsFix as _isPlausibleGpsFix,
+  createGpsFixCoordinator as _createGpsFixCoordinator,
+  GPS_MAX_ACCURACY_M,
+  GPS_MAX_PLAUSIBLE_SPEED_MS,
+} from '../utils/gps.js';
+import {
+  closestPointOnSegment as _closestPointOnSegment,
+  snapToRoute as _snapToRoute,
+  turnArrowForInstruction as _turnArrowForInstruction,
+  shouldSpeakNavInstruction as _shouldSpeakNavInstruction,
+} from '../utils/nav-route.js';
+import {
+  shouldRetryWeather as _shouldRetryWeather,
+  weatherRetryDelayMs as _weatherRetryDelayMs,
+  detectWeatherChange as _detectWeatherChange,
+} from '../utils/weather-ui.js';
+import {
+  CITIES,
+  getHiddenGems,
+  getTransportConfig,
+  getLocalPlaces,
+} from '../data/cities.js';
+import {
+  normalizeFetchedPlaces as _normalizeFetchedPlaces,
+  pickNearestCityId as _pickNearestCityId,
+} from '../utils/city-load.js';
+import {
+  hvKm,
+  hasValidCoords,
+  withHiddenGems as _geoWithHiddenGems,
+  mergePlacePools as _geoMergePools,
+  sortNearestNeighbor as _geoSortNN,
+  routeDistanceKm as _geoRouteKm,
+  centroidOfStops as _geoCentroid,
+  clusterStopsByArea as _geoCluster,
+  orderStopsAreaWise as _geoOrderArea,
+  estimateTimeFitPenaltyKm as _geoTimeFit,
+  optimizeStopOrder as _geoOptimize,
+  bearingBetween as _geoBearing,
+  keepNearbyCluster as _geoKeepNearby,
+  famousPlaceScore as _geoFamous,
+  prioritizePlanStops as _geoPrioritize,
+  getRouteStopsForDay as _geoRouteStops,
+  estimateStopLoadMinutes as _geoLoadMins,
+  normalizeLatLon as _geoNormalizeLatLon,
+} from '../utils/geo.js';
+import {
+  dayPartForMinutes as _dayPartForMinutes,
+  stopTimeScore as _stopTimeScore,
+  stopClimateNote as _stopClimateNote,
+} from '../utils/stop-scoring.js';
+import {
+  getSunTimesClient as _getSunTimesClient,
+  placeSunTimes as _placeSunTimes,
+} from '../utils/sun-times.js';
 import { getTimeBadgesHtml as _getTimeBadgesHtml } from '../utils/time-badges.js';
 import {
   auth,
@@ -475,18 +555,12 @@ function restoreNavCardCollapsed(){
 function followLivePosition(force=false){
   if(!map||cLat==null||cLon==null) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
-  const size = map.getSize ? map.getSize() : null;
-  if (!size || size.x <= 0 || size.y <= 0) return;
   const zoom=Math.max(map.getZoom()||14,15);
   let target=[cLat,cLon];
   if(tripActive){
-    try {
-      const pt=map.project(target,zoom);
-      const shifted=L.point(pt.x,pt.y+110);
-      target=map.unproject(shifted,zoom);
-    } catch (_e) {
-      target=[cLat,cLon];
-    }
+    const pt=map.project(target,zoom);
+    const shifted=L.point(pt.x,pt.y+110);
+    target=map.unproject(shifted,zoom);
   }
   const tLat=Array.isArray(target)?target[0]:target.lat;
   const tLon=Array.isArray(target)?target[1]:target.lng;
@@ -554,31 +628,21 @@ function isPlausibleGpsFix(pos){
 
 // …
 function animateLiveMarkerTo(lat, lon){
-  if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
   if(!liveMkr){ displayedLat=lat; displayedLon=lon; return; }
   if(markerAnimFrame) cancelAnimationFrame(markerAnimFrame);
-  const fromLat=Number.isFinite(displayedLat) ? displayedLat : lat;
-  const fromLon=Number.isFinite(displayedLon) ? displayedLon : lon;
+  const fromLat=displayedLat??lat, fromLon=displayedLon??lon;
   const distM=hvKm(fromLat,fromLon,lat,lon)*1000;
   // Skip animating near-zero movement (avoids a constant no-op rAF loop
   // while stationary) and huge jumps (city switch, very first fix) — those
   // should snap instantly rather than visibly "fly" across the whole map.
-  if(!Number.isFinite(distM) || distM<0.5 || distM>150){
-    displayedLat=lat; displayedLon=lon;
-    try { liveMkr.setLatLng([lat,lon]); } catch (_e) {}
-    return;
-  }
+  if(distM<0.5 || distM>150){ displayedLat=lat; displayedLon=lon; liveMkr.setLatLng([lat,lon]); return; }
   const duration=400, start=performance.now();
   const step=(now)=>{
     const t=Math.min(1,(now-start)/duration);
     const eased=1-Math.pow(1-t,3);
-    const nextLat=fromLat+(lat-fromLat)*eased;
-    const nextLon=fromLon+(lon-fromLon)*eased;
-    if (Number.isFinite(nextLat) && Number.isFinite(nextLon)) {
-      displayedLat=nextLat;
-      displayedLon=nextLon;
-      try { liveMkr.setLatLng([displayedLat,displayedLon]); } catch (_e) {}
-    }
+    displayedLat=fromLat+(lat-fromLat)*eased;
+    displayedLon=fromLon+(lon-fromLon)*eased;
+    liveMkr.setLatLng([displayedLat,displayedLon]);
     if(t<1) markerAnimFrame=requestAnimationFrame(step);
     else markerAnimFrame=null;
   };
@@ -587,52 +651,33 @@ function animateLiveMarkerTo(lat, lon){
 
 // ── Snap-to-road ──────────────────────────────────────────────────────────
 // Projects a raw GPS point onto the nearest point of the currently-drawn
-// route polyline so the user's location marker glides along the road.
+// …
 function snapToRoute(lat, lon){
-  if(!Number.isFinite(lat) || !Number.isFinite(lon)) return [lat, lon];
   if(!rLine) return [lat, lon];
-  let latlngs=rLine.getLatLngs();
-  if(!latlngs) return [lat, lon];
-  if(Array.isArray(latlngs) && latlngs.length && Array.isArray(latlngs[0])) {
-    latlngs = latlngs.flat(Infinity);
-  }
-  if(!Array.isArray(latlngs) || latlngs.length<2) return [lat, lon];
+  const latlngs=rLine.getLatLngs();
+  if(!latlngs || latlngs.length<2) return [lat, lon];
   const p=L.latLng(lat, lon);
   let best=null, bestDist=Infinity;
   for(let i=0;i<latlngs.length-1;i++){
-    const a = latlngs[i], b = latlngs[i+1];
-    if(!a || !b) continue;
-    const candidate=closestPointOnSegment(p, a, b);
-    if(!candidate) continue;
+    const candidate=closestPointOnSegment(p, latlngs[i], latlngs[i+1]);
     const d=p.distanceTo(candidate);
-    if(Number.isFinite(d) && d<bestDist){ bestDist=d; best=candidate; }
+    if(d<bestDist){ bestDist=d; best=candidate; }
   }
-  if(!best || !Number.isFinite(bestDist) || bestDist>40) return [lat, lon];
+  if(!best || bestDist>40) return [lat, lon];
   return [best.lat, best.lng];
 }
 function closestPointOnSegment(p, a, b){
-  if(!p || !a || !b) return null;
-  const pLat = Number.isFinite(p.lat) ? p.lat : Array.isArray(p) ? p[0] : null;
-  const pLng = Number.isFinite(p.lng ?? p.lon) ? (p.lng ?? p.lon) : Array.isArray(p) ? p[1] : null;
-  const aLat = Number.isFinite(a.lat) ? a.lat : Array.isArray(a) ? a[0] : null;
-  const aLng = Number.isFinite(a.lng ?? a.lon) ? (a.lng ?? a.lon) : Array.isArray(a) ? a[1] : null;
-  const bLat = Number.isFinite(b.lat) ? b.lat : Array.isArray(b) ? b[0] : null;
-  const bLng = Number.isFinite(b.lng ?? b.lon) ? (b.lng ?? b.lon) : Array.isArray(b) ? b[1] : null;
-
-  if (pLat == null || pLng == null || aLat == null || aLng == null || bLat == null || bLng == null) {
-    return null;
-  }
-  const cosLat=Math.cos(aLat*Math.PI/180);
-  const toXY=(lat, lng)=>({x:lng*cosLat, y:lat});
-  const A=toXY(aLat, aLng), B=toXY(bLat, bLng), P=toXY(pLat, pLng);
+  // Simple equirectangular projection — fine at the scale of one road
+  // segment (tens of metres), far cheaper than great-circle math for
+  // something recomputed on every GPS fix during live tracking.
+  const cosLat=Math.cos(a.lat*Math.PI/180);
+  const toXY=(pt)=>({x:pt.lng*cosLat, y:pt.lat});
+  const A=toXY(a), B=toXY(b), P=toXY(p);
   const dx=B.x-A.x, dy=B.y-A.y;
   const lenSq=dx*dx+dy*dy;
   let t=lenSq>0 ? ((P.x-A.x)*dx+(P.y-A.y)*dy)/lenSq : 0;
   t=Math.max(0,Math.min(1,t));
-  const resLat = aLat+(bLat-aLat)*t;
-  const resLng = aLng+(bLng-aLng)*t;
-  if(!Number.isFinite(resLat) || !Number.isFinite(resLng)) return null;
-  return L.latLng(resLat, resLng);
+  return L.latLng(a.lat+(b.lat-a.lat)*t, a.lng+(b.lng-a.lng)*t);
 }
 
 function maybeSpeakNavInstruction(text, force=false){
@@ -2494,55 +2539,21 @@ function compassTap(){
   showToast('🧭','Heading',`${degToCompassLabel(lastHeading)} (${deg}°)`);
 }
 
-function resetGPS(){
-  cLat=null; cLon=null; lastAcceptedFix=null; lastAcceptedFixAt=0;
-  document.getElementById('gps-txt').textContent='GPS';
-  if('geolocation' in navigator){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      if(!pos?.coords || !Number.isFinite(pos.coords.latitude) || !Number.isFinite(pos.coords.longitude)) return;
-      cLat=pos.coords.latitude; cLon=pos.coords.longitude; lastAcceptedFix=[cLat,cLon]; lastAcceptedFixAt=pos.timestamp || Date.now();
-      notifyGpsFix(cLat,cLon); document.getElementById('gps-txt').textContent=cLat.toFixed(3);
-      if(liveMkr) { try { liveMkr.setLatLng([cLat,cLon]); } catch (_e) {} }
-      displayedLat=cLat; displayedLon=cLon;
-    }, err=>{ browserLogger.warn('[resetGPS] GPS error:', err); }, {enableHighAccuracy:true, timeout:10000, maximumAge:0});
-  }
-  initGPS();
-}
+function resetGPS(){cLat=null;document.getElementById('gps-txt').textContent='GPS';initGPS();}
 
+// ── "Locate me" map button ──────────────────────────────────────────────────
+// Recenters the map on the user's live position — the same blue-dot-style
+// …
 let isLocating = false;
 async function locateMe(){
-  if (isLocating) return;
+  if (isLocating) return; // ignore rapid repeat taps while a request is in flight
   isLocating = true;
   const btn = document.getElementById('locate-me-btn');
   if (btn) { btn.disabled = true; btn.classList.add('locating'); }
   try {
-    let fixLat = cLat, fixLon = cLon;
-    if ('geolocation' in navigator) {
-      const freshPos = await new Promise((res, rej) => {
-        navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-      }).catch(() => null);
-      if (freshPos?.coords && Number.isFinite(freshPos.coords.latitude) && Number.isFinite(freshPos.coords.longitude)) {
-        cLat = freshPos.coords.latitude; cLon = freshPos.coords.longitude;
-        lastAcceptedFix = [cLat, cLon]; lastAcceptedFixAt = freshPos.timestamp || Date.now();
-        fixLat = cLat; fixLon = cLon; notifyGpsFix(cLat, cLon);
-      }
-    }
-    if (!Number.isFinite(fixLat) || !Number.isFinite(fixLon)) {
-      const fix = await waitForFirstGpsFix(10000);
-      fixLat = fix.lat; fixLon = fix.lon;
-    }
-    if (Number.isFinite(fixLat) && Number.isFinite(fixLon)) {
-      cLat = fixLat; cLon = fixLon;
-      document.getElementById('gps-txt').textContent = fixLat.toFixed(3);
-      if (!liveMkr && map) {
-        liveMkr = L.marker([fixLat, fixLon], { icon: L.divIcon({ className: 'iit-marker', html: '<div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #2563eb;filter:drop-shadow(0 0 8px rgba(37,99,235,.8));transform-origin:50% 70%"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(map);
-      } else if (liveMkr) { try { liveMkr.setLatLng([fixLat, fixLon]); } catch (_e) {} }
-      displayedLat = fixLat; displayedLon = fixLon;
-      if (map) {
-        const zoom = Math.max(map.getZoom() || 14, 16);
-        map.stop(); map.flyTo([fixLat, fixLon], zoom, { animate: true, duration: 0.8 });
-      }
-    }
+    const { lat, lon } = await waitForFirstGpsFix(10000);
+    map.stop();
+    map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { animate: true, duration: 0.8 });
   } catch (e) {
     browserLogger.warn('[locateMe] GPS fix unavailable:', e);
     alert('Could not get your location. Please check that location access is allowed for this site and try again.');

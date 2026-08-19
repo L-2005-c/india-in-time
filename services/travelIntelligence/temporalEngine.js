@@ -235,4 +235,4 @@ function buildTemporalProfile(place, options = {}) {
   };
 }
 
-module.exports = { buildTemporalProfile, nearestHourlyWeather, buildWindows, selectModes, confidenceSummary, classifyWindow };
+module.exports = { buildTemporalProfile, nearestHourlyWeather, buildWindows, selectModes, confidenceSummary };

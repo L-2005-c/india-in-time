@@ -18,7 +18,12 @@ services:
     # afterward drops the devDependencies from node_modules before
     # startCommand runs, so the running process's dependency footprint is
     # unchanged from before.
-    buildCommand: npm ci && npm run build:frontend && npm prune --omit=dev
+    # Full `npm ci` (not --omit=dev) because build:frontend needs esbuild/
+    # clean-css-cli (devDependencies) to produce frontend/public/dist/.
+    # `npm prune --omit=dev` afterward drops devDependencies from
+    # node_modules before startCommand runs, so the running process's
+    # dependency footprint is unchanged.
+    buildCommand: npm ci --include=dev && npm run build:frontend && npm prune --omit=dev
     startCommand: node server.js
     healthCheckPath: /api/health
     envVars:

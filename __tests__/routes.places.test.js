@@ -42,7 +42,7 @@ function buildApp() {
 }
 
 function place(name, cat, lat, lon) {
-  return { id: name, name, cat, coords: [lat, lon], vt: 45, ot: '06:00', ct: '20:00', rating: 4.5, reviews: 1000, tier: 'TIER_A' };
+  return { id: name, name, cat, coords: [lat, lon], vt: 45, ot: '06:00', ct: '20:00' };
 }
 
 let app;
@@ -164,8 +164,7 @@ describe('POST /api/places — caching', () => {
     // lastRefreshAt (routes/places.js) is a module-level Map that isn't
     // reset between tests, so reusing another test's cache key here would
     // inherit its refresh-cooldown state and throttle immediately.
-    const body = { lat: 26.987, lon: 75.876, cityName: 'Jaipur' };
-    discovery.hydrateAiPlaces.mockClear();
+    const body = { lat: 44.4, lon: 55.5, cityName: 'Cooldowntestcity' };
     await request(app).post('/api/places').send(body);
     await request(app).post('/api/places').send({ ...body, refresh: true });   // 1st refresh: allowed
     await request(app).post('/api/places').send({ ...body, refresh: true });   // 2nd refresh: throttled

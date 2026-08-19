@@ -3,7 +3,13 @@
 // Production validation is explicit via validateProductionConfig() so merely
 // importing config in a unit test can never terminate a Jest worker.
 
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+try {
+  require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+} catch (err) {
+  if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
+  // dotenv is a normal runtime dependency. Keep config import resilient for
+  // diagnostics and static checks when a local node_modules tree is partial.
+}
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isProd   = NODE_ENV === 'production';

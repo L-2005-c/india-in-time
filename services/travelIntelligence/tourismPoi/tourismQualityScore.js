@@ -1,152 +1,199 @@
 'use strict';
 
 /**
- * tourismQualityScore.js
- * Calculates the multi-factor Tourism Quality Score (0–100) and assigns Tourism Priority Tiers.
+ * Tourism Quality Score (0–100) and Priority Tiers.
  *
- * Factors:
- * 1. Bayesian log-weighted rating & review volume (avoids 4.8 / 10 reviews beating 4.6 / 8,000 reviews)
- * 2. Category significance & iconicity (signature beaches, museums, viewpoints vs minor spots)
- * 3. Cultural / historical / scenic significance
- * 4. Data-source authority & verification level
- * 5. Metadata completeness (accurate opening hours, coordinates, visit duration)
+ * A place with 4.8 / 10 reviews must NOT automatically outrank
+ * 4.6 / 8,000 reviews. Volume, authority, category validity, and
+ * multi-source confirmation all contribute.
  */
 
-const { resolveSourceAuthority } = require('./tourismAuthorityResolver');
-
-// Tourism Priority Tiers
-const TOURISM_TIERS = {
-  TIER_S: 'TIER_S', // Iconic / Must-Consider (90-100)
-  TIER_A: 'TIER_A', // High-Value Tourist Attraction (75-89)
-  TIER_B: 'TIER_B', // Good Tourist Attraction (60-74)
-  TIER_C: 'TIER_C', // Niche / Local Experience (45-59)
-  TIER_D: 'TIER_D', // Low Confidence / Insufficient Evidence (30-44)
-  REJECT: 'REJECT', // Not a Tourist Destination (< 30)
-};
+const TIERS = Object.freeze({
+  S: 'S', // Iconic / must-consider
+  A: 'A', // High-value tourist attraction
+  B: 'B', // Good tourist attraction
+  C: 'C', // Niche / local experience
+  D: 'D', // Low confidence
+  REJECT: 'REJECT',
+});
 
 /**
- * Calculates a Bayesian log-scaled popularity score from rating (1-5) and review volume.
- * @param {number} rating - User rating (1.0 to 5.0)
- * @param {number} reviewCount - Number of user reviews
- * @returns {number} 0 to 100 popularity score
+ * Bayesian-smoothed rating that balances average rating with review volume.
+ * Uses a prior of 3.5 stars with strength equivalent to 20 reviews.
  */
-function calculatePopularityScore(rating = 4.0, reviewCount = 100) {
-  const r = Math.max(1.0, Math.min(5.0, Number(rating) || 4.0));
-  const c = Math.max(0, Number(reviewCount) || 50);
-
-  // Bayesian prior: mean rating 4.0 with confidence weight m = 50 reviews
-  const priorRating = 4.0;
-  const m = 50;
-  const bayesianRating = (c * r + m * priorRating) / (c + m);
-
-  // Rating contribution (0-60 points) based on Bayesian adjusted rating
-  const ratingPoints = ((bayesianRating - 1.0) / 4.0) * 60;
-
-  // Review volume log scale (0-40 points): 10 reviews -> 10 pts, 100 reviews -> 20 pts, 1000 reviews -> 30 pts, 10000+ reviews -> 40 pts
-  const logReviews = c > 0 ? Math.log10(c + 1) : 0;
-  const reviewPoints = Math.min(40, (logReviews / 4.0) * 40);
-
-  return Math.max(0, Math.min(100, Math.round(ratingPoints + reviewPoints)));
+function bayesianRating(rating, reviewCount, priorMean = 3.5, priorStrength = 20) {
+  const r = Number(rating);
+  const n = Math.max(0, Number(reviewCount) || 0);
+  if (!Number.isFinite(r) || r <= 0) {
+    // No rating — weak prior only
+    return { smoothed: priorMean, confidence: Math.min(0.3, n / (n + priorStrength)) };
+  }
+  const smoothed = (priorStrength * priorMean + n * r) / (priorStrength + n);
+  const confidence = n / (n + priorStrength);
+  return { smoothed, confidence };
 }
 
 /**
- * Calculates the comprehensive Tourism Quality Score (0–100).
- * @param {object} candidate - Place candidate with metadata
- * @param {object} classification - Category classification result from tourismCategoryClassifier
- * @returns {{ qualityScore: number, tier: string, components: object, breakdown: string[] }}
+ * Source hierarchy confidence (0–1).
+ * Higher = more trusted provenance.
  */
-function calculateTourismQuality(candidate = {}, classification = {}) {
-  // If classified as invalid/locality or blacklisted, immediate REJECT
-  if (!classification.isTourismValid) {
+function sourceConfidence(place) {
+  const src = String(place.source || place.dataSource || place.fallbackSource || '').toLowerCase();
+  if (place._whitelistMatch || src === 'curated' || src === 'whitelist') return 0.98;
+  if (src.includes('official') || src.includes('tourism_board')) return 0.95;
+  if (src.includes('wikipedia') || src.includes('wiki')) return 0.85;
+  if (src.includes('gemini') || src.includes('ai')) return 0.55;
+  if (src.includes('nominatim') || src.includes('osm')) return 0.5;
+  if (src.includes('seed') || src === 'city-seeds') return 0.9;
+  if (place.importance === 'must_see') return 0.88;
+  if (place.importance === 'famous') return 0.75;
+  if (place.importance === 'local') return 0.55;
+  return 0.4;
+}
+
+/**
+ * Category validity boost — confirmed tourist categories score higher.
+ */
+function categoryValidityScore(tourismClass, isTourist) {
+  if (!isTourist) return 0;
+  const high = new Set([
+    'BEACH', 'TEMPLE', 'MUSEUM', 'VIEWPOINT', 'SCENIC_LOCATION',
+    'HERITAGE_SITE', 'FORT', 'PALACE', 'MONUMENT', 'ZOO', 'AQUARIUM',
+    'SHOPPING_MALL', 'WATERFALL', 'WILDLIFE',
+  ]);
+  const mid = new Set([
+    'PARK', 'GARDEN', 'FOOD_DESTINATION', 'SHOPPING_DESTINATION',
+    'TOURIST_ATTRACTION', 'CULTURAL_SITE', 'RELIGIOUS_ATTRACTION',
+    'HISTORICAL_SITE', 'NATURE', 'ENTERTAINMENT', 'PHOTOGRAPHY_SPOT',
+  ]);
+  if (high.has(tourismClass)) return 95;
+  if (mid.has(tourismClass)) return 80;
+  return 55;
+}
+
+/**
+ * Compute tourismQualityScore 0–100 and tier.
+ *
+ * @param {object} place
+ * @param {object} classification - from classifyTourismCategory
+ * @param {object} [opts]
+ * @returns {{ score: number, tier: string, factors: object }}
+ */
+function computeTourismQualityScore(place, classification, opts = {}) {
+  if (!classification || !classification.isTourist) {
     return {
-      qualityScore: 0,
-      tier: TOURISM_TIERS.REJECT,
-      components: { popularity: 0, categoryWeight: 0, authority: 0, completeness: 0 },
-      breakdown: ['Disqualified: Non-tourist category or blacklisted locality'],
+      score: 0,
+      tier: TIERS.REJECT,
+      factors: { reason: 'not_tourist', class: classification?.class },
     };
   }
 
-  const name = String(candidate.name || '').toLowerCase();
-  const rawRating = candidate.rating ?? candidate.userRating ?? 4.2;
-  const rawReviews = candidate.reviews ?? candidate.reviewCount ?? candidate.user_ratings_total ?? (candidate.isCurated ? 1200 : 150);
-  const importance = String(candidate.importance || candidate.significance || '').toLowerCase();
+  const rating = Number(place.rating ?? place.userRating ?? place.stars);
+  const reviewCount = Number(place.reviewCount ?? place.user_ratings_total ?? place.reviews ?? 0);
+  const { smoothed, confidence: ratingConf } = bayesianRating(rating, reviewCount);
 
-  // 1. Popularity & Rating component (35% weight)
-  const popularity = calculatePopularityScore(rawRating, rawReviews);
+  // Factor weights (sum ≈ 100)
+  const w = {
+    category: 22,
+    rating: 20,
+    volume: 12,
+    authority: 18,
+    uniqueness: 8,
+    evidence: 10,
+    multiSource: 10,
+  };
 
-  // 2. Category & Iconicity component (30% weight)
-  let categoryPoints = 70; // baseline for valid tourist POIs
-  if (importance === 'must_see' || candidate.isMustSee || candidate.is_signature) {
-    categoryPoints = 100;
-  } else if (importance === 'famous' || candidate.isFamous) {
-    categoryPoints = 85;
-  } else if (/submarine|kailasagiri|rushikonda|ramakrishna beach|charminar|golconda|red fort|india gate|hawa mahal|amber fort|gateway of india|taj mahal|qutub minar/i.test(name)) {
-    categoryPoints = 100; // iconic national landmarks
-  } else if (/beach|museum|fort|palace|waterfall|viewpoint|aquarium|sanctuary|zoo/i.test(name)) {
-    categoryPoints = 80;
-  } else if (/mall|inorbit|cmr central/i.test(name)) {
-    categoryPoints = 78;
+  const categoryScore = categoryValidityScore(classification.class, true);
+
+  // Rating component: map smoothed 1–5 → 0–100
+  const ratingScore = Number.isFinite(smoothed)
+    ? Math.max(0, Math.min(100, ((smoothed - 1) / 4) * 100))
+    : 50;
+
+  // Volume component: log scale, saturates around 5000 reviews
+  const volumeScore = Math.min(100, (Math.log10(Math.max(1, reviewCount) + 1) / Math.log10(5001)) * 100);
+
+  const authorityScore = sourceConfidence(place) * 100;
+
+  // Uniqueness / importance
+  let uniquenessScore = 50;
+  if (place.importance === 'must_see' || place.tourismTier === 'S') uniquenessScore = 98;
+  else if (place.importance === 'famous' || place.tourismTier === 'A') uniquenessScore = 85;
+  else if (place.importance === 'local' || place.tourismTier === 'C') uniquenessScore = 60;
+  if (place.is_sunrise_spot || place.is_sunset_spot) uniquenessScore = Math.min(100, uniquenessScore + 8);
+
+  // Evidence: description, images, opening hours
+  let evidenceScore = 40;
+  if (place.description && String(place.description).length > 40) evidenceScore += 20;
+  if (place.open_time || place.openingHours || place.openTime) evidenceScore += 15;
+  if (place.image || place.photo || place.thumbnail) evidenceScore += 15;
+  if (place.visit_minutes || place.averageVisitDuration) evidenceScore += 10;
+  evidenceScore = Math.min(100, evidenceScore);
+
+  // Multi-source confirmation
+  let multiSourceScore = 30;
+  if (place._whitelistMatch) multiSourceScore = 100;
+  else if (place.nominatimFixed && place.wikiMatch) multiSourceScore = 90;
+  else if (place.wikiMatch || place.wikipedia) multiSourceScore = 75;
+  else if (place.nominatimFixed || place.fallbackSource) multiSourceScore = 50;
+  if (place.sourceConfidence != null) {
+    multiSourceScore = Math.max(multiSourceScore, Number(place.sourceConfidence) * 100);
   }
 
-  // 3. Source Authority component (20% weight)
-  const sourceAuth = resolveSourceAuthority(candidate);
-  const authorityPoints = Math.round(sourceAuth.weight * 100);
+  const raw =
+    (categoryScore * w.category +
+      ratingScore * w.rating +
+      volumeScore * w.volume +
+      authorityScore * w.authority +
+      uniquenessScore * w.uniqueness +
+      evidenceScore * w.evidence +
+      multiSourceScore * w.multiSource) /
+    100;
 
-  // 4. Metadata Completeness & Verification (15% weight)
-  let completenessPoints = 60;
-  if (Array.isArray(candidate.coords) && candidate.coords.length === 2 && Number.isFinite(candidate.coords[0])) {
-    completenessPoints += 15;
-  }
-  if (candidate.ot && candidate.ct) completenessPoints += 15;
-  if (candidate.vt || candidate.visit_minutes) completenessPoints += 10;
-  completenessPoints = Math.min(100, completenessPoints);
+  // Classification confidence dampens score when category is uncertain
+  const classConf = Number(classification.confidence) || 0.5;
+  const score = Math.round(Math.max(0, Math.min(100, raw * (0.7 + 0.3 * classConf))));
 
-  // Weighted Total Quality Score (0–100)
-  const qualityScore = Math.max(0, Math.min(100, Math.round(
-    popularity * 0.35 +
-    categoryPoints * 0.30 +
-    authorityPoints * 0.20 +
-    completenessPoints * 0.15
-  )));
-
-  // Determine Tier
-  let tier = TOURISM_TIERS.TIER_B;
-  if (qualityScore >= 90 || categoryPoints === 100) {
-    tier = TOURISM_TIERS.TIER_S;
-  } else if (qualityScore >= 75) {
-    tier = TOURISM_TIERS.TIER_A;
-  } else if (qualityScore >= 60) {
-    tier = TOURISM_TIERS.TIER_B;
-  } else if (qualityScore >= 45) {
-    tier = TOURISM_TIERS.TIER_C;
-  } else if (qualityScore >= 30) {
-    tier = TOURISM_TIERS.TIER_D;
-  } else {
-    tier = TOURISM_TIERS.REJECT;
-  }
-
-  const breakdown = [
-    `Popularity: ${popularity}/100 (Rating ${rawRating}, Reviews ${rawReviews})`,
-    `Category Iconicity: ${categoryPoints}/100 (${classification.category})`,
-    `Source Authority: ${authorityPoints}/100 (${sourceAuth.label})`,
-    `Metadata Completeness: ${completenessPoints}/100`,
-  ];
+  const tier = scoreToTier(score, place, classification);
 
   return {
-    qualityScore,
+    score,
     tier,
-    components: {
-      popularity,
-      categoryWeight: categoryPoints,
-      authority: authorityPoints,
-      completeness: completenessPoints,
+    factors: {
+      categoryScore: Math.round(categoryScore),
+      ratingScore: Math.round(ratingScore),
+      volumeScore: Math.round(volumeScore),
+      authorityScore: Math.round(authorityScore),
+      uniquenessScore: Math.round(uniquenessScore),
+      evidenceScore: Math.round(evidenceScore),
+      multiSourceScore: Math.round(multiSourceScore),
+      bayesianRating: Math.round(smoothed * 100) / 100,
+      reviewCount,
+      ratingConfidence: Math.round(ratingConf * 100) / 100,
+      classConfidence: classConf,
     },
-    breakdown,
   };
 }
 
+function scoreToTier(score, place, classification) {
+  if (!classification?.isTourist) return TIERS.REJECT;
+  // Explicit curated tier wins when present and high
+  if (place.tourismTier === 'S' || place.importance === 'must_see') return TIERS.S;
+  if (place.tourismTier === 'A') return score >= 55 ? TIERS.A : TIERS.B;
+  if (place._whitelistMatch && place.tourismTier) return place.tourismTier;
+
+  if (score >= 88) return TIERS.S;
+  if (score >= 72) return TIERS.A;
+  if (score >= 55) return TIERS.B;
+  if (score >= 40) return TIERS.C;
+  if (score >= 25) return TIERS.D;
+  return TIERS.REJECT;
+}
+
 module.exports = {
-  calculateTourismQuality,
-  calculatePopularityScore,
-  TOURISM_TIERS,
+  TIERS,
+  bayesianRating,
+  sourceConfidence,
+  computeTourismQualityScore,
+  scoreToTier,
 };

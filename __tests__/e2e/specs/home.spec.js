@@ -33,7 +33,6 @@ test.describe('India In-Time critical UI journeys', () => {
   test('@perf initial document stays within a basic performance budget', async ({ page }) => {
     await page.goto('/', { waitUntil: 'load' });
     const metrics = await page.evaluate(() => {
-      // eslint-disable-next-line no-undef
       const nav = performance.getEntriesByType('navigation')[0];
       return nav ? {
         ttfb: nav.responseStart - nav.requestStart,
