@@ -271,8 +271,12 @@ const placeLoadPromises=new Map();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const t2m=(s,fallback=0)=>{
-  const [h,m]=String(s||'').split(':').map(Number);
+  const raw=String(s||'').trim(); if(!raw) return fallback;
+  const ampm=raw.match(/\b(am|pm)\b/i);
+  const parts=raw.replace(/\s*(am|pm)\s*/i,'').split(':');
+  let h=Number(parts[0]), m=Number(parts[1]||0);
   if(!Number.isFinite(h)||!Number.isFinite(m)) return fallback;
+  if(ampm){ h=h%12; if(/pm/i.test(ampm[1])) h+=12; }
   return Math.max(0,Math.min(23,h))*60+Math.max(0,Math.min(59,m));
 };
 const fmtM=m=>{if(!m||isNaN(m))return'0m';const a=Math.abs(m);return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60?` ${a%60}m`:''}`;};
@@ -316,7 +320,6 @@ try {
 } catch (_e) {
   window.globalSimulationTime = 12 * 60;
 }
-
 
 function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
   const sun = placeSunTimes(loc);
@@ -469,21 +472,17 @@ function createBreakStop(anchorStop,index,duration){
   };
 }
 function applyBreakPlanToCurrentItinerary(baseStops){
-  const routeStops=(baseStops||getRouteStopsForDay(itin)).map(stop=>({ ...stop }));
-  const breakEvery=getBreakEveryMinutes();
-  const breakDuration=getBreakDurationMinutes();
+  const routeStops=(baseStops||getRouteStopsForDay(itin)).filter(s=>!s?.isBreak).map(stop=>({ ...stop }));
+  const breakEvery=getBreakEveryMinutes(), breakDuration=getBreakDurationMinutes();
   if(!breakEvery || !breakDuration) return routeStops;
-  const rebuilt=[];
-  let activeSinceBreak=0;
+  const rebuilt=[]; let activeSinceBreak=0;
   routeStops.forEach(stop=>{
-    const travel=stop.tt||0;
-    const visit=stop.vt||60;
-    if(rebuilt.length && activeSinceBreak>0 && activeSinceBreak + travel + visit > breakEvery){
+    const travel=Math.max(0,parseInt(stop.tt,10)||0), visit=Math.max(15,parseInt(stop.vt,10)||45);
+    if(rebuilt.length && activeSinceBreak>0 && activeSinceBreak+travel+visit>breakEvery){
       rebuilt.push(createBreakStop(rebuilt[rebuilt.length-1], rebuilt.length, breakDuration));
       activeSinceBreak=0;
     }
-    rebuilt.push(stop);
-    activeSinceBreak += travel + visit;
+    rebuilt.push(stop); activeSinceBreak += travel+visit;
   });
   return rebuilt;
 }
@@ -555,33 +554,20 @@ function restoreNavCardCollapsed(){
 function followLivePosition(force=false){
   if(!map||!isFiniteLatLon(cLat,cLon)) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
-  // map.getZoom() can be NaN while the map is mid-init or after a bad setView;
-  // Math.max(NaN, 15) === NaN and Leaflet then throws Invalid LatLng (NaN, NaN).
-  const rawZ=map.getZoom();
-  const zoom=Math.max(Number.isFinite(rawZ)?rawZ:14,15);
+  const rawZ=map.getZoom(), zoom=Math.max(Number.isFinite(rawZ)?rawZ:14,15);
   let target=[cLat,cLon];
   if(tripActive){
-    try{
-      const pt=map.project(target,zoom);
-      if(Number.isFinite(pt.x)&&Number.isFinite(pt.y)){
-        target=map.unproject(L.point(pt.x,pt.y+110),zoom);
-      }
-    }catch(_e){ /* keep raw GPS target */ }
+    try{ const pt=map.project(target,zoom);
+      if(Number.isFinite(pt.x)&&Number.isFinite(pt.y)) target=map.unproject(L.point(pt.x,pt.y+110),zoom);
+    }catch(_e){}
   }
-  const tLat=Array.isArray(target)?target[0]:target?.lat;
-  const tLon=Array.isArray(target)?target[1]:target?.lng;
+  const tLat=Array.isArray(target)?target[0]:target?.lat, tLon=Array.isArray(target)?target[1]:target?.lng;
   if(!isFiniteLatLon(tLat,tLon)) return;
-  const curCenter=map.getCenter();
-  const alreadyThere = curCenter && isFiniteLatLon(curCenter.lat,curCenter.lng)
-    && map.distance(curCenter,[tLat,tLon])<3 && Math.abs((Number.isFinite(rawZ)?rawZ:zoom)-zoom)<0.01;
-  if(alreadyThere) return;
+  const cur=map.getCenter();
+  if(cur && isFiniteLatLon(cur.lat,cur.lng) && map.distance(cur,[tLat,tLon])<3 && Math.abs((Number.isFinite(rawZ)?rawZ:zoom)-zoom)<0.01) return;
   try{ map.stop(); }catch(_e){}
-  try{
-    map.flyTo([tLat,tLon],zoom,{ animate:true, duration:0.8, easeLinearity:0.25 });
-  }catch(e){
-    browserLogger.warn('[followLivePosition] flyTo threw, falling back to setView', e);
-    try{ map.stop(); map.setView([tLat,tLon],zoom); }catch(_e2){}
-  }
+  try{ map.flyTo([tLat,tLon],zoom,{animate:true,duration:0.8,easeLinearity:0.25}); }
+  catch(e){ browserLogger.warn('[followLivePosition] flyTo threw, falling back to setView', e); try{ map.stop(); map.setView([tLat,tLon],zoom); }catch(_e2){} }
 }
 
 function toggleLiveFollow(forceState){
@@ -690,7 +676,6 @@ function maybeSpeakNavInstruction(text, force=false){
 }
 
 function turnArrowForInstruction(text){ return _turnArrowForInstruction(text); }
-
 
 function stopTimeScore(stop, arriveMin, temp, priorityIndex=0, wind=0, personas=null, tripMode=null){
   return _stopTimeScore(stop, arriveMin, temp, priorityIndex, wind, personas, tripMode);
@@ -1252,8 +1237,7 @@ async function generatePlan(){
   }else{avail=prioritizePlanStops(avail,routeStart,prefs);}
   mdPlan=[];let rem=[...avail];
   const startMin=t2m(si);
-  // GeoAI /optimize plans ONE day per call — loop per day, exclude used stops,
-  // re-center day 2+ on city. Partial results are filled by the local planner.
+  // GeoAI /optimize is one day per call; fill remaining days locally.
   const cityCenterForDays = (CITIES[currentCityId]?.lat && CITIES[currentCityId]?.lon)
     ? [CITIES[currentCityId].lat, CITIES[currentCityId].lon] : routeStart;
   try{
@@ -1288,32 +1272,15 @@ async function generatePlan(){
       }
       if(!Array.isArray(optimized?.stops) || !optimized.stops.length) break;
       const usedThisDay=new Set(optimized.stops.map(s=>String(s.id||s.name)));
-      const _geoStops=[...optimized.stops].sort((a,b)=>{
-        const am=t2m(a.arriveAt||'09:00', startMin);
-        const bm=t2m(b.arriveAt||'09:00', startMin);
-        return am-bm;
-      }).map(stop=>{
+      const _geoStops=[...optimized.stops].sort((a,b)=>t2m(a.arriveAt||'09:00',startMin)-t2m(b.arriveAt||'09:00',startMin)).map(stop=>{
         const arriveMin=t2m(stop.arriveAt||'09:00', startMin);
         const leaveMin=t2m(stop.leaveAt||stop.arriveAt||'09:00', arriveMin+(stop.stayMinutes||45));
-        return {
-          ...stop,
-          id:stop.id||stop.name,
-          cat:stop.category||stop.cat||'default',
-          coords:stop.coords,
-          vt:stop.stayMinutes||45,
-          tt:stop.travelMinutes||0,
-          arriveMin,
-          leaveMin,
-          arriveAt:stop.arriveAt,
-          leaveAt:stop.leaveAt,
-          temporalScore:stop.timingFit,
-          slotLabel:_dayPartForMinutes(arriveMin),
-          climateNote:stop.weather?.suitability||'',
-          bestWindow:stop.bestWindow||null,
-          optimizationScore:stop.optimizationScore,
-          waitingMinutes:stop.waitingMinutes||0,
-          geoOptimized:true,
-        };
+        return {...stop, id:stop.id||stop.name, cat:stop.category||stop.cat||'default', coords:stop.coords,
+          vt:stop.stayMinutes||45, tt:stop.travelMinutes||0, arriveMin, leaveMin,
+          arriveAt:m2t(arriveMin), leaveAt:m2t(leaveMin), temporalScore:stop.timingFit,
+          slotLabel:_dayPartForMinutes(arriveMin), climateNote:stop.weather?.suitability||'',
+          bestWindow:stop.bestWindow||null, optimizationScore:stop.optimizationScore,
+          waitingMinutes:stop.waitingMinutes||0, geoOptimized:true, scheduleLocked:true};
       });
       geoDays.push(_geoStops);
       window.__iitLastGeoAIPlan=optimized;
@@ -1353,7 +1320,13 @@ async function generatePlan(){
   if(!mdPlan.length){
     mdPlan=[];rem=[...avail];
     for(let d=0;d<nDays;d++){let day=[],cur=startMin,used=0,unv=[];
-      rem.forEach(loc=>{const tr=day.length?20:0,arr=cur+tr,dep=arr+loc.vt;if(used+loc.vt+tr<=maxT&&arr>=t2m(loc.ot)&&dep<=t2m(loc.ct)){day.push({...loc,tt:tr,slotLabel:_dayPartForMinutes(arr),climateNote:_stopClimateNote(loc,arr,realTemp||28)});used+=loc.vt+tr;cur=dep;}else unv.push(loc);});
+      rem.forEach(loc=>{
+        const tr=day.length?20:0,arr=cur+tr,dep=arr+(loc.vt||45);
+        if(used+(loc.vt||45)+tr<=maxT&&arr>=t2m(loc.ot||'06:00')&&dep<=t2m(loc.ct||'22:00')){
+          day.push({...loc,tt:tr,vt:loc.vt||45,arriveMin:arr,leaveMin:dep,arriveAt:m2t(arr),leaveAt:m2t(dep),scheduleLocked:true,slotLabel:_dayPartForMinutes(arr),climateNote:_stopClimateNote(loc,arr,realTemp||28)});
+          used+=(loc.vt||45)+tr;cur=dep;
+        }else unv.push(loc);
+      });
       if(day.length)mdPlan.push(day);rem=unv;
     }
   }
@@ -1369,11 +1342,17 @@ async function generatePlan(){
   for(let d=0; d<mdPlan.length; d++){
     const savedItin=itin, savedDayIdx=dayIdx;
     itin=mdPlan[d]; dayIdx=d;
-    const stops=getRouteStopsForDay(itin);
-    const hasFixedSlots=stops.some(s=>s.geoOptimized&&s.arriveAt);
-    itin=applyBreakPlanToCurrentItinerary((!hasFixedSlots && d>0) ? optimizeStopOrder(stops,cityCenterCoords) : stops);
+    const raw=Array.isArray(itin)?itin:[];
+    const hasTimed=raw.some(s=>s&&!s.isBreak&&(s.arriveMin!=null||(s.arriveAt&&/^\d{1,2}:\d{2}$/.test(String(s.arriveAt)))));
+    if(hasTimed) itin=raw.map(s=>({...s}));
+    else { const stops=getRouteStopsForDay(raw); itin=applyBreakPlanToCurrentItinerary(d>0?optimizeStopOrder(stops,cityCenterCoords):stops); }
     recalcTimes({trimToWindow:true, dayLabel:`Day ${d+1}`});
-    itin.forEach(s=>{ if(!s.isBreak){ s.scheduleLocked=true; if(s.std&&!s.arriveAt) s.arriveAt=s.sts; if(s.etd&&!s.leaveAt) s.leaveAt=s.ets; } });
+    itin.forEach(s=>{
+      if(s.isBreak) return;
+      s.scheduleLocked=true;
+      if(s.std instanceof Date){ const am=s.std.getHours()*60+s.std.getMinutes(); s.arriveAt=m2t(am); s.arriveMin=am; }
+      if(s.etd instanceof Date) s.leaveAt=m2t(s.etd.getHours()*60+s.etd.getMinutes());
+    });
     mdPlan[d]=itin; itin=savedItin; dayIdx=savedDayIdx;
   }
   await switchDay(0,true);
@@ -1637,7 +1616,6 @@ function ti_renderState(place, state){
   ];
   return parts.filter(Boolean).join('<br>');
 }
-
 
 /** Batch-enrich places with backend Travel Intelligence into place._ti (non-blocking). */
 async function enrichPlacesWithTravelIntel(places, limit = 30) {
@@ -2153,16 +2131,19 @@ function recalcTimes(opts={}){
   const kept=[];
   let dropped=0;
   let droppedNames=[];
+  const startBase=getScheduleStart();
+  const dayStartMin=startBase.getHours()*60+startBase.getMinutes();
   for(const loc of itin){
-    // Preserve fixed timeslots (GeoAI / locked after Generate) — no sequential drift.
-    if(!tripActive && (loc.geoOptimized || loc.scheduleLocked) && (loc.arriveAt || loc.sts) && (loc.leaveAt || loc.ets)){
-      const startBase = getScheduleStart();
-      const startMin = startBase.getHours() * 60 + startBase.getMinutes();
-      const arriveMin = t2m(loc.arriveAt||loc.sts, startMin);
-      const leaveMin = t2m(loc.leaveAt||loc.ets, arriveMin + Math.max(1, parseInt(loc.vt, 10) || 45));
-      const arrive = new Date(startBase); arrive.setHours(Math.floor(arriveMin/60), arriveMin%60, 0, 0);
-      const depart = new Date(startBase); depart.setHours(Math.floor(leaveMin/60), leaveMin%60, 0, 0);
+    const fixedAt=loc.arriveAt && /^\d{1,2}:\d{2}$/.test(String(loc.arriveAt).trim());
+    if(!tripActive && (loc.geoOptimized || loc.scheduleLocked) && (fixedAt || loc.arriveMin!=null)){
+      const arriveMin = loc.arriveMin!=null ? loc.arriveMin : t2m(loc.arriveAt, dayStartMin);
+      const leaveMin = (loc.leaveAt && /^\d{1,2}:\d{2}$/.test(String(loc.leaveAt).trim()))
+        ? t2m(loc.leaveAt, arriveMin+Math.max(1,parseInt(loc.vt,10)||45))
+        : arriveMin+Math.max(1,parseInt(loc.vt,10)||45);
+      const arrive=new Date(startBase); arrive.setHours(Math.floor(arriveMin/60),arriveMin%60,0,0);
+      const depart=new Date(startBase); depart.setHours(Math.floor(leaveMin/60),leaveMin%60,0,0);
       loc.sts=fmt12(arrive); loc.std=arrive; loc.ets=fmt12(depart); loc.etd=depart;
+      loc.arriveMin=arriveMin; loc.arriveAt=m2t(arriveMin); loc.leaveAt=m2t(leaveMin);
       kept.push(loc); t=depart; continue;
     }
     const travel=Math.max(0,parseInt(loc.tt,10)||0);
@@ -2174,7 +2155,9 @@ function recalcTimes(opts={}){
       droppedNames=itin.slice(kept.length).filter(l=>!l.isBreak).map(l=>l.name);
       break;
     }
+    const am=arrive.getHours()*60+arrive.getMinutes();
     loc.sts=fmt12(arrive);loc.std=new Date(arrive);loc.ets=fmt12(depart);loc.etd=new Date(depart);
+    loc.arriveMin=am; loc.arriveAt=m2t(am); loc.leaveAt=m2t(depart.getHours()*60+depart.getMinutes());
     kept.push(loc);
     t=depart;
   }
@@ -2318,10 +2301,15 @@ function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(trip
 function skipStop(){const routeStops=getRouteStopsForDay(itin);if(!routeStops.length)return;const sk=routeStops[0];itin=applyBreakPlanToCurrentItinerary(routeStops.slice(1));sync();addMsg(`⏭️ Skipped <strong>${sk.name}</strong>`);renderRoute();}
 async function optimizeRoute(silent=false){
   if(!itin.length){await renderRoute();return;}
-  const base=getRouteStopsForDay(itin).map(s=>({...s,scheduleLocked:false,geoOptimized:false,arriveAt:undefined,leaveAt:undefined}));
+  const base=getRouteStopsForDay(itin).map(s=>({...s,scheduleLocked:false,geoOptimized:false,arriveAt:undefined,leaveAt:undefined,arriveMin:undefined}));
   itin=applyBreakPlanToCurrentItinerary(optimizeStopOrder(base,getPreviewRouteStart()));
   recalcTimes({trimToWindow:true});
-  itin.forEach(s=>{ if(!s.isBreak){ s.scheduleLocked=true; if(s.std) s.arriveAt=s.sts; if(s.etd) s.leaveAt=s.ets; } });
+  itin.forEach(s=>{
+    if(s.isBreak) return;
+    s.scheduleLocked=true;
+    if(s.std instanceof Date){ s.arriveAt=m2t(s.std.getHours()*60+s.std.getMinutes()); s.arriveMin=s.std.getHours()*60+s.std.getMinutes(); }
+    if(s.etd instanceof Date) s.leaveAt=m2t(s.etd.getHours()*60+s.etd.getMinutes());
+  });
   sync(); if(!silent)addMsg('⚡ Route optimized for an easier tourist flow.');
   await renderRoute();
 }
@@ -3077,7 +3065,6 @@ function renderDrawerContent() {
 function renderAiToolsGrid() {
   // No-op — drawer replaces the grid
 }
-
 
 /*
   grid.innerHTML = [

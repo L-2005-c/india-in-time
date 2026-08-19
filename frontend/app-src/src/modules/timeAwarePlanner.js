@@ -81,10 +81,29 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
     return best;
   }
 
+  function toHHMM(min) {
+    const m = ((Math.round(min) % (24 * 60)) + (24 * 60)) % (24 * 60);
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+
   function pushStop(loc, travel, visit, arrive) {
-    day.push({ ...loc, arriveMin: arrive, vt: visit, travelMin: travel });
+    const leave = arrive + visit;
+    day.push({
+      ...loc,
+      arriveMin: arrive,
+      leaveMin: leave,
+      vt: visit,
+      tt: travel,
+      travelMin: travel,
+      arriveAt: toHHMM(arrive),
+      leaveAt: toHHMM(leave),
+      scheduleLocked: true,
+      geoOptimized: false,
+    });
     usedIds.add(loc.id);
-    currentMin = arrive + visit;
+    currentMin = leave;
     used += travel + visit;
     activeSinceBreak += travel + visit;
     prevCoords = loc.coords || prevCoords;
@@ -121,7 +140,14 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
     pushStop(pick.loc, pick.travel, pick.actualVisit, pick.arrive);
 
     if (breakEvery > 0 && breakDuration > 0 && activeSinceBreak >= breakEvery && used + breakDuration < maxT) {
-      day.push(createBreakStop(pick.loc, day.length, breakDuration));
+      const bStart = currentMin;
+      const br = createBreakStop(pick.loc, day.length, breakDuration);
+      br.arriveMin = bStart;
+      br.leaveMin = bStart + breakDuration;
+      br.arriveAt = toHHMM(bStart);
+      br.leaveAt = toHHMM(bStart + breakDuration);
+      br.tt = 0;
+      day.push(br);
       currentMin += breakDuration;
       used += breakDuration;
       activeSinceBreak = 0;
