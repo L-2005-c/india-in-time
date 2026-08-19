@@ -1,8 +1,8 @@
 /**
  * GPS quality filter + fix coordination (extracted from core/app.js).
  */
-export const GPS_MAX_ACCURACY_M = 60;
-export const GPS_MAX_PLAUSIBLE_SPEED_MS = 55;
+export const GPS_MAX_ACCURACY_M = 3000;
+export const GPS_MAX_PLAUSIBLE_SPEED_MS = 80;
 
 /**
  * @param {GeolocationPosition} pos
@@ -11,19 +11,28 @@ export const GPS_MAX_PLAUSIBLE_SPEED_MS = 55;
  * @param {function} hvKm haversine km
  */
 export function isPlausibleGpsFix(pos, lastAcceptedFix, lastAcceptedFixAt, hvKm) {
-  if (!lastAcceptedFix) return true;
+  if (!pos || !pos.coords) return false;
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return false;
+
+  if (!lastAcceptedFix || !Number.isFinite(lastAcceptedFix[0]) || !Number.isFinite(lastAcceptedFix[1])) {
+    return true;
+  }
   const elapsedS = (pos.timestamp - lastAcceptedFixAt) / 1000;
-  if (elapsedS <= 0) return true;
+  if (elapsedS <= 0 || elapsedS > 20) return true;
+
   const movedKm = hvKm(
     lastAcceptedFix[0],
     lastAcceptedFix[1],
-    pos.coords.latitude,
-    pos.coords.longitude
+    lat,
+    lon
   );
   const impliedSpeed = (movedKm * 1000) / elapsedS;
-  if (impliedSpeed > GPS_MAX_PLAUSIBLE_SPEED_MS) return false;
+  if (impliedSpeed > GPS_MAX_PLAUSIBLE_SPEED_MS && movedKm > 1.0) return false;
   const acc = pos.coords.accuracy;
-  if (Number.isFinite(acc) && acc > GPS_MAX_ACCURACY_M && impliedSpeed > 2) return false;
+  if (Number.isFinite(acc) && acc > GPS_MAX_ACCURACY_M && impliedSpeed > 10) return false;
   return true;
 }
 
