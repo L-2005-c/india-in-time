@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Architecture check
+        run: npm run check:architecture
+      - name: Inline handler check
+        run: npm run check:inline-handlers
+      - name: Unit tests
+        run: npm run test:ci
+      - name: Frontend build
+        run: npm run build:frontend
+      - name: Bundle check
+        run: npm run check:bundle
