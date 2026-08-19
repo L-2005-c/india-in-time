@@ -553,35 +553,34 @@ function restoreNavCardCollapsed(){
 }
 
 function followLivePosition(force=false){
-  if(!map||cLat==null||cLon==null) return;
+  if(!map||!isFiniteLatLon(cLat,cLon)) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
-  const zoom=Math.max(map.getZoom()||14,15);
+  // map.getZoom() can be NaN while the map is mid-init or after a bad setView;
+  // Math.max(NaN, 15) === NaN and Leaflet then throws Invalid LatLng (NaN, NaN).
+  const rawZ=map.getZoom();
+  const zoom=Math.max(Number.isFinite(rawZ)?rawZ:14,15);
   let target=[cLat,cLon];
   if(tripActive){
-    const pt=map.project(target,zoom);
-    const shifted=L.point(pt.x,pt.y+110);
-    target=map.unproject(shifted,zoom);
+    try{
+      const pt=map.project(target,zoom);
+      if(Number.isFinite(pt.x)&&Number.isFinite(pt.y)){
+        target=map.unproject(L.point(pt.x,pt.y+110),zoom);
+      }
+    }catch(_e){ /* keep raw GPS target */ }
   }
-  const tLat=Array.isArray(target)?target[0]:target.lat;
-  const tLon=Array.isArray(target)?target[1]:target.lng;
+  const tLat=Array.isArray(target)?target[0]:target?.lat;
+  const tLon=Array.isArray(target)?target[1]:target?.lng;
   if(!isFiniteLatLon(tLat,tLon)) return;
-  // Leaflet's flyTo() runs its own internal fly-path easing math over a
-// …
   const curCenter=map.getCenter();
   const alreadyThere = curCenter && isFiniteLatLon(curCenter.lat,curCenter.lng)
-    && map.distance(curCenter,[tLat,tLon])<3 && Math.abs((map.getZoom()||zoom)-zoom)<0.01;
+    && map.distance(curCenter,[tLat,tLon])<3 && Math.abs((Number.isFinite(rawZ)?rawZ:zoom)-zoom)<0.01;
   if(alreadyThere) return;
-  map.stop();
+  try{ map.stop(); }catch(_e){}
   try{
-    map.flyTo([tLat,tLon],zoom,{
-      animate:true,
-      duration:0.8,
-      easeLinearity:0.25,
-    });
+    map.flyTo([tLat,tLon],zoom,{ animate:true, duration:0.8, easeLinearity:0.25 });
   }catch(e){
     browserLogger.warn('[followLivePosition] flyTo threw, falling back to setView', e);
-    map.stop();
-    map.setView([tLat,tLon],zoom);
+    try{ map.stop(); map.setView([tLat,tLon],zoom); }catch(_e2){}
   }
 }
 
