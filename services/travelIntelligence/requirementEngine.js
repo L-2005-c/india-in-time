@@ -207,7 +207,18 @@ function parseRequirements(raw = {}) {
   };
 }
 
+function hasUsableCoords(place) {
+  return Array.isArray(place?.coords) && place.coords.length >= 2
+    && Number.isFinite(Number(place.coords[0])) && Number.isFinite(Number(place.coords[1]));
+}
+
 function candidateMatchesHardRequirements(place, requirements) {
+  // The optimizer computes every travel leg from place.coords — a place
+  // without usable coordinates can't be distanced, routed, or timed, so it
+  // must never reach the beam search as a schedulable candidate. (It's
+  // still surfaced upstream in multiDayPlanner's unusedPlaces with a
+  // "no coordinates" reason instead of silently vanishing.)
+  if (!hasUsableCoords(place)) return { ok: false, reason: 'no_coordinates' };
   if (isExcludedCategory(place, requirements.hard.excludedCategories)) return { ok: false, reason: 'excluded_category' };
   if ((requirements.hard.mustAvoidPlaces || []).some((ref) => {
     const target = String(ref).toLowerCase().trim();
@@ -234,6 +245,7 @@ module.exports = {
   parseRequirements,
   filterCandidates,
   candidateMatchesHardRequirements,
+  hasUsableCoords,
   isExcludedCategory,
   normalizeCat,
   normalizeMeal,

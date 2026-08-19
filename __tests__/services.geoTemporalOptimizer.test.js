@@ -14,7 +14,7 @@ describe('geoTemporalOptimizer', () => {
       originCoords: [17.70, 83.30],
       weather: { tempC: 28, condition: 'Clear' },
     });
-    expect(result.algorithm).toBe('geo-temporal-beam-search-v4-structured');
+    expect(result.algorithm).toBe('geo-temporal-beam-search-v5-world-class');
     expect(result.stopCount).toBeGreaterThan(0);
     expect(result.stops.every((s) => s.timingFit != null)).toBe(true);
   });

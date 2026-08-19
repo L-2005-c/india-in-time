@@ -37,6 +37,14 @@ const MEALS = {
   dinner: { start: 18 * 60 + 30, end: 22 * 60 + 30, label: 'dinner' },
 };
 
+// Primary sit-down meals get the full nudge toward a food stop; "snack" is a
+// real but weaker window (tea/evening-snack time isn't as strong a signal as
+// lunch/dinner), and anything outside all four windows gets none. Previously
+// this was a flat 30 for any food place landing in *any* meal window, which
+// meant snack-time and lunch-time stops were scored identically — collapsing
+// a meaningful timing signal the scoring/beam-search downstream relies on.
+const MEAL_TIMING_BONUS = { breakfast: 25, lunch: 30, snack: 15, dinner: 30 };
+
 const OUTDOOR = new Set(['beach', 'scenic', 'park', 'garden', 'waterfall', 'hill', 'fort', 'monument', 'viewpoint']);
 
 function visitMinutes(place) {
@@ -399,7 +407,7 @@ function buildStop(place, scored, arrivalMin, state) {
     experienceScoreAtArrival: intel.visitScore,
     timingScore: intel.isBestTimeNow ? 100 : Math.max(0, Math.min(100, Math.round((intel.scenic?.scenicScore || 50) * 0.7 + (intel.weather?.score || 50) * 0.3))),
     timingFit: intel.isBestTimeNow ? 95 : 65,
-    mealTimingBonus: isFood(place) && mealAt(arrivalMin) ? 30 : 0,
+    mealTimingBonus: isFood(place) ? (MEAL_TIMING_BONUS[mealAt(arrivalMin)] || 0) : 0,
     optimizationScore: Math.round(scored.score),
     crowdLevel: intel.crowdLevel,
     weather: intel.weather,
