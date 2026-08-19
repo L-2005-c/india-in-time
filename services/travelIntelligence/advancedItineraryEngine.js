@@ -458,7 +458,6 @@ function dedupeStates(states) {
 }
 
 function buildInfeasibleResult(requirements, warnings, candidates, diagnostics = {}) {
-  const rejected = Array.isArray(diagnostics.tourismRejected) ? diagnostics.tourismRejected : [];
   return {
     generatedAt: new Date().toISOString(),
     algorithm: 'geo-temporal-beam-search-v5-world-class',
@@ -472,7 +471,7 @@ function buildInfeasibleResult(requirements, warnings, candidates, diagnostics =
     requirementSatisfaction: { score: 0, met: [], unmet: [...new Set([...(requirements.hard.requiredMeals || []), ...(requirements.hard.mustVisit || []), ...(requirements.soft.preferredCategories || [])])] },
     validation: { passed: false, failures: [...new Set(warnings)] },
     requirements: requirements,
-    diagnostics: { candidateCount: candidates.length, tourismEligibleCount: candidates.length, ...diagnostics, tourismRejected: rejected.slice(0, 30) },
+    diagnostics: { candidateCount: candidates.length, tourismRejected: (typeof tourismRejected !== "undefined" ? tourismRejected.slice(0, 30) : []), tourismEligibleCount: candidates.length, ...diagnostics },
   };
 }
 
@@ -516,11 +515,11 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const expansionLimit = Math.min(14, Math.max(4, Number(rawOptions.expansionLimit) || 10));
   const buffer = Math.max(5, Number(rawOptions.bufferMin) || 12);
 
-  if (endMin <= startMin) return buildInfeasibleResult(requirements, ['endTime must be after startTime'], candidates, { tourismRejected });
+  if (endMin <= startMin) return buildInfeasibleResult(requirements, ['endTime must be after startTime'], candidates);
 
   const mustVisitMissing = (requirements.hard.mustVisit || []).filter((req) => !all.some((p) => matchesMustVisit(p, req)));
-  if (mustVisitMissing.length) return buildInfeasibleResult(requirements, mustVisitMissing.map((x) => `Must-visit place not found: ${x}`), candidates, { tourismRejected });
-  if (!candidates.length) return buildInfeasibleResult(requirements, ['No candidates survive the hard constraints.'], candidates, { tourismRejected });
+  if (mustVisitMissing.length) return buildInfeasibleResult(requirements, mustVisitMissing.map((x) => `Must-visit place not found: ${x}`), candidates);
+  if (!candidates.length) return buildInfeasibleResult(requirements, ['No candidates survive the hard constraints.'], candidates);
 
   const origin = requirements.originCoords || (candidates[0] && candidates[0].coords) || null;
   const completedStops = Array.isArray(rawOptions.completedStops) ? rawOptions.completedStops : [];
@@ -671,7 +670,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       if (!beam.some((s) => s.stops.some((st) => matchesMustVisit(st, m)))) reasons.push(`Must-visit place could not be scheduled: ${m}`);
     });
     if (!reasons.length) reasons.push('No candidate sequence satisfied all hard constraints.');
-    return buildInfeasibleResult(requirements, reasons, candidates, { beamWidth, searchedStates: candidatesForFinal.length, tourismRejected });
+    return buildInfeasibleResult(requirements, reasons, candidates, { beamWidth, searchedStates: candidatesForFinal.length });
   }
 
   feasible.sort((a, b) => {

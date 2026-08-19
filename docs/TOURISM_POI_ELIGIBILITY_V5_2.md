@@ -1,14 +1,5 @@
 # India In Time — Tourism POI Eligibility Engine (v5.2)
 
-> **Canonical doc as of the v5.2.2 merge.** This branch's tourism/GeoAI
-> engine (multi-city `tourismWhitelist.js` + Jest regression suite) was
-> selected as the production baseline over the parallel v5.2.1 branch's
-> provenance-resolver approach. That branch's write-up is kept for history
-> at `docs/archive/TOURISM_INTELLIGENCE_UPGRADE_V5_1_1.md`; its concrete
-> production fixes (Render build command, dotenv resilience, SEO assets,
-> `scripts/release-audit.js`) were ported into this branch — see
-> `DEPLOYMENT_PRODUCTION.md` and `DEPLOY.md`.
-
 **Production upgrade:** Real tourism value over raw map data.
 
 ## 1. Existing itinerary architecture
