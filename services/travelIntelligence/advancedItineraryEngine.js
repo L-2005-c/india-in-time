@@ -19,16 +19,19 @@ const {
   parseRequirements,
   filterCandidates,
   candidateMatchesHardRequirements,
+  computeRequirementSatisfaction,
   isExcludedCategory,
   normalizeCat,
   normalizeMeal,
   placeCost,
   isFoodPlace,
+  isShoppingPlace,
 } = require('./requirementEngine');
+const { filterEligibleTourismCandidates } = require('./tourismPoi');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },
-  lunch: { start: 11 * 60 + 30, end: 15 * 60 + 30, label: 'lunch' },
+  lunch: { start: 11 * 60, end: 15 * 60 + 30, label: 'lunch' },
   snack: { start: 16 * 60, end: 18 * 60 + 30, label: 'snack' },
   dinner: { start: 18 * 60 + 30, end: 22 * 60 + 30, label: 'dinner' },
 };
@@ -180,9 +183,19 @@ function travelCost(travel, place, options = {}) {
 }
 
 function mealRequirements(requirements) {
-  return requirements.hard.requiredMeals?.length
-    ? requirements.hard.requiredMeals
-    : (requirements.soft.foodFocus ? ['lunch'] : []);
+  if (requirements.hard.requiredMeals?.length) {
+    return requirements.hard.requiredMeals;
+  }
+  if (requirements.soft.foodFocus) {
+    const start = requirements.hard.startMin;
+    const end = requirements.hard.endMin;
+    const meals = [];
+    if (start <= 14 * 60 && end >= 12 * 60 + 30) meals.push('lunch');
+    else if (start <= 21 * 60 && end >= 19 * 60 + 30) meals.push('dinner');
+    else if (start <= 9 * 60 + 30 && end >= 8 * 60) meals.push('breakfast');
+    return meals;
+  }
+  return [];
 }
 
 function requiredMealMet(stops, meal) {
@@ -191,7 +204,7 @@ function requiredMealMet(stops, meal) {
 
 function requirementSatisfaction(stops, requirements, validation = []) {
   const prefs = requirements.soft.preferredCategories || [];
-  const coveredCats = new Set(stops.map((s) => normalizeCat(s.category)));
+  const coveredCats = new Set(stops.map((s) => isFood(s) ? 'food' : (isShoppingPlace(s) ? 'shopping' : normalizeCat(s.category))));
   const catMet = prefs.filter((p) => coveredCats.has(p));
   const catScore = prefs.length ? (catMet.length / prefs.length) * 100 : 100;
   const required = mealRequirements(requirements);
@@ -273,6 +286,33 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   const requiredMeals = mealRequirements(requirements);
   const neededMeal = requiredMeals.includes(meal) && !state.meals.has(meal);
 
+  // Tourism Quality & Priority Tier contribution
+  const tier = place.tourismTier || 'TIER_B';
+  if (tier === 'TIER_S') score += 22;
+  else if (tier === 'TIER_A') score += 14;
+  else if (tier === 'TIER_B') score += 6;
+  else if (tier === 'TIER_D') score -= 15;
+
+  // Time-dependent Daypart suitability
+  if (arrivalMin < 10 * 60 + 30) {
+    // Morning: sunrise, beaches, viewpoints, parks, temples
+    if (place.is_sunrise_spot || ['beach', 'viewpoint', 'temple', 'park', 'garden'].includes(cat)) score += 15;
+  } else if (arrivalMin >= 10 * 60 + 30 && arrivalMin < 13 * 60) {
+    // Late morning: museums, monuments, heritage
+    if (['museum', 'fort', 'monument', 'heritage'].includes(cat) || place.indoor_outdoor === 'indoor') score += 15;
+  } else if (arrivalMin >= 13 * 60 && arrivalMin < 16 * 60) {
+    // Afternoon: lunch, malls, indoor/shaded
+    if (isFood(place) && meal === 'lunch') score += 25;
+    if (['shopping', 'museum'].includes(cat) || place.indoor_outdoor === 'indoor') score += 18;
+  } else if (arrivalMin >= 16 * 60 && arrivalMin < 19 * 60 + 30) {
+    // Evening: sunset, viewpoints, scenic, beaches, shopping malls
+    if (place.is_sunset_spot || ['scenic', 'beach', 'viewpoint', 'shopping'].includes(cat)) score += 22;
+  } else if (arrivalMin >= 19 * 60 + 30) {
+    // Night: dinner, nightlife, shopping malls
+    if (isFood(place) && meal === 'dinner') score += 25;
+    if (['nightlife', 'shopping'].includes(cat) || place.has_nightlife) score += 18;
+  }
+
   // Temporal value is primary. Waiting is rewarded only when it materially
   // improves the time-dependent experience or fulfils a meal requirement.
   score += Number(intel.scenic?.scenicScore || 0) * 0.18;
@@ -281,13 +321,14 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   score += ({ Low: 8, 'Very Low': 12, Moderate: 0, High: -8, 'Very High': -14 }[intel.crowdLevel] || 0);
   if (requirements.soft.lowCrowd && ['High', 'Very High'].includes(intel.crowdLevel)) score -= 24;
   if (requirements.soft.family) {
-    if (place.family_friendly || ['park', 'museum', 'beach'].includes(cat)) score += 18;
+    if (place.family_friendly || ['park', 'museum', 'beach', 'shopping'].includes(cat)) score += 18;
     else score -= 24;
   }
   if (requirements.soft.photography && ['scenic', 'beach', 'viewpoint'].includes(cat)) score += 15;
   if (requirements.soft.preferredCategories?.length) {
     const preferred = requirements.soft.preferredCategories.includes(cat)
-      || (requirements.soft.preferredCategories.includes('food') && isFood(place));
+      || (requirements.soft.preferredCategories.includes('food') && isFood(place))
+      || (requirements.soft.preferredCategories.includes('shopping') && isShoppingPlace(place));
     if (preferred) score += 48;
     else if (!neededMeal) score -= 72;
   }
@@ -298,6 +339,10 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
     else score -= 12;
   } else if (requirements.soft.foodFocus && (meal === 'lunch' || meal === 'dinner') && !state.meals.has(meal)) {
     score -= 28;
+  }
+  if (isShoppingPlace(place)) {
+    const shoppingIntent = requirements.soft.shoppingFocus || requirements.soft.preferredCategories?.includes('shopping');
+    if (shoppingIntent) score += 35;
   }
   if (place.is_sunset_spot && meal !== 'lunch') score += 8;
   if (state.stops.length && normalizeCat(state.stops[state.stops.length - 1].category) === cat && cat !== 'food') score -= 7;
@@ -406,6 +451,11 @@ function buildStop(place, scored, arrivalMin, state) {
     whyNotOtherTime: intel.scenic?.bestScenicWindow ? [`Chosen around the best available temporal window (${intel.scenic.bestScenicWindow.start || 'time window'})`] : ['Earlier/later candidates scored lower under the current constraints'],
     whyNotAlternative: ['Alternatives were evaluated against the same arrival-time, route, requirement and feasibility state'],
     confidence: Number(intel.confidence?.confidence ?? intel.confidence ?? 50),
+    tourismQualityScore: Number(place.tourismQualityScore || (place.isCurated ? 88 : 75)),
+    tourismTier: place.tourismTier || (place.isCurated ? 'TIER_A' : 'TIER_B'),
+    dataSource: place.source || place.dataSource || 'curated_internal',
+    sourceLabel: place.sourceLabel || (place.isCurated ? 'Verified Curated Dataset' : 'Verified Tourism Provider'),
+    isVerifiedTouristPoi: true,
     nearbyPreferred: Number(scored.distanceKm) <= 3.5,
     cost: scored.cost,
     costSource: scored.costSource,
@@ -473,7 +523,12 @@ function buildInfeasibleResult(requirements, warnings, candidates, diagnostics =
 
 function planAdvancedItinerary(places, rawOptions = {}) {
   const requirements = parseRequirements(rawOptions);
-  const all = Array.isArray(places) ? places : [];
+  const rawAll = Array.isArray(places) ? places : [];
+  const { eligible: all } = filterEligibleTourismCandidates(rawAll, {
+    city: rawOptions.city || rawOptions.cityName || rawOptions.region,
+    cityName: rawOptions.cityName || rawOptions.city,
+    originCoords: rawOptions.originCoords,
+  });
   const candidates = filterCandidates(all, requirements);
   const now = rawOptions.now instanceof Date ? rawOptions.now : new Date(rawOptions.now || Date.now());
   const startMin = requirements.hard.startMin;
@@ -528,9 +583,10 @@ function planAdvancedItinerary(places, rawOptions = {}) {
         // remains uncovered, unless the candidate is itself a required meal.
         const preferred = requirements.soft.preferredCategories || [];
         const missingPreferred = preferred.filter((cat) => !state.categories.has(cat));
-        const placeCat = normalizeCat(place.cat || place.category);
+        const placeCat = isFood(place) ? 'food' : (isShoppingPlace(place) ? 'shopping' : normalizeCat(place.cat || place.category));
         const mealNow = mealAt(state.cursor);
-        const isRequiredMealCandidate = isFood(place) && mealRequirements(requirements).includes(mealNow);
+        const isMealNeeded = isFood(place) && mealRequirements(requirements).some((m) => !state.meals.has(m) && MEALS[m] && state.cursor < MEALS[m].end);
+        const isRequiredMealCandidate = isFood(place) && (mealRequirements(requirements).includes(mealNow) || isMealNeeded);
         if (missingPreferred.length && !missingPreferred.includes(placeCat) && !isRequiredMealCandidate) continue;
 
         const travel = estimateTravel({
@@ -577,7 +633,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
             prevKey: place.name,
             stops: [...state.stops, stop],
             used: new Set([...state.used, key]),
-            categories: new Set([...state.categories, normalizeCat(place.cat || place.category)]),
+            categories: new Set([...state.categories, placeCat]),
             meals: new Set(state.meals),
             score: state.score + rescored.score - Math.max(0, wait * 0.15),
             cost: state.cost + rescored.cost,
@@ -673,8 +729,8 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       requirementSatisfaction: requirementSatisfaction(candidate.stops, requirements).score,
     })),
     warnings,
-    requirementSatisfaction: winner.satisfaction,
-    validation: { passed: true, failures: [], checks: ['opening_hours', 'time_window', 'travel', 'meals', 'must_visit', 'exclusions', 'budget', 'accessibility', 'transport', 'safety', 'duplicates'] },
+    requirementSatisfaction: computeRequirementSatisfaction({ stops: state.stops, totalTravelMinutes: state.travelMinutes, totalDwellMinutes: totalVisitMinutes }, requirements),
+    validation: { passed: true, failures: [], checks: ['opening_hours', 'time_window', 'travel', 'meals', 'must_visit', 'exclusions', 'budget', 'accessibility', 'transport', 'safety', 'duplicates', 'tourism_eligibility'] },
     requirements: requirements,
     dayStructure: dayStructure.coverageReport(state.stops, {
       preferredCategories: requirements.soft.preferredCategories,

@@ -16,6 +16,7 @@ const {
   isConfidentWikiMatch, tokenOverlap, dedupePlacesByName,
   inferFallbackCategory, visitMinutesForCat,
 } = require('../utils/placesMerge');
+const { filterEligibleTourismCandidates } = require('./travelIntelligence/tourismPoi');
 
 async function callGemini(prompt) {
   const text = await callGeminiText(prompt, {
@@ -666,11 +667,14 @@ async function hydrateAiPlaces(aiPlaces, knownPlaces, lat, lon, cityName) {
     }
   }
 
-  const geocoded = await fixAiCoordsViaNominatim(unmatched, lat, lon, cityName);
-  return dedupePlacesByName([
+  const geocoded = await fixAiCoordsViaNominatim(unmatched, lat, lon);
+
+  const combined = dedupePlacesByName([
     ...grounded,
     ...geocoded.map(place => ({ ...place, aiRanked: true })),
   ]);
+  const { eligible } = filterEligibleTourismCandidates(combined, { city: cityName, cityLat: lat, cityLon: lon });
+  return eligible;
 }
 
 

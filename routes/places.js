@@ -10,6 +10,7 @@ const PLACE_CACHE_TTL_MS = config.cache.placesTtlMs;
 const {
   filterPlacesByPrefs,
 } = require('../utils/placesMerge');
+const { filterEligibleTourismCandidates } = require('../services/travelIntelligence/tourismPoi');
 const {
   getPlaces, fetchWiki, fetchCuratedCityFallback, fetchCuratedFoodFallback,
   fetchNominatimFallback, hydrateAiPlaces,
@@ -193,10 +194,20 @@ router.post('/', async (req, res) => {
       });
       if (!isDup) dedupedMerged.push(place);
     }
-    merged.length = 0;
-    merged.push(...dedupedMerged);
 
-    appLogger.info(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
+    const { eligible, rejected } = filterEligibleTourismCandidates(dedupedMerged, {
+      city: cityName,
+      cityLat: lat,
+      cityLon: lon,
+      prefs,
+    });
+    if (rejected.length > 0) {
+      appLogger.info(`[places] Tourism filter rejected ${rejected.length} non-tourist/locality entities (e.g. ${rejected.slice(0, 3).map(r => r.name).join(', ')})`);
+    }
+    merged.length = 0;
+    merged.push(...eligible);
+
+    appLogger.info(`[places] Final verified tourism pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
     if (merged.length >= 3) {
       const payload = { places: merged, source: 'ranked_sources', count: merged.length };
@@ -221,13 +232,14 @@ router.post('/', async (req, res) => {
       const curatedCity = await fetchCuratedCityFallback(lat, lon, cityName).catch(() => []);
       const nominatimFallback = await fetchNominatimFallback(lat, lon, cityName, { foodOnly: wantFoodOnly }).catch(() => []);
       const curatedFood = wantsFood ? await fetchCuratedFoodFallback(lat, lon, cityName).catch(() => []) : [];
-      const all = filterPlacesByPrefs(
+      const rawAll = filterPlacesByPrefs(
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback, ...curatedFood].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&
           arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
         ),
         prefs
       );
+      const { eligible: all } = filterEligibleTourismCandidates(rawAll, { city: cityName, cityLat: lat, cityLon: lon, prefs });
       const payload = { places: all, source: 'error_fallback', count: all.length };
       setCachedPlaces(key, payload);
       return res.json(payload);

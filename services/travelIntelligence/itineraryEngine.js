@@ -4,6 +4,7 @@ const rules = require('../../data/time-intelligence-rules.json');
 const { t2m, m2t, getISTParts } = require('./timeEngine');
 const { estimateTravel } = require('./trafficEngine');
 const { distKm } = require('../../utils/geo');
+const { filterEligibleTourismCandidates } = require('./tourismPoi');
 
 const DEFAULT_VISIT_MIN = {
   temple: 45, beach: 90, scenic: 40, museum: 75, fort: 60, park: 45,
@@ -38,6 +39,8 @@ function mealSlot(nowMin) {
  * @param {number} opts.bufferMin - buffer between stops
  */
 function buildDayPlan(places, opts = {}) {
+  const { eligible } = filterEligibleTourismCandidates(places, { city: opts.city || opts.region });
+  const validPlaces = (eligible && eligible.length > 0) ? eligible : (places || []).filter((p) => p && p.name);
   const now = opts.now || new Date();
   const weather = opts.weather || null;
   const origin = opts.originCoords || null;
@@ -55,7 +58,7 @@ function buildDayPlan(places, opts = {}) {
   }
   // Initial score is used only as a candidate-priority hint. The actual
   // selection is re-scored at each projected arrival time below.
-  const scored = (places || []).map((p) => {
+  const scored = (validPlaces || []).map((p) => {
     const intel = getTI(p, now, weather, {
       fromCoords: origin, personas, tripMode,
       disableExperienceWindows: true,
