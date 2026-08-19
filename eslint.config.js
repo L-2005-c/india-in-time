@@ -108,4 +108,20 @@ module.exports = [
       },
     },
   },
+  {
+    // Playwright e2e specs use page.evaluate(() => {...}) callbacks whose
+    // function bodies run inside the browser, not Node — so they need
+    // browser globals (performance, window, document, etc.) in addition
+    // to the Node/CommonJS globals from the base config above.
+    files: ['__tests__/e2e/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        performance: 'readonly',
+        localStorage: 'readonly',
+      },
+    },
+  },
 ];

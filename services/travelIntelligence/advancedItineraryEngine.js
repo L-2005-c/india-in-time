@@ -13,7 +13,6 @@
 
 const { getTravelIntelligence } = require('./index');
 const { estimateTravel } = require('./trafficEngine');
-const { filterTourismCandidates } = require('./tourismPoi/tourismEligibilityEngine');
 const { m2t, t2m } = require('./timeEngine');
 const dayStructure = require('./dayStructure');
 const {
@@ -26,6 +25,10 @@ const {
   placeCost,
   isFoodPlace,
 } = require('./requirementEngine');
+const {
+  filterEligibleCandidates,
+  TIERS: TOURISM_TIERS,
+} = require('./tourismPoi');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },
@@ -377,10 +380,6 @@ function buildStop(place, scored, arrivalMin, state) {
     id: place.id ?? place.placeId ?? place.name,
     name: place.name,
     category,
-    tourismClass: place.tourismClass || null,
-    tourismTier: place.tourismTier || null,
-    tourismQualityScore: Number.isFinite(Number(place.tourismQualityScore)) ? Number(place.tourismQualityScore) : null,
-    tourismAuthority: place.tourismAuthority || null,
     coords: place.coords,
     purpose: isFood(place) ? (mealAt(arrivalMin) || 'food') : 'experience',
     departAt: m2t(state.cursor),
@@ -459,6 +458,7 @@ function dedupeStates(states) {
 }
 
 function buildInfeasibleResult(requirements, warnings, candidates, diagnostics = {}) {
+  const { tourismRejected: rejectedForDiagnostics, ...restDiagnostics } = diagnostics;
   return {
     generatedAt: new Date().toISOString(),
     algorithm: 'geo-temporal-beam-search-v5-world-class',
@@ -472,21 +472,46 @@ function buildInfeasibleResult(requirements, warnings, candidates, diagnostics =
     requirementSatisfaction: { score: 0, met: [], unmet: [...new Set([...(requirements.hard.requiredMeals || []), ...(requirements.hard.mustVisit || []), ...(requirements.soft.preferredCategories || [])])] },
     validation: { passed: false, failures: [...new Set(warnings)] },
     requirements: requirements,
-    diagnostics: { candidateCount: candidates.length, ...diagnostics },
+    diagnostics: {
+      candidateCount: candidates.length,
+      tourismRejected: Array.isArray(rejectedForDiagnostics) ? rejectedForDiagnostics.slice(0, 30) : [],
+      tourismEligibleCount: candidates.length,
+      ...restDiagnostics,
+    },
   };
 }
 
 function planAdvancedItinerary(places, rawOptions = {}) {
   const requirements = parseRequirements(rawOptions);
   const all = Array.isArray(places) ? places : [];
-  const tourismFilter = filterTourismCandidates(all, {
-    foodRequested: requirements.soft.foodFocus || requirements.soft.preferredCategories.includes('food') || requirements.hard.requiredMeals.length > 0,
-    shoppingRequested: requirements.soft.preferredCategories.includes('shopping'),
-    tourismOnly: rawOptions.tourismOnly === true || rawOptions.onlyTouristPlaces === true,
+
+  // ── Tourism POI Eligibility Gate (before requirement/hard filters) ──────
+  // Prevents localities, residential areas, and non-tourist map entities
+  // from entering the optimizer. Shopping/food allowed based on requirements.
+  const preferred = requirements.soft?.preferredCategories || [];
+  const allowFood = preferred.includes('food')
+    || preferred.includes('cafe')
+    || !!(requirements.hard?.requiredMeals?.length)
+    || requirements.soft?.foodFocus === true
+    || rawOptions.allowFood === true;
+  const allowShopping = preferred.includes('shopping')
+    || preferred.includes('market')
+    || /shop|mall|market/i.test(JSON.stringify(rawOptions.preferences || rawOptions.prefs || ''))
+    || rawOptions.allowShopping === true;
+  const requireTouristOnly = rawOptions.touristOnly === true
+    || /only\s+tourist|tourist\s+attractions?\s+only/i.test(String(rawOptions.query || rawOptions.text || ''));
+
+  const exclusiveCategories = requirements.hard?.exclusiveCategories || rawOptions.exclusiveCategories || [];
+  const { eligible: tourismEligible, rejected: tourismRejected } = filterEligibleCandidates(all, {
+    city: rawOptions.city || rawOptions.cityName || rawOptions.region,
+    // Allow food when requested OR when no category prefs (general discovery still needs meal slots).
+    allowFood: allowFood || preferred.length === 0 || exclusiveCategories.includes('food'),
+    allowShopping: allowShopping || preferred.length === 0 || exclusiveCategories.includes('shopping'),
+    requireTouristOnly,
     discoveryMode: rawOptions.discoveryMode === true,
-    preferredCategories: requirements.soft.preferredCategories,
+    exclusiveCategories,
   });
-  const tourismEligible = tourismFilter.eligible;
+
   const candidates = filterCandidates(tourismEligible, requirements);
   const now = rawOptions.now instanceof Date ? rawOptions.now : new Date(rawOptions.now || Date.now());
   const startMin = requirements.hard.startMin;
@@ -496,11 +521,11 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const expansionLimit = Math.min(14, Math.max(4, Number(rawOptions.expansionLimit) || 10));
   const buffer = Math.max(5, Number(rawOptions.bufferMin) || 12);
 
-  if (endMin <= startMin) return buildInfeasibleResult(requirements, ['endTime must be after startTime'], candidates);
+  if (endMin <= startMin) return buildInfeasibleResult(requirements, ['endTime must be after startTime'], candidates, { tourismRejected });
 
   const mustVisitMissing = (requirements.hard.mustVisit || []).filter((req) => !all.some((p) => matchesMustVisit(p, req)));
-  if (mustVisitMissing.length) return buildInfeasibleResult(requirements, mustVisitMissing.map((x) => `Must-visit place not found: ${x}`), candidates);
-  if (!candidates.length) return buildInfeasibleResult(requirements, ['No candidates survive the hard constraints.'], candidates);
+  if (mustVisitMissing.length) return buildInfeasibleResult(requirements, mustVisitMissing.map((x) => `Must-visit place not found: ${x}`), candidates, { tourismRejected });
+  if (!candidates.length) return buildInfeasibleResult(requirements, ['No candidates survive the hard constraints.'], candidates, { tourismRejected });
 
   const origin = requirements.originCoords || (candidates[0] && candidates[0].coords) || null;
   const completedStops = Array.isArray(rawOptions.completedStops) ? rawOptions.completedStops : [];
@@ -651,7 +676,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       if (!beam.some((s) => s.stops.some((st) => matchesMustVisit(st, m)))) reasons.push(`Must-visit place could not be scheduled: ${m}`);
     });
     if (!reasons.length) reasons.push('No candidate sequence satisfied all hard constraints.');
-    return buildInfeasibleResult(requirements, reasons, candidates, { beamWidth, searchedStates: candidatesForFinal.length });
+    return buildInfeasibleResult(requirements, reasons, candidates, { beamWidth, searchedStates: candidatesForFinal.length, tourismRejected });
   }
 
   feasible.sort((a, b) => {
@@ -701,8 +726,6 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     },
     diagnostics: {
       candidateCount: candidates.length,
-      rejectedCandidateCount: tourismFilter.rejected.length,
-      rejectedCandidates: tourismFilter.rejected,
       beamWidth,
       expansionLimit,
       memoizedIntelligenceStates: memo.size,

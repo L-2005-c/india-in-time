@@ -33,7 +33,7 @@ async function callGemini(prompt) {
               type: 'object',
               properties: {
                 name: { type: 'string' },
-                category: { type: 'string', enum: ['scenic', 'temple', 'beach', 'food'] },
+                category: { type: 'string', enum: ['scenic', 'temple', 'beach', 'food', 'shopping', 'museum', 'park'] },
                 importance: { type: 'string', enum: ['must_see', 'famous', 'local'] },
                 visit_minutes: { type: 'integer' },
                 open_time: { type: 'string', description: "24-hour format e.g. 09:00" },
@@ -68,16 +68,17 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   const foodCount  = Math.max(6, Math.floor(placeCount * 0.25));
   const prompt = `List ${placeCount} real places a tourist should consider in ${cityName}, India.
   Return ONLY valid JSON, no markdown.
-  Categories allowed: scenic, temple, beach, food.
+  Categories allowed: scenic, temple, beach, food, shopping, museum, park.
   Importance allowed: must_see, famous, local.
   STRICT RULES:
   - Put the city's iconic must-see landmarks FIRST, then other famous and well-known tourist attractions, then a few worthwhile local additions.
   - Use importance "must_see" for signature landmarks tourists should not miss, "famous" for widely visited attractions, and "local" only for secondary additions.
   - At least half of the non-food entries must be must_see or famous attractions. Do not fill the list mostly with small local parks or minor neighbourhood places.
-  - Only physical tourist destinations: beaches, forts, palaces, temples, mosques, churches, museums, parks, hills, lakes, viewpoints, ghats, waterfalls, gardens, monuments, caves, zoos, lighthouses, archaeological sites, nature reserves, botanical gardens.
+  - Only physical tourist destinations: beaches, forts, palaces, temples, mosques, churches, museums, parks, hills, lakes, viewpoints, ghats, waterfalls, gardens, monuments, caves, zoos, lighthouses, archaeological sites, nature reserves, botanical gardens, and major shopping malls (named malls only, e.g. CMR Central, Inorbit Mall).
+  - NEVER list localities, neighbourhoods, colonies, junctions, or administrative areas as places (e.g. do NOT return "Marripalem", "Seethammadhara", "Dwaraka Nagar" as stops).
   - Include only a few hidden gems or lesser-known spots after the famous attractions.
 - Include at least ${foodCount} food entries: famous local restaurants, food streets, seafood spots, biryani joints, famous cafes, sweet shops — real named establishments only.
-- DO NOT include: stores, shops, retail, supermarkets, boutiques, markets, shopping malls, roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, or generic areas.
+- DO NOT include: generic stores, kirana shops, retail chains without tourism value, roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, or generic areas. Major named shopping malls ARE allowed when relevant.
 - CRITICAL: Provide the EXACT, official, map-searchable name for each place so it can be accurately found on GPS and maps. Do NOT use generic or abbreviated names.
 - Provide accurate 'open_time' and 'close_time' in 24-hour format. If open 24 hours, use 00:00 to 23:59.
 - Provide 'indoor_outdoor' categorization (indoor, outdoor, mixed).
@@ -478,13 +479,15 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
     'waterfall',
   ]);
 
-  // Name-level blocklist — reject anything whose name matches these patterns
-  const NAME_BLOCK = /\b(road|street|highway|nagar|colony|layout|phase|block|sector|ward|bypass|circle|junction|cross|taluk|mandal|district|division|tehsil|zone|area|peta|palle|village|town|suburb|locality|apartment|residency|complex|towers?|plaza|mall|store|stores|shop|shops|supermarket|mart|boutique)\b/i;
+  // Name-level blocklist — reject non-tourist entities.
+  // NOTE: Do NOT block "mall"/"plaza" — verified shopping destinations are valid.
+  // Final tourism eligibility is enforced by tourismPoi/tourismEligibilityEngine.
+  const NAME_BLOCK = /\b(road|street|highway|nagar|colony|layout|phase|block|sector|ward|bypass|circle|junction|cross|taluk|mandal|district|division|tehsil|zone|area|peta|palle|village|town|suburb|locality|apartment|residency|towers?|store|stores|shop|shops|supermarket|mart|boutique|kirana)\b/i;
 
   // Queries: tourist-specific so Nominatim returns tourist OSM nodes, not roads
   const queries = foodOnly
     ? ['famous restaurant', 'street food', 'local cafe', 'dhaba']
-    : ['tourist attraction', 'historical', 'temple', 'museum', 'viewpoint', 'park', 'famous restaurant'];
+    : ['tourist attraction', 'historical', 'temple', 'museum', 'viewpoint', 'park', 'shopping mall', 'famous restaurant'];
 
   const seen = new Set();
   const out  = [];

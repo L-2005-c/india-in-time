@@ -13,10 +13,11 @@ const CATEGORY_ALIASES = {
   scenic: ['scenic', 'viewpoint', 'viewpoints', 'photography', 'sunset', 'sunrise', 'view'],
   museum: ['museum', 'museums', 'history', 'heritage', 'monument', 'fort'],
   park: ['park', 'parks', 'garden', 'nature'],
-  shopping: ['shopping', 'mall', 'malls', 'shopping mall', 'shopping destination'],
-  market: ['market', 'bazaar'],
+  market: ['market', 'bazaar', 'haat'],
+  shopping: ['shopping', 'mall', 'malls', 'shopping mall', 'shopping centre', 'shopping center'],
   nightlife: ['nightlife', 'night', 'bar', 'club'],
   cafe: ['coffee', 'cafe', 'cafes'],
+  entertainment: ['entertainment', 'cinema', 'theme park'],
 };
 
 function normalizeCat(c) {
@@ -148,6 +149,11 @@ function parseRequirements(raw = {}) {
   ));
   const mustVisit = Array.from(new Set((raw.mustVisit || raw.mustVisitPlaces || raw.mustSee || []).map((p) => String(p).trim().toLowerCase()).filter(Boolean)));
   const mustAvoidPlaces = Array.from(new Set((raw.mustAvoidPlaces || raw.mustAvoid || raw.excludedPlaces || []).map((p) => String(p).trim().toLowerCase()).filter(Boolean)));
+  const exclusiveCategories = normalizeList(raw.exclusiveCategories || raw.onlyCategories || []);
+  // "I want malls only" style natural language hints
+  if (raw.mallsOnly === true || raw.onlyMalls === true) exclusiveCategories.push('shopping');
+  if (raw.beachesOnly === true || raw.onlyBeaches === true) exclusiveCategories.push('beach');
+  if (raw.templesOnly === true || raw.onlyTemples === true) exclusiveCategories.push('temple');
   const dietaryRestrictions = Array.from(new Set([
     ...(Array.isArray(raw.dietaryRestrictions) ? raw.dietaryRestrictions : []),
     ...(raw.vegetarian ? ['vegetarian'] : []),
@@ -159,6 +165,7 @@ function parseRequirements(raw = {}) {
     endMin,
     durationMin: Math.max(30, endMin - startMin),
     excludedCategories: [...new Set(excluded)],
+    exclusiveCategories: [...new Set(exclusiveCategories)],
     maxTravelMinutes: maxTravelMin,
     maxWaitingMinutes: Number.isFinite(raw.maxWaitingMinutes) ? Math.max(0, raw.maxWaitingMinutes) : null,
     maxStops,

@@ -1,6 +1,6 @@
 {
   "name": "india-in-time-backend",
-  "version": "5.2.1",
+  "version": "5.2.2",
   "description": "Production-ready adaptive GeoAI itinerary decision engine for India In Time",
   "main": "server.js",
   "engines": {
@@ -48,8 +48,7 @@
     "check:architecture": "node scripts/architecture-check.js",
     "benchmark:time-intelligence": "node scripts/benchmarks/time-intelligence-v37-v38.js",
     "test:itinerary-regression": "node scripts/itinerary-regression.js",
-    "test:tourism-poi-regression": "node scripts/tourism-poi-regression.js",
-    "report:tourism-upgrade": "node scripts/generate-tourism-upgrade-report.js",
+    "demo:tourism-eligibility": "node scripts/tourism-eligibility-demo.js",
     "release:audit": "node scripts/release-audit.js"
   },
   "jest": {

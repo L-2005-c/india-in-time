@@ -18,7 +18,7 @@ Verify:
 See `docs/NEXT_LEVEL.md`.
 
 
-## Production deployment contract (v5.2.1)
+## Production deployment contract (v5.2.2)
 
 Render must run the frontend build with devDependencies available:
 
@@ -26,4 +26,4 @@ Render must run the frontend build with devDependencies available:
 npm ci --include=dev && npm run build:frontend && npm prune --omit=dev
 ```
 
-The repository intentionally does not ship `node_modules`; Render/CI must install from the committed lockfile. Production startup remains `node server.js`, with `/api/health` as the deployment health check.
+The repository intentionally does not ship `node_modules`; Render/CI must install from the committed lockfile. Production startup remains `node server.js`, with `/api/health` as the deployment health check. `npm run release:audit` verifies this contract (and the presence of the tourism/GeoAI eligibility engine, its Jest regression suite, and SEO assets) before a release ships — see `DEPLOYMENT_PRODUCTION.md` for the full checklist.
