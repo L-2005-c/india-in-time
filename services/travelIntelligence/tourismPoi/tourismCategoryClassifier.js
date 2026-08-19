@@ -68,7 +68,6 @@ const NON_TOURISM_CATEGORIES = {
  */
 function classifyCategory(candidate = {}, context = {}) {
   const name = String(candidate.name || '').trim();
-  const lowerName = name.toLowerCase();
   const rawCat = String(candidate.cat || candidate.category || '').toLowerCase().trim();
   const osmType = String(candidate.type || candidate.osmType || candidate.placeType || '').toLowerCase().trim();
 

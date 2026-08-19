@@ -22,8 +22,6 @@ const {
   computeRequirementSatisfaction,
   isExcludedCategory,
   normalizeCat,
-  normalizeMeal,
-  placeCost,
   isFoodPlace,
   isShoppingPlace,
 } = require('./requirementEngine');
