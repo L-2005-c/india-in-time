@@ -49,7 +49,42 @@ Patched in from **v5.2.1** (`WORLD_CLASS_PRODUCTION_READY`):
   geo-temporal optimizer), not regressions introduced by this merge. Track
   and fix separately; see priority list below.
 
-## Not yet done (tracked, not blocking this merge)
+## Post-merge fix (v5.2.2, after first push to CI)
+
+The first push to GitHub Actions CI (`ci.yml` → `lint` job) failed with 2
+`no-undef` errors:
+
+1. **`services/travelIntelligence/advancedItineraryEngine.js:474`** —
+   `'tourismRejected' is not defined`. This was a **pre-existing bug in the
+   v5.2.0 base**, not introduced by the merge: `buildInfeasibleResult()` is
+   a standalone top-level function, and it referenced `tourismRejected`,
+   which is only declared inside `planAdvancedItinerary()` — a different
+   function scope entirely, so it was never actually in scope. It happened
+   to not throw at runtime only because it was guarded by `typeof x !==
+   "undefined"`, but ESLint's `no-undef` correctly flags referencing an
+   out-of-scope identifier at all, and the diagnostic was silently always
+   returning `[]` in production regardless.
+   **Fix:** `buildInfeasibleResult()` now reads `tourismRejected` from its
+   existing `diagnostics` parameter instead of a nonexistent outer-scope
+   variable, and all 4 call sites now pass `{ tourismRejected }` through
+   explicitly. The rejected-candidates diagnostic now actually works.
+2. **`__tests__/e2e/specs/home.spec.js:36`** — `'performance' is not
+   defined`. The `@perf` Playwright test calls `page.evaluate(() =>
+   performance.getEntriesByType(...))` — that callback runs *inside the
+   browser*, where `performance` is a real global, but ESLint was linting
+   the file under the backend's Node/CommonJS global set (from
+   `eslint.config.js`'s catch-all rule), which doesn't include browser
+   globals.
+   **Fix:** added a scoped `__tests__/e2e/**/*.js` override in
+   `eslint.config.js` declaring `performance`, `window`, `document`,
+   `navigator`, `localStorage` as read-only globals for e2e spec files only
+   — the backend Node-context rules are unaffected everywhere else.
+
+**Validated:** `npm run lint` → **0 errors, 113 warnings** (was 2 errors,
+114 warnings before; one extra pre-existing warning also disappeared as a
+side effect of the scope fix). `npm test` still **604/608** — identical
+pass/fail set as before this fix, confirming no regression.
+
 
 - Fix the 2 pre-existing failing test suites (stale
   `'geo-temporal-beam-search-v4-structured'` assertion vs. the actual

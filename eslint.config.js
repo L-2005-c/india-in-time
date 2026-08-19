@@ -108,4 +108,20 @@ module.exports = [
       },
     },
   },
+  {
+    // Playwright specs run `page.evaluate(() => { ... })` callbacks inside
+    // an actual browser context, not Node — so browser globals like
+    // `performance`/`window`/`document` are legitimate there even though
+    // this file is otherwise a CommonJS Node test file.
+    files: ['__tests__/e2e/**/*.js'],
+    languageOptions: {
+      globals: {
+        performance: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        localStorage: 'readonly',
+      },
+    },
+  },
 ];
