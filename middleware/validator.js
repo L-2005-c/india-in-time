@@ -138,6 +138,14 @@ function validateGeocodeRequest(req, res, next) {
   next();
 }
 
+module.exports = {
+  validateAiRequest,
+  validatePlacesRequest,
+  validateWeatherRequest,
+  validateGeocodeRequest,
+};
+
+
 /**
  * Validate time-intelligence payloads: places array shape, coords, weather.
  */
@@ -195,10 +203,4 @@ function validateTimeIntelRequest(req, res, next) {
   next();
 }
 
-module.exports = {
-  validateAiRequest,
-  validatePlacesRequest,
-  validateWeatherRequest,
-  validateGeocodeRequest,
-  validateTimeIntelRequest,
-};
+module.exports.validateTimeIntelRequest = validateTimeIntelRequest;

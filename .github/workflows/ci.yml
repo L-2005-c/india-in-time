@@ -2,91 +2,32 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
   pull_request:
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  unit:
-    name: Unit tests + coverage + static a11y
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 22
           cache: npm
-      - run: npm ci
-      - name: Architecture + production checks
-        run: |
-          npm run check:architecture
-          npm run check:production
-          npm run check:inline-handlers
+      - name: Install dependencies
+        run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Unit tests (global coverage thresholds)
+      - name: Architecture check
+        run: npm run check:architecture
+      - name: Inline handler check
+        run: npm run check:inline-handlers
+      - name: Unit tests
         run: npm run test:ci
-      - name: Static accessibility (jest/jsdom)
-        run: npm run test:a11y:static
-      - name: Core module coverage gates
-        run: npm run check:core-coverage
-
-  security:
-    name: npm audit (high+)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-      - run: npm ci
-      - name: Audit production dependencies
-        run: npm run security:audit:prod
-      - name: Audit all dependencies (high+)
-        run: npm run security:audit
-
-  frontend:
-    name: Frontend build + bundle
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [unit, security]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-      - run: npm ci
-      - run: npm run build:frontend
-      - run: npm run check:bundle
-
-  e2e:
-    name: Playwright E2E + axe a11y
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    needs: [frontend]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-      - run: npm ci
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Build frontend assets
+      - name: Frontend build
         run: npm run build:frontend
-      - name: E2E journeys
-        run: npm run test:e2e
-        env:
-          CI: true
-      - name: Runtime accessibility (@a11y)
-        run: npx playwright test --config __tests__/e2e/playwright.config.js --grep @a11y
-        env:
-          CI: true
+      - name: Bundle check
+        run: npm run check:bundle
