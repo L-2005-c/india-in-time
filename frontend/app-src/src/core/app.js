@@ -555,19 +555,24 @@ function followLivePosition(force=false){
   if(!map||!isFiniteLatLon(cLat,cLon)) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
   const rawZ=map.getZoom(), zoom=Math.max(Number.isFinite(rawZ)?rawZ:14,15);
-  let target=[cLat,cLon];
+  if(!Number.isFinite(zoom)) return;
+  let tLat=cLat, tLon=cLon;
   if(tripActive){
-    try{ const pt=map.project(target,zoom);
-      if(Number.isFinite(pt.x)&&Number.isFinite(pt.y)) target=map.unproject(L.point(pt.x,pt.y+110),zoom);
+    try{
+      const pt=map.project([cLat,cLon],zoom);
+      if(Number.isFinite(pt?.x)&&Number.isFinite(pt?.y)){
+        const u=map.unproject(L.point(pt.x,pt.y+110),zoom);
+        if(isFiniteLatLon(u.lat,u.lng)){ tLat=u.lat; tLon=u.lng; }
+      }
     }catch(_e){}
   }
-  const tLat=Array.isArray(target)?target[0]:target?.lat, tLon=Array.isArray(target)?target[1]:target?.lng;
   if(!isFiniteLatLon(tLat,tLon)) return;
   const cur=map.getCenter();
-  if(cur && isFiniteLatLon(cur.lat,cur.lng) && map.distance(cur,[tLat,tLon])<3 && Math.abs((Number.isFinite(rawZ)?rawZ:zoom)-zoom)<0.01) return;
+  if(cur && isFiniteLatLon(cur.lat,cur.lng) && map.distance(cur,[tLat,tLon])<3) return;
   try{ map.stop(); }catch(_e){}
-  try{ map.flyTo([tLat,tLon],zoom,{animate:true,duration:0.8,easeLinearity:0.25}); }
-  catch(e){ browserLogger.warn('[followLivePosition] flyTo threw, falling back to setView', e); try{ map.stop(); map.setView([tLat,tLon],zoom); }catch(_e2){} }
+  // Prefer setView during live nav — flyTo can throw Invalid LatLng mid-animation on some Leaflet builds
+  try{ map.setView([tLat,tLon],zoom,{animate:true}); }
+  catch(_e){ try{ map.setView([cLat,cLon],zoom); }catch(_e2){} }
 }
 
 function toggleLiveFollow(forceState){
@@ -2297,7 +2302,7 @@ function updateItinUI(){
 }
 
 // ── Trip Controls ─────────────────────────────────────────────────────────────
-function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);optimizeRoute(true);if(cLat&&cLon){lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
+function startTrip(){if(!cLat){addMsg('📍 Waiting for GPS...');return;}if(tripActive||!itin.length)return;tripActive=true;tripStart=Date.now();lastSpokenNavInstruction='';autoFollowLive=true;navVoiceEnabled=true;updateFollowButton();const btn=document.getElementById('btn-start');btn.textContent='✅ Navigating Live';btn.disabled=true;document.getElementById('trip-st').textContent='LIVE';document.getElementById('phase1-section').style.display='none';addMsg('🟢 <strong>Navigation started!</strong> The map will now follow you live towards '+itin[0].name);updatePlannerShowcase();switchToView('map-view',0);followLivePosition(true);renderRoute();if(cLat&&cLon){lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}setTimeout(()=>maybeSpeakNavInstruction(`Navigation started. Head towards ${itin[0]?.name || 'your destination'}.`,true),400);}
 function skipStop(){const routeStops=getRouteStopsForDay(itin);if(!routeStops.length)return;const sk=routeStops[0];itin=applyBreakPlanToCurrentItinerary(routeStops.slice(1));sync();addMsg(`⏭️ Skipped <strong>${sk.name}</strong>`);renderRoute();}
 async function optimizeRoute(silent=false){
   if(!itin.length){await renderRoute();return;}
@@ -2593,7 +2598,7 @@ function initGPS(){
     if(tripActive) followLivePosition(isF);
     if(streetQuestActive) updateStreetQuestProgress();
     applyMapHeadingRotation();
-    if(isF&&itin.length){optimizeRoute(true);lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}
+    if(isF&&itin.length){renderRoute();lastRouteRenderPos=[cLat,cLon];lastRouteRenderAt=Date.now();}
     else if(tripActive){
       chkArrival();
       // The route polyline used to only be drawn from the very first GPS fix
