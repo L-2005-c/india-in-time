@@ -16,11 +16,14 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
-  // wsproxy expects the WebSocket handshake on a specific path (/v2), not
-  // the bare root. Without it, wsproxy has no route for the request and
-  // answers with a plain HTTP 404 instead of upgrading the connection —
-  // which is exactly the "Unexpected server response: 404" seen in CI.
-  neonConfig.wsProxy = () => `${proxyHost}/v2`;
+  // IMPORTANT: when wsProxy is a function, the driver uses its return value
+  // as the *entire* WebSocket URL verbatim — unlike the string form, it does
+  // NOT append `?address=host:port` for you. The function receives the real
+  // Postgres host/port (e.g. "postgres"/5432 from DATABASE_URL) and MUST pass
+  // that through to the wsproxy sidecar so it knows where to route the
+  // connection; returning a bare proxy host here sends wsproxy a request
+  // with no destination info, which it 404s (this was the bug).
+  neonConfig.wsProxy = (host, port) => `${proxyHost}?address=${host}:${port}`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
