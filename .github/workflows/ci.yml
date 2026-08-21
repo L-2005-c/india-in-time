@@ -73,7 +73,17 @@ jobs:
       wsproxy:
         image: ghcr.io/neondatabase/wsproxy:latest
         env:
-          APPEND_PORT: "postgres:5432"
+          # db/init.js's wsProxy function already sends a complete
+          # ?address=host:port query param (see neonConfig.wsProxy in
+          # db/init.js). wsproxy's APPEND_PORT is *concatenated* onto
+          # whatever address it receives (see neondatabase/wsproxy's
+          # main.go: `addr := addressArg; addr += cfg.AppendPort`), not
+          # substituted — so setting it here corrupts an already-complete
+          # address into garbage like "postgres:5432postgres:5432", which
+          # wsproxy then fails to dial. APPEND_PORT is only needed when the
+          # client does NOT send its own ?address= (e.g. wsProxy is a bare
+          # host string with no address param); that's not the case here,
+          # so leave it unset.
           ALLOW_ADDR_REGEX: "postgres"
           LOG_TRAFFIC: "false"
         ports:
