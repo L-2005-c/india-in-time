@@ -22,8 +22,14 @@ if (process.env.NEON_LOCAL_PROXY === 'true') {
   // Postgres host/port (e.g. "postgres"/5432 from DATABASE_URL) and MUST pass
   // that through to the wsproxy sidecar so it knows where to route the
   // connection; returning a bare proxy host here sends wsproxy a request
-  // with no destination info, which it 404s (this was the bug).
-  neonConfig.wsProxy = (host, port) => `${proxyHost}?address=${host}:${port}`;
+  // with no destination info, which it 404s.
+  //
+  // The `/v2` path segment below is also required: wsproxy only serves a
+  // route on a specific path (this matches the driver's own built-in
+  // default of `host => host + '/v2'` for real Neon connections), not on
+  // the bare root "/" — a request to "/" 404s even with a valid ?address=
+  // query string, which is what happened after the first fix.
+  neonConfig.wsProxy = (host, port) => `${proxyHost}/v2?address=${host}:${port}`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
