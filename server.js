@@ -477,10 +477,8 @@ function startLongRunningServer() {
           await flushAnalyticsBuffer();
           await purgeExpiredCache();
         } catch (_e) {}
-
         // Close database
         await closeDatabase();
-
         logger.info('✅ Cleanup complete. Goodbye!');
         process.exit(0);
       });
@@ -516,5 +514,4 @@ if (!isServerless) {
 // which run this file directly via `node server.js` and rely on
 // startLongRunningServer()'s app.listen() above instead.
 module.exports = app;
-
 }

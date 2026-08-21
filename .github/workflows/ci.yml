@@ -94,6 +94,7 @@ jobs:
       NEON_LOCAL_PROXY: "true"
       NEON_LOCAL_PROXY_HOST: "localhost:4444"
       DATABASE_SSL_REJECT_UNAUTHORIZED: "false"
+      USE_DIST_FRONTEND: "true"
       # Deliberately not a real key — the e2e specs only exercise the public
       # home page, /api/health, and security headers, none of which call
       # Gemini. FIREBASE_SERVICE_ACCOUNT is left unset on purpose too:

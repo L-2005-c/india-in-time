@@ -25,5 +25,8 @@ module.exports = defineConfig({
     port: 3000,
     reuseExistingServer: true,
     timeout: 120000,
+    env: {
+      USE_DIST_FRONTEND: 'true',
+    },
   },
 });
