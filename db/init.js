@@ -15,11 +15,19 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // activates when NEON_LOCAL_PROXY=true, which only the CI e2e job sets. See
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
+  // wsproxy only registers the handler on /v1 (see neondatabase/wsproxy main.go).
+  // The serverless driver appends ?address=<host>:<port> when wsProxy returns
+  // a path ending in /v1, or when the function builds the full query string.
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
+<<<<<<< HEAD
   // The ghcr.io/neondatabase/wsproxy sidecar only serves its WebSocket
   // handler at /v1 — the driver's default wsProxy (host => host + '/v2')
   // doesn't match it, and returning the bare host hits '/' and 404s.
   neonConfig.wsProxy = () => `${proxyHost}/v1`;
+=======
+  neonConfig.wsProxy = (host, port) =>
+    `${proxyHost}/v1?address=${host}${port ? ':' + port : ''}`;
+>>>>>>> 2c6124e1b47e44a045173e2ada325eed2cea854c
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
