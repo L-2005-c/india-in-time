@@ -24,7 +24,12 @@ test.describe('India In-Time critical UI journeys', () => {
   });
 
   test('@a11y home has no serious or critical axe violations', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'networkidle' });
+    // Wait for the main content to be ready
+    await page.waitForSelector('#app, [role="main"]', { timeout: 15000 });
+    // Extra stability wait before running accessibility checks
+    await page.waitForLoadState('networkidle');
+    
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
