@@ -73,9 +73,12 @@ jobs:
       wsproxy:
         image: ghcr.io/neondatabase/wsproxy:latest
         env:
-          APPEND_PORT: "5432"
-          ALLOW_ADDR_REGEX: "postgres"
+          # Destination address is supplied by the neon driver as ?address=host:port.
+          # Do NOT set APPEND_PORT (it would mangle "postgres:5432" into "postgres:54325432").
+          # Allow the CI postgres service hostname (and any port suffix).
+          ALLOW_ADDR_REGEX: "^postgres(:[0-9]+)?$"
           LOG_TRAFFIC: "false"
+          LOG_CONN_INFO: "true"
         ports:
           - 4444:80
     env:
