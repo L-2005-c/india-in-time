@@ -16,7 +16,10 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
-  neonConfig.wsProxy = () => proxyHost;
+  // The ghcr.io/neondatabase/wsproxy sidecar only serves its WebSocket
+  // handler at /v1 — the driver's default wsProxy (host => host + '/v2')
+  // doesn't match it, and returning the bare host hits '/' and 404s.
+  neonConfig.wsProxy = () => `${proxyHost}/v1`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
