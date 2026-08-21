@@ -16,20 +16,15 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
-  // IMPORTANT: when wsProxy is a function, the driver uses its return value
-  // as the *entire* WebSocket URL verbatim — unlike the string form, it does
-  // NOT append `?address=host:port` for you. The function receives the real
-  // Postgres host/port (e.g. "postgres"/5432 from DATABASE_URL) and MUST pass
-  // that through to the wsproxy sidecar so it knows where to route the
-  // connection; returning a bare proxy host here sends wsproxy a request
-  // with no destination info, which it 404s.
-  //
-  // The `/v2` path segment below is also required: wsproxy only serves a
-  // route on a specific path (this matches the driver's own built-in
-  // default of `host => host + '/v2'` for real Neon connections), not on
-  // the bare root "/" — a request to "/" 404s even with a valid ?address=
-  // query string, which is what happened after the first fix.
-  neonConfig.wsProxy = (host, port) => `${proxyHost}/v2?address=${host}:${port}`;
+  // The wsproxy sidecar's APPEND_PORT env var (see .github/workflows/ci.yml's
+  // `e2e` job) pins it to a single fixed backend ("postgres:5432") — it is
+  // NOT a per-request routing hint the client supplies. So the driver should
+  // just point at the proxy itself with no ?address= query string; wsproxy
+  // forwards everything it receives on this path straight to that one
+  // configured backend. (The `/v2` path segment matches the driver's own
+  // built-in default of `host => host + '/v2'` for real Neon connections —
+  // wsproxy only serves a route on a specific path, not the bare root "/".)
+  neonConfig.wsProxy = () => `${proxyHost}/v2`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;

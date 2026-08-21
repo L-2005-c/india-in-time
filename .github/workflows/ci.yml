@@ -73,8 +73,16 @@ jobs:
       wsproxy:
         image: ghcr.io/neondatabase/wsproxy:latest
         env:
-          APPEND_PORT: "5432"
-          ALLOW_ADDR_REGEX: "postgres"
+          # APPEND_PORT takes the *full* backend host:port and pins every
+          # connection through this proxy to that single target — it is not
+          # "append this port to whatever the client asks for". ALLOW_ADDR_REGEX
+          # then just needs to allow that fixed target. This is the config used
+          # by every documented working setup for this image; splitting it into
+          # a bare port + a partial regex (as this previously did) causes the
+          # proxy to 404 every WebSocket upgrade regardless of the client's
+          # request path or ?address= query string.
+          APPEND_PORT: "postgres:5432"
+          ALLOW_ADDR_REGEX: ".*"
           LOG_TRAFFIC: "false"
         ports:
           - 4444:80
