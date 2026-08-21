@@ -65,7 +65,7 @@ const { maintenanceGuard, listFlags, setFlag, getFlag, requireAiEnabled } = requ
 const { idempotency } = require('./middleware/idempotency');
 const { writeAudit } = require('./lib/auditLog');
 
-// ── Import routes ────────────────────────────────────────────────────────────
+// ── Import routes ─────────────────────────────────────────────────────────
 const geocodeRoutes      = require('./routes/geocode');
 const placesRoutes       = require('./routes/places');
 const weatherRoutes      = require('./routes/weather');
@@ -77,6 +77,7 @@ const favoritesRoutes    = require('./routes/favorites');
 const timeIntelRoutes    = require('./routes/time-intelligence');
 const travelDataRoutes   = require('./routes/travel-data');
 const feedbackRoutes     = require('./routes/feedback');
+const itineraryOptimizerRoutes = require('./routes/itinerary-optimizer');
 const { router: analyticsRoutes } = require('./routes/analytics');
 
 const app  = express();
@@ -156,6 +157,9 @@ app.use('/api/trips', generalLimiter, tripsRoutes);
 // Favorites
 app.use('/api/favorites', generalLimiter, favoritesRoutes);
 
+// Itinerary Optimizer (smart planning with nearby place clustering)
+app.use('/api/itinerary', generalLimiter, itineraryOptimizerRoutes);
+
 // GeoAI Time Intelligence Engine (open/closed status, crowd, badges, personalization)
 app.use('/api/time-intelligence', timeIntelLimiter, validateTimeIntelRequest, timeIntelRoutes);
 app.use('/api/travel-data', generalLimiter, travelDataRoutes);
@@ -167,7 +171,7 @@ app.use('/api/feedback', generalLimiter, feedbackRoutes);
 app.use('/api/flags', flagsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// ── Health Checks ────────────────────────────────────────────────────────────
+// ── Health Checks ─────────────────────────────────────────────────────────
 const geminiService = require('./services/gemini');
 const { placesCache, geminiCache, weatherCache, geocodeCache } = require('./services/cache');
 const { requireAdminAuth, requireAdminRole } = require('./middleware/adminAuth');
@@ -442,7 +446,7 @@ app.use(notFoundHandler);
 // ── Global error handler (MUST be last) ──────────────────────────────────────
 app.use(errorHandler);
 
-// ── Start Server ─────────────────────────────────────────────────────────────
+// ── Start Server ─────────────────────────────────────────────────────────
 function startLongRunningServer() {
   initDatabase().then(() => {
     const server = app.listen(PORT, '0.0.0.0', () => {
@@ -459,7 +463,7 @@ function startLongRunningServer() {
     server.headersTimeout   = 66000;
     server.requestTimeout   = config.server.requestTimeoutMs;
 
-    // ── Graceful Shutdown ────────────────────────────────────────────────────────
+    // ── Graceful Shutdown ──────────────────────────────────────────────────────
     function gracefulShutdown(signal) {
       logger.info({ signal }, '🛑 Received shutdown signal — shutting down gracefully');
 
