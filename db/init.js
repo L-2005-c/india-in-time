@@ -21,10 +21,13 @@ if (process.env.NEON_LOCAL_PROXY === 'true') {
   // NOT a per-request routing hint the client supplies. So the driver should
   // just point at the proxy itself with no ?address= query string; wsproxy
   // forwards everything it receives on this path straight to that one
-  // configured backend. (The `/v2` path segment matches the driver's own
-  // built-in default of `host => host + '/v2'` for real Neon connections —
-  // wsproxy only serves a route on a specific path, not the bare root "/".)
-  neonConfig.wsProxy = () => `${proxyHost}/v2`;
+  // configured backend.
+  // IMPORTANT: the open-source wsproxy image only registers the route /v1
+  // (see https://github.com/neondatabase/wsproxy/blob/master/main.go).
+  // The Neon serverless driver defaults to /v2 for real Neon hosts, which
+  // is why we must override to /v1 here — otherwise every WebSocket
+  // upgrade gets HTTP 404 and the server never becomes healthy in CI.
+  neonConfig.wsProxy = () => `${proxyHost}/v1`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
