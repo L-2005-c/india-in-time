@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index,follow">
+<title>Privacy Policy — India In-Time</title>
+<style>
+  :root{
+    --bg:#0a0514; --bg-card:#160e28; --border:#2a2140;
+    --text:#e8f0fa; --text-muted:rgba(180,210,240,0.7); --accent:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.7;}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+  h1{font-family:Georgia,'Playfair Display',serif;font-size:28px;margin:0 0 6px;}
+  .updated{color:var(--text-muted);font-size:13px;margin:0 0 32px;}
+  h2{font-family:Georgia,'Playfair Display',serif;font-size:19px;margin:36px 0 10px;color:var(--text);}
+  p,li{color:var(--text-muted);font-size:14.5px;}
+  a{color:var(--accent);}
+  .notice{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:13px;color:var(--text-muted);margin-bottom:32px;}
+  .notice strong{color:var(--text);}
+  ul{padding-left:20px;}
+  .back{display:inline-block;margin-bottom:24px;color:var(--text-muted);font-size:13px;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="/" class="back">← Back to India In-Time</a>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Draft — last edited [DATE]. Not yet reviewed by counsel.</p>
+
+  <div class="notice">
+    <strong>Before this goes live:</strong> this page reflects what the current codebase actually does (Firebase auth, Neon/Postgres storage, Gemini AI, Google Analytics), generated as a starting draft — it is not a substitute for review by a lawyer familiar with Indian data-protection law (the DPDP Act) and, if you have users outside India, GDPR/CCPA as applicable. Replace every [bracketed] placeholder before publishing, and get it reviewed.
+  </div>
+
+  <h2>Who we are</h2>
+  <p>India In-Time ("we", "us") is a travel-planning app. Contact: [SUPPORT EMAIL]. Registered entity (if any): [ENTITY NAME / ADDRESS].</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Account info:</strong> when you sign in with Google, we receive your name, email address, and profile photo via Firebase Authentication.</li>
+    <li><strong>Trip data:</strong> itineraries, saved plans, budget entries, and "passport" stamps you create in the app, stored in our database so they sync across your devices.</li>
+    <li><strong>Location:</strong> if you grant location permission, your device GPS coordinates are used to center the map, suggest nearby places, and power live-navigation features. This is used in-session and is not sold or shared with advertisers.</li>
+    <li><strong>AI-processed content:</strong> trip preferences, photos you submit to AI tools (photo captions, food-safety scanner, sign/menu translation, AI Lens), and chat messages you send to the in-app assistant are sent to Google's Gemini API to generate responses.</li>
+    <li><strong>Feedback:</strong> star ratings, category tags, and free-text comments you submit are stored to help us improve the app.</li>
+    <li><strong>Usage analytics:</strong> we use Google Analytics (GA4) to understand aggregate usage patterns.</li>
+    <li><strong>Device/technical data:</strong> standard web request metadata (IP address, browser type) collected automatically by our hosting infrastructure for security and rate-limiting.</li>
+  </ul>
+
+  <h2>How we use it</h2>
+  <ul>
+    <li>To create, save, and sync your itineraries across devices.</li>
+    <li>To generate AI-powered recommendations, captions, translations, and trip advice.</li>
+    <li>To operate core features: routing, weather, crowd predictions, and safety tools.</li>
+    <li>To maintain security (rate limiting, abuse prevention) and to improve the app based on aggregate usage and feedback.</li>
+    <li>We do not sell your personal data.</li>
+  </ul>
+
+  <h2>Third parties we share data with</h2>
+  <ul>
+    <li><strong>Google (Firebase):</strong> authentication.</li>
+    <li><strong>Google (Gemini API):</strong> processes content you submit to AI features.</li>
+    <li><strong>Google Analytics:</strong> aggregate usage analytics.</li>
+    <li><strong>[DATABASE HOST, e.g. Neon]:</strong> stores your account and trip data.</li>
+    <li><strong>[HOSTING PROVIDER, e.g. Render]:</strong> runs the application servers.</li>
+    <li>Each of these processes data under its own privacy policy and, where applicable, a data-processing agreement with us.</li>
+  </ul>
+
+  <h2>Data retention</h2>
+  <p>Your trip data is retained until you delete it or delete your account. You can remove locally cached data on a device at any time from Settings → Clear Device Data. [Describe account-deletion process and backend retention/backup schedule once finalized — see BACKUP_RETENTION_DAYS in deployment config.]</p>
+
+  <h2>Your rights</h2>
+  <p>You may request access to, correction of, or deletion of your personal data by contacting [SUPPORT EMAIL]. [Add DPDP Act / GDPR-specific rights language here if applicable to your user base.]</p>
+
+  <h2>Children's privacy</h2>
+  <p>India In-Time is not directed at children under 13 (or the relevant minimum age in your jurisdiction), and we do not knowingly collect data from them.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>We may update this policy from time to time. Material changes will be reflected by updating the date above.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy: [SUPPORT EMAIL].</p>
+</div>
+</body>
+</html>

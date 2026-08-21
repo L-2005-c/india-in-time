@@ -314,6 +314,20 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   if (place.is_sunset_spot && meal !== 'lunch') score += 8;
   if (state.stops.length && normalizeCat(state.stops[state.stops.length - 1].category) === cat && cat !== 'food') score -= 7;
 
+  // Proximity to the previous stop is now an explicit part of the objective,
+  // not just an implicit side-effect of travel time eating into the schedule
+  // window. Without this, two candidates that are otherwise equally scored
+  // are indistinguishable to the beam search even when one is a 2 km walk
+  // from the previous stop and the other is a 15 km crosstown drive — the
+  // route only avoided criss-crossing the city by accident, if at all. The
+  // penalty is capped and gentle relative to the temporal/experience terms
+  // above so a genuinely better stop across town can still win; it only
+  // breaks ties (and near-ties) toward the geographically compact option.
+  const legDistanceKm = Number(travel?.distanceKm);
+  if (Number.isFinite(legDistanceKm)) {
+    score -= Math.min(30, legDistanceKm * 2.5);
+  }
+
   const outdoor = place.indoor_outdoor === 'outdoor' || OUTDOOR.has(cat) || place.is_outdoor === true;
   const condition = String(intel.weather?.condition || '').toLowerCase();
   if (outdoor && /heavy|storm|thunder|cyclone|flood/.test(condition)) return null;

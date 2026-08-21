@@ -25,9 +25,120 @@ jobs:
         run: npm run check:architecture
       - name: Inline handler check
         run: npm run check:inline-handlers
+      # Fails the build on any high/critical advisory in production dependencies.
+      # Previously this was only a manually-run script (`npm run security:audit:prod`),
+      # so a newly-disclosed CVE in a dependency could merge to main undetected.
+      - name: Dependency vulnerability audit
+        run: npm run security:audit:prod
       - name: Unit tests
         run: npm run test:ci
       - name: Frontend build
         run: npm run build:frontend
       - name: Bundle check
         run: npm run check:bundle
+
+  # End-to-end + accessibility gate. Previously `test:e2e` / `test:accessibility`
+  # existed only as local-only scripts and were not run anywhere in CI, so a
+  # broken home page, missing security headers, or a new serious accessibility
+  # violation could all merge to main unnoticed. This job boots a real instance
+  # of the app against an ephemeral database and runs the Playwright specs in
+  # __tests__/e2e/specs against it.
+  #
+  # DB note: the app's boot-time connection (db/init.js) uses
+  # @neondatabase/serverless, which speaks Neon's WebSocket proxy protocol
+  # rather than raw Postgres wire protocol — a plain `postgres` service alone
+  # isn't enough for it to connect. The community `wsproxy` sidecar below
+  # translates that WebSocket protocol to the `postgres` service for local/CI
+  # use only (see https://github.com/neondatabase/wsproxy); production
+  # deployments talk to Neon directly and never set NEON_LOCAL_PROXY.
+  e2e:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: iit_ci
+          POSTGRES_PASSWORD: iit_ci
+          POSTGRES_DB: iit_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      wsproxy:
+        image: ghcr.io/neondatabase/wsproxy:latest
+        env:
+          APPEND_PORT: "5432"
+          ALLOW_ADDR_REGEX: "postgres"
+          LOG_TRAFFIC: "false"
+        ports:
+          - 4444:80
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://iit_ci:iit_ci@postgres:5432/iit_ci
+      NEON_LOCAL_PROXY: "true"
+      NEON_LOCAL_PROXY_HOST: "localhost:4444"
+      DATABASE_SSL_REJECT_UNAUTHORIZED: "false"
+      # Deliberately not a real key — the e2e specs only exercise the public
+      # home page, /api/health, and security headers, none of which call
+      # Gemini. FIREBASE_SERVICE_ACCOUNT is left unset on purpose too:
+      # middleware/auth.js fails closed (401) rather than crashing when it's
+      # missing, and none of these specs hit an auth-protected route.
+      GEMINI_API_KEY: e2e-placeholder-key-not-used-by-these-specs
+      PORT: 3000
+      E2E_BASE_URL: http://127.0.0.1:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run database migrations
+        run: npm run migrate:up
+        env:
+          # Migrations run with node-pg-migrate over plain TCP, straight
+          # against the postgres service — no wsproxy involved here.
+          DATABASE_URL: postgres://iit_ci:iit_ci@localhost:5432/iit_ci
+      - name: Build frontend
+        run: npm run build:frontend
+      # Pinned e2e runner: @playwright/test@1.55.0 (see package.json devDependencies
+      # and scripts/e2e-readiness.js, which checks this file for that exact pin).
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Start server
+        run: |
+          nohup node server.js > server.log 2>&1 &
+          echo $! > server.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "Server is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server did not become healthy in time"
+          cat server.log
+          exit 1
+      - name: Run e2e tests
+        run: npm run test:e2e
+      - name: Run accessibility tests
+        run: npm run test:accessibility
+      - name: Stop server
+        if: always()
+        run: kill "$(cat server.pid)" 2>/dev/null || true
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

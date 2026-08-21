@@ -113,6 +113,7 @@ export function createAuthSession({
       setUser(user);
       window.currentUser = user;
       document.getElementById('login-screen').style.display = 'none';
+      if (typeof window.maybeShowOnboarding === 'function') window.maybeShowOnboarding();
       const avatar = document.getElementById('user-avatar');
       if (user.photoURL) {
         avatar.src = user.photoURL;

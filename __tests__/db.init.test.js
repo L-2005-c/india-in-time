@@ -85,4 +85,34 @@ describe('db/schema — single source of truth', () => {
     migration.up({ sql: (s) => { capturedSql = s; } });
     expect(capturedSql).toBe(SCHEMA_SQL);
   });
+
+  // Regression guard for a real bug found during the technical audit: on a
+  // completely fresh database, `CREATE INDEX ... ON ai_cache(expires_at)`
+  // used to run *before* the `ALTER TABLE ai_cache ADD COLUMN expires_at`
+  // that creates that column, which made the very first boot / the very
+  // first `npm run migrate:up` fail with "column expires_at does not exist"
+  // — verified by actually running this SQL against a real Postgres 16
+  // instance. This test fails loudly if the statements are ever reordered
+  // back to the broken sequence.
+  test('ai_cache.expires_at is added before anything indexes it', () => {
+    const addColumnIdx = SCHEMA_SQL.indexOf('ALTER TABLE ai_cache ADD COLUMN IF NOT EXISTS expires_at');
+    const createIndexIdx = SCHEMA_SQL.indexOf('CREATE INDEX IF NOT EXISTS idx_ai_cache_expires');
+    expect(addColumnIdx).toBeGreaterThan(-1);
+    expect(createIndexIdx).toBeGreaterThan(-1);
+    expect(addColumnIdx).toBeLessThan(createIndexIdx);
+  });
+
+  // Regression guard for the other real bug found during the audit: a stray
+  // migrations/README.md made node-pg-migrate crash entirely with "Cannot
+  // determine numeric prefix for README.md", because it tries to parse every
+  // file in the migrations directory as a timestamped migration.
+  test('the migrations directory contains only numerically-prefixed migration files', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const migrationsDir = path.join(__dirname, '..', 'migrations');
+    const files = fs.readdirSync(migrationsDir);
+    for (const file of files) {
+      expect(file).toMatch(/^\d+[_-]/);
+    }
+  });
 });

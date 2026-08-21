@@ -5,6 +5,23 @@ const appLogger = require('../lib/logger');
 const { Pool, neonConfig } = require('@neondatabase/serverless');
 const ws = require('ws');
 neonConfig.webSocketConstructor = ws; // Required for Node.js
+
+// ── CI/local-only: talk to a plain Postgres container instead of Neon ──────
+// @neondatabase/serverless normally speaks Neon's WebSocket proxy protocol,
+// which a vanilla `postgres` Docker service does not implement — so e2e
+// tests in CI need a small shim (the community `wsproxy` sidecar) sitting in
+// front of an ordinary Postgres container. This block is a no-op in every
+// real deployment (Render/Vercel/local dev against a real Neon URL); it only
+// activates when NEON_LOCAL_PROXY=true, which only the CI e2e job sets. See
+// .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
+if (process.env.NEON_LOCAL_PROXY === 'true') {
+  const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
+  neonConfig.wsProxy = () => proxyHost;
+  neonConfig.useSecureWebSocket = false;
+  neonConfig.pipelineTLS = false;
+  neonConfig.pipelineConnect = false;
+}
+
 require('dotenv').config();
 const { SCHEMA_SQL } = require('./schema');
 
@@ -19,7 +36,8 @@ async function initDatabase() {
     throw new Error('DATABASE_URL environment variable is missing.');
   }
 
-  if (!/-pooler\./.test(process.env.DATABASE_URL) && !/pgbouncer=true/.test(process.env.DATABASE_URL)) {
+  if (process.env.NEON_LOCAL_PROXY !== 'true'
+      && !/-pooler\./.test(process.env.DATABASE_URL) && !/pgbouncer=true/.test(process.env.DATABASE_URL)) {
     appLogger.warn(
       '⚠️  [db] DATABASE_URL does not look like a Neon POOLED connection string ' +
       '(no "-pooler" in the hostname). If you raise CLUSTER_WORKERS above 1, each ' +
@@ -40,7 +58,7 @@ async function initDatabase() {
 
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: sslRejectUnauthorized },
+    ssl: process.env.NEON_LOCAL_PROXY === 'true' ? false : { rejectUnauthorized: sslRejectUnauthorized },
     max: Math.max(2, parseInt(process.env.DB_POOL_MAX, 10) || 8),
     idleTimeoutMillis: 30000,       // release idle clients back after 30s
     connectionTimeoutMillis: 8000,  // fail fast instead of queuing forever if the pool is exhausted

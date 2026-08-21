@@ -99,7 +99,6 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_usage_time    ON api_usage(created_at);
   CREATE INDEX IF NOT EXISTS idx_usage_ep      ON api_usage(endpoint);
   CREATE INDEX IF NOT EXISTS idx_cache_expires ON place_cache(expires_at);
-  CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at);
   CREATE INDEX IF NOT EXISTS idx_place_fb_place ON place_feedback(place_name, city);
   CREATE INDEX IF NOT EXISTS idx_app_fb_time    ON app_feedback(created_at);
 
@@ -119,10 +118,18 @@ const SCHEMA_SQL = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_active_unique
     ON favorites(user_id, place_name, city) WHERE deleted_at IS NULL;
 
+  -- BUGFIX: this index used to be created earlier, in the "Indexes for
+  -- common queries" block above — but ai_cache.expires_at doesn't exist
+  -- until the ALTER TABLE below runs. On a completely fresh database (first
+  -- boot, or "npm run migrate:up" against an empty database), that ordering
+  -- made this exact statement fail with "column expires_at does not exist"
+  -- before a single table had a chance to serve traffic. Moved here so the
+  -- column always exists before anything tries to index it.
   ALTER TABLE ai_cache ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
   UPDATE ai_cache SET expires_at = created_at + INTERVAL '10 minutes' WHERE expires_at IS NULL;
   ALTER TABLE ai_cache ALTER COLUMN expires_at SET DEFAULT (CURRENT_TIMESTAMP + INTERVAL '10 minutes');
   ALTER TABLE ai_cache ALTER COLUMN expires_at SET NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at);
 
   -- Historical crowd observations (pipeline target; engines blend when present)
   CREATE TABLE IF NOT EXISTS historical_crowd (

@@ -34,7 +34,12 @@ function freshnessFactor(ageMinutes) {
 function signalConfidence({ source = 'unavailable', ageMinutes, samples = 0, calibration = null } = {}) {
   let score = 100 * sourceQuality(source) * freshnessFactor(ageMinutes);
   if (samples > 0) score += Math.min(12, Math.log10(samples + 1) * 7);
-  if (Number.isFinite(Number(calibration))) score *= clamp(Number(calibration), 0.5, 1.05);
+  // BUGFIX: `calibration` defaults to `null`, and `Number(null) === 0` is a
+  // *finite* number — without the explicit `calibration != null` guard, every
+  // call that omits calibration silently fell into this branch and had its
+  // score multiplied by clamp(0, 0.5, 1.05) = 0.5, halving the result. Only
+  // apply the calibration multiplier when a real calibration value was given.
+  if (calibration != null && Number.isFinite(Number(calibration))) score *= clamp(Number(calibration), 0.5, 1.05);
   return clamp(Math.round(score), 0, 100);
 }
 

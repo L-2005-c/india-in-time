@@ -30,6 +30,10 @@ import {
   formatAiText as _formatAiText,
 } from '../utils/html-safe.js';
 import { showToast as _showToastMod } from '../modules/notifications.js';
+import {
+  openSettings, closeSettings, clearLocalData,
+  maybeShowOnboarding, advanceOnboarding, skipOnboarding,
+} from '../modules/settingsPanel.js';
 import { addMsg as _addMsgMod } from '../modules/chatUi.js';
 
 import {
@@ -797,7 +801,7 @@ Object.assign(window, {
   showFestivalRadar, showHiddenGems, handleArOverlay, showHartaalAlert,
   handleFoodSafety, showCrowdPredictor, showFareNegotiator, showTripTribe,
   openAiDrawer, closeAiDrawer, renderAiToolsGrid,
-  showAppFeedback,
+  showAppFeedback, maybeShowOnboarding,
 });
 
 document.addEventListener('click', event => {
@@ -1443,6 +1447,8 @@ const STATIC_ACTIONS = {
   shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
   toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
   toggleUserMenu, toggleVoice, waShare,
+  // Settings modal & onboarding
+  openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
   renderToolsHome, renderLingo, renderSafety, renderBudget, renderPassport,
   prepGuide, postcard, getInstaSpots, getSouvenirGuide, showTripRating, showReplanner,
