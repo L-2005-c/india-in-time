@@ -16,7 +16,17 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
-  neonConfig.wsProxy = () => proxyHost;
+  // The @neondatabase/serverless driver calls wsProxy(host, port) — where
+  // host/port are the REAL Postgres target parsed out of DATABASE_URL — and
+  // connects to whatever string it returns. The wsproxy Go sidecar only
+  // routes requests under its `/v1` path, and needs `?address=host:port` in
+  // the query string to know which backend to forward to; without both of
+  // those the driver was hitting `ws://<proxyHost>/` (no path, no address),
+  // which wsproxy's router doesn't recognize and answers with a plain 404 —
+  // exactly the "Unexpected server response: 404" seen in CI. Matches the
+  // pattern documented in @neondatabase/serverless's CONFIG.md for
+  // self-hosted wsproxy setups.
+  neonConfig.wsProxy = (host, port) => `${proxyHost}/v1?address=${host}:${port}`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
