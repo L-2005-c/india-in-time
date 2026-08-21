@@ -16,18 +16,7 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
-  // The wsproxy sidecar's APPEND_PORT env var (see .github/workflows/ci.yml's
-  // `e2e` job) pins it to a single fixed backend ("postgres:5432") — it is
-  // NOT a per-request routing hint the client supplies. So the driver should
-  // just point at the proxy itself with no ?address= query string; wsproxy
-  // forwards everything it receives on this path straight to that one
-  // configured backend.
-  // IMPORTANT: the open-source wsproxy image only registers the route /v1
-  // (see https://github.com/neondatabase/wsproxy/blob/master/main.go).
-  // The Neon serverless driver defaults to /v2 for real Neon hosts, which
-  // is why we must override to /v1 here — otherwise every WebSocket
-  // upgrade gets HTTP 404 and the server never becomes healthy in CI.
-  neonConfig.wsProxy = () => `${proxyHost}/v1`;
+  neonConfig.wsProxy = () => proxyHost;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;
