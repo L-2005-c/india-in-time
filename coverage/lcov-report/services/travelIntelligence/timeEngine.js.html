@@ -1,0 +1,379 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for services/travelIntelligence/timeEngine.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">services/travelIntelligence</a> timeEngine.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">83.33% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>75/90</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">76% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>76/100</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">92.85% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>13/14</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">88.23% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>60/68</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">194805x</span>
+<span class="cline-any cline-yes">194802x</span>
+<span class="cline-any cline-yes">194802x</span>
+<span class="cline-any cline-yes">194802x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">334909x</span>
+<span class="cline-any cline-yes">334909x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">59475x</span>
+<span class="cline-any cline-yes">1427400x</span>
+<span class="cline-any cline-yes">59475x</span>
+<span class="cline-any cline-yes">59475x</span>
+<span class="cline-any cline-yes">59475x</span>
+<span class="cline-any cline-yes">59475x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">59411x</span>
+<span class="cline-any cline-yes">57383x</span>
+<span class="cline-any cline-yes">57383x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29705x</span>
+<span class="cline-any cline-yes">29705x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-yes">59408x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29703x</span>
+<span class="cline-any cline-yes">29243x</span>
+<span class="cline-any cline-yes">27359x</span>
+<span class="cline-any cline-yes">18431x</span>
+<span class="cline-any cline-yes">10555x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-yes">29704x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">59406x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">90013x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">59407x</span>
+<span class="cline-any cline-yes">59407x</span>
+<span class="cline-any cline-yes">59407x</span>
+<span class="cline-any cline-yes">59407x</span>
+<span class="cline-any cline-yes">59407x</span>
+<span class="cline-any cline-yes">59407x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// timeEngine.js — Sunrise, sunset, golden hour, daypart, season
+const rules = require('../../data/time-intelligence-rules.json');
+function t2m(t, fallback = 0) {
+  if (!t || typeof t !== 'string' || !t.includes(':')) return fallback;
+  const [h, m] = t.split(':').map(Number);
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (Number.isNaN(h) || Number.isNaN(m)) <span class="cstat-no" title="statement not covered" >return fallback;</span>
+  return h * 60 + m;
+}
+function m2t(m) {
+  m = ((m % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const IST_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Kolkata', hour12: false,
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short',
+});
+function getISTParts(date) {
+  const parts = IST_FORMATTER.formatToParts(date);
+  const get = (type) =&gt; parts.find((p) =&gt; p.type === type)?.value;
+  const hour = parseInt(get('hour'), 10) % 24;
+  const minute = parseInt(get('minute'), 10);
+  const weekdayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
+  return { minutesOfDay: hour * 60 + minute, dayIndex: weekdayIndex, month: parseInt(get('month'), 10), dayName: DAY_NAMES[weekdayIndex] || <span class="branch-1 cbranch-no" title="branch not covered" >'Unknown' </span>};
+}
+function getSeason(month) {
+  if ([12, 1, 2].includes(month)) return 'winter';
+  <span class="missing-if-branch" title="if path not taken" >I</span>if ([3, 4, 5].includes(month)) <span class="cstat-no" title="statement not covered" >return 'summer';</span>
+  <span class="missing-if-branch" title="else path not taken" >E</span>if ([6, 7, 8, 9].includes(month)) return 'monsoon';
+<span class="cstat-no" title="statement not covered" >  return 'autumn';</span>
+}
+function computeSunTimes(lat, lon, date) {
+  try {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { sunrise: '06:00', sunset: '18:30', sunriseMin: 360, sunsetMin: 1110 };
+    const d = date instanceof Date ? date : <span class="branch-1 cbranch-no" title="branch not covered" >new Date(date);</span>
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (Number.isNaN(d.getTime())) <span class="cstat-no" title="statement not covered" >return { sunrise: '06:00', sunset: '18:30', sunriseMin: 360, sunsetMin: 1110 };</span>
+    const dayOfYear = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
+    const lngHour = lon / 15, zenith = 90.833;
+    function calc(isRise) {
+      const t = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24;
+      const M = 0.9856 * t - 3.289;
+      let L = M + 1.916 * Math.sin((M * Math.PI) / 180) + 0.020 * Math.sin((2 * M * Math.PI) / 180) + 282.634;
+      L = ((L % 360) + 360) % 360;
+      let RA = (180 / Math.PI) * Math.atan(0.91764 * Math.tan((L * Math.PI) / 180));
+      RA = ((RA % 360) + 360) % 360;
+      const Lq = Math.floor(L / 90) * 90, RAq = Math.floor(RA / 90) * 90;
+      RA = (RA + (Lq - RAq)) / 15;
+      const sinDec = 0.39782 * Math.sin((L * Math.PI) / 180);
+      const cosDec = Math.cos(Math.asin(sinDec));
+      const cosH = (Math.cos((zenith * Math.PI) / 180) - sinDec * Math.sin((lat * Math.PI) / 180)) / (cosDec * Math.cos((lat * Math.PI) / 180));
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (cosH &gt; 1 || cosH &lt; -1) <span class="cstat-no" title="statement not covered" >return null;</span>
+      let H = isRise ? 360 - (180 / Math.PI) * Math.acos(cosH) : (180 / Math.PI) * Math.acos(cosH);
+      H /= 15;
+      const UT = ((H + RA - 0.06571 * t - 6.622 - lngHour) % 24 + 24) % 24;
+      const localT = ((UT + 5.5) % 24 + 24) % 24;
+      return Math.floor(localT) * 60 + Math.round((localT - Math.floor(localT)) * 60);
+    }
+    const sunriseMin = calc(true) ?? <span class="branch-1 cbranch-no" title="branch not covered" >360,</span> sunsetMin = calc(false) ?? <span class="branch-1 cbranch-no" title="branch not covered" >1110;</span>
+    return { sunrise: m2t(sunriseMin), sunset: m2t(sunsetMin), sunriseMin, sunsetMin };
+  } catch (_e) { <span class="cstat-no" title="statement not covered" >return { sunrise: '06:00', sunset: '18:30', sunriseMin: 360, sunsetMin: 1110 }; </span>}
+}
+function getDaypart(nowMin, sunsetMin) {
+  if (nowMin &gt;= 300 &amp;&amp; nowMin &lt; 540) return 'earlyMorning';
+  if (nowMin &gt;= 540 &amp;&amp; nowMin &lt; 720) return 'lateMorning';
+  if (nowMin &gt;= 720 &amp;&amp; nowMin &lt; 960) return 'afternoon';
+  if (nowMin &gt;= 960 &amp;&amp; nowMin &lt; sunsetMin) return 'evening';
+  <span class="missing-if-branch" title="else path not taken" >E</span>if (nowMin &gt;= sunsetMin || nowMin &lt; 300) return 'night';
+<span class="cstat-no" title="statement not covered" >  return 'morning';</span>
+}
+function computeGoldenHours(sunriseMin, sunsetMin) {
+  const gh = rules.goldenHour || <span class="branch-1 cbranch-no" title="branch not covered" >{ morningOffsetMin: 60, eveningOffsetMin: 45, blueHourOffsetMin: 20 };</span>
+  const blue = gh.blueHourOffsetMin || <span class="branch-1 cbranch-no" title="branch not covered" >20;</span>
+  return {
+    morningGolden: { start: m2t(Math.max(0, sunriseMin - 15)), end: m2t(sunriseMin + (gh.morningOffsetMin || <span class="branch-1 cbranch-no" title="branch not covered" >60)</span>), startMin: Math.max(0, sunriseMin - 15), endMin: sunriseMin + (gh.morningOffsetMin || <span class="branch-1 cbranch-no" title="branch not covered" >60)</span> },
+    eveningGolden: { start: m2t(Math.max(0, sunsetMin - (gh.eveningOffsetMin || <span class="branch-1 cbranch-no" title="branch not covered" >45)</span>)), end: m2t(Math.min(1439, sunsetMin + 15)), startMin: Math.max(0, sunsetMin - (gh.eveningOffsetMin || <span class="branch-1 cbranch-no" title="branch not covered" >45)</span>), endMin: Math.min(1439, sunsetMin + 15) },
+    morningBlue: { start: m2t(Math.max(0, sunriseMin - blue - 10)), end: m2t(Math.max(0, sunriseMin - 5)), startMin: Math.max(0, sunriseMin - blue - 10), endMin: Math.max(0, sunriseMin - 5) },
+    eveningBlue: { start: m2t(Math.min(1439, sunsetMin + 5)), end: m2t(Math.min(1439, sunsetMin + blue + 5)), startMin: Math.min(1439, sunsetMin + 5), endMin: Math.min(1439, sunsetMin + blue + 5) },
+  };
+}
+function inWindow(min, windows) {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!Array.isArray(windows)) {
+<span class="cstat-no" title="statement not covered" >    if (typeof windows === 'string' &amp;&amp; windows.includes('-')) {</span>
+      const parts = <span class="cstat-no" title="statement not covered" >windows.split('-').map(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; <span class="cstat-no" title="statement not covered" >s.trim())</span>;</span>
+<span class="cstat-no" title="statement not covered" >      if (parts.length === 2) <span class="cstat-no" title="statement not covered" >windows = [parts];</span></span>
+      else <span class="cstat-no" title="statement not covered" >return false;</span>
+    } else <span class="cstat-no" title="statement not covered" >return false;</span>
+  }
+  return windows.some((w) =&gt; Array.isArray(w) &amp;&amp; w.length &gt;= 2 &amp;&amp; min &gt;= t2m(w[0]) &amp;&amp; min &lt;= t2m(w[1]));
+}
+function isInGoldenHour(nowMin, golden) {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!golden) <span class="cstat-no" title="statement not covered" >return { morning: false, evening: false, blue: false, any: false };</span>
+  const morning = nowMin &gt;= golden.morningGolden.startMin &amp;&amp; nowMin &lt;= golden.morningGolden.endMin;
+  const evening = nowMin &gt;= golden.eveningGolden.startMin &amp;&amp; nowMin &lt;= golden.eveningGolden.endMin;
+  const blueM = golden.morningBlue &amp;&amp; nowMin &gt;= golden.morningBlue.startMin &amp;&amp; nowMin &lt;= golden.morningBlue.endMin;
+  const blueE = golden.eveningBlue &amp;&amp; nowMin &gt;= golden.eveningBlue.startMin &amp;&amp; nowMin &lt;= golden.eveningBlue.endMin;
+  return { morning, evening, blue: !!(blueM || blueE), any: morning || evening || blueM || blueE };
+}
+module.exports = { t2m, m2t, DAY_NAMES, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour };
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-21T04:12:32.716Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

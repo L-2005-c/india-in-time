@@ -30,6 +30,10 @@ import {
   formatAiText as _formatAiText,
 } from '../utils/html-safe.js';
 import { showToast as _showToastMod } from '../modules/notifications.js';
+import {
+  openSettings, closeSettings, clearLocalData,
+  maybeShowOnboarding, advanceOnboarding, skipOnboarding,
+} from '../modules/settingsPanel.js';
 import { addMsg as _addMsgMod } from '../modules/chatUi.js';
 
 import {
@@ -797,7 +801,7 @@ Object.assign(window, {
   showFestivalRadar, showHiddenGems, handleArOverlay, showHartaalAlert,
   handleFoodSafety, showCrowdPredictor, showFareNegotiator, showTripTribe,
   openAiDrawer, closeAiDrawer, renderAiToolsGrid,
-  showAppFeedback,
+  showAppFeedback, maybeShowOnboarding,
 });
 
 document.addEventListener('click', event => {
@@ -3384,77 +3388,6 @@ function applyCustomPlaces() {
 }
 
 Object.assign(window, { openCustomizeModal, closeCustomizeModal, selectAllCustomPlaces, applyCustomPlaces });
-
-// ── Settings modal ───────────────────────────────────────────────────────────
-function openSettings() {
-  const user = window.currentUser || null;
-  const nameEl = document.getElementById('set-name');
-  const emailEl = document.getElementById('set-email');
-  const avatarEl = document.getElementById('set-avatar');
-  const fallbackEl = document.getElementById('set-avatar-fallback');
-  if (nameEl) nameEl.textContent = user?.displayName || 'Traveller';
-  if (emailEl) emailEl.textContent = user?.email || '';
-  if (user?.photoURL && avatarEl) {
-    avatarEl.src = user.photoURL;
-    avatarEl.style.display = 'block';
-    if (fallbackEl) fallbackEl.style.display = 'none';
-  } else {
-    if (avatarEl) avatarEl.style.display = 'none';
-    if (fallbackEl) fallbackEl.style.display = 'flex';
-  }
-  const installRow = document.getElementById('settings-install-row');
-  const installBtn = document.getElementById('install-app-btn');
-  if (installRow) installRow.style.display = (installBtn && installBtn.style.display !== 'none') ? 'flex' : 'none';
-  document.getElementById('user-menu')?.classList.remove('open');
-  document.getElementById('settings-modal').style.display = 'flex';
-}
-function closeSettings() {
-  document.getElementById('settings-modal').style.display = 'none';
-}
-function clearLocalData() {
-  if (!window.confirm('Remove locally saved plans and cached data from this device? This does not affect plans saved to your account.')) return;
-  try {
-    localStorage.removeItem(LOCAL_PLANS_KEY);
-    showToast('🗑️', 'Cleared', 'Local device data removed.');
-  } catch (_e) {}
-}
-Object.assign(window, { openSettings, closeSettings, clearLocalData });
-
-// ── First-run onboarding ─────────────────────────────────────────────────────
-const ONBOARDING_KEY = 'tt_onboarded_v1';
-let onboardingStep = 0;
-const ONBOARDING_SLIDE_COUNT = 3;
-function maybeShowOnboarding() {
-  try {
-    if (localStorage.getItem(ONBOARDING_KEY)) return;
-  } catch (_e) { return; }
-  onboardingStep = 0;
-  const overlay = document.getElementById('onboarding-overlay');
-  if (!overlay) return;
-  overlay.style.display = 'flex';
-}
-function renderOnboardingStep() {
-  document.querySelectorAll('.onboarding-slide').forEach((el, i) => {
-    el.classList.toggle('active', i === onboardingStep);
-  });
-  document.querySelectorAll('.onboarding-dot').forEach((el, i) => {
-    el.classList.toggle('active', i === onboardingStep);
-  });
-  const nextBtn = document.querySelector('.onboarding-next');
-  if (nextBtn) nextBtn.textContent = onboardingStep === ONBOARDING_SLIDE_COUNT - 1 ? 'Get Started' : 'Next';
-}
-function advanceOnboarding() {
-  if (onboardingStep >= ONBOARDING_SLIDE_COUNT - 1) { completeOnboarding(); return; }
-  onboardingStep += 1;
-  renderOnboardingStep();
-}
-function skipOnboarding() { completeOnboarding(); }
-function completeOnboarding() {
-  try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_e) {}
-  const overlay = document.getElementById('onboarding-overlay');
-  if (overlay) overlay.style.display = 'none';
-}
-Object.assign(window, { maybeShowOnboarding, advanceOnboarding, skipOnboarding });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.onload=()=>{
