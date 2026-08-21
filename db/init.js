@@ -16,7 +16,11 @@ neonConfig.webSocketConstructor = ws; // Required for Node.js
 // .github/workflows/ci.yml's `e2e` job and https://github.com/neondatabase/wsproxy.
 if (process.env.NEON_LOCAL_PROXY === 'true') {
   const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
-  neonConfig.wsProxy = () => proxyHost;
+  // wsproxy expects the WebSocket handshake on a specific path (/v2), not
+  // the bare root. Without it, wsproxy has no route for the request and
+  // answers with a plain HTTP 404 instead of upgrading the connection —
+  // which is exactly the "Unexpected server response: 404" seen in CI.
+  neonConfig.wsProxy = () => `${proxyHost}/v2`;
   neonConfig.useSecureWebSocket = false;
   neonConfig.pipelineTLS = false;
   neonConfig.pipelineConnect = false;

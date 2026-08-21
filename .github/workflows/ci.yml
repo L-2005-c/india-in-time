@@ -73,8 +73,11 @@ jobs:
       wsproxy:
         image: ghcr.io/neondatabase/wsproxy:latest
         env:
-          APPEND_PORT: "5432"
-          ALLOW_ADDR_REGEX: "postgres"
+          # Must be the full "host:port" of the default upstream, not a bare
+          # port — wsproxy uses this to fill in the target address when the
+          # client's request doesn't carry one.
+          APPEND_PORT: "postgres:5432"
+          ALLOW_ADDR_REGEX: "^postgres:5432$"
           LOG_TRAFFIC: "false"
         ports:
           - 4444:80
