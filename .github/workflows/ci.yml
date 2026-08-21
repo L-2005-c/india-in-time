@@ -73,7 +73,7 @@ jobs:
       wsproxy:
         image: ghcr.io/neondatabase/wsproxy:latest
         env:
-          APPEND_PORT: "5432"
+          APPEND_PORT: "postgres:5432"
           ALLOW_ADDR_REGEX: "postgres"
           LOG_TRAFFIC: "false"
         ports:
