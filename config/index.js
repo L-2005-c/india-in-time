@@ -184,11 +184,8 @@ config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
     }
   }
 
-  // Prefer a healthy Vite dist build whenever it exists (production, CI e2e
-  // with NODE_ENV=test after `npm run build:frontend`, or local USE_DIST_FRONTEND).
-  // Only fall back to the minimal dev-index.html shell when dist is absent.
-  if (distIsHealthy()) return distIndex;
   if (config.isProd) {
+    if (distIsHealthy()) return distIndex;
     throw configError('Production frontend build is missing or unhealthy: run npm run build:frontend before startup');
   }
   if (forceDist && fs.existsSync(distIndex)) return distIndex;

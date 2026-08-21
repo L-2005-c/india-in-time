@@ -73,12 +73,9 @@ jobs:
       wsproxy:
         image: ghcr.io/neondatabase/wsproxy:latest
         env:
-          # Destination address is supplied by the neon driver as ?address=host:port.
-          # Do NOT set APPEND_PORT (it would mangle "postgres:5432" into "postgres:54325432").
-          # Allow the CI postgres service hostname (and any port suffix).
-          ALLOW_ADDR_REGEX: "^postgres(:[0-9]+)?$"
+          APPEND_PORT: "5432"
+          ALLOW_ADDR_REGEX: "postgres"
           LOG_TRAFFIC: "false"
-          LOG_CONN_INFO: "true"
         ports:
           - 4444:80
     env:
@@ -87,10 +84,6 @@ jobs:
       NEON_LOCAL_PROXY: "true"
       NEON_LOCAL_PROXY_HOST: "localhost:4444"
       DATABASE_SSL_REJECT_UNAUTHORIZED: "false"
-      # After `npm run build:frontend`, serve the Vite dist build (has #app /
-      # role=main). config.resolveIndexHtmlPath also prefers healthy dist.
-      # Without this, NODE_ENV=test falls through to stub dev-index.html.
-      USE_DIST_FRONTEND: "1"
       # Deliberately not a real key — the e2e specs only exercise the public
       # home page, /api/health, and security headers, none of which call
       # Gemini. FIREBASE_SERVICE_ACCOUNT is left unset on purpose too:
