@@ -27,6 +27,7 @@ Health check:
 - `CORS_ORIGIN` set to the exact public frontend origin
 - `DATABASE_SSL_REJECT_UNAUTHORIZED=true`
 - `REQUIRE_REDIS_IN_PROD=true`
+- `RATE_LIMIT_AI_USER=30` (authenticated AI requests per user per minute)
 
 Optional intelligence variables include `GEMINI_API_KEY_SECONDARY`, `GEMINI_MODEL`, MapTiler keys, and routing provider settings.
 

@@ -223,6 +223,7 @@ async function deleteCachedPlaces(cacheKey) {
 }
 
 async function purgeExpiredCache() {
+  if (process.env.SKIP_DB_INIT === 'true') return 0;
   const pool = getDb();
   const result = await pool.query(`
     DELETE FROM place_cache WHERE expires_at <= CURRENT_TIMESTAMP;

@@ -12,7 +12,7 @@ function calculateStopBudget(stop, prevCoords, cityId){
 }
 
 function calculateDayBudget(dayStops, cityId, startCoords){
-  let totals = { transport:0, entry:0, food:0, misc:0, total:0 };
+  const totals = { transport:0, entry:0, food:0, misc:0, total:0 };
   let prevCoords = startCoords;
   for(const stop of (dayStops||[])){
     if(stop.isBreak){ prevCoords = stop.coords; continue; }
@@ -28,7 +28,7 @@ function calculateDayBudget(dayStops, cityId, startCoords){
 
 function calculateTripBudget(plan, cityId, startCoords){
   const days = [];
-  let grandTotal = { transport:0, entry:0, food:0, misc:0, total:0 };
+  const grandTotal = { transport:0, entry:0, food:0, misc:0, total:0 };
   for(const dayStops of (plan||[])){
     const db = calculateDayBudget(dayStops, cityId, startCoords);
     days.push(db);

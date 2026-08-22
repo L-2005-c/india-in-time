@@ -79,7 +79,7 @@ function categoryValidityScore(tourismClass, isTourist) {
  * @param {object} [opts]
  * @returns {{ score: number, tier: string, factors: object }}
  */
-function computeTourismQualityScore(place, classification, opts = {}) {
+function computeTourismQualityScore(place, classification, _opts = {}) {
   if (!classification || !classification.isTourist) {
     return {
       score: 0,

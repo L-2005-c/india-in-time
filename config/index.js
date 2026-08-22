@@ -78,6 +78,7 @@ const config = {
   // Rate limiting (requests per minute per IP)
   rateLimit: {
     ai:       parseInt(process.env.RATE_LIMIT_AI, 10)       || 15,
+    aiUser:   parseInt(process.env.RATE_LIMIT_AI_USER, 10) || 30,
     places:   parseInt(process.env.RATE_LIMIT_PLACES, 10)   || 10,
     weather:  parseInt(process.env.RATE_LIMIT_WEATHER, 10)  || 60,
     general:  parseInt(process.env.RATE_LIMIT_GENERAL, 10)  || 100,
@@ -168,7 +169,6 @@ config.resolveIndexHtmlPath = function resolveIndexHtmlPath() {
       // Each ref must exist on disk under publicDir (paths are absolute like /dist/assets/x.js)
       for (const ref of refs) {
         const rel = ref.replace(/^\//, '');
-        const full = path.join(config.publicDir, rel.startsWith('dist/') ? rel : path.join('dist', rel.replace(/^dist\//, '')));
         // Also try: /dist/assets/foo -> public/dist/assets/foo
         //           /assets/foo -> public/dist/assets/foo (legacy)
         const candidates = [

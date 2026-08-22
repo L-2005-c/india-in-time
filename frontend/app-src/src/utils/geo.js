@@ -89,7 +89,8 @@ function mergePlacePools(...pools){
 
 function sortNearestNeighbor(arr,sLat,sLon){
   if(arr.length<=1)return arr;
-  let sorted=[],unsorted=[...arr],firstIdx=0;
+  const sorted=[],unsorted=[...arr];
+  let firstIdx=0;
   if(sLat&&sLon){let minD=Infinity;for(let i=0;i<unsorted.length;i++){const d=hvKm(sLat,sLon,unsorted[i].coords[0],unsorted[i].coords[1]);if(d<minD){minD=d;firstIdx=i;}}}
   sorted.push(unsorted.splice(firstIdx,1)[0]);
   while(unsorted.length>0){const last=sorted[sorted.length-1];let ci=0,minD=Infinity;for(let i=0;i<unsorted.length;i++){const d=hvKm(last.coords[0],last.coords[1],unsorted[i].coords[0],unsorted[i].coords[1]);if(d<minD){minD=d;ci=i;}}sorted.push(unsorted.splice(ci,1)[0]);}

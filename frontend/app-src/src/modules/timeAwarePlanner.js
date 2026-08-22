@@ -15,7 +15,7 @@ function distKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-function nearbyBoost(prevCoords, coords) {
+function _nearbyBoost(prevCoords, coords) {
   const km = distKm(prevCoords, coords);
   if (km <= 1.5) return 30;
   if (km <= 3.5) return 22;

@@ -3,7 +3,7 @@ const logger = require('../lib/logger');
 const express = require('express');
 const router = express.Router();
 const { getBatchState, personalizeScore, suggestOpenAlternatives, getTravelIntelligence } = require('../services/timeIntelligence');
-const { rankPlacesForDay, buildDayPlan, dynamicAdvice, multiDayAdvice, getTravelIntelligenceAsync } = require('../services/travelIntelligence');
+const { rankPlacesForDay, dynamicAdvice, multiDayAdvice, getTravelIntelligenceAsync } = require('../services/travelIntelligence');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const { buildTemporalProfile } = require('../services/travelIntelligence/temporalEngine');
 const { planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');
@@ -169,7 +169,7 @@ router.post('/optimize', async (req, res) => {
 // ── Dynamic re-planning from current state ──────────────────────────────────
 router.post('/replan', async (req, res) => {
   try {
-    const { weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops, bufferMin, region, trigger, reason, preferredCategories, categories } = req.body || {};
+    const { weather, at, fromCoords, tripMode, startMin, endMin, maxStops, bufferMin, region, preferredCategories, categories } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
     const now = at ? new Date(at) : new Date();
@@ -196,7 +196,7 @@ router.post('/replan', async (req, res) => {
 
 router.post('/day-plan', async (req, res) => {
   try {
-    const { weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops, bufferMin, region, preferredCategories, categories } = req.body || {};
+    const { weather, at, fromCoords, tripMode, startMin, endMin, maxStops, bufferMin, region, preferredCategories, categories } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) {
       return res.status(400).json({ error: 'places[] is required' });

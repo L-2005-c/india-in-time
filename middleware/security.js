@@ -20,6 +20,7 @@ function buildHelmetOptions() {
           'https://apis.google.com',        // Firebase Auth's Google sign-in loads apis.google.com/js/api.js
           'https://unpkg.com',              // Leaflet
           'https://cdn.jsdelivr.net',       // DOMPurify
+          'https://cdnjs.cloudflare.com',   // jsPDF export
         ],
         // script-src-attr: previously required 'unsafe-inline' because app.js
         // generated onclick= attributes in template HTML. Those have been

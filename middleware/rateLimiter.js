@@ -53,17 +53,18 @@ async function checkRedisLimit(ip, tier, windowMs) {
   return { count, resetMs: ttl > 0 ? ttl : windowMs };
 }
 
-function createRateLimiter(tier = 'general') {
+function createRateLimiter(tier = 'general', keyGenerator = null) {
   const maxRequests = config.rateLimit[tier] || config.rateLimit.general;
   const windowMs = config.rateLimit.windowMs;
   return async (req, res, next) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const key = keyGenerator ? keyGenerator(req, ip) : ip;
     try {
       const result = redis
-        ? await checkRedisLimit(ip, tier, windowMs)
+        ? await checkRedisLimit(key, tier, windowMs)
         : (config.isProd && config.enterprise.requireRedisInProd
           ? Promise.reject(new Error('Redis is required in production for distributed rate limiting'))
-          : checkMemoryLimit(ip, tier, windowMs));
+          : checkMemoryLimit(key, tier, windowMs));
       const remaining = Math.max(0, maxRequests - result.count);
       const resetAt = Math.ceil((Date.now() + result.resetMs) / 1000);
       res.set('X-RateLimit-Limit', String(maxRequests));
@@ -82,7 +83,7 @@ function createRateLimiter(tier = 'general') {
         return res.status(503).json({ error: 'Rate limiting service temporarily unavailable', code: 'RATE_LIMIT_UNAVAILABLE' });
       }
       appLogger.warn('[rateLimiter] Redis unavailable; using local fallback:', err.message);
-      const result = checkMemoryLimit(ip, tier, windowMs);
+      const result = checkMemoryLimit(key, tier, windowMs);
       return result.count > maxRequests
         ? res.status(429).json({ error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED', tier, limit: maxRequests })
         : next();
@@ -93,6 +94,7 @@ function createRateLimiter(tier = 'general') {
 module.exports = {
   createRateLimiter,
   aiLimiter: createRateLimiter('ai'),
+  aiUserLimiter: createRateLimiter('aiUser', (req, ip) => req.uid ? `user:${req.uid}` : `ip:${ip}`),
   placesLimiter: createRateLimiter('places'),
   weatherLimiter: createRateLimiter('weather'),
   generalLimiter: createRateLimiter('general'),

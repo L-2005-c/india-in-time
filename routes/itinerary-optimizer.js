@@ -3,11 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const appLogger = require('../lib/logger');
-const { distKm, bearing, routeDuration } = require('../utils/geo');
-const config = require('../config');
-const { itineraryCache } = require('../services/cache');
-
-const ITINERARY_CACHE_TTL_MS = config.cache.itineraryTtlMs || 30 * 60 * 1000; // 30 min default
+const { distKm } = require('../utils/geo');
 
 /**
  * Calculate distance between two coordinates [lat, lon]
@@ -130,7 +126,7 @@ async function buildOptimizedItinerary(req) {
     totalMinutes,     // Total time available
     preferNearby = true, // Group nearby places together
     clusterRadiusKm = 1.5,
-    minPlacesPerCluster = 2,
+    minPlacesPerCluster: _minPlacesPerCluster = 2,
   } = req.body;
 
   if (!Array.isArray(places) || places.length === 0) {
@@ -143,7 +139,7 @@ async function buildOptimizedItinerary(req) {
 
   try {
     // Step 1: Cluster nearby places
-    let clusters = preferNearby 
+    const clusters = preferNearby 
       ? clusterNearbyPlaces(places, clusterRadiusKm)
       : places.map(p => ({
           mainPlace: p,

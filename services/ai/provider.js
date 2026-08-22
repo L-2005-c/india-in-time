@@ -10,7 +10,6 @@
 //   3. Automatic failover to AI_FALLBACK_PROVIDER when primary throws a
 //      retryable error (optional; only if that provider is configured)
 
-const config = require('../../config');
 const logger = require('../../lib/logger');
 
 const providers = Object.create(null);

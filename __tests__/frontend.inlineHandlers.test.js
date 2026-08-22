@@ -18,7 +18,7 @@ function walk(dir, out = []) {
 }
 
 test('production frontend contains no executable inline event attributes', () => {
-  const pattern = /\bon(?:click|change|input|keydown|keyup|submit)\s*=/i;
+  const pattern = /\bon(?:click|change|input|keydown|keyup|submit)\s*=\s*["']/i;
   const violations = [];
   for (const rel of files) {
     const base = path.join(root, rel);

@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const { getFlag, listFlags } = require('../lib/featureFlags');
+const { getFlag } = require('../lib/featureFlags');
 
 /** Public, non-sensitive flags for client hydration */
 router.get('/public', (_req, res) => {

@@ -7,8 +7,6 @@
 
 const {
   filterEligibleCandidates,
-  evaluateCandidate,
-  TIERS,
 } = require('../services/travelIntelligence/tourismPoi');
 const { staticCityPlaces } = require('../data/city-seeds');
 
@@ -104,7 +102,7 @@ function demoScenario(title, userRequest, opts = {}) {
 
   console.log('\nCONCEPTUAL ITINERARY WINDOW:', fmt(nowMin), '–', fmt(endMin));
   let t = nowMin;
-  picks.forEach((s, i) => {
+  picks.forEach((s) => {
     const dwell = s.place.vt || s.place.visit_minutes || 60;
     const arrive = t;
     const depart = Math.min(endMin, t + dwell);

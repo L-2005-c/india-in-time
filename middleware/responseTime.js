@@ -6,8 +6,6 @@ function responseTime() {
     const start = process.hrtime.bigint();
     res.on('finish', () => {
       try {
-        const end = process.hrtime.bigint();
-        const ms = Number(end - start) / 1e6;
         if (!res.headersSent) return;
         // Header may already be sent; set only if possible via append at writeHead
       } catch (_e) {}

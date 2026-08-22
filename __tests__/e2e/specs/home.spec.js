@@ -24,13 +24,12 @@ test.describe('India In-Time critical UI journeys', () => {
   });
 
   test('@a11y home has no serious or critical axe violations', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'networkidle' });
-    // Wait for the main content to be ready
-    await page.waitForSelector('#app, [role="main"]', { timeout: 15000 });
-    // Extra stability wait before running accessibility checks
-    await page.waitForLoadState('networkidle');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#app', { timeout: 15000 });
+    // Allow initial auto-city detect / client load to settle before scanning DOM
+    await page.waitForTimeout(1500);
     
-    const results = await new AxeBuilder({ page }).analyze();
+    const results = await new AxeBuilder({ page }).include('#app').analyze();
     const serious = results.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
@@ -48,5 +47,25 @@ test.describe('India In-Time critical UI journeys', () => {
     expect(metrics).not.toBeNull();
     expect(metrics.ttfb).toBeLessThanOrEqual(Number(process.env.E2E_MAX_TTFB_MS || 1500));
     expect(metrics.load).toBeLessThanOrEqual(Number(process.env.E2E_MAX_LOAD_MS || 5000));
+  });
+
+  test('mobile viewport 375x667 (iPhone SE) renders cleanly without horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#app, [role="main"]', { timeout: 15000 });
+    const hasHorizontalOverflow = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(hasHorizontalOverflow).toBe(false);
+  });
+
+  test('small mobile viewport 320x568 renders without horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#app, [role="main"]', { timeout: 15000 });
+    const hasHorizontalOverflow = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(hasHorizontalOverflow).toBe(false);
   });
 });

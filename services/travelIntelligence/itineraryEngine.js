@@ -70,7 +70,7 @@ function buildDayPlan(places, opts = {}) {
   const warnings = [];
 
   // Prefer sunrise spots early, sunset spots near evening, food at meal times
-  function priorityBoost(item, atMin) {
+  function _priorityBoost(item, atMin) {
     let boost = item.score;
     const p = item.place;
     if (p.is_sunrise_spot && atMin < 9 * 60) boost += 15;
@@ -366,7 +366,7 @@ function dynamicAdvice(intel, _opts = {}) {
  * Lightweight multi-day advice: suggest moving outdoor-heavy stops when today is poor.
  * Does not invent weather — uses provided intel signals only.
  */
-function multiDayAdvice(placesIntel = [], opts = {}) {
+function multiDayAdvice(placesIntel = [], _opts = {}) {
   const suggestions = [];
   for (const item of placesIntel) {
     const intel = item.intel || item;

@@ -41,6 +41,8 @@ services:
         sync: false
       - key: REQUIRE_REDIS_IN_PROD
         value: 'true'
+      - key: RATE_LIMIT_AI_USER
+        value: '30'
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: 'true'
       - key: CLUSTER_WORKERS

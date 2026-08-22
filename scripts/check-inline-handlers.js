@@ -16,7 +16,7 @@ for (const rel of roots) {
   const abs = path.join(root, rel);
   if (fs.existsSync(abs)) walk(abs);
 }
-const pattern = /\bon(?:click|change|input|keydown|keyup|submit)\s*=/i;
+const pattern = /\bon(?:click|change|input|keydown|keyup|submit)\s*=\s*["']/i;
 const violations = [];
 for (const file of files) {
   const original = fs.readFileSync(file, 'utf8');

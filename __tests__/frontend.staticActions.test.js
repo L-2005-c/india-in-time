@@ -161,7 +161,7 @@ describe('index.html data-action values <-> app.js dispatch tables — real-file
       'showReplanner', 'showWeatherAlerts', 'generateTripPDF', 'setupNotifications',
       'showFestivalRadar', 'showHiddenGems', 'showHartaalAlert', 'showCrowdPredictor',
       'showFareNegotiator', 'showTripTribe', 'shareEmergency', 'addExpense', 'analyzeBudget',
-      'delExp', 'delPlan', 'loadPlan', 'speak', 'chatAbout', 'aiFoodCard',
+      'delExp', 'delPlan', 'loadPlan', 'loadCloudPlan', 'speak', 'chatAbout', 'aiFoodCard',
       'clickFileInput', 'drawerRun', 'drawerFile',
     ]);
     const unused = [...staticActionKeys].filter(

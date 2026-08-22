@@ -9,7 +9,7 @@
  * USER REQUEST → ... → TOURISM POI DISCOVERY → [THIS ENGINE] → quality → geo → time → ...
  */
 
-const { isBlacklistedEntity, isLocalityOnlyName, normalizeName } = require('./tourismBlacklist');
+const { isBlacklistedEntity, isLocalityOnlyName } = require('./tourismBlacklist');
 const { resolveWhitelist, isVerifiedShoppingDestination } = require('./tourismWhitelist');
 const {
   classifyTourismCategory,

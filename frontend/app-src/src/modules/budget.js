@@ -49,3 +49,36 @@ export function calculateTripBudget(plan, cityId, startCoords, helpers = {}) {
 export function formatInr(n) {
   return `₹${Math.round(Number(n) || 0).toLocaleString('en-IN')}`;
 }
+
+export function renderBudgetBreakdownHTML(tripBudgetData, dayIdx, userBudget = 0) {
+  if (!tripBudgetData) return '';
+  const { days, grandTotal } = tripBudgetData;
+  const overBudget = userBudget > 0 && grandTotal.total > userBudget;
+  const budgetPct = userBudget > 0 ? Math.min(100, (grandTotal.total / userBudget) * 100) : 0;
+  return `
+    <div class="budget-opt-header">
+      <div class="budget-opt-title">💰 Estimated Trip Budget</div>
+      <div class="budget-opt-total" style="color:${overBudget ? '#f87171' : 'var(--jade)'}">₹${grandTotal.total.toLocaleString('en-IN')}</div>
+    </div>
+    ${userBudget > 0 ? `<div class="prog-bar"><div class="prog-fill" style="width:${budgetPct}%;background:${budgetPct > 90 ? '#ef4444' : budgetPct > 75 ? '#f59e0b' : 'var(--jade)'}"></div></div>
+    <div class="bud-meta" style="margin-bottom:10px"><span>${overBudget ? '⚠️ Over budget' : 'Within budget'}</span><span>₹${grandTotal.total} / ₹${userBudget}</span></div>` : ''}
+    <div class="budget-day-scroll">
+      ${days.map((d, i) => {
+        const ct = Math.max(1, d.transport + d.food + d.entry);
+        return `<div class="budget-day-card${i === dayIdx ? ' active' : ''}">
+          <div class="budget-day-label">Day ${i + 1}</div>
+          <div class="budget-day-amount">₹${d.total.toLocaleString('en-IN')}</div>
+          <div class="budget-cat-bar">
+            <div class="budget-cat-seg transport" style="width:${(d.transport / ct * 100).toFixed(0)}%"></div>
+            <div class="budget-cat-seg food" style="width:${(d.food / ct * 100).toFixed(0)}%"></div>
+            <div class="budget-cat-seg entry" style="width:${(d.entry / ct * 100).toFixed(0)}%"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="budget-cat-legend">
+      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--ocean)"></span>Transport ₹${grandTotal.transport}</div>
+      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--sand)"></span>Food ₹${grandTotal.food}</div>
+      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--purple)"></span>Entry ₹${grandTotal.entry}</div>
+    </div>`;
+}

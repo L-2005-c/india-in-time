@@ -1,4 +1,5 @@
 import { showToast } from './notifications.js';
+import { openModal, closeModal } from '../a11y/modal.js';
 
 // Must match LOCAL_PLANS_KEY in core/app.js — duplicated here rather than
 // imported to avoid a core/app.js -> modules -> core/app.js import cycle.
@@ -25,10 +26,10 @@ export function openSettings() {
   const installBtn = document.getElementById('install-app-btn');
   if (installRow) installRow.style.display = (installBtn && installBtn.style.display !== 'none') ? 'flex' : 'none';
   document.getElementById('user-menu')?.classList.remove('open');
-  document.getElementById('settings-modal').style.display = 'flex';
+  openModal('settings-modal');
 }
 export function closeSettings() {
-  document.getElementById('settings-modal').style.display = 'none';
+  closeModal('settings-modal');
 }
 export function clearLocalData() {
   if (!window.confirm('Remove locally saved plans and cached data from this device? This does not affect plans saved to your account.')) return;

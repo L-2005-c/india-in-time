@@ -237,7 +237,6 @@ async function buildMultiDayItinerary(places, options = {}) {
 
     let result;
     try {
-      // eslint-disable-next-line no-await-in-loop
       result = await getOptimizer()(pool, {
         now: date, weather, originCoords, personas, tripMode, region,
         maxStops, bufferMin, startMin, endMin, beamWidth: options.beamWidth,

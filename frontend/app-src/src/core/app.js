@@ -1,4 +1,5 @@
 import { browserLogger } from '../utils/browser-logger.js';
+import { openModal, closeModal } from '../a11y/modal.js';
 import {
   createAuthSession,
 } from '../modules/auth-session.js';
@@ -6,6 +7,7 @@ import {
   calculateStopBudget as _calculateStopBudget,
   calculateDayBudget as _calculateDayBudget,
   calculateTripBudget as _calculateTripBudget,
+  renderBudgetBreakdownHTML as _renderBudgetBreakdownHTML,
 } from '../modules/budget.js';
 import {
   getRouteStopsForDay as _getRouteStopsForDay,
@@ -35,21 +37,41 @@ import {
   maybeShowOnboarding, advanceOnboarding, skipOnboarding,
 } from '../modules/settingsPanel.js';
 import { addMsg as _addMsgMod } from '../modules/chatUi.js';
+import {
+  promptStopFeedback as _promptStopFeedbackMod,
+  rateStop as _rateStopMod,
+  showAppFeedback as _showAppFeedbackMod,
+  fbSetStar as _fbSetStarMod,
+  fbSetCat as _fbSetCatMod,
+  updateFbCounter as _updateFbCounterMod,
+  fbSkip as _fbSkipMod,
+  fbSubmit as _fbSubmitMod,
+} from '../modules/feedback.js';
+import {
+  readLocalPlans as _readLocalPlansMod,
+  writeLocalPlans as _writeLocalPlansMod,
+  savePlan as _savePlanMod,
+  deletePlan as _deletePlanMod,
+  renderSavedPlansListUI as _renderSavedPlansListUIMod,
+  shareTripText as _shareTripTextMod,
+  shareTripWhatsApp as _shareTripWhatsAppMod,
+  shareTripEmergency as _shareTripEmergencyMod,
+} from '../modules/savedPlans.js';
+import {
+  startVoiceInput as _startVoiceInputMod,
+  handleCaption as _handleCaptionMod,
+  handleTranslate as _handleTranslateMod,
+} from '../modules/aiMedia.js';
 
 import {
   getDaypartClient as _getDaypartClient,
   getOpeningStatusPure as _getOpeningStatusPure,
   getCrowdPredictionPure as _getCrowdPredictionPure,
   calculateExperienceScorePure as _calculateExperienceScorePure,
-  CROWD_BASE_BY_DAYPART,
-  CROWD_WEEKEND_MULT,
-  CROWD_PEAK_MULT,
 } from '../utils/experience-score.js';
 import {
   isPlausibleGpsFix as _isPlausibleGpsFix,
   createGpsFixCoordinator as _createGpsFixCoordinator,
-  GPS_MAX_ACCURACY_M,
-  GPS_MAX_PLAUSIBLE_SPEED_MS,
 } from '../utils/gps.js';
 import {
   closestPointOnSegment as _closestPointOnSegment,
@@ -136,9 +158,6 @@ const API = new Proxy({}, {
 
 // ── Transport & Traffic Intelligence ──────────────────────────────────────────
 // ── Transport (modules/transport.js) ──────────────────────────────────────────
-function getTrafficMultiplier(cityId, minuteOfDay){
-  return _getTrafficMultiplierForCity(cityId, minuteOfDay);
-}
 function getTrafficLevel(multiplier){ return _modTrafficLevel(multiplier); }
 function getCrowdMultiplier(stop, dayOfWeek, minuteOfDay){
   return _modCrowdMultiplier(stop, dayOfWeek, minuteOfDay);
@@ -159,9 +178,6 @@ let tripBudgetData = null;
 function calculateStopBudget(stop, prevCoords, cityId){
   return _calculateStopBudget(stop, prevCoords, cityId, { hvKm, getTransportConfig });
 }
-function calculateDayBudget(dayStops, cityId, startCoords){
-  return _calculateDayBudget(dayStops, cityId, startCoords, { hvKm, getTransportConfig });
-}
 function calculateTripBudget(plan, cityId, startCoords){
   return _calculateTripBudget(plan, cityId, startCoords, { hvKm, getTransportConfig });
 }
@@ -170,37 +186,8 @@ function renderBudgetBreakdown(){
   const el = document.getElementById('budget-breakdown');
   if(!el || !tripBudgetData) { if(el) el.style.display='none'; return; }
   el.style.display='block';
-  const { days, grandTotal } = tripBudgetData;
   const userBudget = parseFloat(document.getElementById('trip-budget-input')?.value) || 0;
-  const overBudget = userBudget > 0 && grandTotal.total > userBudget;
-  const budgetPct = userBudget > 0 ? Math.min(100, (grandTotal.total / userBudget) * 100) : 0;
-  const catTotal = Math.max(1, grandTotal.transport + grandTotal.food + grandTotal.entry);
-  el.innerHTML = `
-    <div class="budget-opt-header">
-      <div class="budget-opt-title">💰 Estimated Trip Budget</div>
-      <div class="budget-opt-total" style="color:${overBudget?'#f87171':'var(--jade)'}">₹${grandTotal.total.toLocaleString('en-IN')}</div>
-    </div>
-    ${userBudget > 0 ? `<div class="prog-bar"><div class="prog-fill" style="width:${budgetPct}%;background:${budgetPct>90?'#ef4444':budgetPct>75?'#f59e0b':'var(--jade)'}"></div></div>
-    <div class="bud-meta" style="margin-bottom:10px"><span>${overBudget?'⚠️ Over budget':'Within budget'}</span><span>₹${grandTotal.total} / ₹${userBudget}</span></div>` : ''}
-    <div class="budget-day-scroll">
-      ${days.map((d,i) => {
-        const ct = Math.max(1, d.transport + d.food + d.entry);
-        return `<div class="budget-day-card${i===dayIdx?' active':''}">
-          <div class="budget-day-label">Day ${i+1}</div>
-          <div class="budget-day-amount">₹${d.total.toLocaleString('en-IN')}</div>
-          <div class="budget-cat-bar">
-            <div class="budget-cat-seg transport" style="width:${(d.transport/ct*100).toFixed(0)}%"></div>
-            <div class="budget-cat-seg food" style="width:${(d.food/ct*100).toFixed(0)}%"></div>
-            <div class="budget-cat-seg entry" style="width:${(d.entry/ct*100).toFixed(0)}%"></div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div class="budget-cat-legend">
-      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--ocean)"></span>Transport ₹${grandTotal.transport}</div>
-      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--sand)"></span>Food ₹${grandTotal.food}</div>
-      <div class="budget-cat-item"><span class="budget-cat-dot" style="background:var(--purple)"></span>Entry ₹${grandTotal.entry}</div>
-    </div>`;
+  el.innerHTML = _renderBudgetBreakdownHTML(tripBudgetData, dayIdx, userBudget);
 }
 
 // Explicit auth/session state. These must be initialized before the
@@ -214,7 +201,8 @@ const authCheckedPromise = new Promise(resolve => {
 
 // ── App State ─────────────────────────────────────────────────────────────────
 let currentCityName='India',currentCityId='india',LOCS=[];
-let credits=50,mdPlan=[],dayIdx=0,itin=[];
+const credits=50;
+let mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
 
 // …
@@ -250,8 +238,8 @@ let streetQuestScore=0;
 let streetQuestHealth=3;
 let streetQuestCoins=0;
 let streetQuestLevel=1;
-let streetQuestShield=0;
-let streetQuestBoostUntil=0;
+const _streetQuestShield=0;
+const _streetQuestBoostUntil=0;
 let streetQuestItems=[];
 let streetQuestHazards=[];
 let streetQuestDestinationReached=false;
@@ -278,7 +266,7 @@ const t2m=(s,fallback=0)=>{
   const raw=String(s||'').trim(); if(!raw) return fallback;
   const ampm=raw.match(/\b(am|pm)\b/i);
   const parts=raw.replace(/\s*(am|pm)\s*/i,'').split(':');
-  let h=Number(parts[0]), m=Number(parts[1]||0);
+  let h=Number(parts[0]); const m=Number(parts[1]||0);
   if(!Number.isFinite(h)||!Number.isFinite(m)) return fallback;
   if(ampm){ h=h%12; if(/pm/i.test(ampm[1])) h+=12; }
   return Math.max(0,Math.min(23,h))*60+Math.max(0,Math.min(59,m));
@@ -299,10 +287,6 @@ function getCurrentLocalMin() {
 }
 
 // …
-const _sunTimesCache = new Map();
-function getSunTimesClient(lat, lon, date = new Date()) {
-  return _getSunTimesClient(lat, lon, date);
-}
 function placeSunTimes(loc, date = new Date()) {
   return _placeSunTimes(loc, date);
 }
@@ -339,9 +323,6 @@ function calculateExperienceScore(loc, simTime = window.globalSimulationTime) {
   return pure;
 }
 
-function getDaypartClient(nowMin, sunsetMin) {
-  return _getDaypartClient(nowMin, sunsetMin);
-}
 function getCrowdPrediction(loc, evalTime) {
   const now = evalTime !== undefined ? evalTime : getCurrentLocalMin();
   const isWeekend = [0, 6].includes(new Date().getDay());
@@ -509,16 +490,16 @@ function getPreviewRouteStart(){
 
 function withHiddenGems(cityId, list){ return _geoWithHiddenGems(list, getHiddenGems(cityId)); }
 function mergePlacePools(...pools){ return _geoMergePools(...pools); }
-function sortNearestNeighbor(arr,sLat,sLon){ return _geoSortNN(arr,sLat,sLon); }
-function routeDistanceKm(stops,start){ return _geoRouteKm(stops,start); }
-function centroidOfStops(stops){ return _geoCentroid(stops); }
-function clusterStopsByArea(stops){ return _geoCluster(stops); }
-function orderStopsAreaWise(stops,start){ return _geoOrderArea(stops,start); }
-function estimateTimeFitPenaltyKm(stops, start) { return _geoTimeFit(stops, start); }
+function _sortNearestNeighbor(arr,sLat,sLon){ return _geoSortNN(arr,sLat,sLon); }
+function _routeDistanceKm(stops,start){ return _geoRouteKm(stops,start); }
+function _centroidOfStops(stops){ return _geoCentroid(stops); }
+function _clusterStopsByArea(stops){ return _geoCluster(stops); }
+function _orderStopsAreaWise(stops,start){ return _geoOrderArea(stops,start); }
+function _estimateTimeFitPenaltyKm(stops, start) { return _geoTimeFit(stops, start); }
 function optimizeStopOrder(stops,start){ return _geoOptimize(stops,start); }
 function bearingBetween(from,to){ return _geoBearing(from,to); }
 function keepNearbyCluster(stops,start,maxRadiusKm=6){ return _geoKeepNearby(stops,start,maxRadiusKm); }
-function famousPlaceScore(stop,start){ return _geoFamous(stop,start); }
+function _famousPlaceScore(stop,start){ return _geoFamous(stop,start); }
 function prioritizePlanStops(stops,start,prefs=[]){ return _geoPrioritize(stops,start,prefs); }
 function getRouteStopsForDay(dayStops){ return _geoRouteStops(dayStops); }
 function estimateStopLoadMinutes(stops){ return _geoLoadMins(stops); }
@@ -749,7 +730,7 @@ function updateStreetQuestUI(){ return _sq.updateStreetQuestUI(); }
 function setupStreetQuest(){ return _sq.setupStreetQuest(); }
 function toggleStreetQuest(forceState){ return _sq.toggleStreetQuest(forceState); }
 function updateStreetQuestProgress(){ return _sq.updateStreetQuestProgress(); }
-function updateQuestLevel(){ return _sq.updateQuestLevel(); }
+function _updateQuestLevel(){ return _sq.updateQuestLevel(); }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 function applyTheme(){document.documentElement.setAttribute('data-theme','dark');localStorage.setItem('tt_theme','dark');}
@@ -781,7 +762,7 @@ const authSession = createAuthSession({
   },
 });
 
-const { saveUserData, loadUserData, signInWithGoogle, doSignOut, toggleUserMenu } = authSession;
+const { saveUserData, loadUserData: _loadUserData, signInWithGoogle, doSignOut, toggleUserMenu } = authSession;
 // Legacy HTML event bridge. Registered only after auth/session lexical
 // bindings are initialized, preventing top-level temporal-dead-zone failures.
 Object.assign(window, {
@@ -1328,7 +1309,7 @@ async function generatePlan(){
   }
   if(!mdPlan.length){
     mdPlan=[];rem=[...avail];
-    for(let d=0;d<nDays;d++){let day=[],cur=startMin,used=0,unv=[];
+    for(let d=0;d<nDays;d++){const day=[],unv=[];let cur=startMin,used=0;
       rem.forEach(loc=>{
         const tr=day.length?20:0,arr=cur+tr,dep=arr+(loc.vt||45);
         if(used+(loc.vt||45)+tr<=maxT&&arr>=t2m(loc.ot||'06:00')&&dep<=t2m(loc.ct||'22:00')){
@@ -1379,7 +1360,7 @@ async function generatePlan(){
 }
 
 function renderTabs(){const c=document.getElementById('day-tabs');if(mdPlan.length<=1){c.style.display='none';return;}c.style.display='flex';c.innerHTML='';mdPlan.forEach((_,i)=>{const b=document.createElement('div');b.textContent=`Day ${i+1}`;b.className='day-tab'+(i===0?' active':'');b.addEventListener('click', () => switchDay(i));c.appendChild(b);});}
-async function switchDay(idx,init=false){
+async function switchDay(idx,_init=false){
   dayIdx=idx;itin=mdPlan[dayIdx]||[];
   document.querySelectorAll('.day-tab').forEach((b,i)=>b.classList.toggle('active',i===idx));
   document.getElementById('btn-start').textContent='🚀 Start Live Tracking';
@@ -1394,13 +1375,8 @@ async function switchDay(idx,init=false){
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 function chatAbout(name){switchToView('chat-view',2);setTimeout(()=>{document.getElementById('chat-in').value=`Tell me about ${name}`;handleChat();},200);}
-// ── HTML-escaping helpers ────────────────────────────────────────────────────
-// addMsg() renders its argument via innerHTML (see below) so it can support
-// …
 function escapeHtml(str){ return _escapeHtml(str); }
-function sanitizeChatHtml(html){ return _sanitizeChatHtml(html); }
 function formatAiText(str){ return _formatAiText(str); }
-
 function addMsg(html,isBot=true){ return _addMsgMod(html,isBot); }
 
 // ── Delegated action handling for in-chat widget buttons ────────────────────
@@ -1690,8 +1666,8 @@ async function bestTimeToVisit(query){
       const top=(profile.windows||[]).slice(0,3).map(w=>`<strong>${w.start}–${w.end}</strong> (${w.score}/100, ${w.confidence}% confidence)`).join('<br>');
       const base=`⏰ <strong>${place.name}</strong><br>Best future windows:<br>${top||'No strong window available from current data.'}`;
       return base + (profile.bestWindow?.reasons?.length ? `<br><small>Why: ${escapeHtml(profile.bestWindow.reasons.join(' · '))}</small>` : '');
-    }catch(e){
-      try{ const {places}=await API.timeIntelligenceStatus([ti_placePayload(place)], weather); return ti_renderState(place, places[0]); }catch(_e){ return `⏰ <strong>${escapeHtml(place.name)}</strong> — future timing data unavailable right now.`; }
+    }catch(_e){
+      try{ const {places}=await API.timeIntelligenceStatus([ti_placePayload(place)], weather); return ti_renderState(place, places[0]); }catch(_e2){ return `⏰ <strong>${escapeHtml(place.name)}</strong> — future timing data unavailable right now.`; }
     }
   }
   const pool=(LOCS.length?LOCS:itin).slice(0,8);
@@ -1708,7 +1684,7 @@ async function bestTimeToVisit(query){
         ? `🟢 Open now: <strong>${openNow.slice(0,4).map(s=>s.name).join(', ')}</strong>`
         : `Most spots are closed right now — best window is early morning (6–9 AM) or evening around sunset.`;
     return [header, wxLine, body].join('<br>');
-  }catch(e){ return ''; }
+  }catch(_e){ return ''; }
 }
 
 async function handleChat(){
@@ -1766,7 +1742,7 @@ async function showWeatherAlerts(){
     switchToView('chat-view',2);
     addMsg(`🌦️ <strong>Weather Alerts</strong><br><br>${data.stops.map(s=>`${s.emoji} <strong>${s.name}</strong> — ${s.temp}°C, ${s.desc}${s.rainProb>40?` 🌧️ ${s.rainProb}% rain`:''}`).join('<br>')}`);
     const danger=data.stops.filter(s=>s.alertLevel==='danger');if(danger.length)addMsg(`⚠️ Severe weather at: ${danger.map(s=>s.name).join(', ')}!`);
-  }catch(e){addMsg('⚠️ Could not fetch weather alerts.');}
+  }catch(_e){addMsg('⚠️ Could not fetch weather alerts.');}
 }
 
 // ── PDF Generator ─────────────────────────────────────────────────────────────
@@ -2074,7 +2050,7 @@ async function renderRoute(){
   else raw.push(...visibleStops.map(l=>l.coords));
   if(routeStart&&routeStops.length){nsDist=hvKm(routeStart[0],routeStart[1],routeStops[0].coords[0],routeStops[0].coords[1]).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}
   const accent='#00c8f0';
-  visibleStops.forEach((l,visibleIndex)=>{
+  visibleStops.forEach((l)=>{
     const i = routeStops.findIndex(stop => stop.id === l.id);
     const isCurrent = i===0;
     
@@ -2325,180 +2301,31 @@ async function optimizeRoute(silent=false){
   await renderRoute();
 }
 function smartExtend(){setTripMinutes(getTripMinutes()+60);syncPlannerTimeFields('duration');const ids=new Set(mdPlan.flat().filter(stop=>!stop?.isBreak).map(stop=>stop.id));const c=LOCS.filter(l=>!ids.has(l.id));if(c.length){const base=getRouteStopsForDay(itin);base.push({...c[0],tt:0});itin=applyBreakPlanToCurrentItinerary(base);sync();addMsg(`✨ Added <strong>${c[0].name}</strong>!`);renderRoute();}else addMsg('No more places available.');}
-function addNearby(){const ids=new Set(mdPlan.flat().filter(stop=>!stop?.isBreak).map(stop=>stop.id));let c=LOCS.filter(l=>!ids.has(l.id));if(cLat)c.sort((a,b)=>hvKm(cLat,cLon,a.coords[0],a.coords[1])-hvKm(cLat,cLon,b.coords[0],b.coords[1]));if(c.length){const p={...c[0],tt:0};const base=getRouteStopsForDay(itin);base.splice(tripActive&&base.length>0?1:0,0,p);itin=applyBreakPlanToCurrentItinerary(base);sync();addMsg(`📍 Added detour: <strong>${p.name}</strong>`);renderRoute();}else addMsg('No more places!');}
+function addNearby(){const ids=new Set(mdPlan.flat().filter(stop=>!stop?.isBreak).map(stop=>stop.id));const c=LOCS.filter(l=>!ids.has(l.id));if(cLat)c.sort((a,b)=>hvKm(cLat,cLon,a.coords[0],a.coords[1])-hvKm(cLat,cLon,b.coords[0],b.coords[1]));if(c.length){const p={...c[0],tt:0};const base=getRouteStopsForDay(itin);base.splice(tripActive&&base.length>0?1:0,0,p);itin=applyBreakPlanToCurrentItinerary(base);sync();addMsg(`📍 Added detour: <strong>${p.name}</strong>`);renderRoute();}else addMsg('No more places!');}
 
 // ── Save / Share ──────────────────────────────────────────────────────────────
 
 // ── Save / Load plans (localStorage + optional cloud via /api/trips) ─────────
-const LOCAL_PLANS_KEY = 'india_in_time_saved_plans_v1';
+function _readLocalPlans() { return _readLocalPlansMod(); }
+function _writeLocalPlans(list) { return _writeLocalPlansMod(list); }
 
-function _readLocalPlans() {
-  try {
-    const raw = localStorage.getItem(LOCAL_PLANS_KEY);
-    const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list : [];
-  } catch (_e) {
-    return [];
-  }
-}
-
-function _writeLocalPlans(list) {
-  try {
-    localStorage.setItem(LOCAL_PLANS_KEY, JSON.stringify(list.slice(0, 40)));
-  } catch (_e) { /* quota / private mode */ }
-}
-
-function _serializeCurrentPlan() {
-  const st = document.getElementById('s-time')?.value || '09:00';
-  const et = document.getElementById('e-time')?.value || '';
-  const tm = (typeof getTripMinutes === 'function') ? getTripMinutes() : 0;
-  return {
-    id: 'local-' + Date.now(),
-    city: currentCityName || currentCityId || 'Unknown',
-    cityLat: (typeof cLat === 'number' ? cLat : null),
-    cityLon: (typeof cLon === 'number' ? cLon : null),
-    st, et, tm,
-    data: JSON.stringify(mdPlan || []),
-    savedAt: new Date().toISOString(),
-  };
-}
-
-async function saveIt() {
-  if (!mdPlan || !mdPlan.length) {
-    addMsg('Generate a plan first, then save it.');
-    return;
-  }
-  const payload = _serializeCurrentPlan();
-
-  // Always keep a local copy so offline / unsigned users still have it
-  const local = _readLocalPlans();
-  local.unshift(payload);
-  _writeLocalPlans(local);
-
-  // Cloud save when signed in + API available
-  if (typeof currentUser !== 'undefined' && currentUser && window.API?.saveTrip) {
-    try {
-      const stops = (mdPlan || []).flat().filter(Boolean).map(s => ({
-        id: s.id, name: s.name, cat: s.cat, coords: s.coords,
-        sts: s.sts, ets: s.ets, vt: s.vt, tt: s.tt,
-      }));
-      const tripConfig = {
-        startTime: payload.st,
-        endTime: payload.et,
-        tripMinutes: payload.tm,
-        multiDay: mdPlan,
-      };
-      const res = await window.API.saveTrip(
-        payload.city,
-        payload.cityLat,
-        payload.cityLon,
-        tripConfig,
-        stops
-      );
-      addMsg(`☁️ Saved to cloud${res?.id ? ` (id: ${String(res.id).slice(0, 8)}…)` : ''}. Also kept on this device.`);
-      return;
-    } catch (err) {
-      console.warn('[saveIt] cloud save failed, local copy kept', err);
-      addMsg('💾 Saved on this device. Sign in again to sync to the cloud.');
-      return;
-    }
-  }
-
-  addMsg('💾 Plan saved on this device. Sign in with Google to sync to the cloud.');
+function saveIt() {
+  return _savePlanMod({
+    mdPlan, currentCityName, currentCityId, cLat, cLon,
+    getTripMinutes, currentUser, API, addMsg
+  });
 }
 
 function delPlan(id) {
-  if (!id) return;
-  // Local delete
-  if (String(id).startsWith('local-') || true) {
-    const next = _readLocalPlans().filter(p => p.id !== id);
-    _writeLocalPlans(next);
-  }
-  // Cloud delete when possible
-  if (window.API?.deleteTrip && currentUser && !String(id).startsWith('local-')) {
-    window.API.deleteTrip(id).catch(err => console.warn('[delPlan]', err));
-  }
-  // Refresh list if panel is open
-  const list = document.getElementById('plan-list');
-  if (list && list.dataset.mode === 'saved') {
-    renderSavedPlansList();
-  } else {
-    addMsg('🗑️ Plan deleted.');
-  }
+  return _deletePlanMod(id, {
+    currentUser, API, renderSavedPlansList, addMsg
+  });
 }
 
 function renderSavedPlansList() {
-  const list = document.getElementById('plan-list');
-  if (!list) return;
-  list.dataset.mode = 'saved';
-  const local = _readLocalPlans();
-
-  const renderItems = (items, sourceLabel) => {
-    if (!items.length) return '';
-    return items.map(p => {
-      const when = p.savedAt ? new Date(p.savedAt).toLocaleString() : '';
-      const stops = (() => {
-        try {
-          const d = typeof p.data === 'string' ? JSON.parse(p.data) : (p.stops || p.multiDay || []);
-          const flat = Array.isArray(d?.[0]) ? d.flat() : d;
-          return Array.isArray(flat) ? flat.length : 0;
-        } catch { return p.stopsCount || 0; }
-      })();
-      const encoded = encodeURIComponent(JSON.stringify({
-        data: typeof p.data === 'string' ? p.data : JSON.stringify(p.multiDay || p.stops || []),
-        st: p.st || p.config?.startTime || '09:00',
-        et: p.et || p.config?.endTime || '',
-        tm: p.tm || p.config?.tripMinutes || 0,
-      }));
-      return `<div class="saved-plan-card" style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)">
-        <div style="min-width:0">
-          <div style="font-weight:600;font-size:13px">${escapeHtml?.(p.city || 'Trip') || (p.city || 'Trip')}</div>
-          <div style="font-size:11px;opacity:.7">${stops} stops${when ? ' · ' + when : ''} · ${sourceLabel}</div>
-        </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="itn-btn itnb-green" data-action="loadPlan" data-plan="${encoded}" style="padding:6px 10px;font-size:12px">Load</button>
-          <button class="itn-btn" data-action="delPlan" data-id="${p.id}" style="padding:6px 10px;font-size:12px">🗑️</button>
-        </div>
-      </div>`;
-    }).join('');
-  };
-
-  let html = '<div class="sec-label" style="padding:8px 0">Saved plans</div>';
-  html += renderItems(local, 'this device') || '<div class="empty-state"><div class="empty-icon">🗺️</div><p class="empty-txt">No local plans yet. Generate one and tap Save.</p></div>';
-
-  list.innerHTML = html;
-
-  // Optionally append cloud trips
-  if (currentUser && window.API?.listTrips) {
-    window.API.listTrips().then(res => {
-      const trips = res?.trips || res || [];
-      if (!Array.isArray(trips) || !trips.length) return;
-      const cloudItems = trips.map(t => ({
-        id: t.id,
-        city: t.city,
-        savedAt: t.createdAt,
-        stopsCount: t.stopsCount,
-        data: '[]',
-        st: '09:00',
-        cloud: true,
-      }));
-      // For cloud trips we need full payload — fetch on Load instead
-      const cloudHtml = trips.map(t => {
-        const when = t.createdAt ? new Date(t.createdAt).toLocaleString() : '';
-        return `<div class="saved-plan-card" style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:12px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.15)">
-          <div style="min-width:0">
-            <div style="font-weight:600;font-size:13px">${(t.city || 'Trip')}</div>
-            <div style="font-size:11px;opacity:.7">${t.stopsCount || '?'} stops${when ? ' · ' + when : ''} · cloud</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0">
-            <button class="itn-btn itnb-green" data-action="loadCloudPlan" data-id="${t.id}" style="padding:6px 10px;font-size:12px">Load</button>
-            <button class="itn-btn" data-action="delPlan" data-id="${t.id}" style="padding:6px 10px;font-size:12px">🗑️</button>
-          </div>
-        </div>`;
-      }).join('');
-      list.insertAdjacentHTML('beforeend', '<div class="sec-label" style="padding:12px 0 4px">Cloud</div>' + cloudHtml);
-    }).catch(() => {});
-  }
+  return _renderSavedPlansListUIMod({
+    currentUser, API, escapeHtml
+  });
 }
 
 async function loadCloudPlan(btn) {
@@ -2526,21 +2353,19 @@ async function loadCloudPlan(btn) {
 function toggleLoadPanel() {
   const list = document.getElementById('plan-list');
   if (!list) return;
-  // If already showing saved list, restore the empty/ready state; else show saved
   if (list.dataset.mode === 'saved') {
     list.dataset.mode = '';
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">🗺️</div><p class="empty-txt">Ready! Shape the experience and generate a polished plan.</p></div>`;
     return;
   }
   renderSavedPlansList();
-  // Scroll plan list into view
   list.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
 }
 
-function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));let l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-replay','btn-ls','btn-wa'].forEach(id=>document.getElementById(id).style.display='inline-flex');renderTabs();switchDay(0);updatePlannerShowcase();switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(e){addMsg('⚠️ Load failed.');}}
-function shareIt(){if(!mdPlan.length)return;let t=`🇮🇳 My ${currentCityName} Trip:\n\n`;mdPlan.forEach((d,i)=>{t+=`Day ${i+1}:\n`;d.forEach((l,j)=>t+=`${j+1}. ${l.name} (${l.sts||'--'}–${l.ets||'--'})\n`);});t+='\nIndia In-Time 🚀';if(navigator.share)navigator.share({title:`${currentCityName} Trip`,text:t}).catch(()=>{});else navigator.clipboard?.writeText(t).then(()=>addMsg('📋 Copied!'));}
-function waShare(){if(!mdPlan.length){addMsg('Generate a plan first!');return;}let t=`🇮🇳 *My ${currentCityName} Trip*\n\n`;const icons={beach:'🏖️',temple:'🛕',food:'🍛',scenic:'⛰️'};mdPlan.forEach((d,i)=>{if(mdPlan.length>1)t+=`*Day ${i+1}*\n`;d.forEach(l=>t+=`${icons[l.cat]||'📍'} *${l.name}* — ${l.sts||'--'}–${l.ets||'--'}\n`);t+='\n';});window.open(`https://wa.me/?text=${encodeURIComponent(t)}`,'_blank');}
-function shareEmergency(){if(!cLat||!cLon){alert('GPS not available.');return;}const t=`🚨 EMERGENCY: https://maps.google.com/?q=${cLat},${cLon}`;if(navigator.share)navigator.share({title:'Emergency',text:t}).catch(()=>navigator.clipboard?.writeText(t));else navigator.clipboard?.writeText(t);}
+function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));const l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-replay','btn-ls','btn-wa'].forEach(id=>document.getElementById(id).style.display='inline-flex');renderTabs();switchDay(0);updatePlannerShowcase();switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(_e){addMsg('⚠️ Load failed.');}}
+function shareIt(){ return _shareTripTextMod(mdPlan, currentCityName, { addMsg }); }
+function waShare(){ return _shareTripWhatsAppMod(mdPlan, currentCityName, { addMsg }); }
+function shareEmergency(){ return _shareTripEmergencyMod(cLat, cLon); }
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
 // ── Compass button ───────────────────────────────────────────────────────────
@@ -2625,7 +2450,7 @@ async function chkArrival(){
   if(!n)return;
   if(map.distance([cLat,cLon],n.coords)<100){
     if(!stamps.has(n.id)){stamps.add(n.id);addMsg(`🏆 Passport stamp: <strong>${n.name}</strong>!`);
-      if(currentUser){try{await setDoc(doc(db,'users',currentUser.uid,'data','stamps'),{stamps:[...stamps],updatedAt:serverTimestamp()});}catch(e){}}}
+      if(currentUser){try{await setDoc(doc(db,'users',currentUser.uid,'data','stamps'),{stamps:[...stamps],updatedAt:serverTimestamp()});}catch(_e){}}}
     if(streetQuestActive){streetQuestScore+=25;setStreetQuestMessage(`Checkpoint reached: ${n.name}. New target loading...`);updateStreetQuestUI();}
     maybeSpeakNavInstruction(`Arrived at ${n.name}.`,true);
     addMsg(`🎉 Arrived at <strong>${n.name}</strong>!`);
@@ -2647,7 +2472,7 @@ window.addEventListener('beforeinstallprompt', e => {
 function installPWA() {
   if (dPr) {
     dPr.prompt();
-    dPr.userChoice.then((choiceResult) => {
+    dPr.userChoice.then(() => {
       dPr = null;
       document.getElementById('install-app-btn').style.display = 'none';
       if (typeof toggleUserMenu === 'function') toggleUserMenu();
@@ -2661,230 +2486,63 @@ window.addEventListener('offline',()=>{const t=document.getElementById('off-toas
 window.addEventListener('online',()=>addMsg('📶 Back online!'));
 
 // ═══════════════════════════════════════
-// NEW FEATURE 1 — VOICE ASSISTANT
+// VOICE ASSISTANT & MEDIA TOOLS
 // ═══════════════════════════════════════
-let isListening = false;
-let recognition = null;
-
 function startVoiceInput() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { addMsg('⚠️ Voice input not supported in this browser. Try Chrome!'); return; }
+  return _startVoiceInputMod({
+    currentCityName, itin, voiceOn, API, switchToView,
+    addMsg, addTypingIndicator, formatAiText, escapeHtml, showToast, speak
+  });
+}
 
-  if (isListening) { recognition?.stop(); return; }
+function handleCaption(event) {
+  return _handleCaptionMod(event, {
+    currentCityName, itin, API, switchToView, addMsg, addTypingIndicator, formatAiText
+  });
+}
 
-  recognition = new SpeechRecognition();
-  recognition.lang = 'en-IN';
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  const btn = document.getElementById('btn-voice-input');
-
-  recognition.onstart = () => {
-    isListening = true;
-    btn.textContent = '🔴 Listening...';
-    btn.style.color = '#fca5a5';
-    btn.style.borderColor = 'rgba(239,68,68,.4)';
-    showToast('🎤', 'Listening...', 'Speak your question now!', 3000);
-  };
-
-  recognition.onresult = async (event) => {
-    const transcript = event.results[0][0].transcript;
-    switchToView('chat-view', 2);
-    addMsg(escapeHtml(transcript), false);
-    const typing = addTypingIndicator();
-
-    try {
-      // Use voice-optimised endpoint for shorter spoken responses
-      const text = await API.aiVoiceChat(transcript, currentCityName, itin.map(i => i.name), '');
-      typing.remove();
-      const cleaned = text ? escapeHtml(text).replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').replace(/\n/g, ' ') : null;
-      if (cleaned) {
-        addMsg(cleaned);
-        // Auto speak the response if voice output is on
-        if (voiceOn) speak(cleaned);
-      }
-    } catch { typing.remove(); addMsg('Sorry, I could not process that. Please try again!'); }
-  };
-
-  recognition.onerror = (e) => { addMsg(`🎤 Voice error: ${e.error}. Try again!`); };
-
-  recognition.onend = () => {
-    isListening = false;
-    btn.textContent = '🎤 Speak';
-    btn.style.color = 'var(--purple)';
-    btn.style.borderColor = 'rgba(167,139,250,.25)';
-  };
-
-  recognition.start();
+function handleTranslate(event) {
+  return _handleTranslateMod(event, {
+    currentCityName, API, switchToView, addMsg, addTypingIndicator, formatAiText
+  });
 }
 
 // ═══════════════════════════════════════
-// NEW FEATURE 2 — AI PHOTO CAPTIONS
+// FEEDBACK & RATINGS
 // ═══════════════════════════════════════
-async function handleCaption(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async ev => {
-    switchToView('chat-view', 2);
-    const src = ev.target.result;
-    addMsg(`📸 <strong>Generating captions for your photo...</strong><br><img src="${src}" style="width:100%;max-height:200px;object-fit:contain;border-radius:10px;margin-top:6px">`);
-    const [, meta, b64] = src.match(/^data:([^;]+);base64,(.+)$/);
-    const stopName = itin[0]?.name || currentCityName;
-    const typing = addTypingIndicator();
-    try {
-      const text = await API.aiCaption(b64, meta, currentCityName, stopName);
-      typing.remove();
-      if (text) {
-        addMsg(`✨ <strong>Instagram Captions for ${stopName}</strong><br><br>${formatAiText(text)}`);
-      }
-    } catch { typing.remove(); addMsg('⚠️ Could not generate captions. Try again!'); }
-  };
-  reader.readAsDataURL(file);
+function promptStopFeedback(place) {
+  return _promptStopFeedbackMod(place, { escapeHtml, addMsg });
 }
 
-// ═══════════════════════════════════════
-// NEW FEATURE 3 — TRANSLATE SIGN / MENU
-// ═══════════════════════════════════════
-async function handleTranslate(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async ev => {
-    switchToView('chat-view', 2);
-    const src = ev.target.result;
-    addMsg(`🌐 <strong>Translating...</strong><br><img src="${src}" style="width:100%;max-height:180px;object-fit:contain;border-radius:10px;margin-top:6px">`);
-    const [, meta, b64] = src.match(/^data:([^;]+);base64,(.+)$/);
-    const typing = addTypingIndicator();
-    try {
-      const text = await API.aiTranslate(b64, meta, currentCityName);
-      typing.remove();
-      if (text) addMsg(formatAiText(text));
-    } catch { typing.remove(); addMsg('⚠️ Could not translate. Try a clearer photo with visible text!'); }
-  };
-  reader.readAsDataURL(file);
-}
-
-// …
-
-function promptStopFeedback(place){
-  if(!place?.id || !place?.name) return;
-  addMsg(`⭐ How was <strong>${escapeHtml(place.name)}</strong>?<br><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap" data-role="place-fb" data-place-id="${escapeHtml(String(place.id))}" data-place-name="${escapeHtml(place.name)}">` +
-    [1,2,3,4,5].map(n=>`<button type="button" data-action="rateStopClick" data-n="${n}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:7px 11px;font-size:14px;cursor:pointer">${'⭐'.repeat(n)}</button>`).join('') +
-    `</div>`);
-}
-
-function rateStopClick(btn){
+function rateStopClick(btn) {
   const row = btn.closest('[data-role="place-fb"]');
-  if(!row) return;
+  if (!row) return;
   const placeId = row.dataset.placeId;
   const placeName = row.dataset.placeName;
   const rating = parseInt(btn.dataset.n, 10);
   rateStop(placeId, placeName, rating, row);
 }
 
-async function rateStop(placeId, placeName, rating, row){
-  row = row || document.querySelector(`[data-role="place-fb"][data-place-id="${CSS.escape(String(placeId))}"]`);
-  if(row) row.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Thanks for rating ${escapeHtml(placeName)} — ${'⭐'.repeat(rating)}</div>`;
-  try{
-    await API.submitPlaceFeedback(placeName, currentCityName, rating);
-    showToast('⭐','Thanks for rating it!','Real feedback like this shapes future recommendations.',3000);
-  }catch(e){ browserLogger.error('rateStop error', e); }
-}
-
-const APP_FEEDBACK_CATS = [['love_it','Loving it 😍'],['bug','Found a bug 🐛'],['feature_request','Missing something 💡'],['confusing','Confusing 🤔'],['general','Just general 💭']];
-
-function showAppFeedback(){
-  switchToView('chat-view', 2);
-  // Register handlers every time (safe; Object.assign overwrites) in case module
-  // init order left CHAT_ACTIONS empty under some bundlers.
-  if (typeof registerChatActions === 'function') registerChatActions();
-  addMsg(`💬 <strong>How's India In-Time working for you?</strong><br>Your honest take — good or bad — genuinely shapes what we build next.` +
-    `<div class="fb-card" data-role="fb-card" data-rating="0" data-cat="" style="margin-top:10px">` +
-      `<div data-role="fb-stars" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">` +
-        [1,2,3,4,5].map(n=>`<button type="button" data-action="fbSetStar" data-n="${n}" aria-label="Rate ${n} star${n>1?'s':''}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px 12px;font-size:16px;cursor:pointer;line-height:1;pointer-events:auto">☆</button>`).join('') +
-      `</div>` +
-      `<div data-role="fb-tags" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">` +
-        APP_FEEDBACK_CATS.map(([v,l])=>`<button type="button" data-action="fbSetCat" data-cat="${v}" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;pointer-events:auto">${l}</button>`).join('') +
-      `</div>` +
-      `<div data-role="fb-comment-wrap" style="display:block;margin-top:10px">` +
-        `<textarea data-role="fb-comment" maxlength="2000" rows="2" placeholder="Anything specific? Totally optional." style="width:100%;box-sizing:border-box;background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:8px;font:inherit;color:inherit;resize:vertical"></textarea>` +
-        `<div data-role="fb-counter" style="font-size:10px;color:var(--text-muted);text-align:right;margin-top:2px">0/2000</div>` +
-      `</div>` +
-      `<div data-role="fb-actions" style="display:flex;gap:8px;margin-top:8px">` +
-        `<button type="button" data-action="fbSubmit" style="background:var(--ocean-glow);border:1px solid var(--border-mid);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--ocean);cursor:pointer;pointer-events:auto">Send feedback</button>` +
-        `<button type="button" data-action="fbSkip" style="background:transparent;border:1px solid var(--border-default);border-radius:8px;padding:7px 14px;font-size:12px;color:var(--text-muted);cursor:pointer;pointer-events:auto">Not now</button>` +
-      `</div>` +
-    `</div>`);
-}
-
-function fbSetStar(btn){
-  const card = btn.closest('[data-role="fb-card"]');
-  if(!card) return;
-  const n = parseInt(btn.dataset.n, 10);
-  card.dataset.rating = String(n);
-  card.querySelectorAll('[data-action="fbSetStar"]').forEach(s=>{
-    const sn = parseInt(s.dataset.n, 10);
-    s.textContent = sn <= n ? '★' : '☆';
-  });
-  const tags = card.querySelector('[data-role="fb-tags"]');
-  const commentWrap = card.querySelector('[data-role="fb-comment-wrap"]');
-  const actions = card.querySelector('[data-role="fb-actions"]');
-  if(tags) tags.style.display = 'flex';
-  if(commentWrap) commentWrap.style.display = 'block';
-  if(actions) actions.style.display = 'flex';
-}
-
-function fbSetCat(btn){
-  const card = btn.closest('[data-role="fb-card"]');
-  if(!card) return;
-  const cat = btn.dataset.cat;
-  const already = card.dataset.cat === cat;
-  card.dataset.cat = already ? '' : cat;
-  card.querySelectorAll('[data-action="fbSetCat"]').forEach(t=>{
-    const on = !already && t.dataset.cat === cat;
-    t.style.background = on ? 'var(--ocean-glow)' : 'var(--bg-glass)';
-    t.style.borderColor = on ? 'var(--ocean)' : 'var(--border-default)';
+function rateStop(placeId, placeName, rating, row) {
+  return _rateStopMod(placeId, placeName, rating, row, {
+    escapeHtml, API, currentCityName, showToast, browserLogger
   });
 }
 
-function updateFbCounter(el){
-  const card = el.closest('[data-role="fb-card"]');
-  if(!card) return;
-  const counter = card.querySelector('[data-role="fb-counter"]');
-  if(counter) counter.textContent = `${el.value.length}/2000`;
+function showAppFeedback() {
+  return _showAppFeedbackMod({
+    switchToView, registerChatActions, addMsg
+  });
 }
 
-function fbSkip(btn){
-  const card = btn.closest('[data-role="fb-card"]');
-  if(!card) return;
-  card.outerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">No worries — you can always tap "App Feedback" again later 👋</div>`;
-}
-
-async function fbSubmit(btn){
-  const card = btn.closest('[data-role="fb-card"]');
-  if(!card) return;
-  const rating = parseInt(card.dataset.rating, 10) || 0;
-  if(!rating){
-    if (typeof showToast === 'function') showToast('⭐','Pick a star rating','Tap 1–5 stars above, then send.',2500);
-    else alert('Please pick a star rating (1–5) before sending.');
-    return;
-  }
-  const cat = card.dataset.cat || 'general';
-  const commentEl = card.querySelector('[data-role="fb-comment"]');
-  const message = commentEl ? commentEl.value.trim() : '';
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  try{
-    const activeViewId = viewIds && viewIds.find(v => document.getElementById(v)?.classList.contains('active'));
-    await API.submitAppFeedback(rating, cat, message || null, activeViewId || currentCityId || null);
-    card.outerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">🙏 <strong>Thank you</strong> — feedback like this is exactly what helps us build the right things next.</div>`;
-    showToast('💬','Feedback sent','Thanks for helping us improve India In-Time!',3500);
-  }catch(e){
-    btn.disabled = false;
-    btn.textContent = 'Send feedback';
-    addMsg('⚠️ Could not send feedback right now — please try again in a moment.');
-  }
+function fbSetStar(btn) { return _fbSetStarMod(btn); }
+function fbSetCat(btn) { return _fbSetCatMod(btn); }
+function updateFbCounter(el) { return _updateFbCounterMod(el); }
+function fbSkip(btn) { return _fbSkipMod(btn); }
+function fbSubmit(btn) {
+  return _fbSubmitMod(btn, {
+    API, currentCityId, showToast, addMsg, viewIds
+  });
 }
 
 async function showTripRating() {
@@ -2901,7 +2559,6 @@ async function showTripRating() {
 
   const totalMin = mdPlan.flat().reduce((s, l) => s + l.vt + (l.tt || 0), 0);
   const duration = fmtM(totalMin);
-  const expTotal = expenses.reduce((s, e) => s + e.c, 0);
 
   try {
     const text = await API.aiTripRating(currentCityName, visitedStops.length ? visitedStops : allStops, duration, expenses, [...stamps]);
@@ -3273,8 +2930,7 @@ async function showTripTribe() {
 }
 
 // ── Back Navigation (minimal) ────────────────────────────────────────────────
-let navHistory = [];
-let currentToolsPage = 'home';
+const navHistory = [];
 
 function goBack() {
   if (navHistory.length === 0) { switchToView('plan-view',1); return; }
@@ -3297,13 +2953,14 @@ function updateToolsTitle(title) {
   if (el) el.textContent = title;
 }
 
+let _currentToolsPage = 'home';
 function _trackNavHistory(viewId) {
   const currentActive = document.querySelector('.view.active')?.id;
   if (currentActive && currentActive !== viewId) {
     navHistory.push({ viewId: currentActive, idx: ['map-view','plan-view','chat-view','tools-view'].indexOf(currentActive) });
     if (navHistory.length > 10) navHistory.shift();
   }
-  if(viewId==='tools-view') { renderToolsHome(); currentToolsPage='home'; updateToolsTitle('Tools'); }
+  if(viewId==='tools-view') { renderToolsHome(); _currentToolsPage='home'; updateToolsTitle('Tools'); }
   updateBackButton(viewId);
 }
 
@@ -3314,6 +2971,7 @@ window.history.pushState({ page: 'home' }, '', window.location.href);
 window.customSelectedPlaces = null;
 
 async function openCustomizeModal() {
+  const trigger = document.activeElement;
   const cityId = document.getElementById('city-select')?.value || currentCityId;
   const city = CITIES[cityId];
   if (!city) {
@@ -3340,7 +2998,7 @@ async function openCustomizeModal() {
   const listEl = document.getElementById('customize-places-list');
   listEl.innerHTML = '';
 
-  let availableToSelect = LOCS; // ALL PLACES, completely bypassing the 'prefs' experience filters
+  const availableToSelect = LOCS; // ALL PLACES, completely bypassing the 'prefs' experience filters
 
   availableToSelect.forEach(loc => {
     const isSelected = window.customSelectedPlaces ? window.customSelectedPlaces.includes(loc.id) : true;
@@ -3361,11 +3019,11 @@ async function openCustomizeModal() {
     listEl.appendChild(item);
   });
 
-  document.getElementById('customize-modal').style.display = 'flex';
+  openModal('customize-modal', trigger);
 }
 
 function closeCustomizeModal() {
-  document.getElementById('customize-modal').style.display = 'none';
+  closeModal('customize-modal');
 }
 
 function selectAllCustomPlaces(state) {
@@ -3447,7 +3105,7 @@ window.onload=()=>{
         // most failures are transient (momentary throttling), not permanent.
         const tile = e.tile;
         const originalSrc = e.tile.src;
-        let attempts = tile._iitRetryCount || 0;
+        const attempts = tile._iitRetryCount || 0;
         if(attempts < 3){
           tile._iitRetryCount = attempts + 1;
           setTimeout(()=>{ try{ tile.src = originalSrc; }catch(_e){} }, 800 * (attempts + 1));

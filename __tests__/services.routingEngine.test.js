@@ -126,7 +126,7 @@ describe('routingEngine', () => {
       for (let i = 0; i < 502; i++) {
         const from = [28 + i * 0.0001, 77];
         const to = [29 + i * 0.0001, 78];
-        // eslint-disable-next-line no-await-in-loop
+         
         await routingEngine.fetchOsrmRoute(from, to);
       }
       // The very first pair should now have been evicted, so requesting it

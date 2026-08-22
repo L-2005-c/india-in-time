@@ -73,9 +73,18 @@ function requestOnce(port) {
   });
 }
 
+function createRedisClient(url) {
+  const isTls = String(url).startsWith('rediss://');
+  return new Redis(url, {
+    tls: isTls ? { rejectUnauthorized: process.env.NODE_ENV === 'production' } : undefined,
+    maxRetriesPerRequest: 3,
+    connectTimeout: 8000,
+  });
+}
+
 async function main() {
   log(`Connecting to Redis at ${REDIS_URL} to clear stale test keys...`);
-  const redis = new Redis(REDIS_URL);
+  const redis = createRedisClient(REDIS_URL);
   await redis.ping();
   const staleKeys = await redis.keys('rl:general:*');
   if (staleKeys.length) await redis.del(...staleKeys);

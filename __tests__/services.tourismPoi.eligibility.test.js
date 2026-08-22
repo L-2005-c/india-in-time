@@ -10,9 +10,7 @@
 const {
   evaluateCandidate,
   filterEligibleCandidates,
-  isTourismEligible,
   isLocalityOnlyName,
-  isBlacklistedEntity,
   classifyTourismCategory,
   computeTourismQualityScore,
   resolveWhitelist,

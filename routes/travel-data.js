@@ -4,7 +4,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { getActiveFestivals, festivalCrowdMultiplier } = require('../services/travelIntelligence/festivalEngine');
-const { lookupHistoricalCrowd, attachHistoricalCrowdBatch } = require('../services/travelIntelligence/historicalCrowdStore');
+const { lookupHistoricalCrowd } = require('../services/travelIntelligence/historicalCrowdStore');
 const { requireAdminAuth } = require('../middleware/adminAuth');
 
 const FESTIVAL_PATH = path.join(__dirname, '..', 'data', 'india-festivals.json');
@@ -26,7 +26,7 @@ router.get('/festivals', (req, res) => {
       catalogCount: (raw.festivals || []).length,
       source: 'calendar',
     });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to load festivals' });
   }
 });
@@ -46,7 +46,7 @@ router.get('/historical-crowd', (req, res) => {
       byCategoryCityCount: Object.keys(raw.byCategoryCity || {}).length,
       source: 'historical-json',
     });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to load historical crowd data' });
   }
 });
@@ -65,7 +65,7 @@ router.put('/festivals', requireAdminAuth, (req, res) => {
       delete require.cache[require.resolve('../services/travelIntelligence/festivalEngine')];
     } catch (_e) { /* ignore */ }
     res.json({ ok: true, count: body.festivals.length });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to update festivals' });
   }
 });
@@ -82,7 +82,7 @@ router.put('/historical-crowd', requireAdminAuth, (req, res) => {
       delete require.cache[require.resolve('../services/travelIntelligence/historicalCrowdStore')];
     } catch (_e) { /* ignore */ }
     res.json({ ok: true });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to update historical crowd data' });
   }
 });

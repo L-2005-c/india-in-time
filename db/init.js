@@ -42,6 +42,10 @@ let pool = null;
  * Creates tables if they don't exist.
  */
 async function initDatabase() {
+  if (process.env.SKIP_DB_INIT === 'true') {
+    appLogger.warn('[db] SKIP_DB_INIT=true; skipping database initialization for local test/smoke environment.');
+    return null;
+  }
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL environment variable is missing.');
   }

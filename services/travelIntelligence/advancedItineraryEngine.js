@@ -21,13 +21,10 @@ const {
   candidateMatchesHardRequirements,
   isExcludedCategory,
   normalizeCat,
-  normalizeMeal,
-  placeCost,
   isFoodPlace,
 } = require('./requirementEngine');
 const {
   filterEligibleCandidates,
-  TIERS: TOURISM_TIERS,
 } = require('./tourismPoi');
 
 const MEALS = {
@@ -71,7 +68,7 @@ function minuteOf(value) {
   return t2m(value, -1);
 }
 
-function distanceKm(a, b) {
+function _distanceKm(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length < 2 || b.length < 2) return 999;
   const R = 6371;
   const rad = Math.PI / 180;
@@ -101,7 +98,7 @@ function formatReasons(intel, place, arrivalMin, requirements, travel, waitMinut
   return reasons.length ? reasons : ['Best feasible option under current requirements'];
 }
 
-function selectWeatherAt(weather, minute, baseDate) {
+function selectWeatherAt(weather, minute, _baseDate) {
   if (!weather || !Array.isArray(weather.hourly) || !weather.hourly.length) return weather || null;
   const target = minute;
   let best = null;
@@ -133,7 +130,7 @@ function selectWeatherAt(weather, minute, baseDate) {
   return selected ? { ...weather, ...selected, source: 'forecast' } : weather;
 }
 
-function dateAtMinute(baseDate, minute, startMin) {
+function dateAtMinute(baseDate, minute, _startMin) {
   const base = baseDate instanceof Date ? new Date(baseDate) : new Date();
   const formatter = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
   const parts = formatter.formatToParts(base);
@@ -169,7 +166,7 @@ function mustVisitCoverage(stops, requirements) {
   return required.filter((req) => stops.some((stop) => matchesMustVisit(stop, req)));
 }
 
-function explicitCost(place, options = {}) {
+function explicitCost(place, _options = {}) {
   const keys = ['estimatedCost', 'cost', 'price', 'entryFee', 'entry_fee', 'ticketPrice', 'ticket_price', 'admission'];
   for (const key of keys) {
     const n = Number(place?.[key]);

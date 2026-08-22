@@ -105,7 +105,7 @@ function buildWindows(points, minScore = 60) {
   }).sort((a, b) => b.score - a.score || a.dayOffset - b.dayOffset || a.startMin - b.startMin);
 }
 
-function classifyWindow(window, referenceDate) {
+function _classifyWindow(window, referenceDate) {
   if (!window) return null;
   const currentMin = toDateMinutes(referenceDate);
   if (window.dayOffset === 0 && window.endMin >= currentMin && window.startMin <= currentMin) return 'NOW';

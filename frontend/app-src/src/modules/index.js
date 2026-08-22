@@ -18,3 +18,6 @@ export * as weatherUi from '../utils/weather-ui.js';
 export * as navRoute from '../utils/nav-route.js';
 export * as cityLoad from '../utils/city-load.js';
 export * as htmlSafe from '../utils/html-safe.js';
+export * as feedback from './feedback.js';
+export * as savedPlans from './savedPlans.js';
+export * as aiMedia from './aiMedia.js';

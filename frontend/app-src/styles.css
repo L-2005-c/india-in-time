@@ -296,7 +296,7 @@ body::before {
 .nav-legend-later{background:rgba(255,255,255,.55);}
 .nav-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .nav-stat-box{background:var(--bg-glass);border:1px solid var(--border-default);border-radius:12px;padding:8px 10px;}
-.nav-stat-label{font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);}
+.nav-stat-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);}
 .nav-stat-val{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--text-primary);margin-top:2px;}
 
 /* Minimized live-nav card — collapses down to just the top badge/weather

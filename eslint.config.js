@@ -77,6 +77,13 @@ module.exports = [
         performance: 'readonly',
         Notification: 'readonly',
         SpeechSynthesisUtterance: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        HTMLButtonElement: 'readonly',
+        Element: 'readonly',
+        Node: 'readonly',
+        Event: 'readonly',
+        CustomEvent: 'readonly',
         // Never assigned anywhere in this codebase (old or new frontend) —
         // read defensively via `typeof realSunsetMin === 'number'` as a
         // placeholder for a "real" sunset time that could one day be
@@ -87,7 +94,7 @@ module.exports = [
       },
     },
     rules: {
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'no-undef': 'error',
       'prefer-const': 'warn',
     },

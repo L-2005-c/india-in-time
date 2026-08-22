@@ -15,7 +15,7 @@ function getOpeningStatusPure(loc, min) {
 function getCrowdPredictionPure(loc, min, opts = {}) {
   const daypart = min < 540 ? 'earlyMorning' : min < 720 ? 'lateMorning' : min < 960 ? 'afternoon' : min < 1080 ? 'evening' : 'night';
   const base = { earlyMorning: 0.3, lateMorning: 0.8, afternoon: 0.9, evening: 1.1, night: 0.5 }[daypart] || 0.6;
-  let s = base * (opts.isWeekend ? 1.4 : 1);
+  const s = base * (opts.isWeekend ? 1.4 : 1);
   if (s < 0.35) return 'Very Low';
   if (s < 0.6) return 'Low';
   if (s < 0.95) return 'Moderate';

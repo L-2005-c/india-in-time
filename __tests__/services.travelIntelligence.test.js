@@ -1,4 +1,4 @@
-const { getTravelIntelligence, rankPlacesForDay, buildDayPlan, dynamicAdvice, computeSunTimes } = require('../services/travelIntelligence');
+const { getTravelIntelligence, rankPlacesForDay, buildDayPlan, dynamicAdvice } = require('../services/travelIntelligence');
 const { computeCrowd } = require('../services/travelIntelligence/crowdEngine');
 const { estimateTravel, recommendArrivalWindow } = require('../services/travelIntelligence/trafficEngine');
 const { computeWeatherIntelligence } = require('../services/travelIntelligence/weatherEngine');
@@ -99,7 +99,7 @@ describe('integration', () => {
   });
 });
 
-const { festivalCrowdMultiplier, getActiveFestivals } = require('../services/travelIntelligence/festivalEngine');
+const { festivalCrowdMultiplier } = require('../services/travelIntelligence/festivalEngine');
 const { estimateTravelAsync } = require('../services/travelIntelligence/trafficEngine');
 
 describe('festivalEngine', () => {

@@ -57,7 +57,8 @@ const { initDatabase, closeDatabase } = require('./db/init');
 // ── Import middleware ────────────────────────────────────────────────────────
 const { requestLogger }   = require('./middleware/requestLogger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const { aiLimiter, placesLimiter, weatherLimiter, generalLimiter, timeIntelLimiter } = require('./middleware/rateLimiter');
+const { aiLimiter, aiUserLimiter, placesLimiter, weatherLimiter, generalLimiter, timeIntelLimiter } = require('./middleware/rateLimiter');
+const { optionalAuth } = require('./middleware/auth');
 const { validateAiRequest, validatePlacesRequest, validateTimeIntelRequest, validateWeatherRequest, validateGeocodeRequest } = require('./middleware/validator');
 const { analyticsMiddleware } = require('./routes/analytics');
 const { apiVersion } = require('./middleware/apiVersion');
@@ -149,7 +150,7 @@ app.use('/api/weather', weatherLimiter, validateWeatherRequest, weatherRoutes);
 app.use('/api/weather-alerts', weatherLimiter, validateWeatherRequest, weatherAlertRoutes);
 
 // AI (most expensive — strictest rate limiting)
-app.use('/api/ai', requireAiEnabled, aiLimiter, validateAiRequest, aiRoutes);
+app.use('/api/ai', requireAiEnabled, optionalAuth, aiLimiter, aiUserLimiter, validateAiRequest, aiRoutes);
 
 // Trips (save/load/share)
 app.use('/api/trips', generalLimiter, tripsRoutes);
@@ -250,7 +251,7 @@ app.get('/api/health/ready', requireAdminAuth, async (_req, res) => {
       await r.ping();
       checks.redis = true;
       r.disconnect();
-    } catch (e) {
+    } catch (_e) {
       checks.redis = false;
     }
   }
@@ -372,7 +373,7 @@ app.get('/api/openapi.json', (_req, res) => {
     // Minimal YAML→JSON for the subset we ship (avoid adding a YAML dep):
     // serve raw YAML with correct content-type for Swagger UI / redoc.
     res.type('text/yaml').send(yaml);
-  } catch (e) {
+  } catch (_e) {
     res.status(404).json({ error: 'OpenAPI spec not found' });
   }
 });

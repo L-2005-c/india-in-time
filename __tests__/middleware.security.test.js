@@ -34,6 +34,7 @@ describe('security middleware (CSP / helmet headers)', () => {
     expect(csp).toContain('https://www.gstatic.com');
     expect(csp).toContain('https://unpkg.com');
     expect(csp).toContain('https://cdn.jsdelivr.net');
+    expect(csp).toContain('https://cdnjs.cloudflare.com');
     expect(csp).toContain('https://fonts.googleapis.com');
     expect(csp).toContain('https://*.basemaps.cartocdn.com');
   });

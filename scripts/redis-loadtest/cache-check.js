@@ -19,11 +19,31 @@ const { LRUCache } = require('../../services/cache');
 const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 function log(msg) { console.log(`[cache-check] ${msg}`); }
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function createRedisClient(url) {
+  const isTls = String(url).startsWith('rediss://');
+  return new Redis(url, {
+    tls: isTls ? { rejectUnauthorized: process.env.NODE_ENV === 'production' } : undefined,
+    maxRetriesPerRequest: 3,
+    connectTimeout: 8000,
+  });
+}
+
+async function pollUntil(fn, timeoutMs = 5000, intervalMs = 50) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const result = await fn();
+      if (result) return result;
+    } catch (_e) {}
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
+}
 
 async function main() {
-  const redisA = new Redis(REDIS_URL);
-  const redisB = new Redis(REDIS_URL);
+  log(`Connecting to Redis at ${REDIS_URL}...`);
+  const redisA = createRedisClient(REDIS_URL);
+  const redisB = createRedisClient(REDIS_URL);
   await redisA.ping();
 
   // Clear any stale key from a previous run
@@ -35,10 +55,8 @@ async function main() {
   log('Process A writes a value...');
   cacheA.set('shared-key', { hello: 'world' }, 30000);
 
-  // set() writes through to Redis fire-and-forget — give it a moment to land
-  await sleep(300);
-
-  const rawFromRedis = await redisA.get('cache:loadtest:shared-key');
+  // set() writes through to Redis fire-and-forget — poll until landed (resilient to network/WAN latency)
+  const rawFromRedis = await pollUntil(async () => await redisA.get('cache:loadtest:shared-key'), 4000);
   if (!rawFromRedis) {
     log('❌ FAIL: value never landed in real Redis after set() — write-through is broken.');
     process.exit(1);
@@ -53,11 +71,12 @@ async function main() {
   }
   log('✅ First read on process B was a local miss, as documented (warm kicked off in the background).');
 
-  // Give the background warm a moment to complete
-  await sleep(300);
+  // Poll until background warm completes into memory
+  const secondRead = await pollUntil(() => {
+    const r = cacheB.get('shared-key');
+    return r && r.hello === 'world' ? r : null;
+  }, 4000);
 
-  log('Process B reads the key again — should now be warmed from Redis...');
-  const secondRead = cacheB.get('shared-key');
   if (!secondRead || secondRead.hello !== 'world') {
     log(`❌ FAIL: expected the warmed value {hello: 'world'}, got ${JSON.stringify(secondRead)}`);
     process.exit(1);
