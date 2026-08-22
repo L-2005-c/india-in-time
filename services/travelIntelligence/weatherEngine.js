@@ -76,4 +76,100 @@ function buildWeatherExperienceWindows(weather, place = {}) {
   };
 }
 
-module.exports = { computeWeatherIntelligence, buildWeatherExperienceWindows };
+function weatherEmoji(code) {
+  if (code <= 1)  return '☀️';
+  if (code <= 3)  return '⛅';
+  if (code <= 48) return '☁️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  return '⛈️';
+}
+
+function weatherDesc(code) {
+  if (code <= 1)  return 'Clear skies';
+  if (code <= 3)  return 'Partly cloudy';
+  if (code <= 48) return 'Overcast / foggy';
+  if (code <= 67) return 'Rain expected';
+  if (code <= 77) return 'Snow / sleet';
+  return 'Thunderstorm';
+}
+
+function getDeterministicWeather(lat, lon, now = new Date()) {
+  const month = now.getMonth();
+  const hour = now.getHours();
+  const latitude = Number(lat) || 20;
+
+  let baseTemp = 28;
+  const isMonsoon = month >= 5 && month <= 8; // Jun-Sep
+  const isWinter = month >= 11 || month <= 1;  // Dec-Feb
+  const isSummer = month >= 2 && month <= 4;   // Mar-May
+
+  if (latitude > 28) {
+    if (isWinter) baseTemp = 16;
+    else if (isSummer) baseTemp = 38;
+    else if (isMonsoon) baseTemp = 32;
+    else baseTemp = 28;
+  } else if (latitude > 20) {
+    if (isWinter) baseTemp = 24;
+    else if (isSummer) baseTemp = 35;
+    else if (isMonsoon) baseTemp = 29;
+    else baseTemp = 30;
+  } else {
+    if (isWinter) baseTemp = 26;
+    else if (isSummer) baseTemp = 33;
+    else if (isMonsoon) baseTemp = 28;
+    else baseTemp = 29;
+  }
+
+  const hourDelta = Math.sin(((hour - 8) / 24) * 2 * Math.PI) * 4;
+  const temp = Math.round(baseTemp + hourDelta);
+
+  let weathercode = 1;
+  if (isMonsoon) {
+    weathercode = (hour >= 14 && hour <= 19) ? 51 : 2;
+  } else if (isWinter && (hour <= 8 || hour >= 22)) {
+    weathercode = 45;
+  } else {
+    weathercode = 1;
+  }
+
+  const windKph = isMonsoon ? 18 : 12;
+  const hourly = [];
+  for (let i = 0; i < 24; i++) {
+    const hTime = new Date(now);
+    hTime.setHours(i, 0, 0, 0);
+    const hDelta = Math.sin(((i - 8) / 24) * 2 * Math.PI) * 4;
+    const hTemp = Math.round(baseTemp + hDelta);
+    hourly.push({
+      time: hTime.toISOString().slice(0, 16),
+      tempC: hTemp,
+      precipitationProbability: isMonsoon ? (i >= 13 && i <= 19 ? 65 : 30) : 5,
+      precipitationMm: isMonsoon ? 2 : 0,
+      humidity: isMonsoon ? 80 : 55,
+      windKph: isMonsoon ? 18 : 12,
+      uvIndex: (i >= 10 && i <= 16) ? 7 : 0,
+      cloudCover: isMonsoon ? 75 : 20,
+      visibilityM: 10000,
+      weathercode: isMonsoon ? 51 : 1,
+    });
+  }
+
+  return {
+    temp,
+    tempC: temp,
+    windKph,
+    weathercode,
+    emoji: weatherEmoji(weathercode),
+    display: `${weatherEmoji(weathercode)} ${temp}°C`,
+    forecastSource: 'seasonal_estimate',
+    hourly,
+  };
+}
+
+module.exports = {
+  computeWeatherIntelligence,
+  buildWeatherExperienceWindows,
+  getDeterministicWeather,
+  weatherEmoji,
+  weatherDesc,
+};

@@ -114,7 +114,7 @@ function buildHelmetOptions() {
       },
     },
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false, // disable COOP so Firebase OAuth popups work on mobile
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, // allow Firebase OAuth popups to communicate and close cleanly
   };
 }
 

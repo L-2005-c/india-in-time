@@ -119,15 +119,19 @@ describe('POST /api/weather-alerts — degraded upstream responses', () => {
     expect(res.body.stops[0].temp).toBe(28);
   });
 
-  test('returns 502 when the upstream itself returns a non-ok status', async () => {
+  test('returns graceful 200 fallback when upstream returns non-ok status', async () => {
     fetch.mockResolvedValue({ ok: false, status: 503 });
     const res = await request(app).post('/api/weather-alerts').send({ lat: 26.9, lon: 75.8, stops: [] });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    expect(res.body.current).toBeDefined();
+    expect(typeof res.body.current.temp).toBe('number');
   });
 
-  test('returns 500 on a network-level failure', async () => {
+  test('returns graceful 200 fallback on a network-level failure', async () => {
     fetch.mockRejectedValue(new Error('network down'));
     const res = await request(app).post('/api/weather-alerts').send({ lat: 26.9, lon: 75.8, stops: [] });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+    expect(res.body.current).toBeDefined();
+    expect(typeof res.body.current.temp).toBe('number');
   });
 });

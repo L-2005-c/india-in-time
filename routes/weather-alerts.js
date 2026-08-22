@@ -1,5 +1,4 @@
 'use strict';
-const appLogger = require('../lib/logger');
 // routes/weather-alerts.js
 // Returns detailed weather + best time to visit for each stop in the itinerary
 // POST /api/weather-alerts   { lat, lon, stops: [{name, cat, ot, ct}] }
@@ -7,25 +6,14 @@ const appLogger = require('../lib/logger');
 const express = require('express');
 const fetch   = require('node-fetch');
 const router  = express.Router();
+const appLogger = require('../lib/logger');
 const { keepAliveAgent } = require('../lib/httpAgent');
-
-function weatherEmoji(code) {
-  if (code <= 1)  return '☀️';
-  if (code <= 3)  return '⛅';
-  if (code <= 48) return '☁️';
-  if (code <= 67) return '🌧️';
-  if (code <= 77) return '❄️';
-  return '⛈️';
-}
-
-function weatherDesc(code) {
-  if (code <= 1)  return 'Clear skies';
-  if (code <= 3)  return 'Partly cloudy';
-  if (code <= 48) return 'Overcast / foggy';
-  if (code <= 67) return 'Rain expected';
-  if (code <= 77) return 'Snow / sleet';
-  return 'Thunderstorm';
-}
+const { weatherCache } = require('../services/cache');
+const {
+  getDeterministicWeather,
+  weatherEmoji,
+  weatherDesc,
+} = require('../services/travelIntelligence/weatherEngine');
 
 function alertLevel(code, temp) {
   if (code >= 80) return 'danger';
@@ -42,42 +30,72 @@ function bestTimeForCat(cat, weatherCode) {
   return 'Anytime during opening hours';
 }
 
+async function fetchWeatherHourly(lat, lon) {
+  const cacheKey = `${Number(lat).toFixed(2)},${Number(lon).toFixed(2)}`;
+  const cached = weatherCache.get(cacheKey);
+  if (cached && Array.isArray(cached.hourly) && cached.hourly.length) {
+    return {
+      currentTemp: cached.tempC ?? cached.temp ?? 28,
+      currentCode: cached.weathercode ?? 1,
+      hourlyTemps: cached.hourly.map(h => h.tempC),
+      hourlyCodes: cached.hourly.map(h => h.weathercode),
+      hourlyRainProb: cached.hourly.map(h => h.precipitationProbability),
+    };
+  }
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode,precipitation_probability&current_weather=true&forecast_days=1`;
+    const upstream = await fetch(url, { signal: AbortSignal.timeout(6000), agent: keepAliveAgent });
+    if (upstream.ok) {
+      const data = await upstream.json();
+      const cw = data.current_weather || {};
+      const hourly = data.hourly || {};
+      return {
+        currentTemp: Math.round(cw.temperature ?? 28),
+        currentCode: cw.weathercode ?? 1,
+        hourlyTemps: Array.isArray(hourly.temperature_2m) ? hourly.temperature_2m.map(t => Math.round(t)) : [],
+        hourlyCodes: Array.isArray(hourly.weathercode) ? hourly.weathercode : [],
+        hourlyRainProb: Array.isArray(hourly.precipitation_probability) ? hourly.precipitation_probability : [],
+      };
+    }
+  } catch (err) {
+    appLogger.warn('[weather-alerts] Open-Meteo failed, using fallback:', err.message);
+  }
+
+  const fallback = getDeterministicWeather(lat, lon);
+  return {
+    currentTemp: fallback.tempC,
+    currentCode: fallback.weathercode,
+    hourlyTemps: fallback.hourly.map(h => h.tempC),
+    hourlyCodes: fallback.hourly.map(h => h.weathercode),
+    hourlyRainProb: fallback.hourly.map(h => h.precipitationProbability),
+  };
+}
+
 router.post('/', async (req, res) => {
   const { lat, lon } = req.body;
-  // Cap + shape-check stops: unbounded, unvalidated arrays here let a
-  // single request force arbitrarily large work (unlike routes/ai.js,
-  // which runs every array through sanitizeStringArray/sanitizeObjectArray).
   const stops = Array.isArray(req.body.stops)
     ? req.body.stops.slice(0, 50).filter(s => s && typeof s === 'object')
     : [];
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat/lon' });
 
+  const numLat = parseFloat(lat);
+  const numLon = parseFloat(lon);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLon)) {
+    return res.status(400).json({ error: 'Invalid lat/lon coordinates' });
+  }
+
   try {
-    // Fetch hourly forecast for today
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode,precipitation_probability&current_weather=true&forecast_days=1`;
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(8000), agent: keepAliveAgent });
-    if (!upstream.ok) return res.status(502).json({ error: 'Weather upstream error' });
+    const weather = await fetchWeatherHourly(numLat, numLon);
+    const { currentTemp, currentCode, hourlyTemps, hourlyCodes, hourlyRainProb } = weather;
 
-    const data = await upstream.json();
-    const cw   = data.current_weather;
-    // Guarded: every other upstream call in this app defensively handles a
-    // malformed/partial response — this one previously assumed `hourly`
-    // would always be present and would throw a 500 if it wasn't.
-    const hourly = data.hourly || {};
-    if (!cw) return res.status(502).json({ error: 'No weather data in response' });
-
-    const currentTemp = Math.round(cw.temperature);
-    const currentCode = cw.weathercode;
-
-    // Build per-stop alerts
     const stopAlerts = stops.map(stop => {
-      // Parse opening hour to get the forecast at that time
-      const openHour = parseInt((stop.ot || '09:00').split(':')[0]);
-      const hourIdx  = Math.min(openHour, (hourly.temperature_2m?.length || 1) - 1);
+      const openHour = parseInt((stop.ot || '09:00').split(':')[0]) || 9;
+      const hourIdx  = Math.min(openHour, Math.max(0, hourlyTemps.length - 1));
 
-      const temp     = Math.round(hourly.temperature_2m?.[hourIdx] ?? currentTemp);
-      const code     = hourly.weathercode?.[hourIdx] ?? currentCode;
-      const rainProb = hourly.precipitation_probability?.[hourIdx] ?? 0;
+      const temp     = hourlyTemps[hourIdx] ?? currentTemp;
+      const code     = hourlyCodes[hourIdx] ?? currentCode;
+      const rainProb = hourlyRainProb[hourIdx] ?? 0;
 
       return {
         name:        stop.name,

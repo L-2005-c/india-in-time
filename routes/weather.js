@@ -1,23 +1,18 @@
 'use strict';
-const appLogger = require('../lib/logger');
 // routes/weather.js
-// Proxies Open-Meteo weather fetch (no API key needed, but we proxy for consistency).
+// Proxies Open-Meteo weather fetch with multi-tier caching and deterministic fail-open fallback.
 // GET /api/weather?lat=17.71&lon=83.32
-// Returns: { temp: number, weathercode: number, emoji: string }
+// Returns: { temp: number, weathercode: number, emoji: string, hourly: [...] }
 
 const express = require('express');
 const fetch   = require('node-fetch');
 const router  = express.Router();
+const appLogger = require('../lib/logger');
 const { keepAliveAgent } = require('../lib/httpAgent');
+const { weatherCache } = require('../services/cache');
+const { getDeterministicWeather, weatherEmoji } = require('../services/travelIntelligence/weatherEngine');
 
-function weatherEmoji(code) {
-  if (code <= 1)  return '☀️';
-  if (code <= 3)  return '⛅';
-  if (code <= 48) return '☁️';
-  return '🌧️';
-}
-
-async function fetchOpenMeteo(lat, lon, timeoutMs = 8000) {
+async function fetchOpenMeteo(lat, lon, timeoutMs = 7000) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,precipitation_probability,precipitation,relative_humidity_2m,wind_speed_10m,uv_index,cloud_cover,visibility,weather_code&forecast_days=2&timezone=Asia%2FKolkata`;
   const upstream = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), agent: keepAliveAgent });
   if (!upstream.ok) {
@@ -33,27 +28,40 @@ router.get('/', async (req, res) => {
   const { lat, lon } = req.query;
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat / lon params' });
 
+  const numLat = parseFloat(lat);
+  const numLon = parseFloat(lon);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLon)) {
+    return res.status(400).json({ error: 'Invalid lat / lon coordinates' });
+  }
+
+  const cacheKey = `${numLat.toFixed(2)},${numLon.toFixed(2)}`;
+  const cached = weatherCache.get(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+
   let data;
   try {
-    data = await fetchOpenMeteo(lat, lon);
+    data = await fetchOpenMeteo(numLat, numLon);
   } catch (firstErr) {
-    // One retry — most Open-Meteo failures on Render are a single transient
-    // blip (cold outbound connection, brief upstream hiccup), not a real outage.
     appLogger.warn('[weather] first attempt failed, retrying:', firstErr.message);
     try {
-      data = await fetchOpenMeteo(lat, lon);
+      data = await fetchOpenMeteo(numLat, numLon, 5000);
     } catch (secondErr) {
-      // Log the real reason so it's actually diagnosable in Render logs,
-      // instead of a generic "Weather upstream error" every time.
-      appLogger.error('[weather] upstream failed after retry:', secondErr.message);
-      const status = secondErr.name === 'TimeoutError' || secondErr.name === 'AbortError' ? 504 : 502;
-      return res.status(status).json({ error: 'Weather upstream error', detail: secondErr.message });
+      appLogger.warn('[weather] Open-Meteo upstream unavailable; serving deterministic seasonal fallback:', secondErr.message);
+      const fallback = getDeterministicWeather(numLat, numLon);
+      weatherCache.set(cacheKey, fallback);
+      return res.json(fallback);
     }
   }
 
   try {
     const cw = data?.current_weather;
-    if (!cw) return res.status(502).json({ error: 'No weather data in response' });
+    if (!cw) {
+      const fallback = getDeterministicWeather(numLat, numLon);
+      weatherCache.set(cacheKey, fallback);
+      return res.json(fallback);
+    }
 
     const temp = Math.round(cw.temperature);
     const windKph = Math.round(cw.windspeed || 0);
@@ -70,7 +78,8 @@ router.get('/', async (req, res) => {
       visibilityM: h.visibility?.[i] ?? null,
       weathercode: h.weather_code?.[i] ?? null,
     })) : [];
-    res.json({
+
+    const response = {
       temp,
       tempC: temp,
       windKph,
@@ -79,10 +88,13 @@ router.get('/', async (req, res) => {
       display:     `${weatherEmoji(cw.weathercode)} ${temp}°C`,
       forecastSource: 'Open-Meteo forecast',
       hourly,
-    });
+    };
+    weatherCache.set(cacheKey, response);
+    res.json(response);
   } catch (err) {
-    appLogger.error('[weather] parse error:', err.message);
-    res.status(500).json({ error: 'Weather fetch failed' });
+    appLogger.error('[weather] parse error, serving fallback:', err.message);
+    const fallback = getDeterministicWeather(numLat, numLon);
+    res.json(fallback);
   }
 });
 

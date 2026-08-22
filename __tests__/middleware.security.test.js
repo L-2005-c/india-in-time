@@ -74,9 +74,9 @@ describe('security middleware (CSP / helmet headers)', () => {
     expect(csp).not.toMatch(/https:\/\/evil\.example/);
   });
 
-  test('buildHelmetOptions() keeps crossOriginOpenerPolicy disabled for Firebase OAuth popups', () => {
+  test('buildHelmetOptions() sets crossOriginOpenerPolicy to same-origin-allow-popups for Firebase OAuth popups', () => {
     const opts = buildHelmetOptions();
-    expect(opts.crossOriginOpenerPolicy).toBe(false);
+    expect(opts.crossOriginOpenerPolicy).toEqual({ policy: 'same-origin-allow-popups' });
   });
 
   // Regression test for a real production bug: the Firebase Auth popup flow

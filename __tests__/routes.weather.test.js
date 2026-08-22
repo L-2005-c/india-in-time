@@ -7,6 +7,7 @@ const fetch = require('node-fetch');
 const express = require('express');
 const request = require('supertest');
 const weatherRouter = require('../routes/weather');
+const { weatherCache } = require('../services/cache');
 
 function buildApp() {
   const app = express();
@@ -17,6 +18,7 @@ function buildApp() {
 let app;
 beforeEach(() => {
   jest.clearAllMocks();
+  weatherCache._map.clear();
   app = buildApp();
 });
 
@@ -51,9 +53,11 @@ describe('GET /api/weather', () => {
     const cases = [
       [0, '☀️'], [3, '⛅'], [45, '☁️'], [61, '🌧️'],
     ];
-    for (const [weathercode, expectedEmoji] of cases) {
+    for (let i = 0; i < cases.length; i++) {
+      const [weathercode, expectedEmoji] = cases[i];
+      weatherCache._map.clear();
       fetch.mockResolvedValue(openMeteoResponse({ weathercode }));
-      const res = await request(app).get('/api/weather?lat=1&lon=1');
+      const res = await request(app).get(`/api/weather?lat=${i + 1}&lon=1`);
       expect(res.body.emoji).toBe(expectedEmoji);
     }
   });
@@ -68,31 +72,36 @@ describe('GET /api/weather', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  test('returns 502 after both attempts fail with a regular error', async () => {
+  test('returns graceful 200 seasonal estimate fallback when both upstream attempts fail', async () => {
     fetch.mockRejectedValue(new Error('upstream down'));
     const res = await request(app).get('/api/weather?lat=17.71&lon=83.32');
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    expect(res.body.forecastSource).toBe('seasonal_estimate');
+    expect(typeof res.body.temp).toBe('number');
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  test('returns 504 (not 502) when both attempts time out', async () => {
+  test('returns graceful 200 seasonal estimate fallback when upstream times out', async () => {
     const timeoutErr = new Error('The operation was aborted');
     timeoutErr.name = 'TimeoutError';
     fetch.mockRejectedValue(timeoutErr);
     const res = await request(app).get('/api/weather?lat=17.71&lon=83.32');
-    expect(res.status).toBe(504);
+    expect(res.status).toBe(200);
+    expect(res.body.forecastSource).toBe('seasonal_estimate');
   });
 
-  test('returns 502 (not a crash) when the upstream response has no current_weather field', async () => {
+  test('returns graceful 200 fallback when upstream response has no current_weather field', async () => {
     fetch.mockResolvedValue({ ok: true, json: async () => ({}) });
     const res = await request(app).get('/api/weather?lat=17.71&lon=83.32');
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    expect(res.body.forecastSource).toBe('seasonal_estimate');
   });
 
-  test('surfaces a non-ok upstream status as the thrown error status (triggers retry then 502)', async () => {
+  test('surfaces non-ok upstream status as trigger for retry then graceful fallback', async () => {
     fetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Internal error' });
     const res = await request(app).get('/api/weather?lat=17.71&lon=83.32');
-    expect(res.status).toBe(502);
-    expect(fetch).toHaveBeenCalledTimes(2); // both attempts consumed
+    expect(res.status).toBe(200);
+    expect(res.body.forecastSource).toBe('seasonal_estimate');
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });
