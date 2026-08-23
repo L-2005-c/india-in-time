@@ -58,11 +58,19 @@ export function filterCommands(query = '') {
   });
 }
 
+function escapeText(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /**
  * Render Command Palette list HTML
  */
 export function renderPaletteListHtml(commands = [], selectedIndex = 0) {
-  if (commands.length === 0) {
+  if (!Array.isArray(commands) || commands.length === 0) {
     return `
       <div class="palette-empty">
         <span class="palette-empty-ico">🔍</span>
@@ -77,17 +85,23 @@ export function renderPaletteListHtml(commands = [], selectedIndex = 0) {
   let currentCat = '';
 
   commands.forEach((cmd, idx) => {
+    if (!cmd) return;
     if (cmd.category !== currentCat) {
-      currentCat = cmd.category;
-      html += `<div class="palette-group-hdr">${currentCat}</div>`;
+      currentCat = cmd.category || 'General';
+      html += `<div class="palette-group-hdr">${escapeText(currentCat)}</div>`;
     }
     const isSelected = idx === selectedIndex;
+    const title = escapeText(cmd.title);
+    const subtitle = escapeText(cmd.subtitle);
+    const icon = escapeText(cmd.icon || '⚡');
+    const id = escapeText(cmd.id || `cmd-${idx}`);
+
     html += `
-      <div class="palette-item ${isSelected ? 'selected' : ''}" data-action="execPaletteCmd" data-palette-id="${cmd.id}" data-palette-idx="${idx}">
-        <span class="palette-item-icon">${cmd.icon}</span>
+      <div class="palette-item ${isSelected ? 'selected' : ''}" data-action="execPaletteCmd" data-palette-id="${id}" data-palette-idx="${idx}">
+        <span class="palette-item-icon">${icon}</span>
         <div class="palette-item-body">
-          <div class="palette-item-title">${cmd.title}</div>
-          <div class="palette-item-sub">${cmd.subtitle}</div>
+          <div class="palette-item-title">${title}</div>
+          <div class="palette-item-sub">${subtitle}</div>
         </div>
         <span class="palette-shortcut">${isSelected ? '↵ Enter' : ''}</span>
       </div>

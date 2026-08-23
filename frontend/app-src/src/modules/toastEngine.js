@@ -46,6 +46,11 @@ export function showToast(message, options = {}) {
   msgEl.className = 'toast-msg';
   msgEl.textContent = message;
 
+  if (container.children.length > 2) {
+    const oldest = container.firstChild;
+    if (oldest && oldest.remove) oldest.remove();
+  }
+
   toast.appendChild(iconEl);
   toast.appendChild(msgEl);
   container.appendChild(toast);

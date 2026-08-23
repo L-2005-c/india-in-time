@@ -130,7 +130,14 @@ export function buildOfflineTravelPassHtml(mdPlan, currentCityName, dayIdx = 0, 
         <span>🧭 Planned Timeline & Practical Armor</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
-        ${day.map((stop, i) => {
+        ${day.length === 0 ? `
+          <div style="padding:24px;text-align:center;color:var(--text-muted);background:rgba(255,255,255,0.02);border-radius:12px;border:1px dashed rgba(255,255,255,0.1);">
+            <span style="font-size:24px;display:block;margin-bottom:8px;">🗺️</span>
+            <strong>No itinerary stops generated yet for this day.</strong>
+            <div style="font-size:11px;margin-top:4px;">Generate an itinerary first to unlock your full offline travel pass and armor checklist.</div>
+          </div>
+        ` : day.map((stop, i) => {
+          if (!stop) return '';
           if (stop.isBreak) {
             return `<div style="background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.15);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text-muted);">
               ☕ <strong>${stop.sts || '--'}</strong> — Rest / Tea Break (${stop.vt || 15}m)
