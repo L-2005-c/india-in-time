@@ -1520,7 +1520,7 @@ const STATIC_ACTIONS = {
       input.dispatchEvent(new Event('change', { bubbles: true }));
     }
     document.querySelectorAll('.day-chip').forEach(c => {
-      c.classList.toggle('active', c.dataset.days == days);
+      c.classList.toggle('active', parseInt(c.dataset.days, 10) === days);
     });
   },
   setPace: (btn) => {
@@ -2534,7 +2534,7 @@ function updateItinUI(){
       ? `<div style="font-size:10.5px;color:var(--brand, #38bdf8);margin-top:4px;display:flex;align-items:center;gap:4px;">✨ <em>${escapeHtml(loc.whyThisTime[0])}</em></div>`
       : '';
 
-    const timingWindow = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
+    const advancedMeta = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
     div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${ritualHTML}${dishHTML}${armorHTML}${whyTimeNote}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View"><span>👀 360° View</span></a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="cursor:pointer"><span>🍽️ Food Guide</span></button><button data-action="chatAbout" data-name="${escapeHtml(loc.name)}" class="sc-action" title="Ask AI Concierge" style="cursor:pointer"><span>✨ Ask AI</span></button></div>`;
     list.appendChild(div);
     const failedImg = div.querySelector('.sc-img');
