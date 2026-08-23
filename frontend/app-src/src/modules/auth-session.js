@@ -73,6 +73,23 @@ export function createAuthSession({
     document.getElementById('user-menu')?.classList.toggle('open');
   }
 
+  function checkInAppBrowser() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+    const isInApp = /Instagram|FB_IAB|FBAV|FBAN|Line|MicroMessenger|musical_ly|BytedanceWebview|Snapchat/i.test(ua);
+    if (isInApp) {
+      const warnEl = document.getElementById('inapp-browser-warning');
+      if (warnEl) warnEl.style.display = 'block';
+    }
+    return isInApp;
+  }
+  checkInAppBrowser();
+
+  function continueAsGuest() {
+    document.getElementById('login-screen').style.display = 'none';
+    if (typeof window.maybeShowOnboarding === 'function') window.maybeShowOnboarding();
+    addMessage(`👋 Welcome to <strong>India In-Time</strong>! Pick a city and tap <strong>Generate Plan</strong> to start exploring!`);
+  }
+
   async function signInWithGoogle(event) {
     if (signingIn) return;
     signingIn = true;
@@ -82,13 +99,27 @@ export function createAuthSession({
     if (btn) btn.disabled = true;
     if (loadingEl) loadingEl.style.display = 'block';
 
+    const isInApp = checkInAppBrowser();
+    if (isInApp) {
+      browserLogger.warn('[signInWithGoogle] In-app browser detected — Google OAuth may be restricted by platform');
+    }
+
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
       const expected = error?.code === 'auth/cancelled-popup-request' || error?.code === 'auth/popup-closed-by-user';
       if (!expected) {
-        browserLogger.error('[signInWithGoogle] Unexpected auth error:', error);
-        alert('Sign-in failed: ' + error.message);
+        browserLogger.error('[signInWithGoogle] Auth error:', error);
+        const isStorageOrPopup = error?.code === 'auth/popup-blocked' ||
+                                 error?.code === 'auth/web-storage-unsupported' ||
+                                 (error?.message && error.message.includes('missing initial state'));
+        if (isStorageOrPopup || isInApp) {
+          alert('Google Sign-In is blocked inside Instagram and social in-app browsers.\n\nPlease tap "Continue as Guest" to use the app immediately, or tap "•••" at the top right to open in Chrome or Safari.');
+          const warnEl = document.getElementById('inapp-browser-warning');
+          if (warnEl) warnEl.style.display = 'block';
+        } else {
+          alert('Sign-in failed: ' + error.message);
+        }
       } else {
         browserLogger.warn('[signInWithGoogle] Expected popup race, ignored:', error.code);
       }
@@ -132,5 +163,5 @@ export function createAuthSession({
     }
   });
 
-  return { saveUserData, loadUserData, signInWithGoogle, doSignOut, toggleUserMenu };
+  return { saveUserData, loadUserData, signInWithGoogle, doSignOut, toggleUserMenu, continueAsGuest };
 }

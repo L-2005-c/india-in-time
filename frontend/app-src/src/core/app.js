@@ -780,7 +780,7 @@ const authSession = createAuthSession({
   },
 });
 
-const { saveUserData, loadUserData: _loadUserData, signInWithGoogle, doSignOut, toggleUserMenu } = authSession;
+const { saveUserData, loadUserData: _loadUserData, signInWithGoogle, doSignOut, toggleUserMenu, continueAsGuest } = authSession;
 // Legacy HTML event bridge. Registered only after auth/session lexical
 // bindings are initialized, preventing top-level temporal-dead-zone failures.
 Object.assign(window, {
@@ -792,7 +792,7 @@ Object.assign(window, {
   analyzeBudget, renderToolsHome, renderLingo, renderSafety, renderBudget,
   renderPassport, switchDay, chatAbout, shareEmergency, speak,
   showWeatherAlerts, generateTripPDF, setupNotifications, showToast,
-  signInWithGoogle, doSignOut, toggleUserMenu, toggleLiveFollow, toggleStreetQuest,
+  signInWithGoogle, doSignOut, toggleUserMenu, continueAsGuest, toggleLiveFollow, toggleStreetQuest,
   onTimeSliderChange,
   showReplanner, showTripRating, handleCaption, handleTranslate,
   startVoiceInput, aiFoodCard, runReplanner,
@@ -1509,6 +1509,7 @@ const STATIC_ACTIONS = {
   printPass: () => window.print(),
   openCommandPalette, closeCommandPalette, closePaletteOverlay, execPaletteCmd, toggleTheme,
   switchCity: (btn) => switchCity(btn?.value || btn?.dataset?.city || btn?.dataset?.arg),
+  continueAsGuest,
   // Settings modal & onboarding
   openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)

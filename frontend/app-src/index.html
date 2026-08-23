@@ -63,6 +63,10 @@
     <img class="login-flag" src="/logo-mark.png?v=20260603-logo" fetchpriority="high" alt="India In-Time logo" width="240" height="105" decoding="sync">
     <h1 class="login-title">India <span>In-Time</span></h1>
     <p class="login-sub">AI Travel Companion</p>
+    <div id="inapp-browser-warning" style="display:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--text-primary);margin-bottom:14px;text-align:left;line-height:1.5;">
+      <strong style="color:#f59e0b">📱 In-App Browser Notice</strong><br>
+      Google blocks sign-in inside Instagram/social webviews. Tap <strong>Continue as Guest</strong> to use the app immediately, or tap <strong>•••</strong> (top right) → <em>"Open in Chrome / Safari"</em>.
+    </div>
     <button class="btn-google" data-action="signInWithGoogle">
       <svg class="google-icon" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -71,6 +75,9 @@
         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
       </svg>
       Continue with Google
+    </button>
+    <button class="btn-guest" data-action="continueAsGuest" style="width:100%;margin-top:10px;padding:14px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:var(--text-primary);font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s ease;">
+      <span>Continue as Guest</span> <span>✦</span>
     </button>
     <p class="login-note">Your itineraries, budget & passport stamps<br>sync across all your devices.</p>
     <p class="login-loading" id="login-loading" style="display:none" role="status" aria-live="polite">⏳ Signing in...</p>
