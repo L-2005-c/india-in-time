@@ -140,7 +140,7 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
     openTime: opening.openTime, closeTime: opening.closeTime, opening,
     sunrise: sun.sunrise, sunset: sun.sunset, daypart, isBestTimeNow, isPeakHourNow, goldenHours: golden, inGoldenHour: ghState,
     season, bestSeason, seasonalNote, nightAvailable: opening.nightAvailable, weeklyHoliday: opening.weeklyHoliday,
-    crowdLevel: crowd.level, crowd: { level: crowd.level, score: crowd.crowdScore, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
+    crowdLevel: crowd.level, crowd: { level: crowd.level, score: crowd.crowdScore, crowdBadge: crowd.crowdBadge, isPeakWindow: crowd.isPeakWindow, bestOffPeakWindow: crowd.bestOffPeakWindow, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
     weather: { ...weatherIntel, experienceWindows: weatherWindows }, traffic, scenic, arrival, preferenceScore, confidence, explanation, recommendations,
     weatherWarnings: weatherIntel.warnings || [], badges, notifications, experienceWindows,
     dataQuality: {

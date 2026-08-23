@@ -2232,27 +2232,54 @@ function updateItinUI(){
       return `<a href="${opt.link}" target="_blank" class="transport-card">${badge}<div class="t-icon">${opt.icon}</div><div class="t-mode">${opt.label}</div><div class="t-fare">${opt.fareStr}</div><div class="t-time">~${fmtM(opt.time)}</div></a>`;
     }).join('')}</div>` : '';
 
-    // Traffic + Crowd badges
-    const smartBadgesHTML = `<div class="smart-time-row"><span class="traffic-badge ${trafficInfo.level}">${trafficInfo.emoji} ${trafficInfo.label}</span><span class="crowd-badge ${crowdInfo.level}">${crowdInfo.emoji} ${crowdInfo.label}</span></div>`;
+    // Traffic + Crowd + Weather + Scenic badges
+    const weatherBadge = loc.weatherComfortBadge || loc.weather?.comfortBadge || '';
+    const scenicBadge = loc.scenicBadge || (loc.is_sunset_spot ? '🌅 Sunset View' : '');
+    const crowdBadgeStr = loc.crowdBadge || `${crowdInfo.emoji} ${crowdInfo.label}`;
+    const smartBadgesHTML = `<div class="smart-time-row" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+      <span class="traffic-badge ${trafficInfo.level}">${trafficInfo.emoji} ${trafficInfo.label}</span>
+      <span class="crowd-badge ${crowdInfo.level}">${crowdBadgeStr}</span>
+      ${weatherBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);font-weight:600;">${weatherBadge}</span>` : ''}
+      ${scenicBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.25);font-weight:600;">${scenicBadge}</span>` : ''}
+    </div>`;
 
     const div=document.createElement('div');div.className='stop-card'+(isN?' is-next':'')+' fade-in';
     
-    let nearestSpot = null;
-    let minD = Infinity;
-    if (typeof LOCS !== 'undefined' && LOCS.length) {
-      for(const spot of LOCS) {
-        if(spot.id === loc.id || spot.name === loc.name) continue;
-        if(spot.cat === 'food' || spot.cat === 'break' || spot.isBreak) continue;
-        const d = hvKm(loc.coords[0], loc.coords[1], spot.coords[0], spot.coords[1]);
-        if(d < minD) { minD = d; nearestSpot = spot; }
+    // Nearby places chips
+    let nearbyHTML = '';
+    if (Array.isArray(loc.nearbySpots) && loc.nearbySpots.length > 0) {
+      nearbyHTML = `<div class="nearby-spots-box" style="margin-top:8px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;font-size:11px;">
+        <div style="font-weight:600;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+          <span>📍 Nearby to explore (${loc.nearbySpots.length})</span>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${loc.nearbySpots.map(n => `<span class="nearby-spot-chip" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:2px 8px;font-size:10.5px;color:var(--text-main);">${escapeHtml(n.name)} <small style="color:var(--text-muted)">(${n.distanceM ? (n.distanceM < 1000 ? n.distanceM + 'm' : (n.distanceM/1000).toFixed(1) + 'km') : ''})</small></span>`).join('')}
+        </div>
+      </div>`;
+    } else {
+      let nearestSpot = null;
+      let minD = Infinity;
+      if (typeof LOCS !== 'undefined' && LOCS.length) {
+        for(const spot of LOCS) {
+          if(spot.id === loc.id || spot.name === loc.name) continue;
+          if(spot.cat === 'food' || spot.cat === 'break' || spot.isBreak) continue;
+          const d = hvKm(loc.coords[0], loc.coords[1], spot.coords[0], spot.coords[1]);
+          if(d < minD) { minD = d; nearestSpot = spot; }
+        }
+      }
+      if (nearestSpot && minD <= 3.0) {
+        nearbyHTML = `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${escapeHtml(nearestSpot.name)}</strong> (~${minD.toFixed(1)} km)</div>`;
       }
     }
-    const nearestSpotHTML = nearestSpot ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">📍 Nearest spot: <strong>${nearestSpot.name}</strong> (~${minD.toFixed(1)} km)</div>` : '';
+
+    const whyTimeNote = Array.isArray(loc.whyThisTime) && loc.whyThisTime.length
+      ? `<div style="font-size:10.5px;color:var(--brand, #38bdf8);margin-top:4px;display:flex;align-items:center;gap:4px;">✨ <em>${escapeHtml(loc.whyThisTime[0])}</em></div>`
+      : '';
 
     const timingWindow = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
     const waitNote = loc.waitingMinutes ? `🧘 ${loc.waitingMinutes} min held to protect the higher-value experience window` : '';
     const advancedMeta = [timingWindow, waitNote].filter(Boolean).join('<br>');
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearestSpotHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${whyTimeNote}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const failedImg = div.querySelector('.sc-img');
     if (failedImg) failedImg.addEventListener('error', () => { failedImg.style.display = 'none'; }, { once: true });

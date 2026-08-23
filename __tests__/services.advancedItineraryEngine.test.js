@@ -155,3 +155,55 @@ test('final validator exposes a machine-readable feasibility status', () => {
   expect(plan.validation).toHaveProperty('passed');
   expect(plan).toHaveProperty('requirementSatisfaction.score');
 });
+
+test('nearby walking spots are automatically discovered and attached', () => {
+  const plan = planAdvancedItinerary(VIZAG, {
+    startMin: 9 * 60,
+    endMin: 18 * 60,
+    preferredCategories: ['museum', 'food', 'beach'],
+  });
+  expect(plan.status).toBe('FEASIBLE');
+  // Check that stops have nearbySpots array attached
+  expect(plan.stops.every((s) => Array.isArray(s.nearbySpots))).toBe(true);
+  const stopWithNearby = plan.stops.find((s) => s.nearbySpots.length > 0);
+  if (stopWithNearby) {
+    const nearby = stopWithNearby.nearbySpots[0];
+    expect(nearby).toHaveProperty('name');
+    expect(nearby).toHaveProperty('distanceM');
+    expect(nearby.distanceM).toBeLessThanOrEqual(1200);
+  }
+});
+
+test('high midday heat shifts outdoor activities away from 12-3 PM window', () => {
+  const plan = planAdvancedItinerary(VIZAG, {
+    startMin: 10 * 60,
+    endMin: 17 * 60,
+    preferredCategories: ['beach', 'museum', 'food', 'scenic'],
+    weather: { tempC: 38, condition: 'Sunny' },
+  });
+  expect(plan.status).toBe('FEASIBLE');
+  const middayStops = plan.stops.filter((s) => {
+    const [h, m] = String(s.arriveAt).split(':').map(Number);
+    const min = h * 60 + m;
+    return min >= 12 * 60 && min <= 15 * 60;
+  });
+  // Midday stops should prefer indoor venues like museums/food rather than exposed beaches
+  for (const s of middayStops) {
+    expect(s.category).not.toBe('beach');
+  }
+});
+
+test('sunset spot is aligned with evening golden hour window', () => {
+  const plan = planAdvancedItinerary(VIZAG, {
+    startMin: 14 * 60,
+    endMin: 20 * 60,
+    preferredCategories: ['scenic', 'beach', 'food'],
+  });
+  expect(plan.status).toBe('FEASIBLE');
+  const sunsetStop = plan.stops.find((s) => s.name === "Dolphin's Nose Lighthouse" || s.name === 'Kailasagiri' || s.category === 'scenic');
+  if (sunsetStop) {
+    const [h] = String(sunsetStop.arriveAt).split(':').map(Number);
+    expect(h).toBeGreaterThanOrEqual(15);
+  }
+});
+

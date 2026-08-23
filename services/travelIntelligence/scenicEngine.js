@@ -83,6 +83,37 @@ function computeScenic(place = {}, ctx = {}) {
     else if (isSunsetSpot) photographyWindow = { start: golden.eveningGolden.start, end: golden.eveningGolden.end, label: 'Evening golden hour' };
     else if (isViewpoint) photographyWindow = { start: golden.eveningGolden.start, end: golden.eveningGolden.end, label: 'Preferred evening light' };
   }
-  return { solarPosition: solar, orientation: orientationSupported ? { targetAzimuth: preferredAzimuth, solarAzimuth: solar.azimuth, deltaDegrees: Math.round(orientationDelta * 10) / 10 } : null, scenicScore: score, photographyScore, suitability, scenicTypes: [...new Set(types)], bestScenicWindow: bestWindow, photographyWindow, reasons, isViewpoint, reason: reasons[0] || 'Standard location (limited scenic scoring)' };
+
+  // Calculate dedicated golden hour score & scenic badge
+  let goldenHourRating = 0;
+  let scenicBadge = '📍 Scenic Stop';
+  if (inGH.evening || (isSunsetSpot && nowMin >= (sun.sunsetMin || 1080) - 45 && nowMin <= (sun.sunsetMin || 1080) + 15)) {
+    goldenHourRating = Math.min(100, Math.round(score * 0.95 + (orientationDelta != null && orientationDelta <= 30 ? 10 : 0)));
+    scenicBadge = `📸 Golden Hour (${goldenHourRating}/100)`;
+  } else if (inGH.morning || (isSunriseSpot && nowMin >= (sun.sunriseMin || 360) - 15 && nowMin <= (sun.sunriseMin || 360) + 45)) {
+    goldenHourRating = Math.min(100, Math.round(score * 0.95));
+    scenicBadge = `🌅 Sunrise Light (${goldenHourRating}/100)`;
+  } else if (place.has_nightlife && (nowMin >= 19 * 60 || nowMin < 5 * 60)) {
+    scenicBadge = '✨ Night Illumination';
+  } else if (isViewpoint) {
+    scenicBadge = score >= 75 ? '🏞️ Panoramic Vista' : '👁️ Viewpoint';
+  }
+
+  return {
+    solarPosition: solar,
+    orientation: orientationSupported ? { targetAzimuth: preferredAzimuth, solarAzimuth: solar.azimuth, deltaDegrees: Math.round(orientationDelta * 10) / 10 } : null,
+    scenicScore: score,
+    photographyScore,
+    goldenHourRating,
+    scenicBadge,
+    suitability,
+    scenicTypes: [...new Set(types)],
+    bestScenicWindow: bestWindow,
+    photographyWindow,
+    reasons,
+    isViewpoint,
+    reason: reasons[0] || 'Standard location (limited scenic scoring)',
+  };
 }
 module.exports = { computeScenic, solarPosition };
+

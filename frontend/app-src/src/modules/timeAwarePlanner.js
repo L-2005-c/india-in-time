@@ -74,6 +74,24 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
       if (open && open.isOpenNow === false) continue;
       let score = scoreFn(loc, arrive, temp, i, 0, deps.personas, deps.tripMode);
       if (preferred.length && preferred.includes(String(loc.cat || '').toLowerCase())) score += 15;
+      
+      // Apply spatial proximity reward to group nearby places together
+      if (prevCoords && loc.coords) {
+        score += _nearbyBoost(prevCoords, loc.coords);
+      }
+
+      // Climate & Weather Intelligence
+      const isOutdoor = !['food', 'museum', 'cafe', 'restaurant'].includes(String(loc.cat || '').toLowerCase());
+      if (temp != null && temp >= 33 && arrive >= 11.5 * 60 && arrive <= 15.5 * 60) {
+        if (isOutdoor) score -= 22;
+        else score += 16;
+      }
+
+      // Scenic Golden Hour alignment
+      if ((loc.is_sunset_spot || ['beach', 'scenic', 'hill'].includes(String(loc.cat || '').toLowerCase())) && arrive >= 16.75 * 60 && arrive <= 18.5 * 60) {
+        score += 24;
+      }
+
       // Refuse terrible timing for non-food unless pool is empty
       if (score < 25 && !isFood(loc) && pool.length > 3) continue;
       if (!best || score > best.score) best = { loc, travel, actualVisit, arrive, score, i };
@@ -170,6 +188,24 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
     if (si >= 0) supplementalPool.splice(si, 1);
     pushStop(pick.loc, pick.travel, pick.actualVisit, pick.arrive);
   }
+
+  // Populate nearbySpots for each stop from unused locations
+  const allUsed = new Set(day.map((d) => String(d.id || d.name)));
+  day.forEach((stop) => {
+    if (stop.isBreak || !stop.coords || stop.coords.length < 2) return;
+    const candidates = LOCS.filter((l) => !allUsed.has(String(l.id || l.name)) && l.coords && l.coords.length >= 2);
+    stop.nearbySpots = candidates
+      .map((c) => ({
+        id: c.id || c.name,
+        name: c.name,
+        category: c.cat || 'default',
+        coords: c.coords,
+        distanceM: Math.round(distKm(stop.coords, c.coords) * 1000),
+      }))
+      .filter((c) => c.distanceM <= 1200)
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, 3);
+  });
 
   return Array.isArray(day) ? day : [];
 }

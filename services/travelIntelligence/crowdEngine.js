@@ -51,10 +51,24 @@ function computeCrowd(ctx = {}) {
   if (factors.includes('rainDampening')) parts.push('rain reducing outdoor traffic');
   if (factors.includes('heatDampening')) parts.push('extreme heat reducing outdoor traffic');
   if (festivalInfo && festivalInfo.reason) parts.push(festivalInfo.reason);
+
+  let crowdBadge = '🟡 Moderate Traffic';
+  if (band.level === 'Very Low' || band.level === 'Low') crowdBadge = '🟢 Low Crowd';
+  else if (band.level === 'High') crowdBadge = '🟠 Busy Window';
+  else if (band.level === 'Very High') crowdBadge = '🔴 Peak Rush Window';
+
+  const isPeakWindow = band.level === 'High' || band.level === 'Very High';
+  const bestOffPeakWindow = cat === 'temple' || cat === 'fort' || cat === 'monument'
+    ? '07:30–09:30 or 16:30–18:00'
+    : 'Morning 08:00–10:30';
+
   return {
     level: band.level,
     rawScore: Math.round(rawScore * 100) / 100,
     crowdScore: band.score,
+    crowdBadge,
+    isPeakWindow,
+    bestOffPeakWindow,
     source,
     confidenceBoost,
     factors,

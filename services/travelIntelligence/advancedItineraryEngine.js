@@ -14,6 +14,7 @@
 const { getTravelIntelligence } = require('./index');
 const { estimateTravel } = require('./trafficEngine');
 const { m2t, t2m } = require('./timeEngine');
+const { distKm } = require('../../utils/geo');
 const dayStructure = require('./dayStructure');
 const {
   parseRequirements,
@@ -285,15 +286,15 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   // Temporal value is primary. Waiting is rewarded only when it materially
   // improves the time-dependent experience or fulfils a meal requirement.
   score += Number(intel.scenic?.scenicScore || 0) * 0.18;
-  score += Number(intel.scenic?.photographyScore || 0) * (requirements.soft.photography ? 0.10 : 0.03);
+  score += Number(intel.scenic?.photographyScore || 0) * (requirements.soft.photography ? 0.12 : 0.04);
   score += Number(intel.weather?.score || 50) * 0.12;
-  score += ({ Low: 8, 'Very Low': 12, Moderate: 0, High: -8, 'Very High': -14 }[intel.crowdLevel] || 0);
-  if (requirements.soft.lowCrowd && ['High', 'Very High'].includes(intel.crowdLevel)) score -= 24;
+  score += ({ Low: 10, 'Very Low': 14, Moderate: 0, High: -10, 'Very High': -16 }[intel.crowdLevel] || 0);
+  if (requirements.soft.lowCrowd && ['High', 'Very High'].includes(intel.crowdLevel)) score -= 28;
   if (requirements.soft.family) {
     if (place.family_friendly || ['park', 'museum', 'beach'].includes(cat)) score += 18;
     else score -= 24;
   }
-  if (requirements.soft.photography && ['scenic', 'beach', 'viewpoint'].includes(cat)) score += 15;
+  if (requirements.soft.photography && ['scenic', 'beach', 'viewpoint', 'hill', 'fort'].includes(cat)) score += 18;
   if (requirements.soft.preferredCategories?.length) {
     const preferred = requirements.soft.preferredCategories.includes(cat)
       || (requirements.soft.preferredCategories.includes('food') && isFood(place));
@@ -308,33 +309,70 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   } else if (requirements.soft.foodFocus && (meal === 'lunch' || meal === 'dinner') && !state.meals.has(meal)) {
     score -= 28;
   }
-  if (place.is_sunset_spot && meal !== 'lunch') score += 8;
+
+  // Golden-hour & scenic alignment boost
+  const isGoldenHourEvening = arrivalMin >= 16 * 60 + 45 && arrivalMin <= 18 * 60 + 30;
+  const isSunriseMorning = arrivalMin >= 5 * 60 + 30 && arrivalMin <= 7 * 60 + 30;
+  if (place.is_sunset_spot && isGoldenHourEvening && meal !== 'lunch') score += 24;
+  else if (place.is_sunset_spot && meal !== 'lunch') score += 8;
+  if (place.is_sunrise_spot && isSunriseMorning) score += 24;
+
   if (state.stops.length && normalizeCat(state.stops[state.stops.length - 1].category) === cat && cat !== 'food') score -= 7;
 
-  // Proximity to the previous stop is now an explicit part of the objective,
-  // not just an implicit side-effect of travel time eating into the schedule
-  // window. Without this, two candidates that are otherwise equally scored
-  // are indistinguishable to the beam search even when one is a 2 km walk
-  // from the previous stop and the other is a 15 km crosstown drive — the
-  // route only avoided criss-crossing the city by accident, if at all. The
-  // penalty is capped and gentle relative to the temporal/experience terms
-  // above so a genuinely better stop across town can still win; it only
-  // breaks ties (and near-ties) toward the geographically compact option.
+  // Proximity & Place-to-Place Routing:
+  // Strongly reward nearby contiguous stops (<= 1.5 km and <= 3.5 km) to create
+  // natural walking and short-hop neighborhood clusters, and penalize long
+  // cross-city jumps (> 7 km) to eliminate erratic zig-zagging.
   const legDistanceKm = Number(travel?.distanceKm);
   if (Number.isFinite(legDistanceKm)) {
-    score -= Math.min(30, legDistanceKm * 2.5);
+    if (legDistanceKm <= 1.5) {
+      score += 18; // Walkable / immediate neighbor bonus
+    } else if (legDistanceKm <= 3.5) {
+      score += 10; // Short direct hop bonus
+    } else if (legDistanceKm > 7.0) {
+      score -= Math.min(35, (legDistanceKm - 5.0) * 2.8); // Long hop penalty
+    }
   }
 
+  // Weather-based dynamic climate protection (Heat & Rain Awareness):
   const outdoor = place.indoor_outdoor === 'outdoor' || OUTDOOR.has(cat) || place.is_outdoor === true;
   const condition = String(intel.weather?.condition || '').toLowerCase();
+  const tempC = Number(intel.weather?.tempC);
+  const isMiddayHeat = arrivalMin >= 11 * 60 + 30 && arrivalMin <= 15 * 60 + 30;
+
   if (outdoor && /heavy|storm|thunder|cyclone|flood/.test(condition)) return null;
   if (outdoor && /rain|drizzle|shower/.test(condition)) score -= 40;
-  if (outdoor && Number(intel.weather?.tempC) >= 36) score -= 22;
+
+  if (Number.isFinite(tempC) && tempC >= 33) {
+    if (isMiddayHeat) {
+      if (outdoor) {
+        score -= tempC >= 37 ? 32 : 22; // Penalize direct outdoor midday sun
+      } else {
+        score += 18; // Reward air-conditioned / covered indoor midday refuge
+      }
+    } else if (outdoor && (arrivalMin <= 10 * 60 || arrivalMin >= 16 * 60 + 30)) {
+      score += 12; // Pleasant morning/evening outdoor window
+    }
+  }
+
+  // Crowd-based off-peak scheduling:
+  const isHighDensityPoi = ['temple', 'fort', 'monument', 'museum'].includes(cat);
+  const isPeakCrowdHour = arrivalMin >= 10 * 60 + 30 && arrivalMin <= 14 * 60 + 30;
+  if (isHighDensityPoi) {
+    if (isPeakCrowdHour && ['High', 'Very High'].includes(intel.crowdLevel)) {
+      score -= requirements.soft.lowCrowd ? 28 : 16;
+    } else if (arrivalMin <= 9 * 60 + 30 || (arrivalMin >= 16 * 60 && arrivalMin <= 18 * 60)) {
+      score += 14; // Serene off-peak timing bonus
+    }
+  }
 
   if (requirements.hard.maxWaitingMinutes != null && state.waitMinutes + waitMinutes > requirements.hard.maxWaitingMinutes) return null;
 
-  if (waitMinutes > 0) {    score -= Math.min(24, waitMinutes * 0.18);
-    if (intel.isBestTimeNow || neededMeal) score += Math.min(30, waitMinutes * 0.35 + 8);
+  if (waitMinutes > 0) {
+    score -= Math.min(24, waitMinutes * 0.18);
+    if (intel.isBestTimeNow || neededMeal || (place.is_sunset_spot && isGoldenHourEvening)) {
+      score += Math.min(32, waitMinutes * 0.35 + 10);
+    }
   }
 
   const cost = explicitCost(place, requirements);
@@ -394,6 +432,11 @@ function buildStop(place, scored, arrivalMin, state) {
   const intel = scored.intel;
   const category = place.cat || intel.category || 'default';
   const totalCost = Math.round((state.cost + scored.cost) * 100) / 100;
+  const weatherComfortBadge = intel.weather?.comfortBadge || (intel.weather?.tempC > 33 ? '🌡️ Warm Day' : '🌤️ Pleasant Weather');
+  const crowdBadge = intel.crowd?.crowdBadge || (['Low', 'Very Low'].includes(intel.crowdLevel) ? '🟢 Low Crowd' : '🟡 Moderate Traffic');
+  const scenicBadge = intel.scenic?.scenicBadge || (place.is_sunset_spot ? '🌅 Sunset View' : (['scenic', 'beach', 'hill'].includes(category) ? '🏞️ Scenic Stop' : '📍 Tourist Spot'));
+  const goldenHourRating = Number(intel.scenic?.goldenHourRating || 0);
+
   return {
     key: placeIdentity(place),
     id: place.id ?? place.placeId ?? place.name,
@@ -421,11 +464,16 @@ function buildStop(place, scored, arrivalMin, state) {
     mealTimingBonus: isFood(place) ? (MEAL_TIMING_BONUS[mealAt(arrivalMin)] || 0) : 0,
     optimizationScore: Math.round(scored.score),
     crowdLevel: intel.crowdLevel,
+    crowdBadge,
     weather: intel.weather,
+    weatherComfortBadge,
+    scenicBadge,
+    goldenHourRating,
+    nearbySpots: [],
     open: intel.isOpenNow,
     reasons: scored.reasons,
     whyThisPlace: scored.reasons,
-    whyThisTime: scored.reasons.filter((r) => /time|window|meal|golden|weather|crowd|wait|sunset/i.test(r)),
+    whyThisTime: scored.reasons.filter((r) => /time|window|meal|golden|weather|crowd|wait|sunset|heat|proximity/i.test(r)),
     whyNotOtherTime: intel.scenic?.bestScenicWindow ? [`Chosen around the best available temporal window (${intel.scenic.bestScenicWindow.start || 'time window'})`] : ['Earlier/later candidates scored lower under the current constraints'],
     whyNotAlternative: ['Alternatives were evaluated against the same arrival-time, route, requirement and feasibility state'],
     confidence: Number(intel.confidence?.confidence ?? intel.confidence ?? 50),
@@ -709,20 +757,38 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const confidenceValues = state.stops.map((s) => Number(s.confidence)).filter(Number.isFinite);
   const confidence = confidenceValues.length ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length) : 0;
 
+  const usedIds = new Set(state.stops.map((s) => placeIdentity(s)));
+  const finalizedStops = state.stops.map((stop) => {
+    if (!Array.isArray(stop.coords) || stop.coords.length < 2) return stop;
+    const nearby = candidates
+      .filter((c) => !usedIds.has(placeIdentity(c)) && Array.isArray(c.coords) && c.coords.length >= 2)
+      .map((c) => ({
+        id: c.id ?? c.placeId ?? c.name,
+        name: c.name,
+        category: c.cat || c.category || 'default',
+        coords: c.coords,
+        distanceM: Math.round(distKm(stop.coords[0], stop.coords[1], c.coords[0], c.coords[1]) * 1000),
+      }))
+      .filter((c) => c.distanceM <= 1200)
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, 3);
+    return { ...stop, nearbySpots: nearby };
+  });
+
   return {
     generatedAt: new Date().toISOString(),
     referenceTime: now.toISOString(),
     algorithm: 'geo-temporal-beam-search-v5-world-class',
     objective: 'maximize whole-itinerary experience under hard constraints, time-dependent place states, meals, routing, weather, crowd, scenic windows and budget/accessibility/safety requirements',
     status: 'FEASIBLE',
-    stopCount: state.stops.length,
+    stopCount: finalizedStops.length,
     totalScore: Math.round(state.score),
     totalTravelMinutes: Math.round(state.travelMinutes),
     totalVisitMinutes,
     totalWaitMinutes: Math.round(state.waitMinutes),
     estimatedCost: Math.round(state.cost * 100) / 100,
     confidence,
-    stops: state.stops,
+    stops: finalizedStops,
     alternatives: beam.slice(1, 4).map((candidate) => ({
       score: Math.round(candidate.score),
       stopNames: candidate.stops.map((s) => s.name),
