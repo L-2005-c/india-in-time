@@ -65,6 +65,13 @@ const config = {
     // the primary model, then fall back to fallbackModel on the secondary
     // key only if that also fails. Unset by default — leave '' to disable.
     secondaryApiKey: process.env.GEMINI_API_KEY_SECONDARY || '',
+    // Duration in milliseconds to stick to the secondary API key after the
+    // primary API key exhausts all retries on a retryable failure (quota/429/5xx).
+    // Defaults to 2 minutes (120,000ms) — long enough to avoid burning retry/backoff
+    // latency on every subsequent request during a quota spike or per-minute rate-limit
+    // exhaustion, but short enough to automatically probe and recover once the rolling
+    // window resets without requiring a server restart.
+    primaryKeyCooldownMs: parseInt(process.env.GEMINI_PRIMARY_KEY_COOLDOWN_MS, 10) || 2 * 60 * 1000,
     maxRetries:      parseInt(process.env.GEMINI_MAX_RETRIES, 10) || 3,
     timeoutMs:       parseInt(process.env.GEMINI_TIMEOUT_MS, 10) || 20000,
     imageTimeoutMs:  parseInt(process.env.GEMINI_IMAGE_TIMEOUT_MS, 10) || 30000,

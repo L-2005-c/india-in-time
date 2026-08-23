@@ -15,9 +15,10 @@ const { keepAliveAgent } = require('../lib/httpAgent');
 let circuitState = 'CLOSED';       // CLOSED | OPEN | HALF_OPEN
 let consecutiveFailures = 0;
 let circuitOpenedAt = 0;
+let primaryKeyDeadUntil = 0;        // timestamp (ms) until which primary key is skipped
 let activeRequests = 0;
 const requestQueue = [];           // queued promises when at max concurrency
-const stats = { total: 0, success: 0, failure: 0, cached: 0, retries: 0, circuitTrips: 0, fallbackModelUsed: 0, secondaryKeyUsed: 0 };
+const stats = { total: 0, success: 0, failure: 0, cached: 0, retries: 0, circuitTrips: 0, fallbackModelUsed: 0, secondaryKeyUsed: 0, primaryKeySkipped: 0 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -187,47 +188,79 @@ async function callGemini(parts, opts = {}) {
   try {
     const maxRetries = config.gemini.maxRetries;
     let lastError = null;
+    const now = Date.now();
+    const isPrimaryStickyDead = !!config.gemini.secondaryApiKey && primaryKeyDeadUntil > now;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const result = await _callGeminiOnce(parts, opts);
+    if (primaryKeyDeadUntil !== 0 && now >= primaryKeyDeadUntil) {
+      logger.info({ module: 'gemini' }, 'Primary API key cooldown expired — probing primary key again');
+      primaryKeyDeadUntil = 0;
+    }
 
-        // Success
-        recordSuccess();
-        stats.success++;
+    if (isPrimaryStickyDead) {
+      stats.primaryKeySkipped++;
+      logger.warn(
+        { module: 'gemini', cooldownRemainingMs: primaryKeyDeadUntil - now, secondaryKey: true },
+        'Primary API key in cooldown — skipping primary key, routing directly to secondary key'
+      );
+      lastError = new Error('Primary API key in sticky failover cooldown');
+      lastError.retryable = true;
+    } else {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await _callGeminiOnce(parts, opts);
 
-        // Cache in memory and DB
-        if (cacheKey && result) {
-          geminiCache.set(cacheKey, result, opts.cacheTtlMs);
-          try {
-            await setCachedAiResponse(cacheKey, result);
-          } catch (err) {
-            logger.warn({ module: 'gemini', err: err.message }, 'DB cache write error');
+          // Success
+          recordSuccess();
+          if (primaryKeyDeadUntil !== 0) {
+            logger.info({ module: 'gemini' }, 'Primary API key recovered');
+            primaryKeyDeadUntil = 0;
+          }
+          stats.success++;
+
+          // Cache in memory and DB
+          if (cacheKey && result) {
+            geminiCache.set(cacheKey, result, opts.cacheTtlMs);
+            try {
+              await setCachedAiResponse(cacheKey, result);
+            } catch (err) {
+              logger.warn({ module: 'gemini', err: err.message }, 'DB cache write error');
+            }
+          }
+
+          return result;
+        } catch (err) {
+          lastError = err;
+
+          // Don't retry non-retryable errors
+          if (err.retryable === false) {
+            stats.failure++;
+            recordFailure();
+            throw err;
+          }
+
+          // Retry with exponential backoff
+          if (attempt < maxRetries) {
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+            stats.retries++;
+            logger.warn({ module: 'gemini', attempt, maxRetries, err: err.message, retryInMs: delay }, 'Attempt failed, retrying');
+            await sleep(delay);
           }
         }
+      }
 
-        return result;
-      } catch (err) {
-        lastError = err;
-
-        // Don't retry non-retryable errors
-        if (err.retryable === false) {
-          stats.failure++;
-          recordFailure();
-          throw err;
-        }
-
-        // Retry with exponential backoff
-        if (attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
-          stats.retries++;
-          logger.warn({ module: 'gemini', attempt, maxRetries, err: err.message, retryInMs: delay }, 'Attempt failed, retrying');
-          await sleep(delay);
-        }
+      // If primary key exhausted retries on a retryable error and secondary key is configured,
+      // activate sticky failover cooldown so subsequent requests don't waste time on a dead key.
+      if (lastError && lastError.retryable !== false && config.gemini.secondaryApiKey) {
+        const cooldownMs = config.gemini.primaryKeyCooldownMs;
+        primaryKeyDeadUntil = Date.now() + cooldownMs;
+        logger.warn(
+          { module: 'gemini', cooldownMs, err: lastError.message },
+          'Primary API key exhausted retries on retryable error — sticky failover active, routing to secondary key'
+        );
       }
     }
 
-    // ── All retries against the primary model on the primary key exhausted ──
+    // ── All retries against the primary model on the primary key exhausted (or skipped) ──
     // Fallback chain from here, each step only for retryable failures
     // (network error, 429, 5xx — never a 4xx, since a different model or
     // key won't fix a malformed request):
@@ -242,7 +275,9 @@ async function callGemini(parts, opts = {}) {
     const attemptAlt = async (label, { logCtx, ...altOpts }) => {
       logger.warn(
         { module: 'gemini', ...logCtx, err: lastError.message },
-        `Primary key/model exhausted all retries — trying ${label}`
+        isPrimaryStickyDead
+          ? `Primary key in sticky cooldown — trying ${label}`
+          : `Primary key/model exhausted all retries — trying ${label}`
       );
       const result = await _callGeminiOnce(parts, { ...opts, ...altOpts });
 
@@ -326,6 +361,7 @@ function getStats() {
     ...stats,
     circuitState,
     consecutiveFailures,
+    primaryKeyDeadUntil,
     activeRequests,
     queuedRequests: requestQueue.length,
     cacheStats: geminiCache.getStats(),
@@ -339,6 +375,7 @@ function resetCircuit() {
   circuitState = 'CLOSED';
   consecutiveFailures = 0;
   circuitOpenedAt = 0;
+  primaryKeyDeadUntil = 0;
   logger.info({ module: 'gemini', circuitState: 'CLOSED' }, 'Circuit breaker manually reset → CLOSED');
 }
 

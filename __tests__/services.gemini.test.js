@@ -340,3 +340,114 @@ describe('services/gemini — circuit breaker', () => {
     expect(gemini.getStats().circuitState).toBe('CLOSED');
   });
 });
+
+describe('services/gemini — sticky primary key failover', () => {
+  const ORIGINAL_SECONDARY = process.env.GEMINI_API_KEY_SECONDARY;
+  const ORIGINAL_COOLDOWN = process.env.GEMINI_PRIMARY_KEY_COOLDOWN_MS;
+
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY_SECONDARY = 'test-secondary-key';
+    process.env.GEMINI_PRIMARY_KEY_COOLDOWN_MS = '5000'; // 5s for testing
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_SECONDARY === undefined) delete process.env.GEMINI_API_KEY_SECONDARY;
+    else process.env.GEMINI_API_KEY_SECONDARY = ORIGINAL_SECONDARY;
+
+    if (ORIGINAL_COOLDOWN === undefined) delete process.env.GEMINI_PRIMARY_KEY_COOLDOWN_MS;
+    else process.env.GEMINI_PRIMARY_KEY_COOLDOWN_MS = ORIGINAL_COOLDOWN;
+  });
+
+  test('(a) primary key failing sets sticky flag and very next call skips straight to secondary', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+
+    let primaryAttempts = 0;
+    let secondaryAttempts = 0;
+
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(`key=${config.gemini.secondaryApiKey}`)) {
+        secondaryAttempts++;
+        return okResponse('secondary response');
+      }
+      primaryAttempts++;
+      return { ok: false, status: 429, text: async () => 'rate limit exceeded' };
+    });
+
+    // Call 1: primary fails all 3 retries, then secondary succeeds
+    const res1 = await gemini.callGeminiText('prompt 1');
+    expect(res1).toBe('secondary response');
+    expect(primaryAttempts).toBe(3); // 3 retries on primary
+    expect(secondaryAttempts).toBe(1);
+    expect(gemini.getStats().primaryKeySkipped).toBe(0);
+    expect(gemini.getStats().primaryKeyDeadUntil).toBeGreaterThan(Date.now() - 100);
+
+    // Call 2: sticky failover active -> skips primary key retry loop entirely!
+    const res2 = await gemini.callGeminiText('prompt 2');
+    expect(res2).toBe('secondary response');
+    expect(primaryAttempts).toBe(3); // NO additional attempts against primary
+    expect(secondaryAttempts).toBe(2);
+    expect(gemini.getStats().primaryKeySkipped).toBe(1);
+  });
+
+  test('(b) the flag expires after the cooldown and the primary key is tried again', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+
+    let primaryAttempts = 0;
+    let secondaryAttempts = 0;
+    let primaryShouldSucceed = false;
+
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(`key=${config.gemini.secondaryApiKey}`)) {
+        secondaryAttempts++;
+        return okResponse('secondary response');
+      }
+      primaryAttempts++;
+      if (primaryShouldSucceed) {
+        return okResponse('primary recovered response');
+      }
+      return { ok: false, status: 503, text: async () => 'overloaded' };
+    });
+
+    // Call 1: primary fails, falls back to secondary, sets sticky failover
+    await gemini.callGeminiText('prompt 1');
+    expect(primaryAttempts).toBe(3);
+    expect(secondaryAttempts).toBe(1);
+    expect(gemini.getStats().primaryKeyDeadUntil).toBeGreaterThan(Date.now());
+
+    // Advance time past cooldown
+    const now = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(now + 6000); // 6s > 5s cooldown
+    primaryShouldSucceed = true;
+
+    // Call 2: Cooldown expired -> primary is tried first and succeeds
+    const res2 = await gemini.callGeminiText('prompt 2');
+    expect(res2).toBe('primary recovered response');
+    expect(primaryAttempts).toBe(4); // 3 original + 1 probe attempt
+    expect(secondaryAttempts).toBe(1); // secondary not called
+    expect(gemini.getStats().primaryKeyDeadUntil).toBe(0); // cleared on recovery
+
+    dateSpy.mockRestore();
+  });
+
+  test('(c) a successful primary-key call never sets/clears the flag (flag remains inactive)', async () => {
+    const gemini = freshGeminiModule();
+    const config = require('../config');
+    const mockFetch = require('node-fetch');
+
+    mockFetch.mockImplementation(async (url) => {
+      if (url.includes(`key=${config.gemini.apiKey}`)) {
+        return okResponse('primary normal response');
+      }
+      return okResponse('secondary response');
+    });
+
+    const res = await gemini.callGeminiText('normal prompt');
+    expect(res).toBe('primary normal response');
+    expect(gemini.getStats().primaryKeyDeadUntil).toBe(0);
+    expect(gemini.getStats().primaryKeySkipped).toBe(0);
+  });
+});
