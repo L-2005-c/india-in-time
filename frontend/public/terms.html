@@ -5,74 +5,186 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="index,follow">
 <title>Terms of Service — India In-Time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0a0514; --bg-card:#160e28; --border:#2a2140;
-    --text:#e8f0fa; --text-muted:rgba(180,210,240,0.7); --accent:#a855f7;
+  :root {
+    --bg-base: #06040a;
+    --bg-layer1: #0d0818;
+    --bg-layer2: #140d24;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(139, 92, 246, 0.3);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #8b5cf6;
+    --gold: #f59e0b;
+    --teal: #06b6d4;
   }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.7;}
-  .wrap{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
-  h1{font-family:Georgia,'Playfair Display',serif;font-size:28px;margin:0 0 6px;}
-  .updated{color:var(--text-muted);font-size:13px;margin:0 0 32px;}
-  h2{font-family:Georgia,'Playfair Display',serif;font-size:19px;margin:36px 0 10px;color:var(--text);}
-  p,li{color:var(--text-muted);font-size:14.5px;}
-  a{color:var(--accent);}
-  .notice{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:13px;color:var(--text-muted);margin-bottom:32px;}
-  .notice strong{color:var(--text);}
-  ul{padding-left:20px;}
-  .back{display:inline-block;margin-bottom:24px;color:var(--text-muted);font-size:13px;text-decoration:none;}
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 24px 120px;
+  }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 32px;
+    color: var(--teal);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity .15s ease;
+  }
+  .back-link:hover { opacity: 0.8; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #c084fc;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    margin: 0 0 8px;
+    background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .updated {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    margin: 0 0 40px;
+  }
+  .card {
+    background: var(--bg-layer1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 32px 0 12px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  p, li {
+    color: var(--text-secondary);
+    font-size: 14.5px;
+    margin: 0 0 14px;
+  }
+  ul {
+    padding-left: 22px;
+    margin: 0 0 16px;
+  }
+  li { margin-bottom: 8px; }
+  strong { color: var(--text-primary); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .highlight-box {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  .highlight-box strong { color: var(--gold); }
+  .footer-contact {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 13.5px;
+    color: var(--text-muted);
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <a href="/" class="back">← Back to India In-Time</a>
+  <a href="/" class="back-link">← Back to India In-Time</a>
+  <div class="badge">Legal Agreement</div>
   <h1>Terms of Service</h1>
-  <p class="updated">Draft — last edited [DATE]. Not yet reviewed by counsel.</p>
+  <p class="updated">Effective Date: August 23, 2026 · Founder: Lokesh Chilukuri</p>
 
-  <div class="notice">
-    <strong>Before this goes live:</strong> replace every [bracketed] placeholder and have this reviewed by a lawyer before publishing — this is a starting draft, not a finished legal document.
+  <div class="card">
+    <p>Welcome to <strong>India In-Time</strong> ("we", "us", "our", or the "Service"). By accessing our application, creating an account, or using any of our travel intelligence tools, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the application.</p>
   </div>
 
-  <h2>Acceptance of terms</h2>
-  <p>By creating an account or using India In-Time ("the app"), you agree to these Terms. If you do not agree, do not use the app.</p>
+  <h2>1. Service Overview & AI Travel Intelligence</h2>
+  <p>India In-Time is an adaptive travel planning platform designed to assist travelers with itinerary optimization across India. The application leverages artificial intelligence, spatial routing algorithms, historical crowd modeling, and weather intelligence to generate personalized travel recommendations.</p>
+  
+  <div class="highlight-box">
+    <strong>⚠️ Travel & Information Disclaimer:</strong><br>
+    All itineraries, travel times, ticket fee estimates, auto/taxi fare calculations, cultural ritual schedules (e.g., Aarti timings, temple sanctum darshan hours), crowd density forecasts, and weather alerts are algorithmic estimations provided for informational and planning purposes only. On-ground conditions (road closures, festival crowds, temple Naivedyam closures, weather changes) vary dynamically. Travelers must independently verify safety conditions, monument entry rules, and transport tariffs before traveling.
+  </div>
 
-  <h2>What the app does</h2>
-  <p>India In-Time helps you plan travel itineraries in India using AI-generated recommendations, routing, weather, and crowd-timing intelligence. Recommendations, timing estimates, and AI-generated content (captions, translations, safety information, budget estimates) are provided for informational purposes only and are not guaranteed to be accurate, complete, or current — always verify safety-critical information (opening hours, emergency contacts, road conditions, weather) independently before relying on it.</p>
-
-  <h2>Your account</h2>
+  <h2>2. User Accounts & Authentication</h2>
   <ul>
-    <li>You must sign in with a valid Google account to use most features.</li>
-    <li>You're responsible for keeping your account secure and for activity that happens under it.</li>
-    <li>You must provide accurate information and not impersonate anyone else.</li>
+    <li><strong>Account Creation:</strong> You may sign in using your Google account via Firebase Authentication to sync itineraries and digital passport stamps across devices.</li>
+    <li><strong>Account Security:</strong> You are responsible for maintaining the confidentiality of your credentials and all activities occurring under your account.</li>
+    <li><strong>Accurate Information:</strong> You agree to provide accurate information and not misrepresent your identity.</li>
   </ul>
 
-  <h2>Acceptable use</h2>
-  <p>You agree not to: misuse the AI tools to generate unlawful, harmful, or abusive content; attempt to interfere with or disrupt the service (including its rate limits or security controls); scrape or resell the app's data; or use the app for any purpose that violates applicable law.</p>
+  <h2>3. Acceptable Use Policy</h2>
+  <p>You agree to use India In-Time strictly for lawful, personal, non-commercial travel planning. You agree NOT to:</p>
+  <ul>
+    <li>Use automated scripts, bots, or scrapers to extract POI catalogs, route datasets, or pricing models from our services.</li>
+    <li>Attempt to bypass, overload, or disrupt our rate limits, API gateways, or security controls.</li>
+    <li>Submit unlawful, abusive, defamatory, or harmful content through the in-app AI assistant, photo lens, or feedback forms.</li>
+    <li>Reverse engineer, decompile, or create unauthorized derivative services of the proprietary itinerary engine.</li>
+  </ul>
 
-  <h2>User content</h2>
-  <p>Content you submit (trip preferences, feedback, photos submitted to AI tools) remains yours. By submitting it, you grant us a license to process it as needed to provide the feature you used it for (e.g., generating an itinerary, translating a photo). See our <a href="/privacy.html">Privacy Policy</a> for how this data is handled.</p>
+  <h2>4. User Content & AI Input Submissions</h2>
+  <p>When you submit prompts, text, trip preferences, or images (e.g., photo caption generation, food safety scanner, AI Lens sign translation), you retain full ownership of your content. By submitting content, you grant India In-Time a non-exclusive, royalty-free license to process, analyze, and transmit that content solely to provide and improve the requested feature.</p>
 
-  <h2>Third-party services</h2>
-  <p>The app relies on third-party services (Google Firebase, Google Gemini, mapping/routing providers, weather data) that are outside our control. We are not responsible for outages, inaccuracies, or changes in these third-party services.</p>
+  <h2>5. Emergency SOS & Directory Disclaimers</h2>
+  <p>The Emergency SOS directory and WhatsApp location-sharing tools provided in the app are reference utilities aggregating public Indian emergency services (112, 1091, 1363, 108). India In-Time is not an emergency response provider and does not guarantee cellular network connectivity, third-party dispatch response times, or emergency agency availability.</p>
 
-  <h2>No warranty</h2>
-  <p>The app is provided "as is" without warranties of any kind, express or implied. We do not guarantee the app will be uninterrupted, error-free, or that AI-generated recommendations will be accurate or suitable for your specific trip. Travel involves inherent risk — use your own judgment, especially for safety-related decisions.</p>
+  <h2>6. Third-Party Services & External Links</h2>
+  <p>The service integrates with third-party providers including Google Firebase, Google Gemini, Open-Meteo, MapTiler, OpenStreetMap, and Unsplash. We do not control and are not liable for any third-party service interruptions, external site accuracy, or mapping outages.</p>
 
-  <h2>Limitation of liability</h2>
-  <p>[Standard limitation-of-liability language to be finalized with counsel — typically limits liability to the extent permitted by applicable law and excludes indirect/consequential damages.]</p>
+  <h2>7. Limitation of Liability</h2>
+  <p>To the maximum extent permitted by applicable Indian law (including the Information Technology Act, 2000), India In-Time and its founder, contributors, and service providers shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from: (a) your use or inability to use the service; (b) any delays, missed flights, train disruptions, or safety incidents during travel; or (c) unauthorized access to or alteration of your transmissions or data.</p>
 
-  <h2>Termination</h2>
-  <p>You may stop using the app and delete your account at any time. We may suspend or terminate accounts that violate these Terms.</p>
+  <h2>8. Termination</h2>
+  <p>You may discontinue using the app at any time. You can clear all cached device data from <em>Settings → Clear Device Data</em>. We reserve the right to suspend or terminate accounts that violate these Terms.</p>
 
-  <h2>Governing law</h2>
-  <p>[Specify governing jurisdiction, e.g. "the laws of India", once finalized.]</p>
+  <h2>9. Governing Law & Jurisdiction</h2>
+  <p>These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the competent courts in India.</p>
 
-  <h2>Changes to these terms</h2>
-  <p>We may update these Terms from time to time. Continued use of the app after a change constitutes acceptance of the updated Terms.</p>
+  <h2>10. Contact & Grievance Redressal</h2>
+  <p>For any legal inquiries, support requests, or grievance redressal under Indian Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, please contact:</p>
 
-  <h2>Contact</h2>
-  <p>Questions about these Terms: [SUPPORT EMAIL].</p>
+  <div class="footer-contact">
+    <strong>Founder & Grievance Officer:</strong> Lokesh Chilukuri<br>
+    <strong>Official Email:</strong> <a href="mailto:chilukurilokesh231@gmail.com">chilukurilokesh231@gmail.com</a><br>
+    <strong>Platform:</strong> India In-Time (<a href="https://github.com/L-2005-c/india-in-time">india-in-time</a>)
+  </div>
 </div>
 </body>
 </html>

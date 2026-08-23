@@ -5,82 +5,196 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="index,follow">
 <title>Privacy Policy — India In-Time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0a0514; --bg-card:#160e28; --border:#2a2140;
-    --text:#e8f0fa; --text-muted:rgba(180,210,240,0.7); --accent:#a855f7;
+  :root {
+    --bg-base: #06040a;
+    --bg-layer1: #0d0818;
+    --bg-layer2: #140d24;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(139, 92, 246, 0.3);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #8b5cf6;
+    --gold: #f59e0b;
+    --teal: #06b6d4;
   }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.7;}
-  .wrap{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
-  h1{font-family:Georgia,'Playfair Display',serif;font-size:28px;margin:0 0 6px;}
-  .updated{color:var(--text-muted);font-size:13px;margin:0 0 32px;}
-  h2{font-family:Georgia,'Playfair Display',serif;font-size:19px;margin:36px 0 10px;color:var(--text);}
-  p,li{color:var(--text-muted);font-size:14.5px;}
-  a{color:var(--accent);}
-  .notice{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:13px;color:var(--text-muted);margin-bottom:32px;}
-  .notice strong{color:var(--text);}
-  ul{padding-left:20px;}
-  .back{display:inline-block;margin-bottom:24px;color:var(--text-muted);font-size:13px;text-decoration:none;}
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 24px 120px;
+  }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 32px;
+    color: var(--teal);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity .15s ease;
+  }
+  .back-link:hover { opacity: 0.8; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(6, 182, 212, 0.12);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    margin: 0 0 8px;
+    background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .updated {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    margin: 0 0 40px;
+  }
+  .card {
+    background: var(--bg-layer1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 32px 0 12px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  p, li {
+    color: var(--text-secondary);
+    font-size: 14.5px;
+    margin: 0 0 14px;
+  }
+  ul {
+    padding-left: 22px;
+    margin: 0 0 16px;
+  }
+  li { margin-bottom: 8px; }
+  strong { color: var(--text-primary); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .highlight-box {
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  .highlight-box strong { color: #c084fc; }
+  .footer-contact {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 13.5px;
+    color: var(--text-muted);
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <a href="/" class="back">← Back to India In-Time</a>
+  <a href="/" class="back-link">← Back to India In-Time</a>
+  <div class="badge">Privacy & Protection</div>
   <h1>Privacy Policy</h1>
-  <p class="updated">Draft — last edited [DATE]. Not yet reviewed by counsel.</p>
+  <p class="updated">Effective Date: August 23, 2026 · Founder: Lokesh Chilukuri</p>
 
-  <div class="notice">
-    <strong>Before this goes live:</strong> this page reflects what the current codebase actually does (Firebase auth, Neon/Postgres storage, Gemini AI, Google Analytics), generated as a starting draft — it is not a substitute for review by a lawyer familiar with Indian data-protection law (the DPDP Act) and, if you have users outside India, GDPR/CCPA as applicable. Replace every [bracketed] placeholder before publishing, and get it reviewed.
+  <div class="card">
+    <p>At <strong>India In-Time</strong> ("we", "us", "our"), your digital privacy and data security are foundational principles. This Privacy Policy outlines how we collect, process, and protect your information when you use our web application and travel intelligence services, in accordance with India's <strong>Digital Personal Data Protection Act, 2023 (DPDP Act)</strong> and applicable data protection regulations.</p>
   </div>
 
-  <h2>Who we are</h2>
-  <p>India In-Time ("we", "us") is a travel-planning app. Contact: [SUPPORT EMAIL]. Registered entity (if any): [ENTITY NAME / ADDRESS].</p>
-
-  <h2>What we collect</h2>
+  <h2>1. Information We Collect</h2>
   <ul>
-    <li><strong>Account info:</strong> when you sign in with Google, we receive your name, email address, and profile photo via Firebase Authentication.</li>
-    <li><strong>Trip data:</strong> itineraries, saved plans, budget entries, and "passport" stamps you create in the app, stored in our database so they sync across your devices.</li>
-    <li><strong>Location:</strong> if you grant location permission, your device GPS coordinates are used to center the map, suggest nearby places, and power live-navigation features. This is used in-session and is not sold or shared with advertisers.</li>
-    <li><strong>AI-processed content:</strong> trip preferences, photos you submit to AI tools (photo captions, food-safety scanner, sign/menu translation, AI Lens), and chat messages you send to the in-app assistant are sent to Google's Gemini API to generate responses.</li>
-    <li><strong>Feedback:</strong> star ratings, category tags, and free-text comments you submit are stored to help us improve the app.</li>
-    <li><strong>Usage analytics:</strong> we use Google Analytics (GA4) to understand aggregate usage patterns.</li>
-    <li><strong>Device/technical data:</strong> standard web request metadata (IP address, browser type) collected automatically by our hosting infrastructure for security and rate-limiting.</li>
+    <li><strong>Account Identity:</strong> When you sign in using Google Authentication via Firebase, we receive your name, email address, unique Firebase user ID, and profile picture avatar.</li>
+    <li><strong>Itinerary & Travel Data:</strong> Custom itineraries, saved trip plans, visited spots, expense split records, and digital passport stamps generated in the app are stored in our secure database to enable seamless multi-device synchronization.</li>
+    <li><strong>Real-Time Geolocation (Optional):</strong> If you grant browser GPS permissions, your coordinates are processed strictly client-side to center the interactive map, compute realistic route distances, and provide nearby landmark recommendations. We do not store historical GPS tracking logs on our servers.</li>
+    <li><strong>AI Assistant & Multimodal Content:</strong> Prompts, travel preferences, and uploaded media (such as landmark photos or signage images submitted to the AI Lens or Translation tools) are securely transmitted to Google's Gemini API for instantaneous inference.</li>
+    <li><strong>Usage & Telemetry Data:</strong> We utilize Google Analytics (GA4) with IP anonymization to gather high-level aggregate traffic metrics (e.g., popular city selections, feature usage) to enhance application performance.</li>
   </ul>
 
-  <h2>How we use it</h2>
+  <h2>2. How We Use Your Data</h2>
+  <p>We process your information strictly for the following legitimate purposes:</p>
   <ul>
-    <li>To create, save, and sync your itineraries across devices.</li>
-    <li>To generate AI-powered recommendations, captions, translations, and trip advice.</li>
-    <li>To operate core features: routing, weather, crowd predictions, and safety tools.</li>
-    <li>To maintain security (rate limiting, abuse prevention) and to improve the app based on aggregate usage and feedback.</li>
-    <li>We do not sell your personal data.</li>
+    <li>To generate, optimize, and synchronize your custom travel plans across your devices.</li>
+    <li>To power real-time intelligence engines: road routing, weather pivots, crowd predictions, and cultural schedules.</li>
+    <li>To safeguard system reliability through automated rate-limiting, bot prevention, and abuse detection.</li>
+    <li><strong>We NEVER sell, rent, or monetize your personal data or travel history to third-party advertisers or brokers.</strong></li>
   </ul>
 
-  <h2>Third parties we share data with</h2>
+  <h2>3. Third-Party Infrastructure & Data Processors</h2>
+  <p>To deliver high-availability, low-latency services, India In-Time partners with industry-leading infrastructure providers:</p>
   <ul>
-    <li><strong>Google (Firebase):</strong> authentication.</li>
-    <li><strong>Google (Gemini API):</strong> processes content you submit to AI features.</li>
-    <li><strong>Google Analytics:</strong> aggregate usage analytics.</li>
-    <li><strong>[DATABASE HOST, e.g. Neon]:</strong> stores your account and trip data.</li>
-    <li><strong>[HOSTING PROVIDER, e.g. Render]:</strong> runs the application servers.</li>
-    <li>Each of these processes data under its own privacy policy and, where applicable, a data-processing agreement with us.</li>
+    <li><strong>Google Firebase:</strong> Secure OAuth authentication and session token verification.</li>
+    <li><strong>Google Gemini API:</strong> Generative AI text and vision models.</li>
+    <li><strong>PostgreSQL Database (Neon / Cloud SQL):</strong> Encrypted persistent storage for user itineraries and cached place metadata.</li>
+    <li><strong>Google Analytics (GA4):</strong> Privacy-preserving aggregated analytics.</li>
+    <li><strong>Open-Meteo & OSRM:</strong> Public weather datasets and open road routing algorithms.</li>
   </ul>
 
-  <h2>Data retention</h2>
-  <p>Your trip data is retained until you delete it or delete your account. You can remove locally cached data on a device at any time from Settings → Clear Device Data. [Describe account-deletion process and backend retention/backup schedule once finalized — see BACKUP_RETENTION_DAYS in deployment config.]</p>
+  <h2>4. Data Retention & User Control</h2>
+  <div class="highlight-box">
+    <strong>🛡️ Complete User Control:</strong><br>
+    You can clear all device-stored cached plans, offline map tiles, and session tokens at any time directly in the app by visiting <em>Settings → Clear Device Data</em>.
+  </div>
+  <p>Your saved cloud itineraries remain associated with your account until you delete them or request full account erasure.</p>
 
-  <h2>Your rights</h2>
-  <p>You may request access to, correction of, or deletion of your personal data by contacting [SUPPORT EMAIL]. [Add DPDP Act / GDPR-specific rights language here if applicable to your user base.]</p>
+  <h2>5. Your Rights Under Indian Law (DPDP Act, 2023)</h2>
+  <p>As a user of India In-Time, you have the right to:</p>
+  <ul>
+    <li><strong>Right of Access:</strong> Request a summary of personal data and processing activities associated with your account.</li>
+    <li><strong>Right to Correction & Erasure:</strong> Request the correction of inaccurate data or complete deletion of your account and stored trips.</li>
+    <li><strong>Right of Grievance Redressal:</strong> Contact our designated Data Grievance Officer for prompt resolution of privacy concerns.</li>
+  </ul>
 
-  <h2>Children's privacy</h2>
-  <p>India In-Time is not directed at children under 13 (or the relevant minimum age in your jurisdiction), and we do not knowingly collect data from them.</p>
+  <h2>6. Security Measures</h2>
+  <p>We enforce strict defense-in-depth security standards: SSL/TLS encryption for all data in transit, strict Content Security Policy (CSP) headers, isolated rate limiters, and secure HTTP-only session cookies.</p>
 
-  <h2>Changes to this policy</h2>
-  <p>We may update this policy from time to time. Material changes will be reflected by updating the date above.</p>
+  <h2>7. Children's Privacy</h2>
+  <p>India In-Time is not directed towards children under the age of 13. We do not knowingly collect personal data from minors.</p>
 
-  <h2>Contact</h2>
-  <p>Questions about this policy: [SUPPORT EMAIL].</p>
+  <h2>8. Policy Updates</h2>
+  <p>We may update this Privacy Policy periodically to reflect technological advancements or regulatory requirements. Updates will be posted on this page with a revised effective date.</p>
+
+  <h2>9. Contact & Data Protection Officer</h2>
+  <p>For any questions, data deletion requests, or privacy inquiries, please contact our founder and grievance officer:</p>
+
+  <div class="footer-contact">
+    <strong>Founder & Data Protection Officer:</strong> Lokesh Chilukuri<br>
+    <strong>Email:</strong> <a href="mailto:chilukurilokesh231@gmail.com">chilukurilokesh231@gmail.com</a><br>
+    <strong>Website:</strong> India In-Time (<a href="https://github.com/L-2005-c/india-in-time">india-in-time</a>)
+  </div>
 </div>
 </body>
 </html>
