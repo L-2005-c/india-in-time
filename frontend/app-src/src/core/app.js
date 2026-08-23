@@ -1510,46 +1510,6 @@ const STATIC_ACTIONS = {
   openCommandPalette, closeCommandPalette, closePaletteOverlay, execPaletteCmd, toggleTheme,
   switchCity: (btn) => switchCity(btn?.value || btn?.dataset?.city || btn?.dataset?.arg),
   continueAsGuest,
-  setDays: (btn) => {
-    const days = parseInt(btn.dataset.days, 10);
-    if (!days) return;
-    const input = document.getElementById('n-days');
-    if (input) {
-      input.value = days;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    document.querySelectorAll('.day-chip').forEach(c => {
-      c.classList.toggle('active', parseInt(c.dataset.days, 10) === days);
-    });
-  },
-  setPace: (btn) => {
-    const pace = btn.dataset.pace;
-    if (!pace) return;
-    const sTime = document.getElementById('s-time');
-    const eTime = document.getElementById('e-time');
-    const tHours = document.getElementById('t-hours');
-    const breakEv = document.getElementById('break-every');
-    if (pace === 'relaxed') {
-      if (sTime) sTime.value = '10:00';
-      if (eTime) eTime.value = '16:00';
-      if (tHours) tHours.value = '6';
-      if (breakEv) breakEv.value = '90';
-    } else if (pace === 'balanced') {
-      if (sTime) sTime.value = '09:00';
-      if (eTime) eTime.value = '19:00';
-      if (tHours) tHours.value = '10';
-      if (breakEv) breakEv.value = '120';
-    } else if (pace === 'packed') {
-      if (sTime) sTime.value = '08:00';
-      if (eTime) eTime.value = '20:00';
-      if (tHours) tHours.value = '12';
-      if (breakEv) breakEv.value = '180';
-    }
-    document.querySelectorAll('.pace-chip').forEach(c => {
-      c.classList.toggle('active', c.dataset.pace === pace);
-    });
-  },
   // Settings modal & onboarding
   openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
@@ -2534,8 +2494,10 @@ function updateItinUI(){
       ? `<div style="font-size:10.5px;color:var(--brand, #38bdf8);margin-top:4px;display:flex;align-items:center;gap:4px;">✨ <em>${escapeHtml(loc.whyThisTime[0])}</em></div>`
       : '';
 
-    const advancedMeta = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${ritualHTML}${dishHTML}${armorHTML}${whyTimeNote}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View"><span>👀 360° View</span></a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="cursor:pointer"><span>🍽️ Food Guide</span></button><button data-action="chatAbout" data-name="${escapeHtml(loc.name)}" class="sc-action" title="Ask AI Concierge" style="cursor:pointer"><span>✨ Ask AI</span></button></div>`;
+    const timingWindow = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
+    const waitNote = loc.waitingMinutes ? `🧘 ${loc.waitingMinutes} min held to protect the higher-value experience window` : '';
+    const advancedMeta = [timingWindow, waitNote].filter(Boolean).join('<br>');
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${ritualHTML}${dishHTML}${armorHTML}${whyTimeNote}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const failedImg = div.querySelector('.sc-img');
     if (failedImg) failedImg.addEventListener('error', () => { failedImg.style.display = 'none'; }, { once: true });
