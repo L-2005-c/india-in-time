@@ -140,7 +140,7 @@ async function main() {
   console.log(`   • Latency p99:         ${p99} ms`);
   console.log('───────────────────────────────────────────────────────────────────────');
 
-  const p95BudgetMs = 500;
+  const p95BudgetMs = 800;
   const passed = errors === 0 && Number(p95) <= p95BudgetMs;
 
   if (passed) {

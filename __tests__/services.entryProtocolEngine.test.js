@@ -1,7 +1,7 @@
 // __tests__/services.entryProtocolEngine.test.js
 'use strict';
 
-const { getEntryProtocol, ENTRY_PROTOCOL_DATA } = require('../services/travelIntelligence/entryProtocolEngine');
+const { getEntryProtocol } = require('../services/travelIntelligence/entryProtocolEngine');
 
 describe('entryProtocolEngine', () => {
   test('returns shoe token, dress code, and camera rules for Simhachalam', () => {

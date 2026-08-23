@@ -3,7 +3,7 @@
 // temple sanctum closures (afternoon Naivedyam), light & sound shows, and weekend palace illuminations.
 'use strict';
 
-const { m2t, t2m } = require('./timeEngine');
+const { t2m } = require('./timeEngine');
 
 const CULTURAL_RITUAL_DATA = {
   // Visakhapatnam & AP

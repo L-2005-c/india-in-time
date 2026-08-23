@@ -1,7 +1,7 @@
 // __tests__/services.signatureDishEngine.test.js
 'use strict';
 
-const { getSignatureDish, SIGNATURE_DISH_REGISTRY } = require('../services/travelIntelligence/signatureDishEngine');
+const { getSignatureDish } = require('../services/travelIntelligence/signatureDishEngine');
 
 describe('signatureDishEngine', () => {
   test('returns iconic Irani Chai and Osmania Biscuits for Charminar', () => {

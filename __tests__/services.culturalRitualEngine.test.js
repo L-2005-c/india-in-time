@@ -1,7 +1,7 @@
 // __tests__/services.culturalRitualEngine.test.js
 'use strict';
 
-const { getCulturalRitualIntel, CULTURAL_RITUAL_DATA, matchCulturalEntry } = require('../services/travelIntelligence/culturalRitualEngine');
+const { getCulturalRitualIntel } = require('../services/travelIntelligence/culturalRitualEngine');
 
 describe('culturalRitualEngine', () => {
   test('accurately identifies evening aarti window for Varanasi Ghats', () => {
