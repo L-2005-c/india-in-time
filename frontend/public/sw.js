@@ -66,7 +66,18 @@ self.addEventListener('fetch', event => {
   // drift. Bypassing interception for these specific hosts removes the
   // connect-src dependency for them entirely, permanently — there is no
   // CSP entry left to accidentally omit.
-  const BYPASS_SW_HOSTS = ['unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'api.maptiler.com', 'images.unsplash.com'];
+  const BYPASS_SW_HOSTS = [
+    'unpkg.com',
+    'fonts.googleapis.com',
+    'fonts.gstatic.com',
+    'api.maptiler.com',
+    'images.unsplash.com',
+    'www.googletagmanager.com',
+    'googletagmanager.com',
+    'google-analytics.com',
+    'analytics.google.com',
+    'region1.google-analytics.com',
+  ];
   if (BYPASS_SW_HOSTS.includes(url.hostname)) return;
 
   // Always go to network for API calls

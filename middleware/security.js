@@ -43,6 +43,9 @@ function buildHelmetOptions() {
           'https://api.maptiler.com',        // Leaflet map tiles (primary, when MAPTILER_KEY is set)
           'https://*.googleusercontent.com', // Google/Firebase Auth profile photos (lh3/lh4/lh5...)
           'https://unpkg.com',               // Leaflet's own CSS pulls its marker/layer icon PNGs from unpkg via url()
+          'https://www.googletagmanager.com',// Google Tag Manager / GA4 tracking beacon images
+          'https://*.google-analytics.com',  // Google Analytics telemetry pings
+          'https://*.analytics.google.com',
         ],
         connectSrc: [
           "'self'",
@@ -52,6 +55,7 @@ function buildHelmetOptions() {
           'https://apis.google.com',                 // Firebase Auth's gapi loader (loaded via script-src above) calls back to this
           'https://www.googletagmanager.com',
           'https://*.google-analytics.com',
+          'https://*.analytics.google.com',
           'https://*.basemaps.cartocdn.com',
           'https://*.tile.openstreetmap.org',        // OSM fallback tile source
           'https://api.maptiler.com',                // MapTiler tile/config metadata calls, if any
