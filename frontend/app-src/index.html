@@ -231,218 +231,127 @@
     <!-- ═══ PLAN VIEW ═══ -->
     <div id="plan-view" class="view">
       <div id="phase1-section" class="plan-section">
-        <section class="plan-hero">
-          <div class="hero-grid">
-            <div class="hero-content">
-              <div class="hero-kicker">🧠 GeoAI Time Intelligence Engine</div>
-              <h1 class="hero-title">Know <em>exactly when</em> to visit — before you go.</h1>
-              <p class="hero-copy">The question every trip should start with: <strong>"When should I visit this place for the best possible experience?"</strong> India In-Time answers it with live crowd, weather, sunrise/sunset and seasonal data — then builds the itinerary around the answer.</p>
-              <div class="hero-actions">
-                <button class="hero-btn hero-btn-primary" data-action="focusCitySelect">Build a standout plan</button>
-                <button class="hero-btn hero-btn-secondary" data-action="switchToView" data-view="map-view" data-idx="0">Preview live map</button>
-                <button class="hero-btn hero-btn-secondary" data-action="showAppFeedback">💬 Feedback</button>
-              </div>
-              <div class="hero-metrics">
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Current city</div>
-                  <div class="hero-metric-value" id="hero-city">Visakhapatnam</div>
-                </div>
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Live weather</div>
-                  <div class="hero-metric-value mono" id="hero-weather">--</div>
-                </div>
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Curated stops</div>
-                  <div class="hero-metric-value" id="hero-places">Loading</div>
-                </div>
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Travel mode</div>
-                  <div class="hero-metric-value" id="hero-mode">Balanced</div>
-                </div>
+        <div class="planner-hub-card">
+          
+          <!-- 1. Destination Header -->
+          <div class="ph-header">
+            <div class="ph-title-wrap">
+              <span class="ph-icon">📍</span>
+              <div>
+                <div class="ph-label">Exploring City</div>
+                <div class="ph-city-name" id="hero-city">Visakhapatnam</div>
               </div>
             </div>
-            <div class="hero-visual">
-              <div class="hero-anim-canvas">
-                <!-- Animated gradient background layers -->
-                <div class="hanim-layer hanim-bg"></div>
-                <div class="hanim-layer hanim-aurora1"></div>
-                <div class="hanim-layer hanim-aurora2"></div>
-                <!-- Floating orbs -->
-                <div class="hanim-orb hanim-orb1"></div>
-                <div class="hanim-orb hanim-orb2"></div>
-                <div class="hanim-orb hanim-orb3"></div>
-                <!-- Grid shimmer overlay -->
-                <div class="hanim-grid"></div>
-                <!-- Floating travel icons -->
-                <div class="hanim-icons">
-                  <span class="hanim-icon hi1">🕌</span>
-                  <span class="hanim-icon hi2">🌴</span>
-                  <span class="hanim-icon hi3">⛵</span>
-                  <span class="hanim-icon hi4">🏔️</span>
-                  <span class="hanim-icon hi5">🎪</span>
-                  <span class="hanim-icon hi6">🦚</span>
-                </div>
-                <!-- Scan line animation -->
-                <div class="hanim-scan"></div>
+            <div class="ph-city-select-wrap">
+              <select class="ph-city-select" id="city-select" data-action="switchCity">
+                <optgroup label="Andhra Pradesh"><option value="vizag">🌴 Visakhapatnam</option></optgroup>
+                <optgroup label="Telangana"><option value="hyderabad">🕌 Hyderabad</option></optgroup>
+                <optgroup label="Delhi"><option value="delhi">🏛️ New Delhi</option></optgroup>
+                <optgroup label="Goa"><option value="goa">🏖️ North Goa</option></optgroup>
+                <optgroup label="Karnataka"><option value="bengaluru">🌳 Bengaluru</option></optgroup>
+                <optgroup label="Kerala"><option value="kochi">🛶 Kochi</option></optgroup>
+                <optgroup label="Maharashtra"><option value="mumbai">🎬 Mumbai</option></optgroup>
+                <optgroup label="Rajasthan">
+                  <option value="jaipur">🏰 Jaipur</option>
+                  <option value="udaipur">🌅 Udaipur</option>
+                </optgroup>
+                <optgroup label="Uttar Pradesh">
+                  <option value="agra">🕌 Agra</option>
+                  <option value="varanasi">🛕 Varanasi</option>
+                </optgroup>
+                <optgroup label="West Bengal"><option value="kolkata">🚊 Kolkata</option></optgroup>
+              </select>
+            </div>
+          </div>
+
+          <!-- Hidden synced inputs for compatibility with all algorithms & tests -->
+          <input type="text" id="city-input" class="setting-hidden" placeholder="Search city">
+          <button class="setting-hidden" data-action="focusCitySelect" aria-label="Focus city selector" aria-hidden="true"></button>
+          <button class="setting-hidden" data-action="searchCity" aria-label="Search destination city" aria-hidden="true"></button>
+          <div id="hero-weather" class="setting-hidden">--</div>
+          <div id="hero-places" class="setting-hidden">Loading</div>
+          <div id="hero-mode" class="setting-hidden">Balanced</div>
+
+          <!-- 2. Trip Duration Chips -->
+          <div class="ph-row">
+            <div class="ph-row-label">🗓️ Trip Duration</div>
+            <div class="ph-chip-group" id="days-chip-group">
+              <button type="button" class="ph-chip day-chip active" data-action="setDays" data-days="1">1 Day</button>
+              <button type="button" class="ph-chip day-chip" data-action="setDays" data-days="2">2 Days</button>
+              <button type="button" class="ph-chip day-chip" data-action="setDays" data-days="3">3 Days</button>
+              <button type="button" class="ph-chip day-chip" data-action="setDays" data-days="5">5 Days</button>
+            </div>
+            <input type="number" class="setting-hidden" id="n-days" value="1" min="1" max="7">
+          </div>
+
+          <!-- 3. Pace & Style Chips -->
+          <div class="ph-row">
+            <div class="ph-row-label">⚡ Pace & Style</div>
+            <div class="ph-chip-group" id="pace-chip-group">
+              <button type="button" class="ph-chip pace-chip" data-action="setPace" data-pace="relaxed">☕ Relaxed</button>
+              <button type="button" class="ph-chip pace-chip active" data-action="setPace" data-pace="balanced">⚖️ Balanced</button>
+              <button type="button" class="ph-chip pace-chip" data-action="setPace" data-pace="packed">🏃 Fast Pace</button>
+            </div>
+            <!-- Synced hidden inputs -->
+            <input type="time" class="setting-hidden" id="s-time" value="09:00">
+            <input type="time" class="setting-hidden" id="e-time" value="19:00">
+            <input type="number" class="setting-hidden" id="t-hours" value="10" min="0" max="23">
+            <input type="number" class="setting-hidden" id="t-minutes" value="0" min="0" max="59" step="15">
+            <input type="number" class="setting-hidden" id="t-time" value="600" step="30">
+            <input type="number" class="setting-hidden" id="break-every" value="120" min="0">
+            <input type="number" class="setting-hidden" id="break-duration" value="15" min="0">
+            <input type="number" class="setting-hidden" id="water-every" value="90" min="0">
+          </div>
+
+          <!-- 4. Top Interests -->
+          <div class="ph-row">
+            <div class="ph-row-label">✨ Top Interests</div>
+            <div class="exp-grid">
+              <label class="exp-chip"><input type="checkbox" value="beach" class="pref" checked>🏖️ Beaches</label>
+              <label class="exp-chip"><input type="checkbox" value="scenic" class="pref" checked>⛰️ Scenic</label>
+              <label class="exp-chip"><input type="checkbox" value="temple" class="pref">🛕 Temples</label>
+              <label class="exp-chip"><input type="checkbox" value="food" class="pref">🍛 Local Food</label>
+            </div>
+          </div>
+
+          <!-- 5. Group Style -->
+          <div class="ph-row">
+            <div class="ph-row-label">👥 Who's Traveling?</div>
+            <div class="exp-grid" id="trip-mode-grid">
+              <label class="exp-chip"><input type="radio" name="tripMode" value="solo" class="trip-mode-pref">🧍 Solo</label>
+              <label class="exp-chip"><input type="radio" name="tripMode" value="duo" class="trip-mode-pref" checked>👫 Duo</label>
+              <label class="exp-chip"><input type="radio" name="tripMode" value="family" class="trip-mode-pref">👨‍👩‍👧 Family</label>
+              <label class="exp-chip"><input type="radio" name="tripMode" value="group" class="trip-mode-pref">👥 Group</label>
+            </div>
+          </div>
+
+          <!-- 6. Compact AI Vibe & Budget -->
+          <div class="ph-row">
+            <div class="ph-row-label">💬 Custom Vibe & Budget</div>
+            <div class="ph-vibe-budget-row">
+              <input type="text" class="vibe-single-line" id="vibe" placeholder="e.g. peaceful sunset, authentic food, ocean breeze...">
+              <div class="ph-budget-pill" title="Total Trip Budget (₹)">
+                <span>₹</span>
+                <input type="number" id="trip-budget-input" value="5000" min="0" step="500" placeholder="5000">
               </div>
             </div>
           </div>
-        </section>
 
-        <div class="sec-label">Explore India</div>
-        <div class="search-bar-wrap">
-          <input type="text" id="city-input" class="search-inp" placeholder="Search any city or district…">
-          <button class="search-btn" data-action="searchCity">Search</button>
-        </div>
-
-        <div class="sec-label">Popular Destinations</div>
-        <select class="city-select" id="city-select" data-action="switchCity">
-          <optgroup label="Andhra Pradesh"><option value="vizag">🌴 Visakhapatnam</option></optgroup>
-          <optgroup label="Telangana"><option value="hyderabad">🕌 Hyderabad</option></optgroup>
-          <optgroup label="Delhi"><option value="delhi">🏛️ New Delhi</option></optgroup>
-          <optgroup label="Goa"><option value="goa">🏖️ North Goa</option></optgroup>
-          <optgroup label="Karnataka"><option value="bengaluru">🌳 Bengaluru</option></optgroup>
-          <optgroup label="Kerala"><option value="kochi">🛶 Kochi</option></optgroup>
-          <optgroup label="Maharashtra"><option value="mumbai">🎬 Mumbai</option></optgroup>
-          <optgroup label="Rajasthan">
-            <option value="jaipur">🏰 Jaipur</option>
-            <option value="udaipur">🌅 Udaipur</option>
-          </optgroup>
-          <optgroup label="Uttar Pradesh">
-            <option value="agra">🕌 Agra</option>
-            <option value="varanasi">🛕 Varanasi</option>
-          </optgroup>
-          <optgroup label="West Bengal"><option value="kolkata">🚊 Kolkata</option></optgroup>
-        </select>
-
-        <div class="sec-label">Trip Settings</div>
-        <div class="planner-config-grid">
-          <div class="planner-config-card">
-            <div class="planner-config-head">
-              <div class="planner-config-title">Trip Window</div>
-              <div class="planner-config-note">Start, finish, and duration stay in sync.</div>
-            </div>
-            <div class="setting-stack">
-              <div class="setting-card">
-                <div class="setting-lbl">Days</div>
-                <input type="number" class="setting-inp" id="n-days" value="1" min="1" max="7">
-              </div>
-              <div class="setting-card">
-                <div class="setting-lbl">Start Time</div>
-                <input type="time" class="setting-inp" id="s-time" value="09:00">
-              </div>
-              <div class="setting-card">
-                <div class="setting-lbl">End Time</div>
-                <input type="time" class="setting-inp" id="e-time" value="19:00">
-              </div>
-              <div class="setting-card">
-                <div class="setting-lbl">Duration Hours</div>
-                <input type="number" class="setting-inp" id="t-hours" value="10" min="0" max="23">
-              </div>
-              <div class="setting-card">
-                <div class="setting-lbl">Duration Minutes</div>
-                <input type="number" class="setting-inp" id="t-minutes" value="0" min="0" max="59" step="15">
-              </div>
-              <input type="number" class="setting-inp setting-hidden" id="t-time" value="600" step="30">
-            </div>
+          <!-- 7. Primary Action Button -->
+          <div class="ph-cta-row">
+            <button class="btn-gen btn-gen-hero" data-action="generatePlan">
+              <span>✨ Generate Smart Itinerary</span> <span>✦</span>
+            </button>
           </div>
-          <div class="planner-config-card">
-            <div class="planner-config-head">
-              <div class="planner-config-title">Break Comfort</div>
-              <div class="planner-config-note">Add planned rest pauses between stops.</div>
-            </div>
-            <div class="setting-stack">
-              <div class="setting-card">
-                <div class="setting-lbl">Break Every</div>
-                <input type="number" class="setting-inp" id="break-every" value="120" min="0" step="15">
-              </div>
-              <div class="setting-card">
-                <div class="setting-lbl">Break For</div>
-                <input type="number" class="setting-inp" id="break-duration" value="15" min="0" step="5">
-              </div>
-            </div>
-            <div class="setting-inline-note">Set either field to `0` if you want a nonstop day.</div>
+
+          <!-- 8. Secondary Quick Actions -->
+          <div class="ph-secondary-row">
+            <button class="ph-sec-btn" data-action="openCustomizeModal">🛠️ Customize Places</button>
+            <button class="ph-sec-btn" data-action="toggleLoadPanel">📂 Saved Trips</button>
+            <button class="ph-sec-btn" data-action="showAppFeedback">💬 Feedback</button>
           </div>
-          <div class="planner-config-card">
-            <div class="planner-config-head">
-              <div class="planner-config-title">Health Reminders</div>
-              <div class="planner-config-note">Water and pause nudges can be scheduled together.</div>
-            </div>
-            <div class="setting-stack three">
-              <div class="setting-card">
-                <div class="setting-lbl">Drink Water Every</div>
-                <input type="number" class="setting-inp" id="water-every" value="90" min="0" step="15">
-              </div>
-            </div>
-            <div class="setting-inline-note">Notifications include hydration reminders plus stop closing alerts.</div>
-          </div>
-        </div>
 
-        <div class="planner-insights">
-          <div class="insight-card">
-            <div class="insight-label">Trip Positioning</div>
-            <div class="insight-value" id="insight-style">Balanced luxury</div>
-            <div class="insight-copy" id="insight-style-copy">Designed to feel premium while staying clear, friendly, and easy for first-time users.</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-label">Time Architecture</div>
-            <div class="insight-value" id="insight-time">1 day / 10h</div>
-            <div class="insight-copy" id="insight-time-copy">The planner adapts route density, weather windows, and stop pacing automatically.</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-label">AI Focus</div>
-            <div class="insight-value" id="insight-focus">Scenic + local</div>
-            <div class="insight-copy" id="insight-focus-copy">Use preferences and vibe prompts to shape the story your itinerary tells.</div>
-          </div>
         </div>
-
-        <div class="sec-label">Experiences</div>
-        <div class="exp-grid">
-          <label class="exp-chip"><input type="checkbox" value="beach" class="pref" checked>🏖️ Beaches</label>
-          <label class="exp-chip"><input type="checkbox" value="scenic" class="pref" checked>⛰️ Scenic</label>
-          <label class="exp-chip"><input type="checkbox" value="temple" class="pref">🛕 Temples</label>
-          <label class="exp-chip"><input type="checkbox" value="food" class="pref">🍛 Local Food</label>
-        </div>
-
-        <div class="sec-label">Who's Traveling? <span style="font-weight:400;color:var(--text-muted);font-size:11px">— tailors stop picks, food/gem suggestions &amp; budget tips to your group</span></div>
-        <div class="exp-grid" id="trip-mode-grid">
-          <label class="exp-chip"><input type="radio" name="tripMode" value="solo" class="trip-mode-pref">🧍 Solo</label>
-          <label class="exp-chip"><input type="radio" name="tripMode" value="duo" class="trip-mode-pref">👫 Duo</label>
-          <label class="exp-chip"><input type="radio" name="tripMode" value="trio" class="trip-mode-pref">🧑‍🤝‍🧑 Trio</label>
-          <label class="exp-chip"><input type="radio" name="tripMode" value="family" class="trip-mode-pref">👨‍👩‍👧 Family</label>
-          <label class="exp-chip"><input type="radio" name="tripMode" value="group" class="trip-mode-pref">👥 Group</label>
-        </div>
-
-        <div class="sec-label">Traveler Style <span style="font-weight:400;color:var(--text-muted);font-size:11px">— personalizes stop scoring &amp; ordering</span></div>
-        <div class="exp-grid" id="persona-grid">
-          <label class="exp-chip"><input type="checkbox" value="photographer" class="persona-pref">📷 Photographer</label>
-          <label class="exp-chip"><input type="checkbox" value="family" class="persona-pref">👨‍👩‍👧 Family</label>
-          <label class="exp-chip"><input type="checkbox" value="adventure" class="persona-pref">🧗 Adventure</label>
-          <label class="exp-chip"><input type="checkbox" value="food_lover" class="persona-pref">🍜 Food Lover</label>
-          <label class="exp-chip"><input type="checkbox" value="history" class="persona-pref">🏛️ History</label>
-          <label class="exp-chip"><input type="checkbox" value="nature" class="persona-pref">🌿 Nature</label>
-        </div>
-
-        <div class="vibe-section">
-          <div class="vibe-lbl">✨ AI Vibe</div>
-          <textarea class="vibe-area" id="vibe" placeholder="Describe your mood… e.g., peaceful sunrise by the beach with local breakfast"></textarea>
-        </div>
-
-        <div class="sec-label">Trip Budget</div>
-        <div class="setting-card" style="margin-bottom:14px">
-          <div class="setting-lbl">Your Total Budget (₹)</div>
-          <input type="number" class="setting-inp" id="trip-budget-input" value="5000" min="0" step="500" placeholder="e.g. 5000">
-        </div>
-
-        <div style="display:flex;gap:10px;">
-          <button class="btn-gen" data-action="openCustomizeModal" style="flex:1;background:var(--bg-layer3);border:1px solid var(--border-strong);color:var(--text-primary);">
-            <span>Customize Places</span> <span>🛠️</span>
-          </button>
-          <button class="btn-gen" data-action="generatePlan" style="flex:1;">
-            <span>Generate Itinerary</span> <span>✦</span>
-          </button>
-        </div>
-        <button class="btn-secondary" data-action="toggleLoadPanel">📂 Load Saved Itinerary</button>
       </div>
 
       <div id="plan-summary-banner" class="plan-summary-banner" style="display:none">
