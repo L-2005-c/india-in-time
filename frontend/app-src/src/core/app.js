@@ -1482,11 +1482,8 @@ function execPaletteCmd(btn) {
   closeCommandPalette();
 
   if (cmd.type === 'city' && cmd.cityKey) {
-    const sel = document.getElementById('city-select');
-    if (sel) {
-      sel.value = cmd.cityKey;
-      sel.dispatchEvent(new Event('change'));
-    }
+    const key = cmd.cityKey === 'visakhapatnam' ? 'vizag' : cmd.cityKey;
+    switchCity(key);
     _showMicroToast(`Destination set to ${cmd.title.replace('Switch Destination: ', '')}`, { icon: cmd.icon });
     generatePlan();
     return;
@@ -1511,6 +1508,7 @@ const STATIC_ACTIONS = {
   openOfflinePass, closeOfflinePassModal, shareWhatsAppPass, pivotMonsoonMode, pivotHeatEscapeMode,
   printPass: () => window.print(),
   openCommandPalette, closeCommandPalette, closePaletteOverlay, execPaletteCmd, toggleTheme,
+  switchCity: (btn) => switchCity(btn?.value || btn?.dataset?.city || btn?.dataset?.arg),
   // Settings modal & onboarding
   openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
@@ -1630,11 +1628,17 @@ document.addEventListener('input', (e) => {
   if (el) onTimeSliderChange(el.value);
 });
 document.addEventListener('change', (e) => {
-  const el = e.target.closest('[data-file-action]');
-  if (!el) return;
-  const handlers = { handleArOverlay, handleFoodSafety, handleCaption, handleTranslate, handleAiLens };
-  const fn = handlers[el.dataset.fileAction];
-  if (typeof fn === 'function') fn(e);
+  const fileEl = e.target.closest('[data-file-action]');
+  if (fileEl) {
+    const handlers = { handleArOverlay, handleFoodSafety, handleCaption, handleTranslate, handleAiLens };
+    const fn = handlers[fileEl.dataset.fileAction];
+    if (typeof fn === 'function') fn(e);
+    return;
+  }
+  const cityEl = e.target.closest('#city-select, [data-action="switchCity"]');
+  if (cityEl) {
+    switchCity(cityEl.value || cityEl.dataset?.city || cityEl.dataset?.arg);
+  }
 });
 document.addEventListener('input', (e) => {
   const el = e.target.closest('[data-input-action]');
@@ -3515,10 +3519,13 @@ window.onload=()=>{
 
   document.getElementById('chat-in').addEventListener('keypress',e=>{if(e.key==='Enter')handleChat();});
   document.getElementById('city-input').addEventListener('keypress',e=>{if(e.key==='Enter')searchCity();});
-  syncPlannerTimeFields('duration');
-  ['n-days','t-time','t-hours','t-minutes','break-every','break-duration','water-every','vibe','city-select'].forEach(id=>{
+  ['n-days','t-time','t-hours','t-minutes','break-every','break-duration','water-every','vibe'].forEach(id=>{
     document.getElementById(id)?.addEventListener('input', updatePlannerShowcase);
     document.getElementById(id)?.addEventListener('change', updatePlannerShowcase);
+  });
+  document.getElementById('city-select')?.addEventListener('change', (e) => {
+    if (e.target.value) switchCity(e.target.value);
+    updatePlannerShowcase();
   });
   document.getElementById('s-time')?.addEventListener('input', ()=>{syncPlannerTimeFields('start');updatePlannerShowcase();});
   document.getElementById('s-time')?.addEventListener('change', ()=>{syncPlannerTimeFields('start');updatePlannerShowcase();});

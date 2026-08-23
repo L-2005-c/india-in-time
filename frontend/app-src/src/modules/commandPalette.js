@@ -22,7 +22,7 @@ export const PALETTE_COMMANDS = [
   { id: 'city-bengaluru', category: 'Destinations', title: 'Switch Destination: Bengaluru', subtitle: 'Lush gardens, palace heritage & vibrant craft brewing', icon: '🌳', type: 'city', cityKey: 'bengaluru' },
   { id: 'city-jaipur', category: 'Destinations', title: 'Switch Destination: Jaipur (Pink City)', subtitle: 'Royal Rajput hill forts, Amber Palace & Johari Bazaar', icon: '🏰', type: 'city', cityKey: 'jaipur' },
   { id: 'city-varanasi', category: 'Destinations', title: 'Switch Destination: Varanasi (Kashi)', subtitle: 'Sacred Ganga ghats, evening Maha Aarti & silk weavers', icon: '🪔', type: 'city', cityKey: 'varanasi' },
-  { id: 'city-visakhapatnam', category: 'Destinations', title: 'Switch Destination: Visakhapatnam (Vizag)', subtitle: 'Scenic coastal drive, Kailasagiri & submarine museum', icon: '⚓', type: 'city', cityKey: 'visakhapatnam' },
+  { id: 'city-visakhapatnam', category: 'Destinations', title: 'Switch Destination: Visakhapatnam (Vizag)', subtitle: 'Scenic coastal drive, Kailasagiri & submarine museum', icon: '⚓', type: 'city', cityKey: 'vizag' },
   { id: 'city-hyderabad', category: 'Destinations', title: 'Switch Destination: Hyderabad', subtitle: 'Nizam palaces, Golconda sound show & Charminar chai', icon: '💎', type: 'city', cityKey: 'hyderabad' },
   { id: 'city-goa', category: 'Destinations', title: 'Switch Destination: Goa', subtitle: 'Portuguese cathedrals, golden beaches & coastal thalis', icon: '🌴', type: 'city', cityKey: 'goa' },
   { id: 'city-amritsar', category: 'Destinations', title: 'Switch Destination: Amritsar', subtitle: 'Golden Temple Darbar, Wagah Border & kulcha trails', icon: '✨', type: 'city', cityKey: 'amritsar' },
