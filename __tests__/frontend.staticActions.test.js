@@ -162,7 +162,7 @@ describe('index.html data-action values <-> app.js dispatch tables — real-file
       'showFestivalRadar', 'showHiddenGems', 'showHartaalAlert', 'showCrowdPredictor',
       'showFareNegotiator', 'showTripTribe', 'shareEmergency', 'addExpense', 'analyzeBudget',
       'delExp', 'delPlan', 'loadPlan', 'loadCloudPlan', 'speak', 'chatAbout', 'aiFoodCard',
-      'clickFileInput', 'drawerRun', 'drawerFile', 'shareWhatsAppPass', 'printPass',
+      'clickFileInput', 'drawerRun', 'drawerFile', 'shareWhatsAppPass', 'printPass', 'execPaletteCmd',
     ]);
     const unused = [...staticActionKeys].filter(
       (k) => !htmlActions.has(k) && !dynamicOnly.has(k) && !appJs.includes(`data-action="${k}"`)

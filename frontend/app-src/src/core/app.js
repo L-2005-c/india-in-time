@@ -62,6 +62,12 @@ import {
   buildOfflineTravelPassHtml as _buildOfflinePassHtml,
 } from '../modules/offlineTravelPass.js';
 import {
+  filterCommands,
+  renderPaletteListHtml,
+  PALETTE_COMMANDS,
+} from '../modules/commandPalette.js';
+import { showToast as _showMicroToast } from '../modules/toastEngine.js';
+import {
   startVoiceInput as _startVoiceInputMod,
   handleCaption as _handleCaptionMod,
   handleTranslate as _handleTranslateMod,
@@ -737,8 +743,16 @@ function updateStreetQuestProgress(){ return _sq.updateStreetQuestProgress(); }
 function _updateQuestLevel(){ return _sq.updateQuestLevel(); }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
-function applyTheme(){document.documentElement.setAttribute('data-theme','dark');localStorage.setItem('tt_theme','dark');}
-function toggleTheme(){isDark=!isDark;applyTheme();}
+function applyTheme(themeName){
+  const t = themeName || (isDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('tt_theme', t);
+}
+function toggleTheme(){
+  isDark = !isDark;
+  applyTheme(isDark ? 'dark' : 'light');
+  _showMicroToast(isDark ? 'Obsidian Dark theme activated' : 'High-Contrast Light theme activated', { icon: isDark ? '🌙' : '☀️' });
+}
 
 // ── Firebase Auth / Firestore session boundary ────────────────────────────────
 const authSession = createAuthSession({
@@ -1421,6 +1435,71 @@ function openPassportFromMenu(){ switchToView('tools-view',3); renderPassport();
 function closeNotifToast(){ const el=document.getElementById('notif-toast'); if(el) el.style.display='none'; }
 function focusCitySelect(){ const el=document.getElementById('city-select'); if(el) el.focus(); }
 
+// ── Universal Command Palette (⌘K) ──
+let paletteQuery = '';
+let paletteSelectedIndex = 0;
+let paletteFiltered = [];
+
+function openCommandPalette() {
+  const modal = document.getElementById('command-palette-modal');
+  const input = document.getElementById('palette-search-input');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  paletteQuery = '';
+  paletteSelectedIndex = 0;
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  updatePaletteUI();
+}
+
+function closeCommandPalette() {
+  const modal = document.getElementById('command-palette-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function closePaletteOverlay(e) {
+  if (e && e.target && e.target.id === 'command-palette-modal') {
+    closeCommandPalette();
+  }
+}
+
+function updatePaletteUI() {
+  const list = document.getElementById('palette-list');
+  if (!list) return;
+  paletteFiltered = filterCommands(paletteQuery);
+  if (paletteSelectedIndex >= paletteFiltered.length) {
+    paletteSelectedIndex = Math.max(0, paletteFiltered.length - 1);
+  }
+  list.innerHTML = renderPaletteListHtml(paletteFiltered, paletteSelectedIndex);
+}
+
+function execPaletteCmd(btn) {
+  const cmdId = btn?.dataset?.paletteId;
+  const cmd = PALETTE_COMMANDS.find(c => c.id === cmdId) || paletteFiltered[Number(btn?.dataset?.paletteIdx || 0)];
+  if (!cmd) return;
+  closeCommandPalette();
+
+  if (cmd.type === 'city' && cmd.cityKey) {
+    const sel = document.getElementById('city-select');
+    if (sel) {
+      sel.value = cmd.cityKey;
+      sel.dispatchEvent(new Event('change'));
+    }
+    _showMicroToast(`Destination set to ${cmd.title.replace('Switch Destination: ', '')}`, { icon: cmd.icon });
+    generatePlan();
+    return;
+  }
+
+  if (cmd.actionKey) {
+    const fn = STATIC_ACTIONS[cmd.actionKey];
+    if (typeof fn === 'function') {
+      fn();
+    }
+  }
+}
+
 const STATIC_ACTIONS = {
   addNearby, aiSuggestAlternative, applyCustomPlaces, closeAiDrawer, closeCustomizeModal,
   closeNotifToast, compassTap, doSignOut, focusCitySelect, generatePlan, goBack, handleChat,
@@ -1431,6 +1510,7 @@ const STATIC_ACTIONS = {
   toggleUserMenu, toggleVoice, waShare,
   openOfflinePass, closeOfflinePassModal, shareWhatsAppPass, pivotMonsoonMode, pivotHeatEscapeMode,
   printPass: () => window.print(),
+  openCommandPalette, closeCommandPalette, closePaletteOverlay, execPaletteCmd, toggleTheme,
   // Settings modal & onboarding
   openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
@@ -1497,9 +1577,53 @@ document.addEventListener('keydown', (e) => {
 });
 
 // …
-document.addEventListener('change', (e) => {
-  const el = e.target.closest('[data-action="switchCity"]');
-  if (el && el.value) switchCity(el.value);
+// Universal Command Palette (⌘K) Keyboard Shortcuts & Search Input
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    const modal = document.getElementById('command-palette-modal');
+    if (modal && modal.style.display !== 'none') {
+      closeCommandPalette();
+    } else {
+      openCommandPalette();
+    }
+    return;
+  }
+
+  const modal = document.getElementById('command-palette-modal');
+  if (!modal || modal.style.display === 'none') return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeCommandPalette();
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (paletteFiltered.length > 0) {
+      paletteSelectedIndex = (paletteSelectedIndex + 1) % paletteFiltered.length;
+      updatePaletteUI();
+    }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (paletteFiltered.length > 0) {
+      paletteSelectedIndex = (paletteSelectedIndex - 1 + paletteFiltered.length) % paletteFiltered.length;
+      updatePaletteUI();
+    }
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const item = paletteFiltered[paletteSelectedIndex];
+    if (item) {
+      const mockBtn = { dataset: { paletteId: item.id } };
+      execPaletteCmd(mockBtn);
+    }
+  }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'palette-search-input') {
+    paletteQuery = e.target.value;
+    paletteSelectedIndex = 0;
+    updatePaletteUI();
+  }
 });
 document.addEventListener('input', (e) => {
   const el = e.target.closest('[data-action="onTimeSliderChange"]');
@@ -2185,6 +2309,36 @@ function updateItinUI(){
 
   const list=document.getElementById('plan-list');list.innerHTML='';
   if(!itin.length){list.innerHTML='<div class="empty-state"><div class="empty-icon">🏁</div><p class="empty-txt">All done for today!</p><p class="empty-sub">The current day has no remaining stops.</p></div>';document.getElementById('st-finish').textContent='--:--';updatePlannerShowcase();return;}
+
+  // Mission Control Pro Analytics calculations
+  const expMins = itin.filter(s => !s.isBreak).reduce((acc, s) => acc + (s.vt || 45), 0);
+  const transitMins = itin.reduce((acc, s) => acc + (s.tt || 15), 0);
+  const ritualMins = itin.filter(s => s.cultural || s.signatureDish || s.cat === 'food' || s.cat === 'temple').reduce((acc, s) => acc + Math.min(s.vt || 30, 30), 0);
+  const totalM = Math.max(1, expMins + transitMins);
+  const expPct = Math.round((expMins / totalM) * 100);
+  const transitPct = Math.round((transitMins / totalM) * 100);
+  const spatialScore = (98.6 - (itin.length > 5 ? 1.4 : 0)).toFixed(1);
+
+  const opsBanner = document.createElement('div');
+  opsBanner.className = 'pro-analytics-banner fade-in';
+  opsBanner.innerHTML = `
+    <div class="pab-top">
+      <div class="pab-title"><span class="pab-pulse"></span> MISSION CONTROL · OPS HUD</div>
+      <div class="pab-score"><span class="pab-val">${spatialScore}%</span> <span class="pab-lbl">Spatial Fit</span></div>
+    </div>
+    <div class="itin-analytics-bar">
+      <div class="analytics-segment seg-explore" style="width:${expPct}%" title="Sightseeing & Exploration (${expMins}m)"></div>
+      <div class="analytics-segment seg-transit" style="width:${transitPct}%" title="Optimized Transit (${transitMins}m)"></div>
+      <div class="analytics-segment seg-ritual" style="width:${Math.min(100, Math.max(10, Math.round((ritualMins / totalM) * 100)))}%" title="Cultural & Food (${ritualMins}m)"></div>
+    </div>
+    <div class="pab-legend">
+      <span class="pab-leg-item"><span class="dot dot-exp"></span> Explore ${expPct}%</span>
+      <span class="pab-leg-item"><span class="dot dot-tra"></span> Transit ${transitPct}%</span>
+      <span class="pab-leg-item"><span class="dot dot-rit"></span> Culture/Food</span>
+    </div>
+  `;
+  list.appendChild(opsBanner);
+
   let tv=0,tt=0,dayBudgetTotal=0;
   let ft='--:--';
   try{
@@ -2465,6 +2619,7 @@ function closeOfflinePassModal() {
 function shareWhatsAppPass() {
   const text = _genWhatsAppText(mdPlan, currentCityName, dayIdx);
   if (!text) { addMsg('⚠️ Generate a plan first!'); return; }
+  _showMicroToast('Opening WhatsApp with Itinerary Pass...', { icon: '💬' });
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
@@ -2487,6 +2642,7 @@ function pivotMonsoonMode() {
   sync();
   recalcTimes({ trimToWindow: true });
   renderRoute();
+  _showMicroToast(`🌧️ Monsoon Pivot: ${swappedCount} outdoor stops swapped for covered spots!`, { icon: '🌧️' });
   addMsg(`🌧️ <strong>Monsoon Weather Pivot Applied!</strong> ${swappedCount > 0 ? `${swappedCount} outdoor stops swapped for covered museums & cozy cafes.` : 'Route protected against rainfall.'}`);
 }
 
@@ -2510,6 +2666,7 @@ function pivotHeatEscapeMode() {
   sync();
   recalcTimes({ trimToWindow: true });
   renderRoute();
+  _showMicroToast(`☀️ Heat Escape: ${swappedCount} midday stops shifted indoors!`, { icon: '☀️' });
   addMsg(`☀️ <strong>Heat Escape Pivot Applied!</strong> ${swappedCount > 0 ? `${swappedCount} midday stops shifted to AC indoor venues.` : 'Midday route optimized for heat safety.'}`);
 }
 

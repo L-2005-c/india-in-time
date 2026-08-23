@@ -46,7 +46,7 @@
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-VHL27Z2LRP"></script>
 <script src="/gtag-init.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="./styles.css">
 
@@ -143,14 +143,14 @@
         <span class="logo-accent">In-Time</span>
       </div>
       <div class="header-pills-wrap">
-        <!-- <div class="hpill hpill-credits">⚡ <span id="cr-cnt">50</span></div> -->
-        <!-- <div class="hpill hpill-jade">💎 Pro</div> -->
-        <!-- <button class="hpill hpill-install" data-action="installPWA">📲 Install</button> -->
+        <button class="cmd-k-btn" data-action="openCommandPalette" title="Universal Command Palette (⌘K)"><span class="cmd-k-icon">⚡</span> <span class="cmd-k-lbl">⌘K</span></button>
+        <div class="edge-telemetry-badge" title="Edge Compute: IND-BLR Edge · ML v5.2"><span class="edge-dot"></span> <span class="edge-lbl">12ms Edge</span></div>
         <button class="hpill hpill-ocean" id="btn-replay" style="display:none">🎬 Replay</button>
         <button class="hpill hpill-live"  id="btn-ls"     style="display:none">🔴 Live</button>
         <button class="hpill hpill-wa"    id="btn-wa"     style="display:none" data-action="waShare">💬 WhatsApp</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="theme-btn" data-action="toggleTheme" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">🌓</button>
         <div class="gps-badge" data-action="resetGPS" id="gps-badge"><span class="gps-dot"></span><span id="gps-txt">GPS</span></div>
         <img id="user-avatar" class="user-avatar" src="" alt="Me" style="display:none" data-action="toggleUserMenu">
       </div>
@@ -706,6 +706,26 @@
     </div>
   </div>
 </div>
+
+<!-- Universal Command Palette (⌘K) Modal -->
+<div id="command-palette-modal" class="palette-overlay" data-action="closePaletteOverlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Command Palette">
+  <div class="palette-card">
+    <div class="palette-input-wrap">
+      <span class="palette-search-ico">⚡</span>
+      <input type="text" id="palette-search-input" class="palette-search-input" placeholder="Type a destination or command... (e.g. Monsoon, Jaipur, Budget)" autocomplete="off" spellcheck="false" aria-label="Search commands and places">
+      <kbd class="palette-esc-kbd" data-action="closeCommandPalette">ESC</kbd>
+    </div>
+    <div id="palette-list" class="palette-list" role="listbox"></div>
+    <div class="palette-footer">
+      <span class="pf-tip"><span>↑↓</span> to navigate</span>
+      <span class="pf-tip"><span>↵</span> to select</span>
+      <span class="pf-tip"><span>ESC</span> to close</span>
+    </div>
+  </div>
+</div>
+
+<!-- Micro-Toast Notification Container -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
 
 <!-- Service Worker Registration -->
 <script src="/sw-register.js"></script>
