@@ -1694,12 +1694,19 @@ body::before {
 
 /* ── Extra small phones (≤360px) ── */
 @media(max-width:360px){
-  .logo{font-size:14px;gap:5px;}
-  .header-logo-mark{height:22px;width:auto;}
-  .hpill{padding:4px 8px;font-size:8.5px;gap:3px;}
-  .gps-badge{padding:3px 6px;font-size:7.5px;}
-  .theme-btn{width:30px;height:30px;font-size:13px;}
-  .user-avatar{width:28px;height:28px;}
+  #header{padding:0 6px;}
+  .header-inner{gap:4px;}
+  .logo{font-size:12px;gap:3px;flex-shrink:0;}
+  .header-logo-mark{height:18px;width:auto;}
+  #hdr-city{max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
+  .header-pills-wrap{flex:1 1 auto;min-width:60px;gap:3px;padding:2px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .cmd-k-btn{padding:2px 5px;font-size:9px;gap:2px;}
+  .edge-telemetry-badge{padding:2px 4px;font-size:7.5px;gap:3px;}
+  .edge-lbl{font-size:7.5px;}
+  .hpill{padding:3px 6px;font-size:8px;gap:2px;}
+  .gps-badge{padding:2px 5px;font-size:7px;}
+  .theme-btn{width:26px;height:26px;font-size:11px;}
+  .user-avatar{width:24px;height:24px;}
   .hero-title{font-size:20px;max-width:100%;}
   .hero-copy{font-size:11px;}
   .hero-kicker{font-size:8px;padding:3px 7px;}
@@ -1751,8 +1758,19 @@ body::before {
 
 /* ── Small phones (≤480px) ── */
 @media(max-width:480px){
-  .hpill{padding:5px 10px;font-size:9.5px;}
-  .gps-badge{padding:4px 7px;font-size:8px;}
+  #header{padding:0 8px;}
+  .header-inner{gap:6px;}
+  .logo{font-size:13px;gap:4px;flex-shrink:0;}
+  .header-logo-mark{height:20px;width:auto;}
+  #hdr-city{max-width:85px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
+  .header-pills-wrap{flex:1 1 auto;min-width:80px;gap:4px;padding:2px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .cmd-k-btn{padding:3px 6px;font-size:9.5px;gap:3px;}
+  .edge-telemetry-badge{padding:3px 5px;font-size:8px;gap:3px;}
+  .edge-lbl{font-size:8px;}
+  .hpill{padding:3px 7px;font-size:9px;gap:3px;}
+  .gps-badge{padding:3px 6px;font-size:8px;}
+  .theme-btn{width:28px;height:28px;font-size:12px;}
+  .user-avatar{width:26px;height:26px;}
   .hero-grid{grid-template-columns:1fr;}
   .hero-visual{min-height:130px;max-height:150px;border-radius:16px;}
   .hero-title{font-size:clamp(21px, 5.5vw, 26px);max-width:100%;}
@@ -1775,6 +1793,15 @@ body::before {
 
 /* ── Medium phones & small tablets (≤720px) ── */
 @media(max-width:720px){
+  #header{padding:0 12px;}
+  .header-inner{gap:8px;}
+  .logo{font-size:14px;gap:6px;flex-shrink:0;}
+  .header-logo-mark{height:22px;width:auto;}
+  #hdr-city{max-width:105px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
+  .header-pills-wrap{flex:1 1 auto;min-width:100px;gap:5px;padding:3px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .cmd-k-btn{padding:3.5px 7px;font-size:10px;gap:3px;}
+  .edge-telemetry-badge{padding:3.5px 6px;font-size:8.5px;}
+  .hpill{padding:4px 8px;font-size:9.5px;}
   .hero-grid{grid-template-columns:1fr;}
   .planner-insights{grid-template-columns:1fr;}
   .planner-config-grid{grid-template-columns:1fr;}
@@ -2095,10 +2122,12 @@ body::after{
     0 1px 0 rgba(168,85,247,.06) inset;
 }
 
-/* Scroll indicator fade for pills */
-.header-pills-wrap{
-  mask-image:linear-gradient(to right,black 85%,transparent 100%);
-  -webkit-mask-image:linear-gradient(to right,black 85%,transparent 100%);
+/* Scroll indicator fade for desktop pills */
+@media (min-width: 1024px) {
+  .header-pills-wrap {
+    mask-image: linear-gradient(to right, black 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 88%, transparent 100%);
+  }
 }
 
 /* Smooth scrolling everywhere */
