@@ -488,11 +488,19 @@
         <div class="itin-hdr">
           <div class="itin-title">Itinerary</div>
           <div class="itin-actions">
-            <button class="itn-btn itnb-green" id="btn-save"  style="display:none" data-action="saveIt">💾 Save</button>
-            <button class="itn-btn itnb-blue"  id="btn-share" style="display:none" data-action="shareIt">📤 Share</button>
-            <button class="itn-btn itnb-teal"  data-action="switchToView" data-view="tools-view" data-idx="4">💸 Budget</button>
+            <button class="itn-btn itnb-green" id="btn-save" style="display:none" data-action="saveIt">💾 Save</button>
+            <button class="itn-btn itnb-gold" id="btn-pass" style="display:none" data-action="openOfflinePass">🎫 Travel Pass</button>
+            <button class="itn-btn itnb-wa" id="btn-wa" style="display:none" data-action="waShare">💬 WhatsApp</button>
+            <button class="itn-btn itnb-blue" id="btn-share" style="display:none" data-action="shareIt">📤 Share</button>
+            <button class="itn-btn itnb-teal" data-action="switchToView" data-view="tools-view" data-idx="4">💸 Budget</button>
             <span class="status-chip" id="trip-st">PLAN</span>
           </div>
+        </div>
+        <!-- Weather Quick Pivot Bar -->
+        <div class="weather-pivot-bar" id="weather-pivot-bar" style="display:none;padding:6px 12px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.07);gap:8px;align-items:center;overflow-x:auto;">
+          <span style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">⚡ Climate Pivot:</span>
+          <button class="pivot-btn pivot-monsoon" data-action="pivotMonsoonMode" title="Swap outdoor stops for covered museums, cafes & havelis" style="padding:4px 10px;border-radius:99px;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">🌧️ Monsoon Mode</button>
+          <button class="pivot-btn pivot-heat" data-action="pivotHeatEscapeMode" title="Shift midday stops to AC indoor venues" style="padding:4px 10px;border-radius:99px;font-size:11px;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.3);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">☀️ Heat Escape</button>
         </div>
         <div class="day-tabs" id="day-tabs" style="display:none"></div>
       </div>

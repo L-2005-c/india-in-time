@@ -2162,3 +2162,37 @@ body::after{
 .skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999}
 .skip-link:focus{left:8px;top:8px;width:auto;height:auto;padding:8px 12px;background:#10b981;color:#000;overflow:visible}
 
+/* Unique Travel Intelligence UI Additions */
+.itnb-gold{
+  background:linear-gradient(135deg,rgba(234,179,8,0.2),rgba(245,158,11,0.3));
+  border:1px solid rgba(234,179,8,0.45);
+  color:#fde047;
+}
+.itnb-wa{
+  background:linear-gradient(135deg,rgba(37,211,102,0.18),rgba(18,140,126,0.3));
+  border:1px solid rgba(37,211,102,0.4);
+  color:#4ade80;
+}
+.signature-dish-chip{
+  transition:all .2s ease;
+}
+.signature-dish-chip:hover{
+  background:rgba(234,179,8,0.15) !important;
+  border-color:rgba(234,179,8,0.4) !important;
+}
+.cultural-ritual-chip{
+  animation:culturalGlow 3s infinite alternate ease-in-out;
+}
+@keyframes culturalGlow{
+  0%{opacity:0.85;}
+  100%{opacity:1;filter:drop-shadow(0 0 4px rgba(251,191,36,0.4));}
+}
+.pivot-btn{
+  transition:transform .15s ease, filter .15s ease;
+}
+.pivot-btn:hover{
+  transform:translateY(-1px);
+  filter:brightness(1.15);
+}
+
+

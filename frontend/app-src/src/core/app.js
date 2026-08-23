@@ -58,6 +58,10 @@ import {
   shareTripEmergency as _shareTripEmergencyMod,
 } from '../modules/savedPlans.js';
 import {
+  generateWhatsAppShareText as _genWhatsAppText,
+  buildOfflineTravelPassHtml as _buildOfflinePassHtml,
+} from '../modules/offlineTravelPass.js';
+import {
   startVoiceInput as _startVoiceInputMod,
   handleCaption as _handleCaptionMod,
   handleTranslate as _handleTranslateMod,
@@ -1324,7 +1328,9 @@ async function generatePlan(){
   document.getElementById('phase2-section').style.display='block';
   document.getElementById('aitools-section').style.display='block';
   renderAiToolsGrid();
-  ['btn-save','btn-share','btn-replay','btn-ls','btn-wa'].forEach(id=>document.getElementById(id).style.display='inline-flex');
+  ['btn-save','btn-share','btn-pass','btn-wa','btn-replay','btn-ls'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'inline-flex'; });
+  const pivotBar = document.getElementById('weather-pivot-bar');
+  if (pivotBar) pivotBar.style.display = 'flex';
   renderTabs();
   resetTrimNotice(); // fresh plan — allow the "stops didn't fit" notice to fire again if it applies
   const plannedStopCount = mdPlan.flat().length;
@@ -1423,6 +1429,8 @@ const STATIC_ACTIONS = {
   shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
   toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
   toggleUserMenu, toggleVoice, waShare,
+  openOfflinePass, closeOfflinePassModal, shareWhatsAppPass, pivotMonsoonMode, pivotHeatEscapeMode,
+  printPass: () => window.print(),
   // Settings modal & onboarding
   openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
@@ -2272,6 +2280,32 @@ function updateItinUI(){
       }
     }
 
+    // Cultural Ritual / Aarti Alert
+    const ritual = loc.cultural;
+    const ritualHTML = ritual?.culturalBadge
+      ? `<div class="cultural-ritual-chip" style="font-size:11px;color:#fbbf24;margin-top:5px;display:flex;align-items:center;gap:4px;"><span>${escapeHtml(ritual.culturalBadge)}</span> ${ritual.recommendation ? `<span style="font-size:10px;opacity:0.85;">(${escapeHtml(ritual.recommendation)})</span>` : ''}</div>`
+      : '';
+
+    // Signature Dish Companion
+    const dish = loc.signatureDish;
+    const dishHTML = dish?.dishName
+      ? `<div class="signature-dish-chip" style="margin-top:6px;padding:4px 8px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.22);border-radius:6px;font-size:11px;color:#fde047;display:flex;align-items:center;gap:6px;"><span>🍛 <strong>Must-Try:</strong> ${escapeHtml(dish.dishName)} <small style="opacity:0.85;">(${escapeHtml(dish.iconicSpot)})</small></span></div>`
+      : '';
+
+    // Smart Entry Checklist & Travel Armor
+    const proto = loc.entryProtocol;
+    let armorHTML = '';
+    if (proto) {
+      const tags = [];
+      if (proto.footwear?.requiredOff) tags.push(`<span style="background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);border-radius:4px;padding:1px 5px;font-size:10px;">👟 ${escapeHtml(proto.footwear.tokenStand || 'Shoes off')}</span>`);
+      if (proto.dressCode?.strict) tags.push(`<span style="background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);border-radius:4px;padding:1px 5px;font-size:10px;">👕 Modest / Traditional Dress</span>`);
+      if (proto.security?.cloakroomRequired) tags.push(`<span style="background:rgba(249,115,22,0.15);color:#fdba74;border:1px solid rgba(249,115,22,0.3);border-radius:4px;padding:1px 5px;font-size:10px;">📱 Locker for phones</span>`);
+      if (proto.tickets?.onlineQr) tags.push(`<span style="background:rgba(56,189,248,0.15);color:#7dd3fc;border:1px solid rgba(56,189,248,0.3);border-radius:4px;padding:1px 5px;font-size:10px;">🎟️ ASI QR Ticket</span>`);
+      if (tags.length > 0) {
+        armorHTML = `<div class="entry-armor-row" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${tags.join('')}</div>`;
+      }
+    }
+
     const whyTimeNote = Array.isArray(loc.whyThisTime) && loc.whyThisTime.length
       ? `<div style="font-size:10.5px;color:var(--brand, #38bdf8);margin-top:4px;display:flex;align-items:center;gap:4px;">✨ <em>${escapeHtml(loc.whyThisTime[0])}</em></div>`
       : '';
@@ -2279,7 +2313,7 @@ function updateItinUI(){
     const timingWindow = loc.bestWindow ? `⏱ Best experience ${loc.bestWindow.start || ''}–${loc.bestWindow.end || ''} · ${loc.timingFit != null ? Math.round(loc.timingFit) : '—'}% timing fit` : '';
     const waitNote = loc.waitingMinutes ? `🧘 ${loc.waitingMinutes} min held to protect the higher-value experience window` : '';
     const advancedMeta = [timingWindow, waitNote].filter(Boolean).join('<br>');
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${whyTimeNote}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${ritualHTML}${dishHTML}${armorHTML}${whyTimeNote}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
     list.appendChild(div);
     const failedImg = div.querySelector('.sc-img');
     if (failedImg) failedImg.addEventListener('error', () => { failedImg.style.display = 'none'; }, { once: true });
@@ -2389,10 +2423,95 @@ function toggleLoadPanel() {
   list.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
 }
 
-function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));const l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-replay','btn-ls','btn-wa'].forEach(id=>document.getElementById(id).style.display='inline-flex');renderTabs();switchDay(0);updatePlannerShowcase();switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(_e){addMsg('⚠️ Load failed.');}}
+function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));const l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-pass','btn-wa','btn-replay','btn-ls'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='inline-flex'; });const pb=document.getElementById('weather-pivot-bar');if(pb)pb.style.display='flex';renderTabs();switchDay(0);updatePlannerShowcase();switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(_e){addMsg('⚠️ Load failed.');}}
 function shareIt(){ return _shareTripTextMod(mdPlan, currentCityName, { addMsg }); }
-function waShare(){ return _shareTripWhatsAppMod(mdPlan, currentCityName, { addMsg }); }
+function waShare(){
+  const text = _genWhatsAppText(mdPlan, currentCityName, dayIdx);
+  if (text) {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  } else {
+    _shareTripWhatsAppMod(mdPlan, currentCityName, { addMsg });
+  }
+}
 function shareEmergency(){ return _shareTripEmergencyMod(cLat, cLon); }
+
+function openOfflinePass() {
+  if (!mdPlan || !mdPlan.length || !itin.length) {
+    addMsg('⚠️ Generate or load an itinerary first to open the Offline Travel Pass.');
+    return;
+  }
+  let container = document.getElementById('offline-pass-modal-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'offline-pass-modal-container';
+    document.body.appendChild(container);
+  }
+  const modalHtml = _buildOfflinePassHtml(mdPlan, currentCityName, dayIdx, currentCityId);
+  container.innerHTML = `
+    <div class="custom-modal-backdrop fade-in" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10900;backdrop-filter:blur(8px);padding:16px;">
+      <div class="custom-modal-content" style="background:var(--bg-layer1,#10091d);border:1px solid rgba(255,255,255,0.18);border-radius:16px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.7);position:relative;">
+        <button data-action="closeOfflinePassModal" aria-label="Close" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;z-index:2;">✕</button>
+        ${modalHtml}
+      </div>
+    </div>
+  `;
+}
+
+function closeOfflinePassModal() {
+  const container = document.getElementById('offline-pass-modal-container');
+  if (container) container.innerHTML = '';
+}
+
+function shareWhatsAppPass() {
+  const text = _genWhatsAppText(mdPlan, currentCityName, dayIdx);
+  if (!text) { addMsg('⚠️ Generate a plan first!'); return; }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function pivotMonsoonMode() {
+  if (!itin || !itin.length) { addMsg('⚠️ Generate a plan first to apply Monsoon Pivot.'); return; }
+  const indoorPool = (LOCS || []).filter(l => ['museum', 'food', 'shopping', 'temple', 'scenic'].includes(l.cat) && l.indoor_outdoor !== 'outdoor');
+  if (!indoorPool.length) { addMsg('ℹ️ No indoor alternatives found in current city catalog.'); return; }
+  const baseStops = getRouteStopsForDay(itin);
+  let swappedCount = 0;
+  const filtered = baseStops.map(s => {
+    if (['beach', 'park', 'waterfall', 'hill'].includes(s.cat)) {
+      const alt = indoorPool.find(p => !baseStops.some(b => b.id === p.id && b.name === p.name)) || s;
+      if (alt !== s) swappedCount++;
+      return { ...alt, tt: s.tt, vt: alt.vt || 45 };
+    }
+    return s;
+  });
+  itin = applyBreakPlanToCurrentItinerary(filtered);
+  mdPlan[dayIdx] = itin;
+  sync();
+  recalcTimes({ trimToWindow: true });
+  renderRoute();
+  addMsg(`🌧️ <strong>Monsoon Weather Pivot Applied!</strong> ${swappedCount > 0 ? `${swappedCount} outdoor stops swapped for covered museums & cozy cafes.` : 'Route protected against rainfall.'}`);
+}
+
+function pivotHeatEscapeMode() {
+  if (!itin || !itin.length) { addMsg('⚠️ Generate a plan first to apply Heat Escape Pivot.'); return; }
+  const indoorPool = (LOCS || []).filter(l => ['museum', 'food', 'shopping'].includes(l.cat) || l.indoor_outdoor === 'indoor');
+  if (!indoorPool.length) { addMsg('ℹ️ No indoor alternatives found in current city catalog.'); return; }
+  const baseStops = getRouteStopsForDay(itin);
+  let swappedCount = 0;
+  const adjusted = baseStops.map(s => {
+    const arr = s.arriveMin || 720;
+    if (arr >= 11.5 * 60 && arr <= 15.5 * 60 && ['beach', 'fort', 'park', 'hill'].includes(s.cat)) {
+      const alt = indoorPool.find(p => !baseStops.some(b => b.id === p.id && b.name === p.name)) || s;
+      if (alt !== s) swappedCount++;
+      return { ...alt, tt: s.tt, vt: alt.vt || 50 };
+    }
+    return s;
+  });
+  itin = applyBreakPlanToCurrentItinerary(adjusted);
+  mdPlan[dayIdx] = itin;
+  sync();
+  recalcTimes({ trimToWindow: true });
+  renderRoute();
+  addMsg(`☀️ <strong>Heat Escape Pivot Applied!</strong> ${swappedCount > 0 ? `${swappedCount} midday stops shifted to AC indoor venues.` : 'Midday route optimized for heat safety.'}`);
+}
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
 // ── Compass button ───────────────────────────────────────────────────────────

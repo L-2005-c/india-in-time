@@ -7,6 +7,9 @@ const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier } = require
 const { computeWeatherIntelligence, buildWeatherExperienceWindows } = require('./weatherEngine');
 const { computeScenic } = require('./scenicEngine');
 const { computeVisitScore, computeTimeScore, openingToScore, trafficToScore, computePreferenceScore } = require('./scoringEngine');
+const { getCulturalRitualIntel } = require('./culturalRitualEngine');
+const { getSignatureDish } = require('./signatureDishEngine');
+const { getEntryProtocol } = require('./entryProtocolEngine');
 const { computeConfidence } = require('./confidenceEngine');
 const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
 const itineraryEngine = require('./itineraryEngine');
@@ -74,6 +77,10 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   });
   const explanation = buildExplanation({ visitScore: scored.visitScore, visitLabel: scored.label, opening, crowd, weather: weatherIntel, traffic, scenic, arrival });
   const statusLabel = buildStatusLabel({ opening, visitLabel: scored.label, crowd, weather: weatherIntel, scenic, daypart, nightAvailable: opening.nightAvailable });
+  const cultural = getCulturalRitualIntel(place, nowMin, ist.dayIndex);
+  const signatureDish = getSignatureDish(place, options.region || place.region || place.city || '');
+  const entryProtocol = getEntryProtocol(place);
+
   const badges = [];
   if (opening.isOpenNow === true) badges.push('🟢 Open');
   else if (opening.isOpenNow === false) badges.push('🔴 Closed');
@@ -81,6 +88,7 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   if (opening.status === 'CLOSING_SOON') badges.push('🟡 Closing Soon');
   if (place.is_sunrise_spot) badges.push('🌅 Best at Sunrise');
   if (place.is_sunset_spot) badges.push('🌇 Best at Sunset');
+  if (cultural?.culturalBadge) badges.push(cultural.culturalBadge);
   if (weather && weather.tempC >= 38) badges.push('🔥 Hot Weather');
   if (weather && /rain/i.test(weather.condition || '')) badges.push('🌧 Rain Alert');
   if (crowd.level === 'High' || crowd.level === 'Very High') badges.push('👥 Peak Crowd');
@@ -119,6 +127,7 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   if (opening.isOpenNow && opening.minutesToClose != null && opening.minutesToClose <= 60) notifications.push(`This attraction closes in ${opening.minutesToClose} minutes.`);
   if (place.is_sunset_spot && nowMin < sun.sunsetMin && sun.sunsetMin - nowMin <= 30) notifications.push(`Golden hour starts in ${sun.sunsetMin - nowMin} minutes.`);
   if (crowd.level === 'High' || crowd.level === 'Very High') notifications.push('Heavy crowd expected — consider visiting earlier or later.');
+  if (cultural?.isSanctumClosed) notifications.push(cultural.recommendation);
   if (opening.isOpenNow === false && opening.minutesToOpen != null) {
     const h = Math.floor(opening.minutesToOpen / 60), m = opening.minutesToOpen % 60;
     notifications.push(`Opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`} — best time around ${sun.sunrise}.`);
@@ -126,6 +135,8 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   const recommendations = [];
   if (place.is_sunrise_spot && daypart === 'earlyMorning') recommendations.push('Sunrise viewpoint — arrive 15 min before sunrise');
   if (place.is_sunset_spot && (daypart === 'evening' || ghState.evening)) recommendations.push('Golden hour photography tips');
+  if (cultural?.recommendation && !cultural.isSanctumClosed) recommendations.push(cultural.recommendation);
+  if (signatureDish?.mustTryReason) recommendations.push(`Must-try nearby: ${signatureDish.dishName} at ${signatureDish.iconicSpot}`);
   if (daypart === 'earlyMorning') recommendations.push('Suggest breakfast nearby');
   if (daypart === 'afternoon') recommendations.push('Suggest lunch restaurants nearby');
   if (weatherIntel.warnings?.length) recommendations.push(...weatherIntel.warnings.slice(0, 2));
@@ -142,6 +153,7 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
     season, bestSeason, seasonalNote, nightAvailable: opening.nightAvailable, weeklyHoliday: opening.weeklyHoliday,
     crowdLevel: crowd.level, crowd: { level: crowd.level, score: crowd.crowdScore, crowdBadge: crowd.crowdBadge, isPeakWindow: crowd.isPeakWindow, bestOffPeakWindow: crowd.bestOffPeakWindow, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
     weather: { ...weatherIntel, experienceWindows: weatherWindows }, traffic, scenic, arrival, preferenceScore, confidence, explanation, recommendations,
+    cultural, signatureDish, entryProtocol,
     weatherWarnings: weatherIntel.warnings || [], badges, notifications, experienceWindows,
     dataQuality: {
       opening: opening.dataQuality,

@@ -1,0 +1,275 @@
+// services/travelIntelligence/signatureDishEngine.js
+// Curates iconic signature dishes and legendary micro-local food spots situated within 50m–300m of Indian attractions.
+'use strict';
+
+const SIGNATURE_DISH_REGISTRY = {
+  // Hyderabad
+  charminar: {
+    dishName: 'Irani Chai & Osmania Biscuits',
+    iconicSpot: 'Nimrah Cafe & Bakery (directly facing Charminar gate)',
+    distanceM: 35,
+    isVeg: true,
+    priceRange: '₹20–₹50',
+    mustTryReason: 'Dip warm buttery Osmania biscuits into authentic steaming Irani dum chai while watching the minarets.',
+  },
+  golconda_fort: {
+    dishName: 'Resham Handi Biryani & Mirchi Ka Salan',
+    iconicSpot: 'Hotel Rumaan / Golconda Heritage Kebab Court',
+    distanceM: 180,
+    isVeg: false,
+    priceRange: '₹150–₹280',
+    mustTryReason: 'Traditional slow-cooked firewood biryani with authentic Hyderabadi spice blend.',
+  },
+  salar_jung_museum: {
+    dishName: 'Haleem & Paya Nahari',
+    iconicSpot: 'Nayab Hotel (near Nayapul bridge)',
+    distanceM: 250,
+    isVeg: false,
+    priceRange: '₹120–₹240',
+    mustTryReason: 'Legendary morning Nahari with soft Char Koni Naan, operational since 1953.',
+  },
+  birla_mandir: {
+    dishName: 'Ghee Podi Idli & Filter Coffee',
+    iconicSpot: 'Minerva Coffee Shop / Taj Mahal Hotel Himayatnagar',
+    distanceM: 350,
+    isVeg: true,
+    priceRange: '₹80–₹160',
+    mustTryReason: 'Melt-in-mouth button idlis drenched in pure cow ghee and gun powder podi.',
+  },
+  hussain_sagar_lake: {
+    dishName: 'Masala Pav Bhaji & Kulfi Falooda',
+    iconicSpot: 'Eat Street Promenade',
+    distanceM: 50,
+    isVeg: true,
+    priceRange: '₹90–₹180',
+    mustTryReason: 'Breezy lakeside evening pav bhaji with rich saffron rabdi kulfi.',
+  },
+
+  // Visakhapatnam (Vizag)
+  ramakrishna_beach: {
+    dishName: 'Hot Muri Mixture & Andhra Mirchi Bajji',
+    iconicSpot: 'RK Beach Street Carts (near Kali Temple & Submarine)',
+    distanceM: 30,
+    isVeg: true,
+    priceRange: '₹30–₹60',
+    mustTryReason: 'Tangy puffed rice with roasted peanuts, lemon, onion, and crispy besan stuffed green chilli fritters by the waves.',
+  },
+  simhachalam: {
+    dishName: 'Simhachalam Appalu Prasadam & Punugulu',
+    iconicSpot: 'Devasthanam Prasadam Counter & Hilltop Vendors',
+    distanceM: 40,
+    isVeg: true,
+    priceRange: '₹20–₹50',
+    mustTryReason: 'Crisp golden jaggery-infused sweet appalu blessed at the 11th-century Narasimha shrine.',
+  },
+  kailasagiri: {
+    dishName: 'Bamboo Chicken & Filter Kaapi',
+    iconicSpot: 'Hilltop Viewpoint Food Kiosks',
+    distanceM: 60,
+    isVeg: false,
+    priceRange: '₹120–₹220',
+    mustTryReason: 'Spicy marinated chicken roasted inside fresh green bamboo stalks with panoramic Bay of Bengal views.',
+  },
+  rushikonda_beach: {
+    dishName: 'Prawn Fry & Fresh Coconut Water',
+    iconicSpot: 'Rushikonda Beach Shack Food Plaza',
+    distanceM: 45,
+    isVeg: false,
+    priceRange: '₹150–₹300',
+    mustTryReason: 'Catch-of-the-day Andhra spiced coastal sea prawns fried with curry leaves.',
+  },
+  ins_kursura_submarine: {
+    dishName: 'Guntur Karampodi Dosa',
+    iconicSpot: 'Venkatadri Vantillu / Beach Food Walk',
+    distanceM: 120,
+    isVeg: true,
+    priceRange: '₹70–₹130',
+    mustTryReason: 'Ghee roast dosa smeared with flaming red Andhra spice paste and peanut chutney.',
+  },
+
+  // Varanasi
+  varanasi_ghats: {
+    dishName: 'Tamatar Chaat & Malaiyo / Blue Lassi',
+    iconicSpot: 'Kashi Chaat Bhandar (Godowlia) & Blue Lassi Shop (Manikarnika)',
+    distanceM: 110,
+    isVeg: true,
+    priceRange: '₹40–₹90',
+    mustTryReason: 'Warm spiced mashed tomato gravy cooked in desi ghee, topped with crisp namakpare and sugar syrup.',
+  },
+  kashi_vishwanath: {
+    dishName: 'Banarasi Kachori Jalebi & Thandai',
+    iconicSpot: 'Ram Bhandar (Thatheri Bazar) & Baba Thandai',
+    distanceM: 140,
+    isVeg: true,
+    priceRange: '₹40–₹80',
+    mustTryReason: 'Crisp urad dal kachori with spicy chana curry and piping hot saffron spiral jalebis.',
+  },
+
+  // Jaipur
+  hawa_mahal: {
+    dishName: 'Pyaaz Kachori & Saffron Ghewar',
+    iconicSpot: 'LMB (Laxmi Mishthan Bhandar) & Wind View Cafe rooftop',
+    distanceM: 70,
+    isVeg: true,
+    priceRange: '₹50–₹150',
+    mustTryReason: 'Flaky deep-fried pastry bursting with caramelized spicy onion filling.',
+  },
+  amber_fort: {
+    dishName: 'Dal Baati Churma & Kesar Chai',
+    iconicSpot: '1135 AD Heritage Courtyard / Surajpol Street Kiosks',
+    distanceM: 90,
+    isVeg: true,
+    priceRange: '₹120–₹450',
+    mustTryReason: 'Fire-baked wheat balls dunked in melted ghee, served with five-lentil Panchmel dal and sweet churma.',
+  },
+  city_palace_jaipur: {
+    dishName: 'Mirchi Vada & Lassi in Earthen Kulhad',
+    iconicSpot: 'Lassiwala (MI Road - Shop 312 since 1944)',
+    distanceM: 280,
+    isVeg: true,
+    priceRange: '₹40–₹80',
+    mustTryReason: 'Thick, creamy yogurt drink topped with a thick layer of malai in terracotta cups.',
+  },
+
+  // Amritsar
+  golden_temple: {
+    dishName: 'Amritsari Kulcha & Guru Ka Langar',
+    iconicSpot: 'Bhai Kulwant Singh Kulchian Wale & Langar Hall',
+    distanceM: 80,
+    isVeg: true,
+    priceRange: '₹0–₹80',
+    mustTryReason: 'Crisp layered tandoori bread stuffed with spiced potato and paneer, served with spicy chole and tamarind-onion chutney.',
+  },
+
+  // Delhi
+  red_fort: {
+    dishName: 'Old Delhi Jalebi & Rabri with Dahi Bhalla',
+    iconicSpot: 'Old Famous Jalebi Wala (Dariba Kalan corner, Chandni Chowk)',
+    distanceM: 160,
+    isVeg: true,
+    priceRange: '₹50–₹120',
+    mustTryReason: 'Giant thick jalebis fried in pure desi ghee soaked in saffron syrup, served with creamy rabri since 1884.',
+  },
+  qutub_minar: {
+    dishName: 'Kakori Kebabs & Roomali Roti',
+    iconicSpot: 'Mehrauli Heritage Food Walk / Olive Bistro Court',
+    distanceM: 220,
+    isVeg: false,
+    priceRange: '₹180–₹380',
+    mustTryReason: 'Silky smooth melt-in-mouth Awadhi spiced kebabs with paper-thin flatbread.',
+  },
+
+  // Mumbai
+  gateway_of_india: {
+    dishName: 'Bun Maska, Mutton Pattice & Irani Chai',
+    iconicSpot: 'Cafe Leopold / Kyani & Co. / BadeMiya',
+    distanceM: 150,
+    isVeg: false,
+    priceRange: '₹70–₹250',
+    mustTryReason: 'Iconic Colaba culinary heritage since 1871.',
+  },
+  marine_drive: {
+    dishName: 'Chowpatty Bhelpuri & Kulfi Ice Cream',
+    iconicSpot: 'Girgaon Chowpatty Food Plaza',
+    distanceM: 50,
+    isVeg: true,
+    priceRange: '₹50–₹110',
+    mustTryReason: 'Zesty puffed rice tossed with raw mango, tamarind chutney, and fine sev alongside the sea breeze.',
+  },
+
+  // Goa
+  baga_beach: {
+    dishName: 'Goan Fish Curry Thali & Bebinca',
+    iconicSpot: 'Britto’s Beach Shack & Souza Lobo',
+    distanceM: 40,
+    isVeg: false,
+    priceRange: '₹220–₹450',
+    mustTryReason: 'Tangy coconut-kokum kingfish curry with red rice, followed by 7-layered traditional Goan coconut pudding.',
+  },
+  fort_aguada: {
+    dishName: 'Prawn Balchão & Feni Cocktail / Fresh Tender Coconut',
+    iconicSpot: 'Sinquerim Cliffside Shacks',
+    distanceM: 120,
+    isVeg: false,
+    priceRange: '₹180–₹350',
+    mustTryReason: 'Fiery Portuguese-Goan spiced prawn pickle preparation overlooking the lighthouse.',
+  },
+};
+
+/**
+ * Get hyper-local signature dish recommendation for a place.
+ * @param {object} place Place object
+ * @param {string} cityName City name
+ */
+function getSignatureDish(place = {}, cityName = '') {
+  const name = String(place.name || '').toLowerCase();
+  const id = String(place.id || '').toLowerCase();
+  const cat = String(place.cat || '').toLowerCase();
+
+  for (const [key, data] of Object.entries(SIGNATURE_DISH_REGISTRY)) {
+    const cleanKey = key.replace(/_/g, ' ');
+    if (name.includes(cleanKey) || id.includes(key)) {
+      return {
+        ...data,
+        matchedBy: 'poi_exact',
+      };
+    }
+  }
+
+  // City or category fallback heuristics
+  const cName = String(cityName || '').toLowerCase();
+  if (cat === 'temple') {
+    return {
+      dishName: 'Holy Temple Prasadam & Sweets',
+      iconicSpot: 'Official Temple Trust Counter near entrance',
+      distanceM: 30,
+      isVeg: true,
+      priceRange: '₹20–₹50',
+      mustTryReason: 'Freshly prepared traditional sweet laddu or pulihora prasadam.',
+      matchedBy: 'category_fallback',
+    };
+  }
+
+  if (cat === 'beach') {
+    return {
+      dishName: 'Fresh Sea-Breeze Snacks & Tender Coconut',
+      iconicSpot: 'Beach Promenade Kiosks',
+      distanceM: 25,
+      isVeg: true,
+      priceRange: '₹40–₹80',
+      mustTryReason: 'Roasted corn with lime-chilli butter and sweet tender coconut water.',
+      matchedBy: 'category_fallback',
+    };
+  }
+
+  if (cName.includes('hyderabad')) {
+    return {
+      dishName: 'Irani Chai & Osmania Biscuits',
+      iconicSpot: 'Nearby Local Irani Cafe',
+      distanceM: 150,
+      isVeg: true,
+      priceRange: '₹30–₹60',
+      mustTryReason: 'Classic Hyderabadi tea-time tradition with buttery biscuits.',
+      matchedBy: 'city_fallback',
+    };
+  }
+
+  if (cName.includes('vizag') || cName.includes('visakhapatnam')) {
+    return {
+      dishName: 'Andhra Mirchi Bajji & Punugulu',
+      iconicSpot: 'Local Street Carts',
+      distanceM: 100,
+      isVeg: true,
+      priceRange: '₹30–₹60',
+      mustTryReason: 'Crispy deep-fried street snacks served with spicy peanut and ginger chutneys.',
+      matchedBy: 'city_fallback',
+    };
+  }
+
+  return null;
+}
+
+module.exports = {
+  getSignatureDish,
+  SIGNATURE_DISH_REGISTRY,
+};
