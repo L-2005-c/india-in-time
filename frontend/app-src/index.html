@@ -144,10 +144,17 @@
   <!-- HEADER -->
   <header id="header" role="banner">
     <div class="header-inner">
-      <div class="logo">
-        <img class="header-logo-mark" src="/logo-mark.png?v=20260603-logo" alt="" width="62" height="27" decoding="sync">
-        <span id="hdr-city" style="color:var(--text-primary)">India</span>
-        <span class="logo-accent">In-Time</span>
+      <div class="header-top-row">
+        <div class="logo">
+          <img class="header-logo-mark" src="/logo-mark.png?v=20260603-logo" alt="" width="62" height="27" decoding="sync">
+          <span id="hdr-city" style="color:var(--text-primary)">India</span>
+          <span class="logo-accent">In-Time</span>
+        </div>
+        <div class="header-controls">
+          <button class="theme-btn" data-action="toggleTheme" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">🌓</button>
+          <div class="gps-badge" data-action="resetGPS" id="gps-badge"><span class="gps-dot"></span><span id="gps-txt">GPS</span></div>
+          <img id="user-avatar" class="user-avatar" src="" alt="Me" style="display:none" data-action="toggleUserMenu">
+        </div>
       </div>
       <div class="header-pills-wrap">
         <button class="cmd-k-btn" data-action="openCommandPalette" title="Universal Command Palette (⌘K)"><span class="cmd-k-icon">⚡</span> <span class="cmd-k-lbl">⌘K</span></button>
@@ -155,11 +162,6 @@
         <button class="hpill hpill-ocean" id="btn-replay" style="display:none">🎬 Replay</button>
         <button class="hpill hpill-live"  id="btn-ls"     style="display:none">🔴 Live</button>
         <button class="hpill hpill-wa"    id="btn-wa"     style="display:none" data-action="waShare">💬 WhatsApp</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <button class="theme-btn" data-action="toggleTheme" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">🌓</button>
-        <div class="gps-badge" data-action="resetGPS" id="gps-badge"><span class="gps-dot"></span><span id="gps-txt">GPS</span></div>
-        <img id="user-avatar" class="user-avatar" src="" alt="Me" style="display:none" data-action="toggleUserMenu">
       </div>
     </div>
   </header>
