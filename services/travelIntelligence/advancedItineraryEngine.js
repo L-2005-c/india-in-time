@@ -23,7 +23,9 @@ const {
   isExcludedCategory,
   normalizeCat,
   isFoodPlace,
+  detectConflictingRequirements,
 } = require('./requirementEngine');
+const { computeDnaMatch } = require('./personalTravelDna');
 const {
   filterEligibleCandidates,
 } = require('./tourismPoi');
@@ -316,6 +318,13 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   if (place.is_sunset_spot && isGoldenHourEvening && meal !== 'lunch') score += 24;
   else if (place.is_sunset_spot && meal !== 'lunch') score += 8;
   if (place.is_sunrise_spot && isSunriseMorning) score += 24;
+
+  // Personal Travel DNA matching boost
+  const dnaProfile = requirements.travelDna || requirements.dnaProfile || requirements.soft.travelDna;
+  const dnaMatch = computeDnaMatch(place, dnaProfile);
+  if (dnaMatch && Number.isFinite(dnaMatch.score)) {
+    score += (dnaMatch.score - 50) * 0.28;
+  }
 
   if (state.stops.length && normalizeCat(state.stops[state.stops.length - 1].category) === cat && cat !== 'food') score -= 7;
 
@@ -761,8 +770,10 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const confidence = confidenceValues.length ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length) : 0;
 
   const usedIds = new Set(state.stops.map((s) => placeIdentity(s)));
+  const dnaProfile = requirements.travelDna || requirements.dnaProfile || requirements.soft.travelDna;
   const finalizedStops = state.stops.map((stop) => {
-    if (!Array.isArray(stop.coords) || stop.coords.length < 2) return stop;
+    const dnaInfo = computeDnaMatch(stop, dnaProfile);
+    if (!Array.isArray(stop.coords) || stop.coords.length < 2) return { ...stop, dnaMatch: dnaInfo };
     const nearby = candidates
       .filter((c) => !usedIds.has(placeIdentity(c)) && Array.isArray(c.coords) && c.coords.length >= 2)
       .map((c) => ({
@@ -775,7 +786,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       .filter((c) => c.distanceM <= 1200)
       .sort((a, b) => a.distanceM - b.distanceM)
       .slice(0, 3);
-    return { ...stop, nearbySpots: nearby };
+    return { ...stop, nearbySpots: nearby, dnaMatch: dnaInfo };
   });
 
   return {
@@ -830,13 +841,38 @@ function replanAdvanced(remainingPlaces, options = {}) {
     ? options.cursor
     : (completed.at(-1)?.leaveAt ? minuteOf(completed.at(-1).leaveAt) : options.startMin);
   const currentCoords = options.currentCoords || completed.at(-1)?.coords || options.originCoords;
-  return planAdvancedItinerary(remainingPlaces, {
+  const newPlan = planAdvancedItinerary(remainingPlaces, {
     ...options,
     completedStops: completed,
     cursor,
     currentCoords,
     startMin: cursor,
   });
+
+  const previousStops = Array.isArray(options.previousStops) ? options.previousStops : (options.previousPlan?.stops || []);
+  const newStops = newPlan.stops || [];
+  
+  // Calculate adaptive replanning diff
+  const changes = [];
+  if (previousStops.length && newStops.length) {
+    const prevNames = previousStops.map(s => s.name);
+    const newNames = newStops.map(s => s.name);
+    const added = newNames.filter(n => !prevNames.includes(n));
+    const dropped = prevNames.filter(n => !newNames.includes(n));
+    if (added.length) changes.push(`Added ${added.join(', ')}`);
+    if (dropped.length) changes.push(`Adjusted route from ${dropped.join(', ')}`);
+  }
+
+  return {
+    ...newPlan,
+    replanningDiff: {
+      hasChanges: changes.length > 0,
+      changes,
+      previousStopCount: previousStops.length,
+      updatedStopCount: newStops.length,
+      reason: options.replanReason || 'Itinerary dynamically adapted to live travel pacing & conditions',
+    },
+  };
 }
 
 module.exports = {

@@ -235,4 +235,33 @@ function buildTemporalProfile(place, options = {}) {
   };
 }
 
-module.exports = { buildTemporalProfile, nearestHourlyWeather, buildWindows, selectModes, confidenceSummary };
+/**
+ * Generate 24-hour continuous temporal suitability curve for API consumers.
+ */
+function generateSuitabilityCurve(place, ctx = {}) {
+  const profile = buildTemporalProfile(place, { ...ctx, horizonHours: 24, stepMin: 60 });
+  const hourlyCurve = (profile.points || []).slice(0, 24).map(p => ({
+    hour: Math.floor(p.minute / 60),
+    timeLabel: m2t(p.minute),
+    score: p.score,
+    confidence: p.confidence,
+    reasons: p.reasons || [],
+    isOpen: p.opening?.isOpenNow !== false,
+  }));
+  return {
+    place: place.name,
+    curve: hourlyCurve,
+    bestHour: hourlyCurve.reduce((best, cur) => cur.score > best.score ? cur : best, hourlyCurve[0] || {}),
+    overallConfidence: profile.confidence?.overall || 85,
+    summary: profile.bestWindow ? `Peak experience window: ${profile.bestWindow.start}–${profile.bestWindow.end}` : 'Suitability calculated across 24h',
+  };
+}
+
+module.exports = {
+  buildTemporalProfile,
+  generateSuitabilityCurve,
+  nearestHourlyWeather,
+  buildWindows,
+  selectModes,
+  confidenceSummary,
+};

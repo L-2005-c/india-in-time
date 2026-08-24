@@ -5,9 +5,11 @@ const router = express.Router();
 const { getBatchState, personalizeScore, suggestOpenAlternatives, getTravelIntelligence } = require('../services/timeIntelligence');
 const { rankPlacesForDay, dynamicAdvice, multiDayAdvice, getTravelIntelligenceAsync } = require('../services/travelIntelligence');
 const { mapWithConcurrency } = require('../utils/concurrency');
-const { buildTemporalProfile } = require('../services/travelIntelligence/temporalEngine');
-const { planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');
+const { buildTemporalProfile, generateSuitabilityCurve } = require('../services/travelIntelligence/temporalEngine');
+const { planAdvancedItinerary, replanAdvanced } = require('../services/travelIntelligence/advancedItineraryEngine');
 const { buildMultiDayItinerary } = require('../services/travelIntelligence/multiDayPlanner');
+const { computeDnaMatch, deriveDnaFromPersonas, sanitizeDnaProfile } = require('../services/travelIntelligence/personalTravelDna');
+const { detectConflictingRequirements } = require('../services/travelIntelligence/requirementEngine');
 const MAX_PLACES = 50;
 const MAX_TRIP_DAYS = 21;
 const LIVE_ROUTING_CONCURRENCY = Math.max(1, parseInt(process.env.LIVE_ROUTING_CONCURRENCY, 10) || 5);
@@ -327,6 +329,80 @@ router.post('/multi-day-advice', (req, res) => {
   } catch (err) {
     logger.error('[time-intelligence:multi-day-advice]', err.message);
     res.status(500).json({ error: 'Failed to compute multi-day advice' });
+  }
+});
+
+// ── 24h Temporal Suitability Curve ─────────────────────────────────────────
+router.post('/curve', (req, res) => {
+  try {
+    const { place, weather, at, personas, tripMode, region } = req.body || {};
+    if (!place || typeof place !== 'object' || !place.name) {
+      return res.status(400).json({ error: 'place object with name is required' });
+    }
+    const now = at ? new Date(at) : new Date();
+    const result = generateSuitabilityCurve(place, {
+      referenceDate: now,
+      weather: weather || null,
+      personas: Array.isArray(personas) ? personas : [],
+      tripMode: tripMode || null,
+      region: region || null,
+    });
+    res.json(result);
+  } catch (err) {
+    logger.error('[time-intelligence:curve]', err.message);
+    res.status(500).json({ error: 'Failed to compute temporal suitability curve' });
+  }
+});
+
+// ── Personal Travel DNA Analysis & Matching ─────────────────────────────────
+router.post('/dna', (req, res) => {
+  try {
+    const { personas, tripMode, places, travelDna } = req.body || {};
+    const dnaProfile = travelDna ? sanitizeDnaProfile(travelDna) : deriveDnaFromPersonas(personas, tripMode);
+    
+    let scoredPlaces = [];
+    if (Array.isArray(places) && places.length > 0) {
+      scoredPlaces = places.slice(0, MAX_PLACES).map(p => ({
+        name: p.name,
+        category: p.cat || p.category,
+        dnaMatch: computeDnaMatch(p, dnaProfile),
+      }));
+    }
+
+    res.json({
+      travelDna: dnaProfile,
+      places: scoredPlaces,
+    });
+  } catch (err) {
+    logger.error('[time-intelligence:dna]', err.message);
+    res.status(500).json({ error: 'Failed to evaluate Travel DNA profile' });
+  }
+});
+
+// ── Hard Constraints & Conflict Resolution ───────────────────────────────────
+router.post('/conflicts', (req, res) => {
+  try {
+    const { requirements, places } = req.body || {};
+    const result = detectConflictingRequirements(requirements, places || []);
+    res.json(result);
+  } catch (err) {
+    logger.error('[time-intelligence:conflicts]', err.message);
+    res.status(500).json({ error: 'Failed to evaluate constraint conflicts' });
+  }
+});
+
+// ── Dynamic Adaptive Replanning ─────────────────────────────────────────────
+router.post('/replan', (req, res) => {
+  try {
+    const { places, options } = req.body || {};
+    if (!Array.isArray(places) || !places.length) {
+      return res.status(400).json({ error: 'places[] is required for replanning' });
+    }
+    const result = replanAdvanced(places, options || {});
+    res.json(result);
+  } catch (err) {
+    logger.error('[time-intelligence:replan]', err.message);
+    res.status(500).json({ error: 'Failed to execute adaptive replanning' });
   }
 });
 

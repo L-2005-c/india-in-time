@@ -242,10 +242,93 @@ function filterCandidates(places, requirements) {
   return (places || []).filter((p) => candidateMatchesHardRequirements(p, requirements).ok);
 }
 
+/**
+ * Detects hard requirement conflicts before optimization begins.
+ * Returns structured conflict data with 3 actionable resolution alternatives.
+ */
+function detectConflictingRequirements(requirements, places = [], startCoords = null) {
+  const req = requirements?.hard || requirements || {};
+  const conflicts = [];
+  const startMin = req.startTimeMinutes != null ? req.startTimeMinutes : 540; // 09:00
+  const endMin = req.endTimeMinutes != null ? req.endTimeMinutes : 1140; // 19:00
+  const availableMinutes = req.maxTripMinutes || Math.max(0, endMin - startMin);
+
+  const mustIncludes = (req.mustIncludePlaces || []).map(r => String(r).toLowerCase().trim());
+  const mandatoryPlaces = places.filter(p => {
+    const name = String(p.name || '').toLowerCase();
+    const id = String(p.id || '').toLowerCase();
+    return mustIncludes.some(m => name.includes(m) || m.includes(name) || id === m);
+  });
+
+  // Check 1: Mandatory place visit time overflow
+  let minMandatoryMinutes = 0;
+  mandatoryPlaces.forEach(p => {
+    minMandatoryMinutes += Math.max(30, Number(p.vt || p.visitMinutes || 45));
+  });
+
+  // Conservative travel time estimate (15 min average per stop)
+  const estimatedTravelMinutes = mandatoryPlaces.length > 1 ? (mandatoryPlaces.length - 1) * 18 : 0;
+  const totalMinRequired = minMandatoryMinutes + estimatedTravelMinutes;
+
+  if (totalMinRequired > availableMinutes && availableMinutes > 0) {
+    conflicts.push(`Requested ${mandatoryPlaces.length} mandatory stops require at least ${totalMinRequired} mins, but only ${availableMinutes} mins are scheduled.`);
+  }
+
+  // Check 2: Unmatched mandatory place
+  if (mustIncludes.length > mandatoryPlaces.length) {
+    const missing = mustIncludes.filter(m => !mandatoryPlaces.some(p => String(p.name).toLowerCase().includes(m)));
+    if (missing.length > 0) {
+      conflicts.push(`Could not locate verified destination matching: ${missing.join(', ')}.`);
+    }
+  }
+
+  // Check 3: Short trip asking for sunset + dinner + distant sights
+  const wantsSunset = (requirements?.soft?.preferredCategories || []).includes('scenic') || (req.mustIncludePlaces || []).some(m => /beach|sunset|viewpoint/i.test(m));
+  const wantsDinner = req.mealPreference === 'dinner' || (req.requiredMeals || []).includes('dinner');
+  if (wantsSunset && wantsDinner && availableMinutes < 150) {
+    conflicts.push('A sunset view followed by dinner comfortably requires at least 2.5–3 hours to avoid rushing.');
+  }
+
+  if (!conflicts.length) {
+    return { isConflicting: false, conflicts: [], alternatives: [] };
+  }
+
+  const suggestedDurationHours = Math.ceil((totalMinRequired + 60) / 60);
+
+  const alternatives = [
+    {
+      id: 'A',
+      title: 'Prioritize Top Scenic Highlights',
+      description: 'Focus on the single highest-rated highlight and pair with a nearby dining spot.',
+      adjustedParams: { maxTripMinutes: availableMinutes, prioritizeScenic: true },
+    },
+    {
+      id: 'B',
+      title: 'Streamlined Fast-Paced Tour',
+      description: 'Reduce time spent at each stop (25–30 mins) to fit all mandatory destinations.',
+      adjustedParams: { stopPacing: 'fast', maxTripMinutes: availableMinutes },
+    },
+    {
+      id: 'C',
+      title: `Extend Trip to ${suggestedDurationHours} Hours`,
+      description: `Expand trip window by ${suggestedDurationHours * 60 - availableMinutes} mins for a relaxed, complete experience.`,
+      adjustedParams: { maxTripMinutes: suggestedDurationHours * 60, endTimeMinutes: startMin + suggestedDurationHours * 60 },
+    },
+  ];
+
+  return {
+    isConflicting: true,
+    conflicts,
+    alternatives,
+    summary: `Your requested constraints conflict: ${conflicts[0]}`,
+  };
+}
+
 module.exports = {
   parseRequirements,
   filterCandidates,
   candidateMatchesHardRequirements,
+  detectConflictingRequirements,
   hasUsableCoords,
   isExcludedCategory,
   normalizeCat,

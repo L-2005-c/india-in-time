@@ -78,10 +78,26 @@ function computeScenic(place = {}, ctx = {}) {
     if (weatherIntel.visibilityKm != null) photographyScore += weatherIntel.visibilityKm >= 10 ? 8 : weatherIntel.visibilityKm >= 5 ? 3 : -8;
     photographyScore = Math.max(0, Math.min(100, Math.round(photographyScore)));
   }
+
+  // Component breakdown calculation
+  const lightScore = inGH.any ? 96 : (isSunriseSpot || isSunsetSpot) ? 88 : isViewpoint ? 75 : 60;
+  const weatherScore = weatherIntel ? Math.max(20, Math.min(100, weatherIntel.score || 80)) : 78;
+  const visibilityScore = weatherIntel?.visibilityKm ? (weatherIntel.visibilityKm >= 10 ? 95 : weatherIntel.visibilityKm >= 5 ? 80 : 50) : 85;
+  const crowdScore = (place.reviewCount && place.reviewCount > 10000) ? 65 : 88;
+  const orientationScore = orientationSupported ? (orientationDelta <= 25 ? 96 : orientationDelta <= 60 ? 82 : 55) : 80;
+
+  const componentScores = {
+    light: lightScore,
+    weather: weatherScore,
+    visibility: visibilityScore,
+    crowd: crowdScore,
+    orientation: orientationScore,
+  };
+
   if (golden) {
-    if (isSunriseSpot) photographyWindow = { start: golden.morningGolden.start, end: golden.morningGolden.end, label: 'Morning golden hour' };
-    else if (isSunsetSpot) photographyWindow = { start: golden.eveningGolden.start, end: golden.eveningGolden.end, label: 'Evening golden hour' };
-    else if (isViewpoint) photographyWindow = { start: golden.eveningGolden.start, end: golden.eveningGolden.end, label: 'Preferred evening light' };
+    if (isSunriseSpot) photographyWindow = { start: golden.morningGolden.start, end: golden.morningGolden.end, label: 'Morning golden hour', score: Math.round((lightScore + weatherScore + visibilityScore) / 3), components: componentScores };
+    else if (isSunsetSpot) photographyWindow = { start: golden.eveningGolden.start, end: golden.eveningGolden.end, label: 'Evening golden hour', score: Math.round((lightScore + weatherScore + visibilityScore + orientationScore) / 4), components: componentScores };
+    else if (isViewpoint) photographyWindow = { start: golden.eveningGolden.start, end: golden.eveningGolden.end, label: 'Preferred evening light', score: Math.round((lightScore + weatherScore) / 2), components: componentScores };
   }
 
   // Calculate dedicated golden hour score & scenic badge
@@ -104,6 +120,7 @@ function computeScenic(place = {}, ctx = {}) {
     orientation: orientationSupported ? { targetAzimuth: preferredAzimuth, solarAzimuth: solar.azimuth, deltaDegrees: Math.round(orientationDelta * 10) / 10 } : null,
     scenicScore: score,
     photographyScore,
+    componentScores,
     goldenHourRating,
     scenicBadge,
     suitability,
@@ -112,6 +129,7 @@ function computeScenic(place = {}, ctx = {}) {
     photographyWindow,
     reasons,
     isViewpoint,
+    confidence: weatherIntel ? 90 : 75,
     reason: reasons[0] || 'Standard location (limited scenic scoring)',
   };
 }

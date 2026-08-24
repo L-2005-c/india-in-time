@@ -124,6 +124,108 @@ function temporalRegret(arrivalScore, bestFutureScore) {
   };
 }
 
+/**
+ * Authoritative Unified Travel Value Score calculation.
+ * Synthesizes all 5 intelligence systems with intent-adaptive weighting.
+ */
+function computeTravelValueScore({
+  tourismQuality = 60,
+  temporalSuitability = 60,
+  scenicValue = 50,
+  weatherFit = 75,
+  crowdFit = 70,
+  dnaMatch = 65,
+  routeEfficiency = 70,
+  openingAvailability = 90,
+  intent = 'balanced',
+  confidence = 85,
+} = {}) {
+  const components = {
+    tourismQuality: clamp(tourismQuality),
+    temporalSuitability: clamp(temporalSuitability),
+    scenicValue: clamp(scenicValue),
+    weatherFit: clamp(weatherFit),
+    crowdFit: clamp(crowdFit),
+    dnaMatch: clamp(dnaMatch),
+    routeEfficiency: clamp(routeEfficiency),
+    openingAvailability: clamp(openingAvailability),
+  };
+
+  const INTENT_WEIGHTS = {
+    photography: {
+      scenicValue: 0.28,
+      temporalSuitability: 0.24,
+      weatherFit: 0.16,
+      tourismQuality: 0.12,
+      dnaMatch: 0.10,
+      routeEfficiency: 0.05,
+      crowdFit: 0.05,
+      openingAvailability: 0.00,
+    },
+    food: {
+      tourismQuality: 0.32,
+      temporalSuitability: 0.25,
+      dnaMatch: 0.20,
+      openingAvailability: 0.10,
+      routeEfficiency: 0.08,
+      weatherFit: 0.05,
+      crowdFit: 0.00,
+      scenicValue: 0.00,
+    },
+    family: {
+      openingAvailability: 0.20,
+      routeEfficiency: 0.22,
+      tourismQuality: 0.20,
+      crowdFit: 0.15,
+      weatherFit: 0.12,
+      temporalSuitability: 0.08,
+      dnaMatch: 0.03,
+      scenicValue: 0.00,
+    },
+    adventure: {
+      scenicValue: 0.25,
+      dnaMatch: 0.22,
+      weatherFit: 0.20,
+      temporalSuitability: 0.15,
+      tourismQuality: 0.10,
+      routeEfficiency: 0.08,
+      crowdFit: 0.00,
+      openingAvailability: 0.00,
+    },
+    balanced: {
+      tourismQuality: 0.22,
+      temporalSuitability: 0.20,
+      scenicValue: 0.15,
+      dnaMatch: 0.14,
+      routeEfficiency: 0.11,
+      weatherFit: 0.08,
+      crowdFit: 0.05,
+      openingAvailability: 0.05,
+    },
+  };
+
+  const weights = INTENT_WEIGHTS[intent] || INTENT_WEIGHTS.balanced;
+  const scoreRaw = Object.entries(weights).reduce((sum, [k, w]) => sum + components[k] * w, 0);
+  const score = clamp(Math.round(scoreRaw));
+
+  // Determine top contributing explainability reasons
+  const reasons = [];
+  if (components.temporalSuitability >= 80) reasons.push('Optimal time window & solar conditions');
+  if (components.tourismQuality >= 80) reasons.push('Verified high-quality destination');
+  if (components.dnaMatch >= 80) reasons.push('Strong alignment with your Travel DNA');
+  if (components.scenicValue >= 80) reasons.push('Exceptional scenic / visual vantage');
+  if (components.routeEfficiency >= 85) reasons.push('Minimizes travel time in current cluster');
+
+  return {
+    score,
+    confidence: clamp(confidence),
+    components,
+    weights,
+    intent,
+    reasons: reasons.length ? reasons : ['Solid overall travel suitability fit'],
+  };
+}
+
 module.exports = {
   clamp,
   sourceQuality,
@@ -132,6 +234,7 @@ module.exports = {
   weightedMean,
   uncertaintyFromSignals,
   computeDecisionScore,
+  computeTravelValueScore,
   scenarioRobustness,
   temporalRegret,
 };

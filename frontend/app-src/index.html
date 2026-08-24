@@ -92,6 +92,7 @@
   <div class="um-item" data-action="openLoadPanelFromMenu">📂 My Saved Plans</div>
   <div class="um-item" data-action="openBudgetFromMenu">💸 My Budget</div>
   <div class="um-item" data-action="openPassportFromMenu">🛂 My Passport</div>
+  <div class="um-item" data-action="openTravelDnaModal">🧬 Personal Travel DNA</div>
   <div class="um-item" id="install-app-btn" data-action="installPWA" style="display:none; color: var(--accent);">⬇️ Install App</div>
   <div class="um-item" data-action="openSettings">⚙️ Settings</div>
   <div class="um-item um-signout" data-action="doSignOut">🚪 Sign Out</div>
@@ -122,11 +123,10 @@
 
 <!-- AI Tools Side Drawer -->
 <div id="ai-drawer-overlay" data-action="closeAiDrawer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
-<div id="ai-drawer" style="position:fixed;bottom:0;left:0;right:0;max-height:85vh;z-index:8001;background:var(--bg-layer1);border-top:1px solid var(--border-mid);border-top-left-radius:24px;border-top-right-radius:24px;box-shadow:0 -8px 40px rgba(0,0,0,.6);overflow-y:auto;transform:translateY(110%);transition:transform .35s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom);">
-  <div style="width:36px;height:5px;background:var(--border-strong);border-radius:3px;margin:12px auto 4px;"></div>
-  <div style="position:sticky;top:0;z-index:10;background:var(--bg-layer1);border-bottom:1px solid var(--border-subtle);padding:0 16px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);">
+<div id="ai-drawer" style="display:none;position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:var(--bg-card);border-top:1px solid var(--border-default);border-radius:20px 20px 0 0;z-index:9000;box-shadow:0 -8px 32px rgba(0,0,0,0.4);max-height:85vh;overflow-y:auto;transition:transform .3s ease;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--border-subtle);position:sticky;top:0;background:var(--bg-card);z-index:1;">
     <div>
-      <div style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--text-primary);">AI Tools</div>
+      <div id="ai-drawer-title" style="font-weight:700;font-size:15px;color:var(--text-primary);">AI Local Guide</div>
       <div style="font-size:9px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Powered by Gemini AI</div>
     </div>
     <button data-action="closeAiDrawer" aria-label="Close AI assistant" style="width:34px;height:34px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border-default);color:var(--text-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
@@ -158,6 +158,7 @@
       </div>
       <div class="header-pills-wrap">
         <button class="cmd-k-btn" data-action="openCommandPalette" title="Universal Command Palette (⌘K)"><span class="cmd-k-icon">⚡</span> <span class="cmd-k-lbl">⌘K</span></button>
+        <button class="hpill" data-action="openTravelDnaModal" style="display:inline-flex;align-items:center;gap:4px;background:rgba(168,85,247,0.18);border:1px solid rgba(168,85,247,0.35);color:#d8b4fe;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:12px;cursor:pointer;">🧬 DNA</button>
         <div class="edge-telemetry-badge" title="Edge Compute: IND-BLR Edge · ML v5.2"><span class="edge-dot"></span> <span class="edge-lbl">12ms Edge</span></div>
         <button class="hpill hpill-ocean" id="btn-replay" style="display:none">🎬 Replay</button>
         <button class="hpill hpill-live"  id="btn-ls"     style="display:none">🔴 Live</button>

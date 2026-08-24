@@ -1,5 +1,6 @@
 import { browserLogger } from '../utils/browser-logger.js';
 import { openModal, closeModal } from '../a11y/modal.js';
+import { openTravelDnaModal, getTravelDna } from '../modules/travelDna.js';
 import {
   createAuthSession,
 } from '../modules/auth-session.js';
@@ -1501,7 +1502,7 @@ const STATIC_ACTIONS = {
   addNearby, aiSuggestAlternative, applyCustomPlaces, closeAiDrawer, closeCustomizeModal,
   closeNotifToast, compassTap, doSignOut, focusCitySelect, generatePlan, goBack, handleChat,
   installPWA, locateMe, openAiDrawer, openBudgetFromMenu, openCustomizeModal,
-  openLoadPanelFromMenu, openPassportFromMenu, optimizeRoute, resetGPS, saveIt, searchCity,
+  openLoadPanelFromMenu, openPassportFromMenu, openTravelDnaModal, optimizeRoute, resetGPS, saveIt, searchCity,
   shareIt, showAppFeedback, skipStop, smartExtend, startTrip, startVoiceInput,
   toggleLiveFollow, toggleLoadPanel, toggleNavCardCollapsed, toggleStreetQuest,
   toggleUserMenu, toggleVoice, waShare,
@@ -2431,15 +2432,20 @@ function updateItinUI(){
       return `<a href="${opt.link}" target="_blank" class="transport-card">${badge}<div class="t-icon">${opt.icon}</div><div class="t-mode">${opt.label}</div><div class="t-fare">${opt.fareStr}</div><div class="t-time">~${fmtM(opt.time)}</div></a>`;
     }).join('')}</div>` : '';
 
-    // Traffic + Crowd + Weather + Scenic badges
+    // Traffic + Crowd + Weather + Scenic + Travel DNA badges
     const weatherBadge = loc.weatherComfortBadge || loc.weather?.comfortBadge || '';
     const scenicBadge = loc.scenicBadge || (loc.is_sunset_spot ? '🌅 Sunset View' : '');
     const crowdBadgeStr = loc.crowdBadge || `${crowdInfo.emoji} ${crowdInfo.label}`;
+    const dnaBadgeHTML = loc.dnaMatch?.score ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.25);font-weight:600;" title="${escapeHtml(loc.dnaMatch.reasons?.[0] || 'DNA Match')}">🧬 ${loc.dnaMatch.score}% Fit</span>` : '';
+    const photoBadgeHTML = loc.photographyWindow ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.25);font-weight:600;">📸 ${loc.photographyWindow.start}–${loc.photographyWindow.end}</span>` : '';
+
     const smartBadgesHTML = `<div class="smart-time-row" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
       <span class="traffic-badge ${trafficInfo.level}">${trafficInfo.emoji} ${trafficInfo.label}</span>
       <span class="crowd-badge ${crowdInfo.level}">${crowdBadgeStr}</span>
       ${weatherBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);font-weight:600;">${weatherBadge}</span>` : ''}
       ${scenicBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.25);font-weight:600;">${scenicBadge}</span>` : ''}
+      ${dnaBadgeHTML}
+      ${photoBadgeHTML}
     </div>`;
 
     const div=document.createElement('div');div.className='stop-card'+(isN?' is-next':'')+' fade-in';
