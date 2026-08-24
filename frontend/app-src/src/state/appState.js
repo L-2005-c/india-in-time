@@ -17,7 +17,7 @@
  *   appState.setState({ currentCityId: 'mumbai' });
  */
 
-let listeners = new Set();
+const listeners = new Set();
 
 const initialState = {
   // Auth
@@ -83,7 +83,6 @@ export function getState() {
  * Update state (shallow merge)
  */
 export function setState(updates) {
-  const prevState = state;
   state = { ...state, ...updates };
   
   // Notify all subscribers of state change
@@ -91,7 +90,7 @@ export function setState(updates) {
   
   // Persist to localStorage for offline access
   persistState({
-    userId,
+    userId: state.userId,
     currentCityId: state.currentCityId,
     preferences: state.preferences,
     favorites: state.favorites,

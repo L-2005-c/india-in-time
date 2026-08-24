@@ -3,9 +3,9 @@
  * Catches uncaught exceptions and displays graceful fallback UI
  */
 
-import { captureException, captureMessage } from '@/services/client-observability';
+import { captureException } from '@/services/client-observability';
 
-let errorHandlers = new Set();
+const errorHandlers = new Set();
 let lastError = null;
 
 /**

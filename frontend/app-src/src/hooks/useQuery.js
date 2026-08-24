@@ -9,26 +9,19 @@ import { captureException } from '@/services/client-observability';
 const queryCache = new Map();
 const queryListeners = new Map();
 
-interface UseQueryOptions {
-  enabled?: boolean;
-  retry?: number | boolean;
-  retryDelay?: number;
-  staleTime?: number; // milliseconds
-  cacheTime?: number; // milliseconds
-  onError?: (error: Error) => void;
-  onSuccess?: (data: any) => void;
-}
-
-interface UseQueryResult {
-  data?: any;
-  isLoading: boolean;
-  isError: boolean;
-  error?: Error;
-  refetch: () => Promise<any>;
-}
-
 /**
  * Hook for data fetching with caching and retry
+ * @param {string|string[]} queryKey - Cache key for the query
+ * @param {Function} queryFn - Async function that fetches data
+ * @param {Object} options - Query options
+ * @param {boolean} [options.enabled=true] - Enable/disable query
+ * @param {number|boolean} [options.retry=3] - Number of retries
+ * @param {number} [options.retryDelay=1000] - Delay between retries in ms
+ * @param {number} [options.staleTime=300000] - Time before data is considered stale
+ * @param {number} [options.cacheTime=600000] - Time to keep data in cache
+ * @param {Function} [options.onError] - Error callback
+ * @param {Function} [options.onSuccess] - Success callback
+ * @returns {Object} Query result with data, loading, error states
  */
 export function useQuery(queryKey, queryFn, options = {}) {
   const {
@@ -42,16 +35,13 @@ export function useQuery(queryKey, queryFn, options = {}) {
   } = options;
   
   const key = Array.isArray(queryKey) ? queryKey.join('|') : queryKey;
-  const [data, setData] = (function() {
-    const state = {
-      data: undefined,
-      isLoading: enabled,
-      isError: false,
-      error: null,
-      lastUpdated: 0,
-    };
-    return [state, (updates) => Object.assign(state, updates)];
-  })();
+  const stateHolder = {
+    data: undefined,
+    isLoading: enabled,
+    isError: false,
+    error: null,
+    lastUpdated: 0,
+  };
   
   let mounted = true;
   
@@ -62,7 +52,7 @@ export function useQuery(queryKey, queryFn, options = {}) {
       // Check cache
       const cached = queryCache.get(key);
       if (cached && Date.now() - cached.timestamp < staleTime) {
-        setData({
+        Object.assign(stateHolder, {
           data: cached.data,
           isLoading: false,
           isError: false,
@@ -72,7 +62,7 @@ export function useQuery(queryKey, queryFn, options = {}) {
         return cached.data;
       }
       
-      setData({ isLoading: true, isError: false, error: null });
+      Object.assign(stateHolder, { isLoading: true, isError: false, error: null });
       
       const result = await queryFn();
       
@@ -80,7 +70,7 @@ export function useQuery(queryKey, queryFn, options = {}) {
       
       // Cache result
       queryCache.set(key, { data: result, timestamp: Date.now() });
-      setData({ data: result, isLoading: false, isError: false });
+      Object.assign(stateHolder, { data: result, isLoading: false, isError: false });
       onSuccess?.(result);
       notifyListeners(key);
       
@@ -98,7 +88,7 @@ export function useQuery(queryKey, queryFn, options = {}) {
         return;
       }
       
-      setData({
+      Object.assign(stateHolder, {
         isLoading: false,
         isError: true,
         error: err,
@@ -115,7 +105,7 @@ export function useQuery(queryKey, queryFn, options = {}) {
   fetchData();
   
   return {
-    ...data,
+    ...stateHolder,
     refetch: () => fetchData(),
     unsubscribe: () => {
       mounted = false;
@@ -126,29 +116,31 @@ export function useQuery(queryKey, queryFn, options = {}) {
 
 /**
  * Hook for mutations (POST, PUT, DELETE)
+ * @param {Function} mutationFn - Async function to execute
+ * @param {Object} options - Mutation options
+ * @param {Function} [options.onError] - Error callback
+ * @param {Function} [options.onSuccess] - Success callback
+ * @returns {Object} Mutation result with mutate function
  */
 export function useMutation(mutationFn, options = {}) {
   const { onError, onSuccess } = options;
   
-  const [state, setState] = (function() {
-    const s = {
-      data: null,
-      isLoading: false,
-      isError: false,
-      error: null,
-    };
-    return [s, (updates) => Object.assign(s, updates)];
-  })();
+  const stateHolder = {
+    data: null,
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
   
   const mutate = async (...args) => {
     try {
-      setState({ isLoading: true, isError: false, error: null });
+      Object.assign(stateHolder, { isLoading: true, isError: false, error: null });
       const result = await mutationFn(...args);
-      setState({ data: result, isLoading: false, isError: false });
+      Object.assign(stateHolder, { data: result, isLoading: false, isError: false });
       onSuccess?.(result);
       return result;
     } catch (err) {
-      setState({ isLoading: false, isError: true, error: err });
+      Object.assign(stateHolder, { isLoading: false, isError: true, error: err });
       onError?.(err);
       captureException(err, { mutation: mutationFn.name });
       throw err;
@@ -156,10 +148,10 @@ export function useMutation(mutationFn, options = {}) {
   };
   
   return {
-    ...state,
+    ...stateHolder,
     mutate,
     mutateAsync: mutate,
-    reset: () => setState({
+    reset: () => Object.assign(stateHolder, {
       data: null,
       isLoading: false,
       isError: false,
