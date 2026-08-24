@@ -23,7 +23,6 @@ const {
   isExcludedCategory,
   normalizeCat,
   isFoodPlace,
-  detectConflictingRequirements,
 } = require('./requirementEngine');
 const { computeDnaMatch } = require('./personalTravelDna');
 const {

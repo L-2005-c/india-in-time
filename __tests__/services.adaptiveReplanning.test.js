@@ -1,7 +1,7 @@
 'use strict';
 
 const { detectConflictingRequirements } = require('../services/travelIntelligence/requirementEngine');
-const { replanAdvanced, planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');
+const { replanAdvanced } = require('../services/travelIntelligence/advancedItineraryEngine');
 const { computeTravelValueScore } = require('../services/travelIntelligence/decisionEngine');
 
 describe('Adaptive Itinerary & Conflict Resolution Engine', () => {

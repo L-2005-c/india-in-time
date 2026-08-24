@@ -1,110 +1,28 @@
 import { browserLogger } from '../utils/browser-logger.js';
 import { openModal, closeModal } from '../a11y/modal.js';
-import { openTravelDnaModal, getTravelDna } from '../modules/travelDna.js';
-import {
-  createAuthSession,
-} from '../modules/auth-session.js';
-import {
-  calculateStopBudget as _calculateStopBudget,
-  calculateDayBudget as _calculateDayBudget,
-  calculateTripBudget as _calculateTripBudget,
-  renderBudgetBreakdownHTML as _renderBudgetBreakdownHTML,
-} from '../modules/budget.js';
-import {
-  getRouteStopsForDay as _getRouteStopsForDay,
-  createBreakStop as _createBreakStop,
-  estimateStopLoadMinutes as _estimateStopLoadMinutes,
-} from '../modules/planner.js';
-
-import {
-  getTransportOptions as _getTransportOptionsMod,
-  getTrafficMultiplierForCity as _getTrafficMultiplierForCity,
-  getSmartTravelTimeForCity as _getSmartTravelTimeForCity,
-  getTrafficLevel as _modTrafficLevel,
-  getCrowdLevel as _modCrowdLevel,
-  getCrowdMultiplier as _modCrowdMultiplier,
-  getSmartVisitTime as _modSmartVisitTime,
-} from '../modules/transport.js';
+import { openTravelDnaModal } from '../modules/travelDna.js';
+import { createAuthSession } from '../modules/auth-session.js';
+import { calculateStopBudget as _calculateStopBudget, calculateDayBudget as _calculateDayBudget, calculateTripBudget as _calculateTripBudget, renderBudgetBreakdownHTML as _renderBudgetBreakdownHTML } from '../modules/budget.js';
+import { getRouteStopsForDay as _getRouteStopsForDay, createBreakStop as _createBreakStop, estimateStopLoadMinutes as _estimateStopLoadMinutes } from '../modules/planner.js';
+import { getTransportOptions as _getTransportOptionsMod, getTrafficMultiplierForCity as _getTrafficMultiplierForCity, getSmartTravelTimeForCity as _getSmartTravelTimeForCity, getTrafficLevel as _modTrafficLevel, getCrowdLevel as _modCrowdLevel, getCrowdMultiplier as _modCrowdMultiplier, getSmartVisitTime as _modSmartVisitTime } from '../modules/transport.js';
 import { buildTimeAwareDay as _buildTimeAwareDayMod } from '../modules/timeAwarePlanner.js';
 import { createStreetQuest } from '../modules/streetQuest.js';
-import {
-  escapeHtml as _escapeHtml,
-  sanitizeChatHtml as _sanitizeChatHtml,
-  formatAiText as _formatAiText,
-} from '../utils/html-safe.js';
+import { escapeHtml as _escapeHtml, sanitizeChatHtml as _sanitizeChatHtml, formatAiText as _formatAiText } from '../utils/html-safe.js';
 import { showToast as _showToastMod } from '../modules/notifications.js';
-import {
-  openSettings, closeSettings, clearLocalData,
-  maybeShowOnboarding, advanceOnboarding, skipOnboarding,
-} from '../modules/settingsPanel.js';
+import { openSettings, closeSettings, clearLocalData, maybeShowOnboarding, advanceOnboarding, skipOnboarding } from '../modules/settingsPanel.js';
 import { addMsg as _addMsgMod } from '../modules/chatUi.js';
-import {
-  promptStopFeedback as _promptStopFeedbackMod,
-  rateStop as _rateStopMod,
-  showAppFeedback as _showAppFeedbackMod,
-  fbSetStar as _fbSetStarMod,
-  fbSetCat as _fbSetCatMod,
-  updateFbCounter as _updateFbCounterMod,
-  fbSkip as _fbSkipMod,
-  fbSubmit as _fbSubmitMod,
-} from '../modules/feedback.js';
-import {
-  readLocalPlans as _readLocalPlansMod,
-  writeLocalPlans as _writeLocalPlansMod,
-  savePlan as _savePlanMod,
-  deletePlan as _deletePlanMod,
-  renderSavedPlansListUI as _renderSavedPlansListUIMod,
-  shareTripText as _shareTripTextMod,
-  shareTripWhatsApp as _shareTripWhatsAppMod,
-  shareTripEmergency as _shareTripEmergencyMod,
-} from '../modules/savedPlans.js';
-import {
-  generateWhatsAppShareText as _genWhatsAppText,
-  buildOfflineTravelPassHtml as _buildOfflinePassHtml,
-} from '../modules/offlineTravelPass.js';
-import {
-  filterCommands,
-  renderPaletteListHtml,
-  PALETTE_COMMANDS,
-} from '../modules/commandPalette.js';
+import { promptStopFeedback as _promptStopFeedbackMod, rateStop as _rateStopMod, showAppFeedback as _showAppFeedbackMod, fbSetStar as _fbSetStarMod, fbSetCat as _fbSetCatMod, updateFbCounter as _updateFbCounterMod, fbSkip as _fbSkipMod, fbSubmit as _fbSubmitMod } from '../modules/feedback.js';
+import { readLocalPlans as _readLocalPlansMod, writeLocalPlans as _writeLocalPlansMod, savePlan as _savePlanMod, deletePlan as _deletePlanMod, renderSavedPlansListUI as _renderSavedPlansListUIMod, shareTripText as _shareTripTextMod, shareTripWhatsApp as _shareTripWhatsAppMod, shareTripEmergency as _shareTripEmergencyMod } from '../modules/savedPlans.js';
+import { generateWhatsAppShareText as _genWhatsAppText, buildOfflineTravelPassHtml as _buildOfflinePassHtml } from '../modules/offlineTravelPass.js';
+import { filterCommands, renderPaletteListHtml, PALETTE_COMMANDS } from '../modules/commandPalette.js';
 import { showToast as _showMicroToast } from '../modules/toastEngine.js';
-import {
-  startVoiceInput as _startVoiceInputMod,
-  handleCaption as _handleCaptionMod,
-  handleTranslate as _handleTranslateMod,
-} from '../modules/aiMedia.js';
-
-import {
-  getDaypartClient as _getDaypartClient,
-  getOpeningStatusPure as _getOpeningStatusPure,
-  getCrowdPredictionPure as _getCrowdPredictionPure,
-  calculateExperienceScorePure as _calculateExperienceScorePure,
-} from '../utils/experience-score.js';
-import {
-  isPlausibleGpsFix as _isPlausibleGpsFix,
-  createGpsFixCoordinator as _createGpsFixCoordinator,
-} from '../utils/gps.js';
-import {
-  closestPointOnSegment as _closestPointOnSegment,
-  snapToRoute as _snapToRoute,
-  turnArrowForInstruction as _turnArrowForInstruction,
-  shouldSpeakNavInstruction as _shouldSpeakNavInstruction,
-} from '../utils/nav-route.js';
-import {
-  shouldRetryWeather as _shouldRetryWeather,
-  weatherRetryDelayMs as _weatherRetryDelayMs,
-  detectWeatherChange as _detectWeatherChange,
-} from '../utils/weather-ui.js';
-import {
-  CITIES,
-  getHiddenGems,
-  getTransportConfig,
-  getLocalPlaces,
-} from '../data/cities.js';
-import {
-  normalizeFetchedPlaces as _normalizeFetchedPlaces,
-  pickNearestCityId as _pickNearestCityId,
-} from '../utils/city-load.js';
+import { startVoiceInput as _startVoiceInputMod, handleCaption as _handleCaptionMod, handleTranslate as _handleTranslateMod } from '../modules/aiMedia.js';
+import { getDaypartClient as _getDaypartClient, getOpeningStatusPure as _getOpeningStatusPure, getCrowdPredictionPure as _getCrowdPredictionPure, calculateExperienceScorePure as _calculateExperienceScorePure } from '../utils/experience-score.js';
+import { isPlausibleGpsFix as _isPlausibleGpsFix, createGpsFixCoordinator as _createGpsFixCoordinator } from '../utils/gps.js';
+import { closestPointOnSegment as _closestPointOnSegment, snapToRoute as _snapToRoute, turnArrowForInstruction as _turnArrowForInstruction, shouldSpeakNavInstruction as _shouldSpeakNavInstruction } from '../utils/nav-route.js';
+import { shouldRetryWeather as _shouldRetryWeather, weatherRetryDelayMs as _weatherRetryDelayMs, detectWeatherChange as _detectWeatherChange } from '../utils/weather-ui.js';
+import { CITIES, getHiddenGems, getTransportConfig, getLocalPlaces } from '../data/cities.js';
+import { normalizeFetchedPlaces as _normalizeFetchedPlaces, pickNearestCityId as _pickNearestCityId } from '../utils/city-load.js';
 import {
   hvKm,
   hasValidCoords,

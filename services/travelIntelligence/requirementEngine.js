@@ -246,7 +246,7 @@ function filterCandidates(places, requirements) {
  * Detects hard requirement conflicts before optimization begins.
  * Returns structured conflict data with 3 actionable resolution alternatives.
  */
-function detectConflictingRequirements(requirements, places = [], startCoords = null) {
+function detectConflictingRequirements(requirements, places = [], _startCoords = null) {
   const req = requirements?.hard || requirements || {};
   const conflicts = [];
   const startMin = req.startTimeMinutes != null ? req.startTimeMinutes : 540; // 09:00
