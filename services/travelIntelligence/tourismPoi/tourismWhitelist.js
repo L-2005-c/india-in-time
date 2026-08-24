@@ -50,6 +50,11 @@ const VIZAG = [
   entry('Sai Priya Beach Restaurant', 'food', 'B', 17.7858, 83.3845, ['sai priya']),
   entry('Alpha Hotel Vizag', 'food', 'C', 17.7122, 83.3018, ['alpha hotel']),
   entry('Tenneti Park', 'park', 'B', 17.7484, 83.3495),
+  entry('Kambalakonda Jungle Trek', 'trekking', 'S', 17.7795, 83.3355, ['kambalakonda trek']),
+  entry('Simhachalam Hill Pavani Trail', 'trekking', 'A', 17.7680, 83.2520, ['simhachalam trek']),
+  entry('Vanjangi Cloud Peak Trek', 'trekking', 'S', 18.0062, 82.7230, ['vanjangi trek', 'meghala konda']),
+  entry('Katiki Waterfalls Jungle Trail', 'trekking', 'A', 18.2910, 83.0080, ['katiki trek']),
+  entry('Yarada Dolphin Ridge Hike', 'trekking', 'B', 17.6560, 83.2710, ['dolphin ridge trek']),
 ];
 
 const HYDERABAD = [
@@ -62,6 +67,8 @@ const HYDERABAD = [
   entry('Birla Mandir Hyderabad', 'temple', 'A', 17.4062, 78.4691, ['birla mandir']),
   entry('Inorbit Mall Hyderabad', 'shopping', 'A', 17.4337, 78.3862, ['inorbit mall hyderabad']),
   entry('GVK One Mall', 'shopping', 'A', 17.4193, 78.4482, ['gvk one']),
+  entry('Khajaguda Hills Cave & Bouldering Trail', 'trekking', 'A', 17.4140, 78.3610, ['khajaguda trek']),
+  entry('Ananthagiri Hills Vikarabad Forest Trek', 'trekking', 'A', 17.3110, 77.8650, ['ananthagiri trek']),
 ];
 
 const GOA = [
@@ -73,6 +80,8 @@ const GOA = [
   entry('Anjuna Beach', 'beach', 'A', 15.5752, 73.7405),
   entry('Palolem Beach', 'beach', 'A', 15.0100, 74.0232),
   entry('Old Goa Churches', 'heritage', 'A', 15.5036, 73.9122),
+  entry('Dudhsagar Jungle Railway Trek', 'trekking', 'S', 15.3144, 74.3143, ['dudhsagar trek']),
+  entry('Tambdi Surla Waterfall Trek', 'trekking', 'A', 15.4410, 74.2560, ['tambdi surla trek']),
 ];
 
 const JAIPUR = [
@@ -84,6 +93,8 @@ const JAIPUR = [
   entry('Nahargarh Fort', 'scenic', 'A', 26.9373, 75.8155),
   entry('Albert Hall Museum', 'museum', 'A', 26.9117, 75.8195),
   entry('World Trade Park Jaipur', 'shopping', 'A', 26.8533, 75.8046, ['wtp jaipur']),
+  entry('Nahargarh Fort Hilltop Trek', 'trekking', 'A', 26.9402, 75.8170, ['nahargarh trek']),
+  entry('Hathni Kund Hidden Valley Trek', 'trekking', 'A', 26.9620, 75.8450, ['hathni kund trek']),
 ];
 
 const DELHI = [
@@ -97,6 +108,8 @@ const DELHI = [
   entry('Chandni Chowk', 'shopping', 'A', 28.6505, 77.2303),
   entry('Connaught Place', 'shopping', 'A', 28.6315, 77.2167, ['cp delhi']),
   entry('Select Citywalk', 'shopping', 'A', 28.5286, 77.2191),
+  entry('Asola Bhatti Wildlife Sanctuary Ridge Trail', 'trekking', 'A', 28.4680, 77.2620, ['asola bhatti trek']),
+  entry('Aravalli Biodiversity Park Nature Trail', 'trekking', 'A', 28.4890, 77.0980, ['aravalli trail']),
 ];
 
 const MUMBAI = [
@@ -109,6 +122,8 @@ const MUMBAI = [
   entry('Juhu Beach', 'beach', 'A', 19.0996, 72.8258),
   entry('Phoenix Palladium', 'shopping', 'A', 18.9942, 72.8250, ['phoenix mall mumbai']),
   entry('High Street Phoenix', 'shopping', 'A', 18.9940, 72.8245),
+  entry('Sanjay Gandhi National Park Kanheri Caves Trek', 'trekking', 'A', 19.2060, 72.9060, ['kanheri caves trek']),
+  entry('Karnala Fort & Bird Sanctuary Trek', 'trekking', 'A', 18.8890, 73.1200, ['karnala trek']),
 ];
 
 const BENGALURU = [
@@ -120,6 +135,9 @@ const BENGALURU = [
   entry('Bannerghatta National Park', 'wildlife', 'A', 12.8005, 77.5770),
   entry('UB City Mall', 'shopping', 'A', 12.9718, 77.5960, ['ub city']),
   entry('Phoenix Marketcity Bangalore', 'shopping', 'A', 12.9972, 77.6964),
+  entry('Nandi Hills Sunrise & Heritage Steps Trek', 'trekking', 'S', 13.3702, 77.6835, ['nandi hills trek']),
+  entry('Skandagiri Peak Sunrise Trek', 'trekking', 'S', 13.4180, 77.6830, ['skandagiri trek']),
+  entry('Savandurga Monolith Hill Climb', 'trekking', 'A', 12.9190, 77.2930, ['savandurga trek']),
 ];
 
 const KOCHI = [

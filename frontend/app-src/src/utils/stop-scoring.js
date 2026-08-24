@@ -39,8 +39,8 @@ export function personaBonus(stop, personas) {
   if (set.has('history') && (cat === 'fort' || cat === 'monument' || cat === 'museum' || cat === 'temple')) b += 12;
   if ((set.has('foodie') || set.has('food_lover') || set.has('food-lover')) && cat === 'food') b += 16;
   if (set.has('spiritual') && cat === 'temple') b += 12;
-  if (set.has('adventure') && (cat === 'hill' || cat === 'waterfall' || cat === 'beach')) b += 10;
-  if (set.has('nature') && (cat === 'park' || cat === 'scenic' || cat === 'beach' || cat === 'garden')) b += 10;
+  if (set.has('adventure') && (cat === 'trekking' || cat === 'hiking' || cat === 'hill' || cat === 'waterfall' || cat === 'beach')) b += 16;
+  if (set.has('nature') && (cat === 'trekking' || cat === 'hiking' || cat === 'park' || cat === 'scenic' || cat === 'beach' || cat === 'garden')) b += 12;
   return b;
 }
 
@@ -64,6 +64,11 @@ export function stopTimeScore(stop, arriveMin, temp, priorityIndex = 0, wind = 0
   const cat = String(stop.cat || '').toLowerCase();
 
   // --- Category × daypart (core time intelligence) ---
+  if (cat === 'trekking' || cat === 'hiking') {
+    if (part === 'Morning' || (arriveMin >= 15.5 * 60 && arriveMin <= 18.5 * 60)) score += 26;
+    else if (part === 'Afternoon' && climate === 'hot') score -= 22;
+    else if (part === 'Night') score -= 25;
+  }
   if (cat === 'beach' || cat === 'scenic') {
     if (part === 'Morning' || (arriveMin >= 16.5 * 60 && arriveMin <= 18.5 * 60)) score += 24;
     else if (part === 'Afternoon') score -= 18;

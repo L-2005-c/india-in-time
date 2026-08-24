@@ -267,8 +267,11 @@ function matchesExclusive(want, productCat, tourismClass, place) {
   if (w === 'temple' || w === 'temples') return cat === 'temple' || cls.includes('TEMPLE') || cls.includes('RELIGIOUS');
   if (w === 'museum' || w === 'museums') return cat === 'museum' || cls === 'MUSEUM';
   if (w === 'food' || w === 'restaurant') return cat === 'food' || cls === 'FOOD_DESTINATION';
+  if (w === 'trekking' || w === 'trek' || w === 'hiking' || w === 'hike') {
+    return cat === 'trekking' || cls.includes('TREK') || cls.includes('HIKE') || cls.includes('ADVENTURE') || /\b(trek|hike|trail|ridge|peak)\b/i.test(name);
+  }
   if (w === 'scenic' || w === 'photography') {
-    return ['scenic', 'beach', 'park', 'museum'].includes(cat) || /SCENIC|VIEWPOINT|PHOTO|BEACH|PARK/.test(cls);
+    return ['scenic', 'trekking', 'beach', 'park', 'museum'].includes(cat) || /SCENIC|VIEWPOINT|PHOTO|BEACH|PARK|TREK/.test(cls);
   }
   return false;
 }

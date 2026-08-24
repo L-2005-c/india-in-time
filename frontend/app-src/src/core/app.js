@@ -2383,7 +2383,14 @@ function updateItinUI(){
       ft=last.ets||last.leaveAt||'--:--';
     }
   }catch(_e){ ft=itin[itin.length-1]?.ets||'--:--'; }
-  const imgs={beach:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=96&h=96&fit=crop',temple:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=96&h=96&fit=crop',food:'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=96&h=96&fit=crop',scenic:'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=96&h=96&fit=crop'};
+  const imgs={
+    beach:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=96&h=96&fit=crop',
+    temple:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=96&h=96&fit=crop',
+    food:'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=96&h=96&fit=crop',
+    scenic:'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=96&h=96&fit=crop',
+    trekking:'https://images.unsplash.com/photo-1551632811-561732d1e306?w=96&h=96&fit=crop',
+    shopping:'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=96&h=96&fit=crop'
+  };
   const startMin = t2m(document.getElementById('s-time')?.value || '09:00');
   const dow = new Date().getDay();
   itin.forEach((loc,i)=>{

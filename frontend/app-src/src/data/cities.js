@@ -86,6 +86,16 @@ const LOCAL_PLACE_SEEDS = {
     ['Upland Bistro Waltair','food',17.7280,83.3180,45,'11:00','23:00'],
     ['Pastry Coffee & Co Siripuram','food',17.7225,83.3175,40,'09:00','23:00'],
     ['Kailasagiri Ropeway','scenic',17.7488,83.3402,40,'07:00','20:00'],
+    ['Kambalakonda Jungle Trek','trekking',17.7795,83.3355,120,'06:00','17:00'],
+    ['Simhachalam Hill Pavani Trail','trekking',17.7680,83.2520,105,'05:30','18:30'],
+    ['Kailasagiri Hill Ridge Trail','trekking',17.7475,83.3425,75,'05:30','19:00'],
+    ['Vanjangi Cloud Peak Trek','trekking',18.0062,82.7230,150,'04:30','17:30'],
+    ['Katiki Waterfalls Jungle Trail','trekking',18.2910,83.0080,120,'06:30','17:00'],
+    ['Borra Caves to Gupteshwar Trail','trekking',18.2815,83.0402,120,'07:00','17:00'],
+    ['Yarada Dolphin Ridge Hike','trekking',17.6560,83.2710,90,'05:30','18:30'],
+    ['Lambasingi Forest & Cloud Trail','trekking',17.8180,82.4930,120,'05:30','17:30'],
+    ['Madhavadhara to Simhachalam Ridge Trek','trekking',17.7520,83.2750,110,'05:30','18:00'],
+    ['Tatipudi Reservoir Nature Trail','trekking',18.1710,83.2050,90,'06:00','17:30'],
   ],
   hyderabad: [
     ['Charminar','scenic',17.3616,78.4747,60,'09:00','17:30'],
@@ -96,6 +106,10 @@ const LOCAL_PLACE_SEEDS = {
     ['Chowmahalla Palace','scenic',17.3578,78.4717,75,'10:00','17:00'],
     ['Paradise Biryani','food',17.4416,78.4870,45,'11:00','23:00'],
     ['Cafe Niloufer','food',17.3991,78.4624,40,'07:00','23:00'],
+    ['Khajaguda Hills Cave & Bouldering Trail','trekking',17.4140,78.3610,90,'05:30','19:00'],
+    ['Ananthagiri Hills Vikarabad Forest Trek','trekking',17.3110,77.8650,120,'06:00','18:00'],
+    ['Bhongir Fort Monolith Climb','trekking',17.5100,78.8890,90,'06:00','17:30'],
+    ['Moula Ali Hill Sunburst Trek','trekking',17.4680,78.5630,60,'05:30','19:00'],
   ],
   goa: [
     ['Baga Beach','beach',15.5553,73.7517,90,'06:00','22:00'],
@@ -106,6 +120,10 @@ const LOCAL_PLACE_SEEDS = {
     ['Miramar Beach','beach',15.4827,73.8074,60,'06:00','21:00'],
     ['Thalassa','food',15.6164,73.7555,60,'12:00','23:30'],
     ['Ritz Classic Panaji','food',15.4989,73.8278,45,'11:00','23:00'],
+    ['Dudhsagar Jungle Railway Trek','trekking',15.3144,74.3143,150,'06:00','16:30'],
+    ['Tambdi Surla Waterfall Trek','trekking',15.4410,74.2560,120,'07:00','16:30'],
+    ['Pali Waterfall Forest Hike','trekking',15.5340,74.1950,110,'07:00','17:00'],
+    ['Chorla Ghats Nature Trail','trekking',15.6570,74.1280,120,'06:00','18:00'],
   ],
   jaipur: [
     ['Amber Fort','scenic',26.9855,75.8513,90,'08:00','18:00'],
@@ -116,6 +134,10 @@ const LOCAL_PLACE_SEEDS = {
     ['Birla Mandir Jaipur','temple',26.8923,75.8155,45,'06:00','21:00'],
     ['Lassiwala','food',26.9166,75.8102,35,'08:00','16:00'],
     ['Rawat Mishthan Bhandar','food',26.9213,75.7967,45,'08:00','22:30'],
+    ['Nahargarh Fort Hilltop Trek','trekking',26.9402,75.8170,90,'05:30','18:30'],
+    ['Hathni Kund Hidden Valley Trek','trekking',26.9620,75.8450,105,'06:00','17:30'],
+    ['Chour Ghati Aravali Trail','trekking',26.9080,75.8610,90,'06:00','18:00'],
+    ['Bhuteshwar Nath Ridge Trek','trekking',26.9740,75.8290,100,'05:30','18:00'],
   ],
   udaipur: [
     ['City Palace Udaipur','scenic',24.5764,73.6835,90,'09:30','17:30'],
@@ -126,6 +148,9 @@ const LOCAL_PLACE_SEEDS = {
     ['Jagdish Temple','temple',24.5799,73.6823,45,'05:00','22:00'],
     ['Ambrai Restaurant','food',24.5781,73.6814,60,'11:00','23:00'],
     ['Natraj Dining Hall','food',24.5724,73.6997,45,'11:00','22:30'],
+    ['Bahubali Hills Badi Lake Peak Trek','trekking',24.6220,73.6350,90,'05:30','18:30'],
+    ['Purohito Ka Talab Ridge Trek','trekking',24.6710,73.7420,90,'06:00','18:00'],
+    ['Sajjangarh Monsoon Palace Forest Trail','trekking',24.5910,73.6370,90,'06:00','18:00'],
   ],
   delhi: [
     ['India Gate','scenic',28.6129,77.2295,45,'06:00','22:00'],
@@ -136,6 +161,9 @@ const LOCAL_PLACE_SEEDS = {
     ['Akshardham Temple','temple',28.6127,77.2773,90,'10:00','20:00'],
     ['Karim Hotel','food',28.6495,77.2334,45,'11:00','23:30'],
     ['Paranthe Wali Gali','food',28.6560,77.2307,45,'09:00','22:00'],
+    ['Asola Bhatti Wildlife Sanctuary Ridge Trail','trekking',28.4680,77.2620,120,'06:00','17:00'],
+    ['Aravalli Biodiversity Park Nature Trail','trekking',28.4890,77.0980,90,'05:30','19:00'],
+    ['Damdama Lake & Leopard Trail Hike','trekking',28.3020,77.0850,120,'06:00','18:00'],
   ],
   mumbai: [
     ['Gateway of India','scenic',18.9220,72.8347,45,'06:00','22:00'],
@@ -146,6 +174,9 @@ const LOCAL_PLACE_SEEDS = {
     ['Juhu Beach','beach',19.0988,72.8267,75,'06:00','22:00'],
     ['Leopold Cafe','food',18.9220,72.8317,45,'07:30','23:30'],
     ['Bademiya','food',18.9217,72.8324,45,'12:00','23:30'],
+    ['Sanjay Gandhi National Park Kanheri Caves Trek','trekking',19.2060,72.9060,120,'07:30','17:00'],
+    ['Yeoor Hills Forest Trail','trekking',19.2310,72.9520,105,'06:00','18:00'],
+    ['Karnala Fort & Bird Sanctuary Trek','trekking',18.8890,73.1200,120,'06:30','17:00'],
   ],
   bengaluru: [
     ['Bangalore Palace','scenic',13.0035,77.5891,75,'10:00','17:30'],
@@ -156,6 +187,10 @@ const LOCAL_PLACE_SEEDS = {
     ['Ulsoor Lake','scenic',12.9824,77.6199,45,'06:00','20:00'],
     ['Vidyarthi Bhavan','food',12.9450,77.5714,40,'06:30','20:00'],
     ['MTR Lalbagh','food',12.9551,77.5856,45,'06:30','21:30'],
+    ['Nandi Hills Sunrise & Heritage Steps Trek','trekking',13.3702,77.6835,120,'05:30','18:00'],
+    ['Skandagiri Peak Sunrise Trek','trekking',13.4180,77.6830,150,'04:00','16:00'],
+    ['Savandurga Monolith Hill Climb','trekking',12.9190,77.2930,140,'06:00','16:30'],
+    ['Makalidurga Fort Railway & Hill Trek','trekking',13.4280,77.5020,130,'06:00','17:00'],
   ],
   kochi: [
     ['Fort Kochi Beach','beach',9.9637,76.2375,75,'06:00','21:00'],
@@ -166,6 +201,8 @@ const LOCAL_PLACE_SEEDS = {
     ['Marine Drive Kochi','scenic',9.9772,76.2773,60,'06:00','22:00'],
     ['Kashi Art Cafe','food',9.9650,76.2425,45,'08:30','22:00'],
     ['Kayees Rahmathulla Cafe','food',9.9627,76.2547,45,'11:00','22:00'],
+    ['Thattekad Bird Sanctuary Jungle Hike','trekking',10.1310,76.6920,120,'06:30','17:00'],
+    ['Bhoothathankettu Forest Dam Trail','trekking',10.1410,76.6630,105,'07:00','17:30'],
   ],
   agra: [
     ['Taj Mahal','scenic',27.1751,78.0421,120,'06:00','18:30'],
@@ -176,6 +213,7 @@ const LOCAL_PLACE_SEEDS = {
     ['Jama Masjid Agra','temple',27.1837,78.0179,45,'06:00','20:00'],
     ['Pinch of Spice','food',27.1596,78.0432,45,'11:00','23:00'],
     ['Deviram Sweets','food',27.1667,78.0087,35,'08:00','22:00'],
+    ['Sur Sarovar Bird Sanctuary Lake Trail','trekking',27.2480,77.8420,90,'06:00','17:30'],
   ],
   varanasi: [
     ['Dashashwamedh Ghat','scenic',25.3062,83.0107,75,'05:00','22:00'],
@@ -186,6 +224,7 @@ const LOCAL_PLACE_SEEDS = {
     ['Manikarnika Ghat','scenic',25.3102,83.0140,45,'05:00','22:00'],
     ['Kashi Chaat Bhandar','food',25.3094,83.0061,40,'16:00','22:30'],
     ['Blue Lassi','food',25.3095,83.0088,35,'08:00','22:00'],
+    ['Chunar Fort Ridge Hike Varanasi','trekking',25.1270,82.8760,110,'06:00','17:00'],
   ],
   kolkata: [
     ['Victoria Memorial','scenic',22.5448,88.3426,90,'10:00','17:00'],
@@ -193,6 +232,8 @@ const LOCAL_PLACE_SEEDS = {
     ['Indian Museum','scenic',22.5580,88.3507,75,'10:00','17:00'],
     ['Dakshineswar Kali Temple','temple',22.6550,88.3570,75,'06:00','21:00'],
     ['Kalighat Kali Temple','temple',22.5204,88.3425,60,'05:00','22:30'],
+    ['Santragachi Lake Eco Wetland Trail','trekking',22.5800,88.2790,90,'06:00','18:00'],
+    ['Chintamoni Kar Bird Sanctuary Trail','trekking',22.4280,88.4020,80,'07:00','17:00'],
     ['Prinsep Ghat','scenic',22.5552,88.3317,60,'06:00','21:00'],
     ['Peter Cat','food',22.5524,88.3526,45,'11:00','23:00'],
     ['Arsalan Park Circus','food',22.5415,88.3657,45,'11:00','23:30'],
@@ -426,7 +467,7 @@ const CITY_TRANSPORT_CONFIG = {
 };
 const DEFAULT_TRANSPORT_CONFIG = { hasMetro:false, hasTrain:false, busFare:[10,30], autoBase:25, autoPerKm:12, cabBase:50, cabPerKm:15, congestion:1.0 };
 
-const ENTRY_FEE_ESTIMATES = { scenic:50, temple:0, beach:0, food:0, break:0 };
+const ENTRY_FEE_ESTIMATES = { scenic:50, temple:0, beach:0, food:0, break:0, trekking:30, shopping:0 };
 
 // ── Transport & Traffic Intelligence ──────────────────────────────────────────
 // NOTE: the original inline app.js fell back to CITY_TRANSPORT_CONFIG[currentCityId]

@@ -35,6 +35,7 @@ const TOURISM_CLASSES = Object.freeze({
   NIGHTLIFE: 'NIGHTLIFE',
   FAMILY_ATTRACTION: 'FAMILY_ATTRACTION',
   ADVENTURE: 'ADVENTURE',
+  TREKKING: 'TREKKING',
   PHOTOGRAPHY_SPOT: 'PHOTOGRAPHY_SPOT',
   // Reject classes
   LOCALITY: 'LOCALITY',
@@ -152,6 +153,7 @@ const NAME_RULES = [
   { re: /\bpalace\b/i, cls: TOURISM_CLASSES.PALACE },
   { re: /\bmonument\b|\bmemorial\b/i, cls: TOURISM_CLASSES.MONUMENT },
   { re: /\bheritage\b|\bruins\b|\barchaeological\b/i, cls: TOURISM_CLASSES.HERITAGE_SITE },
+  { re: /\btrek\b|\btrekking\b|\bhike\b|\bhiking\b|\btrail\b|\btrails\b/i, cls: TOURISM_CLASSES.TREKKING },
   { re: /\bwaterfall\b|\bfalls\b/i, cls: TOURISM_CLASSES.WATERFALL },
   { re: /\bviewpoint\b|\bview\s*point\b|\blighthouse\b/i, cls: TOURISM_CLASSES.VIEWPOINT },
   { re: /\bpark\b|\bgarden\b/i, cls: TOURISM_CLASSES.PARK },
@@ -277,7 +279,8 @@ function toProductCategory(tourismClass) {
     [TOURISM_CLASSES.ENTERTAINMENT]: 'entertainment',
     [TOURISM_CLASSES.NIGHTLIFE]: 'nightlife',
     [TOURISM_CLASSES.FAMILY_ATTRACTION]: 'scenic',
-    [TOURISM_CLASSES.ADVENTURE]: 'scenic',
+    [TOURISM_CLASSES.ADVENTURE]: 'trekking',
+    [TOURISM_CLASSES.TREKKING]: 'trekking',
     [TOURISM_CLASSES.TOURIST_ATTRACTION]: 'scenic',
   };
   return map[tourismClass] || null;

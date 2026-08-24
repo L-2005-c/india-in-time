@@ -11,6 +11,7 @@ const CATEGORY_ALIASES = {
   temple: ['temple', 'temples', 'spiritual', 'mandir', 'church', 'churches', 'mosque', 'mosques', 'gurudwara'],
   food: ['food', 'restaurant', 'restaurants', 'cafe', 'cafes', 'local food', 'cuisine', 'dining'],
   scenic: ['scenic', 'viewpoint', 'viewpoints', 'photography', 'sunset', 'sunrise', 'view'],
+  trekking: ['trekking', 'trek', 'treks', 'hike', 'hiking', 'trails', 'trail', 'mountain', 'hill climbing'],
   museum: ['museum', 'museums', 'history', 'heritage', 'monument', 'fort'],
   park: ['park', 'parks', 'garden', 'nature'],
   market: ['market', 'bazaar', 'haat'],
