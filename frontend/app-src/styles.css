@@ -104,14 +104,58 @@
 }
 
 /* ═══════════════════════════════════════════
-   RESET
+   RESET & SMOOTH PERFORMANCE FOUNDATION
 ═══════════════════════════════════════════ */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html{height:100%;height:100dvh;min-height:-webkit-fill-available;overflow:hidden;}
-body{height:100%;height:100dvh;min-height:-webkit-fill-available;overflow:hidden;background:var(--bg-base);color:var(--text-primary);-webkit-font-smoothing:antialiased;touch-action:manipulation;}
-::-webkit-scrollbar{width:2px;height:2px;}
-::-webkit-scrollbar-thumb{background:var(--border-mid);border-radius:2px;}
-::-webkit-scrollbar-track{background:transparent;}
+*,*::before,*::after{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  -webkit-tap-highlight-color:transparent;
+}
+html{
+  height:100%;
+  height:100dvh;
+  min-height:-webkit-fill-available;
+  overflow:hidden;
+  scroll-behavior:smooth;
+  -webkit-text-size-adjust:100%;
+}
+body{
+  height:100%;
+  height:100dvh;
+  min-height:-webkit-fill-available;
+  overflow:hidden;
+  background:var(--bg-base);
+  color:var(--text-primary);
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  touch-action:manipulation;
+}
+::-webkit-scrollbar{
+  width:4px;
+  height:4px;
+}
+::-webkit-scrollbar-thumb{
+  background:rgba(139,92,246,0.22);
+  border-radius:999px;
+  transition:background .2s ease;
+}
+::-webkit-scrollbar-thumb:hover{
+  background:rgba(139,92,246,0.5);
+}
+::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+/* Universal Smooth Scrolling & Momentum Inertia */
+#plan-view, #map-view, #chat-view, #tools-view, #chat-messages,
+.modal-sheet, .day-tabs, .header-pills-wrap, #palette-list,
+#customize-places-list, .budget-day-scroll, .exp-list {
+  scroll-behavior:smooth;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+}
 
 /* Keyboard-focus ring — visible only for keyboard/assistive nav,
    never on mouse/touch taps, so it layers cleanly over the existing
@@ -243,13 +287,27 @@ body::before {
 ═══════════════════════════════════════════ */
 #content{flex:1;overflow:hidden;position:relative;}
 @keyframes viewFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
 }
-.view{display:none;height:100%;flex-direction:column;overflow:hidden;}
+.view{
+  display:none;
+  height:100%;
+  flex-direction:column;
+  overflow:hidden;
+  will-change:transform, opacity;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
 .view.active{
   display:flex;
-  animation: viewFadeIn 0.25s ease forwards;
+  animation: viewFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* ═══════════════════════════════════════════
@@ -1103,9 +1161,20 @@ body::before {
 .day-tab.active{background:var(--gold);border-color:var(--gold);color:#000;}
 .day-tab:active{transform:scale(.95);}
 /* ═══════════════════════════════════════════
-   STOP CARDS — World-Class Glassmorphism
+   STOP CARDS — World-Class Glassmorphism & GPU Smoothing
 ═══════════════════════════════════════════ */
 #plan-list{padding:8px 12px 110px;}
+
+@keyframes stopSlideUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
 
 .stop-card {
   background:linear-gradient(180deg, rgba(20, 13, 36, 0.8) 0%, rgba(13, 8, 24, 0.92) 100%);
@@ -1114,13 +1183,23 @@ body::before {
   border-radius:16px;
   padding:14px;
   margin-bottom:10px; position:relative;
-  transition:all .25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:transform .25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow .25s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease;
   box-shadow:0 12px 36px -4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.09);
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
+  contain:layout style paint;
+  content-visibility:auto;
+  contain-intrinsic-size:0 110px;
+  will-change:transform, opacity;
+  transform:translate3d(0, 0, 0);
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.stop-card.fade-in, .break-card.fade-in {
+  animation: stopSlideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .stop-card:hover{
-  transform:translateY(-2px);
+  transform:translate3d(0, -2px, 0);
   border-color:rgba(139,92,246,0.45);
   box-shadow:0 18px 44px -4px rgba(0,0,0,0.65), 0 0 24px rgba(139,92,246,0.16), inset 0 1px 0 rgba(255,255,255,0.14);
 }
@@ -1134,7 +1213,7 @@ body::before {
   0%{box-shadow:0 16px 44px -4px rgba(6, 182, 212, 0.18), 0 0 0 1px rgba(6, 182, 212, 0.2), inset 0 1px 0 rgba(6, 182, 212, 0.25);}
   100%{box-shadow:0 20px 48px -4px rgba(6, 182, 212, 0.28), 0 0 0 1.5px rgba(6, 182, 212, 0.4), inset 0 1px 0 rgba(6, 182, 212, 0.4);}
 }
-.stop-card:active{transform:scale(.99);}
+.stop-card:active{transform:scale(.985);}
 
 .sc-row{display:flex;gap:12px;align-items:flex-start;}
 .sc-img{width:56px;height:56px;border-radius:14px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.1);}
@@ -1458,7 +1537,7 @@ body::before {
 .sp-del{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#fca5a5;padding:6px 10px;min-height:34px;border-radius:8px;font-size:12px;cursor:pointer;touch-action:manipulation;}
 
 /* ═══════════════════════════════════════════
-   BOTTOM NAV — Floating Luxury Dock
+   BOTTOM NAV — Floating Luxury Dock & GPU Smooth Tabs
 ═══════════════════════════════════════════ */
 #bottom-nav{
   flex-shrink:0; z-index:100;
@@ -1474,23 +1553,28 @@ body::before {
   max-width:480px;
   box-shadow:0 14px 36px -4px rgba(0,0,0,.7), 0 0 20px rgba(139,92,246,.15), inset 0 1px 0 rgba(255,255,255,.15);
   height:54px;
-  transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change:transform;
+  transform:translate3d(0, 0, 0);
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  transition:transform .25s cubic-bezier(0.16, 1, 0.3, 1), background .25s ease, box-shadow .25s ease, border-color .25s ease;
 }
 .nav-item{
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:4px 2px; gap:2px; cursor:pointer; transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding:4px 2px; gap:2px; cursor:pointer;
+  transition:all .22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select:none; position:relative; touch-action:manipulation; border-radius:18px;
 }
-.nav-item:active{transform:scale(.94);}
-.nav-ico{font-size:18px;line-height:1;transition:all .2s cubic-bezier(0.34, 1.56, 0.64, 1);}
-.nav-lbl{font-size:9px;font-weight:700;color:var(--text-muted);transition:color .2s;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:0.4px;text-transform:uppercase;}
+.nav-item:active{transform:scale(.92);}
+.nav-ico{font-size:18px;line-height:1;transition:transform .22s cubic-bezier(0.34, 1.56, 0.64, 1), filter .22s ease;}
+.nav-lbl{font-size:9px;font-weight:700;color:var(--text-muted);transition:color .22s cubic-bezier(0.16, 1, 0.3, 1);font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:0.4px;text-transform:uppercase;}
 .nav-item.active{
-  background:linear-gradient(135deg, rgba(139,92,246,0.22), rgba(6,182,212,0.15));
-  border:1px solid rgba(139,92,246,0.35);
-  box-shadow:0 2px 10px rgba(139,92,246,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+  background:linear-gradient(135deg, rgba(139,92,246,0.24), rgba(6,182,212,0.18));
+  border:1px solid rgba(139,92,246,0.38);
+  box-shadow:0 2px 12px rgba(139,92,246,0.25), inset 0 1px 0 rgba(255,255,255,0.22);
 }
 .nav-item.active .nav-lbl{color:#fff;font-weight:800;text-shadow:0 0 8px rgba(139,92,246,0.6);}
-.nav-item.active .nav-ico{transform:translateY(-1px) scale(1.08);filter:drop-shadow(0 0 8px var(--gold));}
+.nav-item.active .nav-ico{transform:translate3d(0, -2px, 0) scale(1.1);filter:drop-shadow(0 0 8px var(--gold));}
 
 /* ═══════════════════════════════════════════
    SPLASH SCREEN
@@ -2254,7 +2338,7 @@ body::after{
 }
 .stop-card{
   border-left:3.5px solid var(--gold);
-  transition:all .25s cubic-bezier(.4, 0, .2, 1);
+  transition:transform .25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow .25s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease;
 }
 .stop-card:hover{
   border-color:var(--gold-border);
@@ -2267,7 +2351,7 @@ body::after{
   box-shadow:0 12px 36px rgba(6,182,212,.18), inset 0 1px 0 rgba(255,255,255,.1);
 }
 .tool-card{
-  transition:all .25s cubic-bezier(.4, 0, .2, 1);
+  transition:transform .25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow .25s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease;
 }
 .tool-card:hover, .tool-card:active{
   border-color:var(--gold-border);
