@@ -5,9 +5,9 @@ const appLogger = require('../lib/logger');
 
 const { getDb } = require('./init');
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 //  TRIPS
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 async function saveTrip({ id, userId, city, cityLat, cityLon, configJson, stopsJson }) {
   const pool = getDb();
@@ -51,9 +51,9 @@ async function deleteTrip(tripId, userId) {
   await pool.query(`UPDATE trips SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, [tripId, userId]);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 //  FAVORITES
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 async function addFavorite({ userId, placeName, city, lat, lon, category, notes }) {
   const pool = getDb();
@@ -91,15 +91,23 @@ async function isFavorite(userId, placeName, city) {
   return rows.length > 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 //  API USAGE ANALYTICS
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 let analyticsBuffer = [];
 let analyticsFlushTimer = null;
 
 async function flushAnalyticsBuffer() {
-  if (analyticsBuffer.length === 0) return;
+  if (analyticsBuffer.length === 0) {
+    // Clear timer when buffer is empty to avoid wasting CPU cycles
+    if (analyticsFlushTimer) {
+      clearInterval(analyticsFlushTimer);
+      analyticsFlushTimer = null;
+    }
+    return;
+  }
+  
   const batch = [...analyticsBuffer];
   analyticsBuffer = [];
 
@@ -186,9 +194,9 @@ async function getApiUsageSummary(hours = 24) {
   return { period: `${hours}h`, since, byEndpoint: byEndpointRes.rows, totals: totalsRes.rows[0] };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 //  PLACE CACHE (persistent)
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 async function getCachedPlaces(cacheKey) {
   const pool = getDb();
@@ -232,9 +240,9 @@ async function purgeExpiredCache() {
   return result.rowCount;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 //  AI CACHE (persistent)
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 async function getCachedAiResponse(promptHash) {
   const pool = getDb();
@@ -258,9 +266,9 @@ async function setCachedAiResponse(promptHash, responseTxt, ttlMs = 10 * 60 * 10
   `, [promptHash, responseTxt, expiresAt]);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 //  FEEDBACK — per-place rating + overall app experience
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 
 async function submitPlaceFeedback({ userId, placeName, city, rating, accurate, comment }) {
   const pool = getDb();
