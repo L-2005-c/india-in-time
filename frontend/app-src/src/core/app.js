@@ -2065,16 +2065,11 @@ function switchToView(viewId,idx,skipRenderHome=false){
   viewIds.forEach(v=>{const el=document.getElementById(v);if(el){el.classList.remove('active');el.style.display='none';}});
   const target=document.getElementById(viewId);
   if(target){
-    target.style.display=viewId==='tools-view'?'block':'flex';
-    void target.offsetHeight; // Force layout tick for silky CSS transition
     target.classList.add('active');
+    target.style.display=viewId==='tools-view'?'block':'flex';
   }
   document.querySelectorAll('.nav-item').forEach((n,i)=>{const on=i===idx||i===3&&idx>=3;n.classList.toggle('active',on);if(on)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
-  if(viewId==='map-view'&&map){
-    map.invalidateSize();
-    requestAnimationFrame(()=>map.invalidateSize());
-    setTimeout(()=>map.invalidateSize(),200);
-  }
+  if(viewId==='map-view'&&map){map.invalidateSize();setTimeout(()=>map.invalidateSize(),50);setTimeout(()=>map.invalidateSize(),300);}
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
   else if(!skipRenderHome && (idx===3||viewId==='tools-view')) renderToolsHome();
@@ -2403,7 +2398,6 @@ function updateItinUI(){
     if(loc.isBreak){
       const breakCard=document.createElement('div');
       breakCard.className='break-card fade-in';
-      breakCard.style.animationDelay=`${Math.min(i*35,450)}ms`;
       breakCard.innerHTML=`<div class="break-card-top"><div class="break-card-title">☕ ${escapeHtml(loc.name)}</div><div class="dur-badge">${fmtM(loc.vt)}</div></div><div class="break-card-copy">Pause at ${loc.sts||'--'} and give yourself a short reset before the next stretch of the day.</div><div class="break-card-tags"><span class="break-tag">🕒 ${loc.sts||'--'} to ${loc.ets||'--'}</span><span class="break-tag">💧 Water reset</span><span class="break-tag">🧘 ${loc.climateNote||'Slow down for a moment'}</span></div>`;
       list.appendChild(breakCard);
       const nextStop=itin[i+1];
@@ -2449,7 +2443,6 @@ function updateItinUI(){
     </div>`;
 
     const div=document.createElement('div');div.className='stop-card'+(isN?' is-next':'')+' fade-in';
-    div.style.animationDelay=`${Math.min(i*35,450)}ms`;
     
     // Nearby places chips
     let nearbyHTML = '';
