@@ -6,12 +6,11 @@
  * Allows travelers to test counterfactual scenarios without mutating their active itinerary.
  */
 
-const { planAdvancedItinerary } = require('./advancedItineraryEngine');
-
 /**
  * Simulates an alternative travel scenario and generates a comparative diff against the baseline plan.
  */
 function simulateScenario(candidates = [], currentPlan = {}, scenario = {}) {
+  const { planAdvancedItinerary } = require('./advancedItineraryEngine');
   const baseReq = currentPlan?.requirements || {};
   const simOptions = {
     ...baseReq,

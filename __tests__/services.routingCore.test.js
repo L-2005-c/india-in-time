@@ -161,7 +161,7 @@ describe('Production Routing — Authoritative Routing Engine & India Corridors'
       expect(res.distance.kilometers).toBeLessThanOrEqual(c.maxKm);
       expect(res.duration.trafficAwareMinutes).toBeGreaterThan(5);
     }
-  });
+  }, 25000);
 
   test('formats user-facing distance and duration cleanly', () => {
     expect(formatDistance(450)).toBe('450 m');

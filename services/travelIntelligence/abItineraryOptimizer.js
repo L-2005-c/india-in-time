@@ -11,8 +11,6 @@
  * 4. Safe experiment bounds (hard constraints cannot be breached).
  */
 
-const { planAdvancedItinerary } = require('./advancedItineraryEngine');
-
 function hashUser(str = '') {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -37,6 +35,7 @@ function getExperimentVariant(userId = 'anonymous', experimentId = 'exp_itinerar
  * Generates competing internal candidate plans and selects the optimal one.
  */
 function optimizePlanWithAbCandidates(places = [], options = {}) {
+  const { planAdvancedItinerary } = require('./advancedItineraryEngine');
   const userId = options.userId || 'user_1';
   const experiment = getExperimentVariant(userId, options.experimentId);
 
