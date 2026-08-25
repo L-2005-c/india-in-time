@@ -2161,12 +2161,8 @@ async function renderRoute(){
   let routeStops=getRouteStopsForDay(itin);
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const routeStart=getPreviewRouteStart();
-  routeStops.forEach((s,i)=>{const prev=i===0?routeStart:routeStops[i-1].coords; const dKm = prev ? (hvKm(prev[0],prev[1],s.coords[0],s.coords[1]) * 1.42) : 2; s.tt=prev?Math.max(6,Math.round(dKm / 0.32)):10;});
-  if(recalcTimes({trimToWindow:true})>0){
-    sync();
-    routeStops=getRouteStopsForDay(itin);
-    if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'No stops fit this time window';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Increase the end time or duration.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
-  }
+  routeStops.forEach((s,i)=>{ if(!s.tt){ const prev=i===0?routeStart:routeStops[i-1]?.coords; const dKm = prev && hasValidCoords(prev) && hasValidCoords(s.coords) ? (hvKm(prev[0],prev[1],s.coords[0],s.coords[1]) * 1.42) : 2; s.tt=prev?Math.max(6,Math.round(dKm / 0.32)):10; } });
+  if(recalcTimes({trimToWindow:true})>0){ sync(); routeStops=getRouteStopsForDay(itin); }
   routeStops = routeStops.filter(stop => hasValidCoords(stop.coords));
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const visibleStops = tripActive
@@ -2177,29 +2173,25 @@ async function renderRoute(){
   if(tripActive && cLat&&cLon) raw.push([cLat,cLon]);
   if(tripActive && activeStop) raw.push(activeStop.coords);
   else raw.push(...visibleStops.map(l=>l.coords));
-  if(routeStart&&routeStops.length){nsDist=hvKm(routeStart[0],routeStart[1],routeStops[0].coords[0],routeStops[0].coords[1]).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}
+  if(routeStart && routeStops.length && hasValidCoords(routeStart) && hasValidCoords(routeStops[0]?.coords)){ nsDist=hvKm(routeStart[0],routeStart[1],routeStops[0].coords[0],routeStops[0].coords[1]).toFixed(1)+'km'; nsEta=fmtM(routeStops[0].tt || 10); }
   const accent='#00c8f0';
   visibleStops.forEach((l)=>{
     const i = routeStops.findIndex(stop => stop.id === l.id);
     const isCurrent = i===0;
-    
-    // EXPERIENCE SCORE COLORS
     const exp = calculateExperienceScore(l, window.globalSimulationTime);
-    let expCol = '#6b7280'; // Gray (Closed)
-    if(exp.score > 79) expCol = '#10b981'; // Green
-    else if(exp.score > 59) expCol = '#f59e0b'; // Yellow
-    else if(exp.score > 39) expCol = '#f97316'; // Orange
-    else if(exp.score > 0) expCol = '#ef4444'; // Red
-
+    let expCol = '#6b7280';
+    if(exp.score > 79) expCol = '#10b981';
+    else if(exp.score > 59) expCol = '#f59e0b';
+    else if(exp.score > 39) expCol = '#f97316';
+    else if(exp.score > 0) expCol = '#ef4444';
     const col = tripActive && isCurrent ? '#00e5a0' : expCol;
     const size = isCurrent ? 18 : (tripActive ? 12 : 16);
     const shadow = isCurrent ? `${col}88` : 'rgba(255,255,255,0.18)';
     const label = tripActive && !isCurrent ? `<div style="position:absolute;top:-10px;right:-8px;min-width:16px;height:16px;border-radius:999px;background:rgba(8,14,26,.92);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px">${i+1}</div>` : '';
     const ic=L.divIcon({className:'iit-marker',html:`<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 0 10px ${shadow};opacity:${tripActive && !isCurrent ? 0.75 : 1}">${label}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
-    
     const popupHtml = `
       <div style="min-width:180px;">
-        <b>${l.name}</b><br>
+        <b>${escapeHtml(l.name)}</b><br>
         <small>${isCurrent && tripActive ? 'Next stop' : `Visit: ${fmtM(l.vt)}`}</small>
         <hr style="margin:8px 0;border-color:rgba(255,255,255,0.1)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -2207,7 +2199,7 @@ async function renderRoute(){
           <span style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:10px;">${exp.state}</span>
         </div>
         <ul style="padding-left:16px;margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;">
-          ${exp.reasons.map(r => `<li>${r}</li>`).join('')}
+          ${exp.reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
         </ul>
         ${typeof getTimeBadgesHtml==='function' ? getTimeBadgesHtml(l) : ''}
         ${typeof getTravelIntelPanelHtml==='function' ? getTravelIntelPanelHtml(l) : ''}
@@ -2217,17 +2209,14 @@ async function renderRoute(){
   });
   if(raw.length>=2){
     rLine=L.polyline(raw,{color:accent,weight:tripActive?6:4,opacity:tripActive?0.95:0.85,lineCap:'round',lineJoin:'round'}).addTo(map);
-    if(!tripActive) map.fitBounds(rLine.getBounds(),{padding:[60,100]});
+    if(!tripActive && map && typeof map.fitBounds === 'function') map.fitBounds(rLine.getBounds(),{padding:[60,100]});
   }
   document.getElementById('nav-next').textContent=routeStops[0].name;const defaultNavText=`Head towards ${routeStops[0].name} (~${nsDist})`;document.getElementById('nav-turn').textContent=defaultNavText;document.getElementById('nav-turn-icon').textContent=turnArrowForInstruction(defaultNavText);document.getElementById('nav-dist').textContent=nsDist;document.getElementById('nav-eta').textContent=nsEta;
   const roadRouteApplied = raw.length >= 2 ? await fetchRoadRoute(raw, {accent, tripActive, routeStops}) : false;
   if(!roadRouteApplied && tripActive){
-    // The public OSRM demo mirror(s) are rate-limited/shared and this
-// …
     clearTimeout(window._roadRouteRetryTimer);
     window._roadRouteRetryTimer = setTimeout(()=>{ if(tripActive) renderRoute(); }, 4000);
   }
-  if(recalcTimes({trimToWindow:true})>0){sync();return renderRoute();}
   updateItinUI();
   if(streetQuestActive) setupStreetQuest();
 }
