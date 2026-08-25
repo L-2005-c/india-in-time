@@ -23,7 +23,6 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock IntersectionObserver
-// eslint-disable-next-line no-undef
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
@@ -35,11 +34,9 @@ global.IntersectionObserver = class IntersectionObserver {
 };
 
 // Mock fetch globally for request tests
-// eslint-disable-next-line no-undef
 global.fetch = vi.fn();
 
 // Suppress console errors in tests (use expect() to verify error handling)
-// eslint-disable-next-line no-undef
 global.console = {
   ...console,
   error: vi.fn(),

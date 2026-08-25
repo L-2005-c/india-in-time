@@ -3,7 +3,6 @@
  * Provides useQuery and useMutation utilities
  */
 
-import { api } from '@/services/api-client';
 import { captureException } from '@/services/client-observability';
 
 const queryCache = new Map();
@@ -29,7 +28,7 @@ export function useQuery(queryKey, queryFn, options = {}) {
     retry = 3,
     retryDelay = 1000,
     staleTime = 5 * 60 * 1000, // 5 minutes
-    cacheTime = 10 * 60 * 1000, // 10 minutes
+    cacheTime: _cacheTime = 10 * 60 * 1000, // 10 minutes
     onError,
     onSuccess,
   } = options;

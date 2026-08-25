@@ -20,6 +20,9 @@
 const listeners = new Set();
 
 const initialState = {
+  // Connectivity
+  isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+
   // Auth
   userId: null,
   userEmail: null,
@@ -68,9 +71,12 @@ const initialState = {
   placeCache: {},
   weatherCache: {},
   aiResponseCache: {},
+
+  // Feature Flags
+  featureFlags: {},
 };
 
-let state = { ...initialState };
+export let state = { ...initialState };
 
 /**
  * Get current state snapshot
@@ -203,6 +209,10 @@ export function initializeAppState(globals = window) {
   }
 }
 
+export function setOnline(isOnline) {
+  setState({ isOnline: Boolean(isOnline) });
+}
+
 export const appState = {
   getState,
   setState,
@@ -210,4 +220,5 @@ export const appState = {
   resetState,
   selectors,
   initializeAppState,
+  setOnline,
 };

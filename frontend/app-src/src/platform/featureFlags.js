@@ -1,4 +1,4 @@
-import { state } from '../state/appState.js';
+import { getState, setState } from '../state/appState.js';
 
 const defaults = {
   aiEnabled: true,
@@ -12,14 +12,16 @@ const defaults = {
 };
 
 export function getFlag(name) {
-  if (state.featureFlags && Object.prototype.hasOwnProperty.call(state.featureFlags, name)) {
-    return !!state.featureFlags[name];
+  const current = getState();
+  if (current.featureFlags && Object.prototype.hasOwnProperty.call(current.featureFlags, name)) {
+    return !!current.featureFlags[name];
   }
   return Object.prototype.hasOwnProperty.call(defaults, name) ? defaults[name] : false;
 }
 
 export function setFlags(flags = {}) {
-  state.featureFlags = { ...defaults, ...state.featureFlags, ...flags };
+  const current = getState();
+  setState({ featureFlags: { ...defaults, ...(current.featureFlags || {}), ...flags } });
 }
 
 export async function hydrateFlagsFromServer() {
