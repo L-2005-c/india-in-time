@@ -10,6 +10,11 @@
 const { verifyToken } = require('./auth');
 const logger = require('../lib/logger');
 
+const ADMIN_WHITELIST = new Set([
+  'chilukurilokesh231@gmail.com',
+  ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [])
+]);
+
 async function tryFirebaseAdminAuth(req) {
   const header = req.headers.authorization || '';
   const match = header.match(/^Bearer (.+)$/i);
@@ -17,18 +22,19 @@ async function tryFirebaseAdminAuth(req) {
 
   try {
     const decoded = await verifyToken(match[1]);
-    if (decoded && decoded.admin === true) {
+    const email = (decoded?.email || '').toLowerCase().trim();
+    if (decoded && (decoded.admin === true || (email && ADMIN_WHITELIST.has(email)))) {
       req.uid = decoded.uid;
-      req.adminEmail = decoded.email || null;
-      req.adminRole = decoded.role || 'admin';
-      req.adminAuthMethod = 'firebase-claim';
+      req.adminEmail = email || null;
+      req.adminRole = decoded.role || 'owner';
+      req.adminAuthMethod = decoded.admin === true ? 'firebase-claim' : 'admin-whitelist';
       return true;
     }
 
     if (decoded) {
       logger.warn(
-        { uid: decoded.uid },
-        '[adminAuth] valid Firebase token but missing admin custom claim — denying'
+        { uid: decoded.uid, email: decoded.email },
+        '[adminAuth] valid Firebase token but missing admin custom claim or email whitelist — denying'
       );
     }
   } catch (err) {

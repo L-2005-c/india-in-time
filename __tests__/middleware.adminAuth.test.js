@@ -81,7 +81,28 @@ describe('requireAdminAuth — Firebase-only administrator authentication', () =
     expect(req.adminAuthMethod).toBe('firebase-claim');
   });
 
-  test('rejects a valid Firebase token without the admin claim', async () => {
+  test('accepts a verified Firebase token for whitelisted founder admin email', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    verifyToken.mockResolvedValue({
+      uid: 'lokesh-uid',
+      email: 'chilukurilokesh231@gmail.com',
+      admin: false,
+    });
+
+    const req = { headers: { authorization: 'Bearer founder-token' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminAuth(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.uid).toBe('lokesh-uid');
+    expect(req.adminEmail).toBe('chilukurilokesh231@gmail.com');
+    expect(req.adminRole).toBe('owner');
+    expect(req.adminAuthMethod).toBe('admin-whitelist');
+  });
+
+  test('rejects a valid Firebase token without the admin claim or whitelist email', async () => {
     process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
     verifyToken.mockResolvedValue({
       uid: 'user-uid',

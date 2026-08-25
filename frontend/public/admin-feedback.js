@@ -1,4 +1,4 @@
-import { watchAdminAuth, signInAdmin, adminFetch } from '/admin-auth.js';
+import { watchAdminAuth, signInAdmin, signOutAdmin, adminFetch } from '/admin-auth.js';
 
 let ADMIN_READY = false;
 
@@ -109,6 +109,7 @@ function renderPlace(rows){
 // ── Delegated action handling (replaces the onclick attributes above) ───────
 const ADMIN_ACTIONS = {
   unlock, loadAll,
+  signOut: signOutAdmin,
   showTab: (el) => showTab(el.dataset.tab),
 };
 document.addEventListener('click', (e) => {
@@ -127,6 +128,8 @@ watchAdminAuth({
     ADMIN_READY = true;
     document.getElementById('gate').style.display = 'none';
     document.getElementById('dash').style.display = 'block';
+    const badgeEl = document.getElementById('admin-user-badge');
+    if (badgeEl) badgeEl.textContent = `Signed in as ${user.email || user.displayName || 'Administrator'} • Real-time feedback analytics.`;
     document.getElementById('admin-auth-status').textContent = `Authenticated as ${user.email || user.displayName || 'administrator'}.`;
     signIn.textContent = `Signed in: ${user.email || user.displayName || 'Admin'}`;
     loadAll();
@@ -135,7 +138,7 @@ watchAdminAuth({
     ADMIN_READY = false;
     document.getElementById('gate').style.display = 'block';
     document.getElementById('dash').style.display = 'none';
-    document.getElementById('admin-auth-status').textContent = message || 'Use an account with the Firebase admin custom claim.';
+    document.getElementById('admin-auth-status').textContent = message || 'Sign in with an authorized administrator Google account.';
   },
 });
 
