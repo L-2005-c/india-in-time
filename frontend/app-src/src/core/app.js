@@ -1,4 +1,5 @@
 import { browserLogger } from '../utils/browser-logger.js';
+import { installLeafletSafetyGuards } from './mapGuards.js';
 import { openModal, closeModal } from '../a11y/modal.js';
 import { openTravelDnaModal } from '../modules/travelDna.js';
 import { createAuthSession } from '../modules/auth-session.js';
@@ -2776,9 +2777,9 @@ function initGPS(){
   },err=>{document.getElementById('gps-txt').textContent='No GPS';notifyGpsError(err);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
 }
 async function chkArrival(){
-  if(!itin.length||!cLat)return;const n=getRouteStopsForDay(itin)[0];
-  if(!n)return;
-  if(map.distance([cLat,cLon],n.coords)<100){
+  if(!itin.length||!Number.isFinite(cLat)||!Number.isFinite(cLon))return;const n=getRouteStopsForDay(itin)[0];
+  if(!n||!hasValidCoords(n.coords))return;
+  if(map&&typeof map.distance==='function'&&map.distance([cLat,cLon],n.coords)<100){
     if(!stamps.has(n.id)){stamps.add(n.id);addMsg(`🏆 Passport stamp: <strong>${n.name}</strong>!`);
       if(currentUser){try{await setDoc(doc(db,'users',currentUser.uid,'data','stamps'),{stamps:[...stamps],updatedAt:serverTimestamp()});}catch(_e){}}}
     if(streetQuestActive){streetQuestScore+=25;setStreetQuestMessage(`Checkpoint reached: ${n.name}. New target loading...`);updateStreetQuestUI();}
@@ -3380,6 +3381,7 @@ Object.assign(window, { openCustomizeModal, closeCustomizeModal, selectAllCustom
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.onload=()=>{
   applyTheme();
+  try { installLeafletSafetyGuards(typeof L !== 'undefined' ? L : window.L); } catch(_e){}
   // Wait for the real auth check (not a blind timer) before revealing
 // …
   Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4000))])

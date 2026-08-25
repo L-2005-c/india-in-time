@@ -21,7 +21,7 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       const stub = {};
       ['addTo','bindPopup','bindTooltip','setLatLng','setStyle','setIcon','setLatLngs','on','off','remove','removeFrom']
         .forEach(method => { stub[method] = () => stub; });
-      stub.getBounds = () => Lib.latLngBounds([[20.5937,78.9629],[20.5937,78.9629]]);
+      stub.getBounds = () => (typeof Lib.latLngBounds === 'function' ? Lib.latLngBounds([[20.5937,78.9629],[20.5937,78.9629]]) : { isValid: () => false, getCenter: () => ({ lat: 20.5937, lng: 78.9629 }) });
       stub.getLatLngs = () => [];
       stub.getElement = () => null;
       return stub;
@@ -32,17 +32,34 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       Lib.latLng = function latLngGuard(a, b, c) {
         try {
           if (Array.isArray(a)) {
-            if (!Number.isFinite(+a[0]) || !Number.isFinite(+a[1])) return originalLatLng.call(Lib, 20.5937, 78.9629);
-          } else if (a && typeof a === 'object') {
-            if (!Number.isFinite(+a.lat) || !Number.isFinite(+(a.lng ?? a.lon))) return originalLatLng.call(Lib, 20.5937, 78.9629);
-          } else if (!Number.isFinite(+a) || !Number.isFinite(+b)) {
+            const lat = +a[0], lng = +a[1];
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return originalLatLng.call(Lib, 20.5937, 78.9629);
+            return originalLatLng.call(Lib, lat, lng);
+          }
+          if (a && typeof a === 'object') {
+            const lat = +a.lat, lng = +(a.lng ?? a.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return originalLatLng.call(Lib, 20.5937, 78.9629);
+            return originalLatLng.call(Lib, lat, lng);
+          }
+          const lat = +a, lng = +b;
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             return originalLatLng.call(Lib, 20.5937, 78.9629);
           }
-          return originalLatLng.call(Lib, a, b, c);
+          return originalLatLng.call(Lib, lat, lng, c);
         } catch (_e) {
           return originalLatLng.call(Lib, 20.5937, 78.9629);
         }
       };
+    }
+
+    if (typeof Lib.LatLng === 'function') {
+      const OrigLatLng = Lib.LatLng;
+      Lib.LatLng = function SafeLatLng(lat, lng, alt) {
+        const safeLat = Number.isFinite(+lat) ? +lat : 20.5937;
+        const safeLng = Number.isFinite(+lng) ? +lng : 78.9629;
+        return new OrigLatLng(safeLat, safeLng, alt);
+      };
+      Lib.LatLng.prototype = OrigLatLng.prototype;
     }
 
     if (Lib.Marker && Lib.Marker.prototype) {
@@ -75,11 +92,62 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       }
       return originalPolyline.call(Lib, clean, options);
     };
+
+    ['circle', 'circleMarker'].forEach(fn => {
+      if (typeof Lib[fn] === 'function') {
+        const orig = Lib[fn];
+        Lib[fn] = function safeCircle(latlng, options) {
+          if (!isFiniteLatLngPair(latlng)) return noopLayer();
+          return orig.call(Lib, latlng, options);
+        };
+      }
+    });
+
+    if (typeof Lib.latLngBounds === 'function') {
+      const origBounds = Lib.latLngBounds;
+      Lib.latLngBounds = function safeLatLngBounds(a, b) {
+        try {
+          if (Array.isArray(a)) {
+            const clean = a.filter(isFiniteLatLngPair);
+            if (clean.length === 0) return origBounds.call(Lib, [[20.5937, 78.9629], [20.5937, 78.9629]]);
+            return origBounds.call(Lib, clean, b);
+          }
+          return origBounds.call(Lib, a, b);
+        } catch (_e) {
+          return origBounds.call(Lib, [[20.5937, 78.9629], [20.5937, 78.9629]]);
+        }
+      };
+    }
   }
 
   if (!Lib.Map || Lib.Map.prototype.__moveGuardInstalled) return;
   Lib.Map.prototype.__moveGuardInstalled = true;
   const originalSetView = Lib.Map.prototype.setView;
+
+  if (typeof Lib.Map.prototype.distance === 'function') {
+    const origDistance = Lib.Map.prototype.distance;
+    Lib.Map.prototype.distance = function guardedDistance(latlng1, latlng2) {
+      if (!Array.isArray(latlng1) && (!latlng1 || typeof latlng1 !== 'object')) return 0;
+      if (!Array.isArray(latlng2) && (!latlng2 || typeof latlng2 !== 'object')) return 0;
+      try {
+        return origDistance.call(this, latlng1, latlng2);
+      } catch (_e) {
+        return 0;
+      }
+    };
+  }
+
+  if (typeof Lib.Map.prototype.fitBounds === 'function') {
+    const origFitBounds = Lib.Map.prototype.fitBounds;
+    Lib.Map.prototype.fitBounds = function guardedFitBounds(bounds, options) {
+      try {
+        if (!bounds || (typeof bounds.isValid === 'function' && !bounds.isValid())) return this;
+        return origFitBounds.call(this, bounds, options);
+      } catch (_e) {
+        return this;
+      }
+    };
+  }
 
   ['flyTo', 'panTo', 'setView'].forEach(methodName => {
     const original = Lib.Map.prototype[methodName];
@@ -115,4 +183,8 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       }
     };
   });
+}
+
+if (typeof window !== 'undefined' && window.L) {
+  installLeafletSafetyGuards(window.L);
 }
