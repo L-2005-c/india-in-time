@@ -130,3 +130,46 @@ export function onOnlineStatusChange(callback) {
     window.removeEventListener('offline', () => callback(false));
   };
 }
+
+/**
+ * Fetch authoritative route from backend
+ */
+export async function fetchRoute(origin, destination, options = {}) {
+  const originStr = Array.isArray(origin) ? `${origin[0]},${origin[1]}` : origin;
+  const destStr = Array.isArray(destination) ? `${destination[0]},${destination[1]}` : destination;
+  const params = new URLSearchParams({
+    origin: originStr,
+    destination: destStr,
+    mode: options.mode || 'driving',
+    ...(options.departureTime ? { departureTime: options.departureTime } : {}),
+    ...(options.preference ? { preference: options.preference } : {}),
+  });
+  return api.get(`/api/v1/routing/route?${params.toString()}`);
+}
+
+/**
+ * Fetch multi-stop itinerary route matrix
+ */
+export async function fetchRouteMatrix(stops, options = {}) {
+  return api.post('/api/v1/routing/matrix', {
+    stops,
+    mode: options.mode || 'driving',
+    departureTime: options.departureTime,
+    preference: options.preference,
+  });
+}
+
+/**
+ * Fetch lightweight ETA
+ */
+export async function fetchEta(origin, destination, options = {}) {
+  const originStr = Array.isArray(origin) ? `${origin[0]},${origin[1]}` : origin;
+  const destStr = Array.isArray(destination) ? `${destination[0]},${destination[1]}` : destination;
+  const params = new URLSearchParams({
+    origin: originStr,
+    destination: destStr,
+    mode: options.mode || 'driving',
+    ...(options.departureTime ? { departureTime: options.departureTime } : {}),
+  });
+  return api.get(`/api/v1/routing/eta?${params.toString()}`);
+}

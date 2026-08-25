@@ -79,6 +79,7 @@ const timeIntelRoutes    = require('./routes/time-intelligence');
 const travelDataRoutes   = require('./routes/travel-data');
 const feedbackRoutes     = require('./routes/feedback');
 const itineraryOptimizerRoutes = require('./routes/itinerary-optimizer');
+const routingRoutes            = require('./routes/routing');
 const { router: analyticsRoutes } = require('./routes/analytics');
 
 const app  = express();
@@ -160,6 +161,10 @@ app.use('/api/favorites', generalLimiter, favoritesRoutes);
 
 // Itinerary Optimizer (smart planning with nearby place clustering)
 app.use('/api/itinerary', generalLimiter, itineraryOptimizerRoutes);
+
+// Authoritative Routing & Traffic Intelligence
+app.use('/api/v1/routing', generalLimiter, routingRoutes);
+app.use('/api/routing', generalLimiter, routingRoutes);
 
 // GeoAI Time Intelligence Engine (open/closed status, crowd, badges, personalization)
 app.use('/api/time-intelligence', timeIntelLimiter, validateTimeIntelRequest, timeIntelRoutes);

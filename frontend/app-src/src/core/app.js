@@ -2076,39 +2076,75 @@ const ROAD_ROUTE_MIRRORS = [
   'https://router.project-osrm.org/route/v1/driving/'
 ];
 async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
-  const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');
-  for(let mirrorIdx=0; mirrorIdx<ROAD_ROUTE_MIRRORS.length; mirrorIdx++){
-    const attemptsForThisMirror = mirrorIdx===0 ? 2 : 1;
-    for(let attempt=0; attempt<attemptsForThisMirror; attempt++){
-      try{
-        const res=await fetch(`${ROAD_ROUTE_MIRRORS[mirrorIdx]}${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(5000)});
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        const d=await res.json();
-        if(!d.routes?.[0]?.geometry?.coordinates) throw new Error('No route geometry');
-        const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+  if (!raw || raw.length < 2) return false;
+  // 1. Authoritative Backend Routing API First
+  try {
+    const origin = raw[0];
+    const destination = raw[raw.length - 1];
+    const url = `/api/v1/routing/route?origin=${origin[0]},${origin[1]}&destination=${destination[0]},${destination[1]}&mode=driving`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const d = await res.json();
+      if (d.success && d.route?.geometry?.length >= 2) {
         map.removeLayer(rLine);
-        rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);
-        // NOTE: deliberately no fitBounds() here while tripActive. This used
-// …
-        if(d.routes[0].legs){
-          const activeLeg=d.routes[0].legs[0];
-          if(activeLeg){routeStops[0].tt=Math.ceil(activeLeg.duration/60);nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';nsEta=fmtM(routeStops[0].tt);}
+        rLine = L.polyline(d.route.geometry, {
+          color: accent,
+          weight: tripActive ? 7 : 4,
+          opacity: tripActive ? 0.98 : 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+        if (routeStops[0]) {
+          routeStops[0].tt = d.duration?.trafficAwareMinutes || d.duration?.minutes || routeStops[0].tt;
+          nsDist = d.distance?.formatted || `${(d.distance?.kilometers || 0).toFixed(1)} km`;
+          nsEta = d.duration?.formatted || fmtM(routeStops[0].tt);
         }
-        const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);
-        if(ns){
-          const road=ns.name?` via ${ns.name}`:'';
-          const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');
-          const navText=`Next: ${action}${road}`.trim();
-          document.getElementById('nav-turn').textContent=navText;
+        if (d.route.steps?.[0]?.instruction) {
+          const navText = `Next: ${d.route.steps[0].instruction}`.trim();
+          document.getElementById('nav-turn').textContent = navText;
           maybeSpeakNavInstruction(navText);
         }
-        document.getElementById('nav-dist').textContent=nsDist;
-        document.getElementById('nav-eta').textContent=nsEta;
+        document.getElementById('nav-dist').textContent = nsDist;
+        document.getElementById('nav-eta').textContent = nsEta;
         applyMapHeadingRotation();
         return true;
-      }catch(e){
-        browserLogger.warn(`Road routing failed (mirror ${mirrorIdx}, attempt ${attempt+1}):`,e);
       }
+    }
+  } catch (_backendErr) {
+    // Fallback to client OSRM mirrors
+  }
+
+  // 2. Direct OSRM Mirrors Fallback
+  const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');
+  for(let mirrorIdx=0; mirrorIdx<ROAD_ROUTE_MIRRORS.length; mirrorIdx++){
+    try{
+      const res=await fetch(`${ROAD_ROUTE_MIRRORS[mirrorIdx]}${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(4000)});
+      if(!res.ok) continue;
+      const d=await res.json();
+      if(!d.routes?.[0]?.geometry?.coordinates) continue;
+      const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+      map.removeLayer(rLine);
+      rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);
+      if(d.routes[0].legs?.[0]){
+        const activeLeg=d.routes[0].legs[0];
+        routeStops[0].tt=Math.ceil(activeLeg.duration/60);
+        nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';
+        nsEta=fmtM(routeStops[0].tt);
+      }
+      const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);
+      if(ns){
+        const road=ns.name?` via ${ns.name}`:'';
+        const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');
+        const navText=`Next: ${action}${road}`.trim();
+        document.getElementById('nav-turn').textContent=navText;
+        maybeSpeakNavInstruction(navText);
+      }
+      document.getElementById('nav-dist').textContent=nsDist;
+      document.getElementById('nav-eta').textContent=nsEta;
+      applyMapHeadingRotation();
+      return true;
+    }catch(e){
+      browserLogger.warn(`Road routing fallback failed:`,e);
     }
   }
   return false;
@@ -2119,7 +2155,7 @@ async function renderRoute(){
   let routeStops=getRouteStopsForDay(itin);
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const routeStart=getPreviewRouteStart();
-  routeStops.forEach((s,i)=>{const prev=i===0?routeStart:routeStops[i-1].coords;s.tt=prev?Math.max(5,Math.round(hvKm(prev[0],prev[1],s.coords[0],s.coords[1])/0.45)):10;});
+  routeStops.forEach((s,i)=>{const prev=i===0?routeStart:routeStops[i-1].coords; const dKm = prev ? (hvKm(prev[0],prev[1],s.coords[0],s.coords[1]) * 1.42) : 2; s.tt=prev?Math.max(6,Math.round(dKm / 0.32)):10;});
   if(recalcTimes({trimToWindow:true})>0){
     sync();
     routeStops=getRouteStopsForDay(itin);
