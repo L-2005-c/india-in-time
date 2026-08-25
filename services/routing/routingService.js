@@ -14,11 +14,6 @@ const { buildCacheKey, getCachedRoute, setCachedRoute } = require('./routeCache'
 const ROAD_NETWORK_FACTOR = 1.42; // Real-world Indian road distance vs haversine straight-line
 const ROUTING_TIMEOUT_MS = Number(process.env.ROUTING_TIMEOUT_MS) || 4500;
 
-const OSRM_MIRRORS = [
-  process.env.OSRM_BASE_URL || 'https://routing.openstreetmap.de/routed-car',
-  'https://router.project-osrm.org',
-];
-
 /**
  * Formats distance into a clean user-facing string.
  */
@@ -96,14 +91,18 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
  * Public OSRM Multi-Mirror Adapter.
  */
 async function fetchOsrmRoute(fromCoords, toCoords, opts = {}) {
-  const profile = opts.mode === 'walking' ? 'foot' : (opts.mode === 'bicycling' ? 'bike' : 'driving');
+  const mode = opts.mode || 'driving';
+  const profile = mode === 'walking' ? 'foot' : (mode === 'bicycling' ? 'bike' : 'driving');
+  const mirrorSub = mode === 'walking' ? 'routed-foot' : (mode === 'bicycling' ? 'routed-bike' : 'routed-car');
   const coords = `${fromCoords[1]},${fromCoords[0]};${toCoords[1]},${toCoords[0]}`;
 
-  for (const mirror of OSRM_MIRRORS) {
-    const isDedicatedProfile = mirror.includes('routed-');
-    const url = isDedicatedProfile
-      ? `${mirror}/route/v1/${coords}?overview=full&geometries=geojson&steps=true`
-      : `${mirror}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=true`;
+  const mirrors = [
+    `https://routing.openstreetmap.de/${mirrorSub}`,
+    'https://router.project-osrm.org',
+  ];
+
+  for (const mirror of mirrors) {
+    const url = `${mirror}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=true`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs || ROUTING_TIMEOUT_MS);
@@ -330,35 +329,35 @@ async function calculateRouteMatrix(stops = [], opts = {}) {
     return { success: false, error: 'At least two stops required for matrix routing', legs: [] };
   }
 
-  const legs = [];
-  let currentDeparture = opts.departureTime ? new Date(opts.departureTime) : new Date();
-  let totalDistanceMeters = 0;
-  let totalDurationSeconds = 0;
-  let totalTrafficDelayMinutes = 0;
+  const baseDeparture = opts.departureTime ? new Date(opts.departureTime) : new Date();
+  const legPromises = [];
 
   for (let i = 0; i < stops.length - 1; i++) {
     const originStop = stops[i];
     const destStop = stops[i + 1];
+    legPromises.push(
+      calculateRoute(originStop.coords, destStop.coords, {
+        ...opts,
+        originName: originStop.name,
+        destName: destStop.name,
+        departureTime: baseDeparture.toISOString(),
+      })
+    );
+  }
 
-    const legResult = await calculateRoute(originStop.coords, destStop.coords, {
-      ...opts,
-      originName: originStop.name,
-      destName: destStop.name,
-      departureTime: currentDeparture.toISOString(),
-    });
+  const legs = await Promise.all(legPromises);
 
-    legs.push(legResult);
+  let totalDistanceMeters = 0;
+  let totalDurationSeconds = 0;
+  let totalTrafficDelayMinutes = 0;
 
-    if (legResult.success) {
+  legs.forEach(legResult => {
+    if (legResult && legResult.success) {
       totalDistanceMeters += legResult.distance.meters;
       totalDurationSeconds += legResult.duration.trafficAwareSeconds;
       totalTrafficDelayMinutes += legResult.traffic.delayMinutes;
-
-      // Project next leg departure = arrival + stop visit duration (default 45 mins)
-      const visitMins = Number(destStop.duration || destStop.estMins || destStop.vt || 45);
-      currentDeparture = new Date(new Date(legResult.timestamps.projectedArrival).getTime() + (visitMins * 60000));
     }
-  }
+  });
 
   return {
     success: true,

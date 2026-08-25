@@ -2113,8 +2113,11 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
       }
     }
     if (fullGeometry && fullGeometry.length >= 2) {
-      map.removeLayer(rLine);
+      if (rLine && map) map.removeLayer(rLine);
       rLine = L.polyline(fullGeometry, { color: accent, weight: tripActive ? 7 : 4, opacity: tripActive ? 0.98 : 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+      if (!tripActive && map && typeof map.fitBounds === 'function' && rLine.getBounds && typeof rLine.getBounds === 'function' && rLine.getBounds().isValid && rLine.getBounds().isValid()) {
+        try { map.fitBounds(rLine.getBounds(), { padding: [60, 100] }); } catch (_e) {}
+      }
       if (distanceFormatted) nsDist = distanceFormatted;
       if (durationFormatted) nsEta = durationFormatted;
       if (nextStepInstruction) { const navText = `Next: ${nextStepInstruction}`.trim(); document.getElementById('nav-turn').textContent = navText; maybeSpeakNavInstruction(navText); }
@@ -2133,8 +2136,11 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
       const d = await res.json();
       if (!d.routes?.[0]?.geometry?.coordinates) continue;
       const lc = d.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-      map.removeLayer(rLine);
+      if (rLine && map) map.removeLayer(rLine);
       rLine = L.polyline(lc, { color: accent, weight: tripActive ? 7 : 4, opacity: tripActive ? 0.98 : 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+      if (!tripActive && map && typeof map.fitBounds === 'function' && rLine.getBounds && typeof rLine.getBounds === 'function' && rLine.getBounds().isValid && rLine.getBounds().isValid()) {
+        try { map.fitBounds(rLine.getBounds(), { padding: [60, 100] }); } catch (_e) {}
+      }
       if (d.routes[0].legs?.[0]) {
         const activeLeg = d.routes[0].legs[0];
         if (routeStops[0]) routeStops[0].tt = Math.ceil(activeLeg.duration / 60);
