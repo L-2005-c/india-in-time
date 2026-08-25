@@ -37,6 +37,9 @@ const { evaluateWeatherOpportunityWindows } = require('./weatherOpportunity');
 const { findRouteAwareDining } = require('./mealIntelligence');
 const { evaluateTravelLoad } = require('./fatigueModel');
 const { simulateScenario } = require('./whatIfSimulator');
+const { evaluateGroupSatisfaction, createGroupProfile } = require('./groupTravelEngine');
+const { computeDestinationFingerprint, findSimilarDestinations } = require('./destinationFingerprints');
+const { optimizePlanWithAbCandidates } = require('./abItineraryOptimizer');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },
@@ -849,6 +852,8 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     const crowdCurve = generatePredictiveCrowdCurve(stop, { arrivalMin: stop.arriveMin, weather: requirements.weather });
     const nextStop = state.stops[idx + 1];
     const routeDining = nextStop ? findRouteAwareDining(stop.coords, nextStop.coords, candidates, { timeMin: stop.leaveMin, weather: requirements.weather }) : [];
+    const fingerprint = computeDestinationFingerprint(stop);
+    const similar = findSimilarDestinations(stop, candidates, 2);
 
     return {
       ...stop,
@@ -856,11 +861,15 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       dnaMatch: dnaInfo,
       crowdForecast: crowdCurve,
       routeDining,
+      fingerprint,
+      similarDestinations: similar,
     };
   });
 
   const travelLoad = evaluateTravelLoad(finalizedStops, { weather: requirements.weather, tripMode: requirements.soft?.tripMode });
   const weatherOpportunity = evaluateWeatherOpportunityWindows(requirements.hourlyWeather, requirements.hard?.startMin || 540);
+  const groupProfile = requirements.groupProfile || (requirements.members ? createGroupProfile(requirements.members, { groupMode: requirements.groupMode }) : null);
+  const groupEvaluation = groupProfile ? evaluateGroupSatisfaction(finalizedStops, groupProfile) : null;
 
   const result = {
     generatedAt: new Date().toISOString(),
@@ -872,6 +881,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     climateMode: climateStrategy.mode,
     travelLoad,
     weatherOpportunity,
+    groupEvaluation,
     stopCount: finalizedStops.length,
     totalScore: Math.round(state.score),
     totalTravelMinutes: Math.round(state.travelMinutes),
@@ -950,6 +960,9 @@ module.exports = {
   shouldTriggerReplan,
   critiqueItinerary,
   simulateScenario,
+  createGroupProfile,
+  evaluateGroupSatisfaction,
+  optimizePlanWithAbCandidates,
   scoreAtArrival: (place, arrivalMin, state, requirements, weather, nowBase) => {
     const travel = estimateTravel({ fromCoords: state?.prevCoords || requirements.originCoords, toCoords: place.coords, departMin: state?.cursor || requirements.hard.startMin, isFirstStop: !(state?.stops?.length) });
     return scoreTransition(place, arrivalMin, state || { cursor: requirements.hard.startMin, prevCoords: requirements.originCoords, stops: [], meals: new Set(), categories: new Set(), cost: 0, travelMinutes: 0, waitMinutes: 0 }, requirements, weather, nowBase || new Date(), travel, 0, new Map());
