@@ -2077,75 +2077,80 @@ const ROAD_ROUTE_MIRRORS = [
 ];
 async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
   if (!raw || raw.length < 2) return false;
-  // 1. Authoritative Backend Routing API First
   try {
-    const origin = raw[0];
-    const destination = raw[raw.length - 1];
-    const url = `/api/v1/routing/route?origin=${origin[0]},${origin[1]}&destination=${destination[0]},${destination[1]}&mode=driving`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (res.ok) {
-      const d = await res.json();
-      if (d.success && d.route?.geometry?.length >= 2) {
-        map.removeLayer(rLine);
-        rLine = L.polyline(d.route.geometry, {
-          color: accent,
-          weight: tripActive ? 7 : 4,
-          opacity: tripActive ? 0.98 : 0.9,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(map);
-        if (routeStops[0]) {
-          routeStops[0].tt = d.duration?.trafficAwareMinutes || d.duration?.minutes || routeStops[0].tt;
-          nsDist = d.distance?.formatted || `${(d.distance?.kilometers || 0).toFixed(1)} km`;
-          nsEta = d.duration?.formatted || fmtM(routeStops[0].tt);
+    let fullGeometry = null, distanceFormatted = null, durationFormatted = null, nextStepInstruction = null;
+    if (raw.length === 2) {
+      const res = await fetch(`/api/v1/routing/route?origin=${raw[0][0]},${raw[0][1]}&destination=${raw[1][0]},${raw[1][1]}&mode=driving`, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success && Array.isArray(d.route?.geometry) && d.route.geometry.length >= 2) {
+          fullGeometry = d.route.geometry;
+          if (routeStops[0]) {
+            routeStops[0].tt = d.duration?.trafficAwareMinutes || d.duration?.minutes || routeStops[0].tt;
+            distanceFormatted = d.distance?.formatted || `${(d.distance?.kilometers || 0).toFixed(1)} km`;
+            durationFormatted = d.duration?.formatted || fmtM(routeStops[0].tt);
+          }
+          if (d.route.steps?.[0]?.instruction) nextStepInstruction = d.route.steps[0].instruction;
         }
-        if (d.route.steps?.[0]?.instruction) {
-          const navText = `Next: ${d.route.steps[0].instruction}`.trim();
-          document.getElementById('nav-turn').textContent = navText;
-          maybeSpeakNavInstruction(navText);
+      }
+    } else {
+      const res = await fetch(`/api/v1/routing/matrix`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stops: raw.map(c => ({ coords: c })), mode: 'driving' }), signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success && Array.isArray(d.legs) && d.legs.length > 0) {
+          const geometries = [];
+          d.legs.forEach((leg, idx) => {
+            if (leg?.success && Array.isArray(leg.route?.geometry)) geometries.push(...leg.route.geometry);
+            if (routeStops[idx] && leg?.duration) routeStops[idx].tt = leg.duration.trafficAwareMinutes || leg.duration.minutes || routeStops[idx].tt;
+          });
+          if (geometries.length >= 2) {
+            fullGeometry = geometries;
+            if (d.legs[0]?.distance?.formatted) { distanceFormatted = d.legs[0].distance.formatted; durationFormatted = d.legs[0].duration?.formatted || fmtM(routeStops[0]?.tt || 10); }
+            if (d.legs[0]?.route?.steps?.[0]?.instruction) nextStepInstruction = d.legs[0].route.steps[0].instruction;
+          }
         }
-        document.getElementById('nav-dist').textContent = nsDist;
-        document.getElementById('nav-eta').textContent = nsEta;
-        applyMapHeadingRotation();
-        return true;
       }
     }
-  } catch (_backendErr) {
-    // Fallback to client OSRM mirrors
-  }
-
-  // 2. Direct OSRM Mirrors Fallback
-  const coords=raw.map(p=>`${p[1]},${p[0]}`).join(';');
-  for(let mirrorIdx=0; mirrorIdx<ROAD_ROUTE_MIRRORS.length; mirrorIdx++){
-    try{
-      const res=await fetch(`${ROAD_ROUTE_MIRRORS[mirrorIdx]}${coords}?overview=full&geometries=geojson&steps=true`,{signal:AbortSignal.timeout(4000)});
-      if(!res.ok) continue;
-      const d=await res.json();
-      if(!d.routes?.[0]?.geometry?.coordinates) continue;
-      const lc=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+    if (fullGeometry && fullGeometry.length >= 2) {
       map.removeLayer(rLine);
-      rLine=L.polyline(lc,{color:accent,weight:tripActive?7:4,opacity:tripActive?0.98:0.9,lineCap:'round',lineJoin:'round'}).addTo(map);
-      if(d.routes[0].legs?.[0]){
-        const activeLeg=d.routes[0].legs[0];
-        routeStops[0].tt=Math.ceil(activeLeg.duration/60);
-        nsDist=((activeLeg.distance||0)/1000).toFixed(1)+'km';
-        nsEta=fmtM(routeStops[0].tt);
-      }
-      const ns=d.routes[0].legs[0]?.steps?.find(step=>step?.name||step?.maneuver?.modifier||step?.maneuver?.type);
-      if(ns){
-        const road=ns.name?` via ${ns.name}`:'';
-        const action=(ns.maneuver?.modifier||ns.maneuver?.type||'continue').replace(/_/g,' ');
-        const navText=`Next: ${action}${road}`.trim();
-        document.getElementById('nav-turn').textContent=navText;
-        maybeSpeakNavInstruction(navText);
-      }
-      document.getElementById('nav-dist').textContent=nsDist;
-      document.getElementById('nav-eta').textContent=nsEta;
+      rLine = L.polyline(fullGeometry, { color: accent, weight: tripActive ? 7 : 4, opacity: tripActive ? 0.98 : 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+      if (distanceFormatted) nsDist = distanceFormatted;
+      if (durationFormatted) nsEta = durationFormatted;
+      if (nextStepInstruction) { const navText = `Next: ${nextStepInstruction}`.trim(); document.getElementById('nav-turn').textContent = navText; maybeSpeakNavInstruction(navText); }
+      document.getElementById('nav-dist').textContent = nsDist;
+      document.getElementById('nav-eta').textContent = nsEta;
       applyMapHeadingRotation();
       return true;
-    }catch(e){
-      browserLogger.warn(`Road routing fallback failed:`,e);
     }
+  } catch (_e) { /* fallback to client OSRM mirrors */ }
+
+  const coords = raw.map(p => `${p[1]},${p[0]}`).join(';');
+  for (let mIdx = 0; mIdx < ROAD_ROUTE_MIRRORS.length; mIdx++) {
+    try {
+      const res = await fetch(`${ROAD_ROUTE_MIRRORS[mIdx]}${coords}?overview=full&geometries=geojson&steps=true`, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) continue;
+      const d = await res.json();
+      if (!d.routes?.[0]?.geometry?.coordinates) continue;
+      const lc = d.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      map.removeLayer(rLine);
+      rLine = L.polyline(lc, { color: accent, weight: tripActive ? 7 : 4, opacity: tripActive ? 0.98 : 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+      if (d.routes[0].legs?.[0]) {
+        const activeLeg = d.routes[0].legs[0];
+        if (routeStops[0]) routeStops[0].tt = Math.ceil(activeLeg.duration / 60);
+        nsDist = ((activeLeg.distance || 0) / 1000).toFixed(1) + 'km';
+        nsEta = fmtM(routeStops[0]?.tt || Math.ceil(activeLeg.duration / 60));
+      }
+      const ns = d.routes[0].legs[0]?.steps?.find(step => step?.name || step?.maneuver?.modifier || step?.maneuver?.type);
+      if (ns) {
+        const navText = `Next: ${(ns.maneuver?.modifier || ns.maneuver?.type || 'continue').replace(/_/g, ' ')}${ns.name ? ` via ${ns.name}` : ''}`.trim();
+        document.getElementById('nav-turn').textContent = navText;
+        maybeSpeakNavInstruction(navText);
+      }
+      document.getElementById('nav-dist').textContent = nsDist;
+      document.getElementById('nav-eta').textContent = nsEta;
+      applyMapHeadingRotation();
+      return true;
+    } catch (e) { browserLogger.warn(`Road routing fallback failed:`, e); }
   }
   return false;
 }
