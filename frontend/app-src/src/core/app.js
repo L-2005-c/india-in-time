@@ -411,10 +411,11 @@ function getRouteStart(){
 }
 
 function getPreviewRouteStart(){
-  // Only trust live GPS as the route start once a trip is actually live —
-// …
-  if (tripActive && cLat && cLon) return [cLat, cLon];
-  return getCityCenter() || ((cLat && cLon) ? [cLat, cLon] : null);
+  const cityCenter = getCityCenter();
+  if (tripActive && cLat && cLon) {
+    if (!cityCenter || hvKm(cLat, cLon, cityCenter[0], cityCenter[1]) <= 65) return [cLat, cLon];
+  }
+  return cityCenter || ((cLat && cLon) ? [cLat, cLon] : null);
 }
 
 function withHiddenGems(cityId, list){ return _geoWithHiddenGems(list, getHiddenGems(cityId)); }
@@ -468,6 +469,9 @@ function restoreNavCardCollapsed(){
 function followLivePosition(force=false){
   if(!map||!isFiniteLatLon(cLat,cLon)) return;
   if(!force && (!tripActive || !autoFollowLive)) return;
+  const cityCenter = getCityCenter();
+  // If the user's physical GPS is in a different city (>65km), do not pull the map away from the city they are exploring
+  if(cityCenter && hvKm(cLat,cLon,cityCenter[0],cityCenter[1]) > 65 && !tripActive && !force) return;
   const rawZ=map.getZoom(), zoom=Math.max(Number.isFinite(rawZ)?rawZ:14,15);
   if(!Number.isFinite(zoom)) return;
   let tLat=cLat, tLon=cLon;
@@ -484,7 +488,6 @@ function followLivePosition(force=false){
   const cur=map.getCenter();
   if(cur && isFiniteLatLon(cur.lat,cur.lng) && map.distance(cur,[tLat,tLon])<3) return;
   try{ map.stop(); }catch(_e){}
-  // Prefer setView during live nav — flyTo can throw Invalid LatLng mid-animation on some Leaflet builds
   try{ map.setView([tLat,tLon],zoom,{animate:true}); }
   catch(_e){ try{ map.setView([cLat,cLon],zoom); }catch(_e2){} }
 }
@@ -496,9 +499,7 @@ function toggleLiveFollow(forceState){
 }
 
 function applyMapHeadingRotation(){
-  // Rotating Leaflet's map pane can blank the tile layer because Leaflet uses
-  // the same transform for its own positioning. Keep heading on the player
-  // marker only and leave the map tiles unrotated.
+  // Kept on marker only to avoid blanking Leaflet tile layers
 }
 
 function updateLiveMarkerHeading(){
@@ -523,65 +524,70 @@ function deriveHeading(pos){
   return lastHeading;
 }
 
-// ── GPS fix quality filter ───────────────────────────────────────────────
-// Raw phone GPS is noisy: a single bad fix (accuracy circle of 100m+, or a
-// …
 function isPlausibleGpsFix(pos){
   return _isPlausibleGpsFix(pos, lastAcceptedFix, lastAcceptedFixAt, hvKm);
 }
 
-// …
 function animateLiveMarkerTo(lat, lon){
+  if(!isFiniteLatLon(lat, lon)) return;
   if(!liveMkr){ displayedLat=lat; displayedLon=lon; return; }
   if(markerAnimFrame) cancelAnimationFrame(markerAnimFrame);
-  const fromLat=displayedLat??lat, fromLon=displayedLon??lon;
+  const fromLat=Number.isFinite(displayedLat) ? displayedLat : lat;
+  const fromLon=Number.isFinite(displayedLon) ? displayedLon : lon;
   const distM=hvKm(fromLat,fromLon,lat,lon)*1000;
-  // Skip animating near-zero movement (avoids a constant no-op rAF loop
-  // while stationary) and huge jumps (city switch, very first fix) — those
-  // should snap instantly rather than visibly "fly" across the whole map.
-  if(distM<0.5 || distM>150){ displayedLat=lat; displayedLon=lon; liveMkr.setLatLng([lat,lon]); return; }
+  if(!Number.isFinite(distM) || distM<0.5 || distM>150){
+    displayedLat=lat; displayedLon=lon;
+    try { liveMkr.setLatLng([lat,lon]); } catch(_e){}
+    return;
+  }
   const duration=400, start=performance.now();
   const step=(now)=>{
     const t=Math.min(1,(now-start)/duration);
     const eased=1-Math.pow(1-t,3);
     displayedLat=fromLat+(lat-fromLat)*eased;
     displayedLon=fromLon+(lon-fromLon)*eased;
-    liveMkr.setLatLng([displayedLat,displayedLon]);
+    if(isFiniteLatLon(displayedLat, displayedLon)){
+      try { liveMkr.setLatLng([displayedLat,displayedLon]); } catch(_e){}
+    }
     if(t<1) markerAnimFrame=requestAnimationFrame(step);
     else markerAnimFrame=null;
   };
   markerAnimFrame=requestAnimationFrame(step);
 }
 
-// ── Snap-to-road ──────────────────────────────────────────────────────────
-// Projects a raw GPS point onto the nearest point of the currently-drawn
-// …
 function snapToRoute(lat, lon){
-  if(!rLine) return [lat, lon];
-  const latlngs=rLine.getLatLngs();
-  if(!latlngs || latlngs.length<2) return [lat, lon];
+  if(!isFiniteLatLon(lat, lon) || !rLine) return [lat, lon];
+  let latlngs=rLine.getLatLngs();
+  if(!latlngs || !latlngs.length) return [lat, lon];
+  if(Array.isArray(latlngs[0])) latlngs = latlngs.flat(Infinity);
+  if(latlngs.length<2) return [lat, lon];
   const p=L.latLng(lat, lon);
   let best=null, bestDist=Infinity;
   for(let i=0;i<latlngs.length-1;i++){
+    if(!latlngs[i] || !latlngs[i+1]) continue;
     const candidate=closestPointOnSegment(p, latlngs[i], latlngs[i+1]);
+    if(!candidate || !isFiniteLatLon(candidate.lat, candidate.lng)) continue;
     const d=p.distanceTo(candidate);
-    if(d<bestDist){ bestDist=d; best=candidate; }
+    if(Number.isFinite(d) && d<bestDist){ bestDist=d; best=candidate; }
   }
-  if(!best || bestDist>40) return [lat, lon];
+  if(!best || bestDist>40 || !isFiniteLatLon(best.lat, best.lng)) return [lat, lon];
   return [best.lat, best.lng];
 }
 function closestPointOnSegment(p, a, b){
-  // Simple equirectangular projection — fine at the scale of one road
-  // segment (tens of metres), far cheaper than great-circle math for
-  // something recomputed on every GPS fix during live tracking.
+  if(!a || !b || !isFiniteLatLon(a.lat, a.lng) || !isFiniteLatLon(b.lat, b.lng) || !isFiniteLatLon(p.lat, p.lng)) return p;
   const cosLat=Math.cos(a.lat*Math.PI/180);
   const toXY=(pt)=>({x:pt.lng*cosLat, y:pt.lat});
   const A=toXY(a), B=toXY(b), P=toXY(p);
   const dx=B.x-A.x, dy=B.y-A.y;
   const lenSq=dx*dx+dy*dy;
-  let t=lenSq>0 ? ((P.x-A.x)*dx+(P.y-A.y)*dy)/lenSq : 0;
+  if(!Number.isFinite(lenSq) || lenSq<=0) return a;
+  let t=((P.x-A.x)*dx+(P.y-A.y)*dy)/lenSq;
+  if(!Number.isFinite(t)) t=0;
   t=Math.max(0,Math.min(1,t));
-  return L.latLng(a.lat+(b.lat-a.lat)*t, a.lng+(b.lng-a.lng)*t);
+  const resLat=a.lat+(b.lat-a.lat)*t;
+  const resLng=a.lng+(b.lng-a.lng)*t;
+  if(!isFiniteLatLon(resLat, resLng)) return a;
+  return L.latLng(resLat, resLng);
 }
 
 function maybeSpeakNavInstruction(text, force=false){
@@ -2664,14 +2670,20 @@ function resetGPS(){cLat=null;document.getElementById('gps-txt').textContent='GP
 // …
 let isLocating = false;
 async function locateMe(){
-  if (isLocating) return; // ignore rapid repeat taps while a request is in flight
+  if (isLocating) return;
   isLocating = true;
   const btn = document.getElementById('locate-me-btn');
   if (btn) { btn.disabled = true; btn.classList.add('locating'); }
   try {
     const { lat, lon } = await waitForFirstGpsFix(10000);
     map.stop();
-    map.flyTo([lat, lon], Math.max(map.getZoom(), 16), { animate: true, duration: 0.8 });
+    const cityCenter = getCityCenter();
+    if (cityCenter && hvKm(lat, lon, cityCenter[0], cityCenter[1]) > 65) {
+      const nearestId = _pickNearestCityId(lat, lon, CITIES, (a,b,c,d)=>(c-a)**2+(d-b)**2);
+      const nearestName = CITIES[nearestId]?.name || 'your area';
+      showToast('📍', 'Live GPS Fix', `You are near ${nearestName} (~${Math.round(hvKm(lat,lon,cityCenter[0],cityCenter[1]))} km from ${currentCityName}).`, 4500);
+    }
+    map.flyTo([lat, lon], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
   } catch (e) {
     browserLogger.warn('[locateMe] GPS fix unavailable:', e);
     alert('Could not get your location. Please check that location access is allowed for this site and try again.');

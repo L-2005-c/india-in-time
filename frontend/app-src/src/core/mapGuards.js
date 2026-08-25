@@ -27,6 +27,33 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       return stub;
     };
 
+    const originalLatLng = Lib.latLng;
+    if (typeof originalLatLng === 'function') {
+      Lib.latLng = function latLngGuard(a, b, c) {
+        try {
+          if (Array.isArray(a)) {
+            if (!Number.isFinite(+a[0]) || !Number.isFinite(+a[1])) return originalLatLng.call(Lib, 20.5937, 78.9629);
+          } else if (a && typeof a === 'object') {
+            if (!Number.isFinite(+a.lat) || !Number.isFinite(+(a.lng ?? a.lon))) return originalLatLng.call(Lib, 20.5937, 78.9629);
+          } else if (!Number.isFinite(+a) || !Number.isFinite(+b)) {
+            return originalLatLng.call(Lib, 20.5937, 78.9629);
+          }
+          return originalLatLng.call(Lib, a, b, c);
+        } catch (_e) {
+          return originalLatLng.call(Lib, 20.5937, 78.9629);
+        }
+      };
+    }
+
+    if (Lib.Marker && Lib.Marker.prototype) {
+      const origSetLatLng = Lib.Marker.prototype.setLatLng;
+      Lib.Marker.prototype.setLatLng = function guardedSetLatLng(latlng) {
+        if (!isFiniteLatLngPair(latlng)) return this;
+        try { return origSetLatLng.call(this, latlng); }
+        catch (_err) { return this; }
+      };
+    }
+
     const originalMarker = Lib.marker;
     Lib.marker = function markerGuard(coords, options) {
       if (!isFiniteLatLngPair(coords)) {
