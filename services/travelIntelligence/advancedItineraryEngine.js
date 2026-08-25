@@ -14,7 +14,6 @@
 const { getTravelIntelligence } = require('./index');
 const { estimateTravel } = require('./trafficEngine');
 const { m2t, t2m } = require('./timeEngine');
-const { distKm } = require('../../utils/geo');
 const dayStructure = require('./dayStructure');
 const {
   parseRequirements,
@@ -28,6 +27,9 @@ const { computeDnaMatch } = require('./personalTravelDna');
 const {
   filterEligibleCandidates,
 } = require('./tourismPoi');
+const { calculateSolarTimes, getScenicScore } = require('./astronomyTime');
+const { analyzeClimateStrategy, scorePlaceUnderClimate } = require('./climateEngine');
+const { evaluateBacktrackingPenalty, getNearbyRecommendations } = require('./proximityGraph');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },
@@ -342,6 +344,23 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
     }
   }
 
+  // Directional Backtracking Penalty (prevents A -> B -> A zig-zagging)
+  if (state.prevPrevCoords && state.prevCoords && place.coords) {
+    const backtrackPenalty = evaluateBacktrackingPenalty(state.prevPrevCoords, state.prevCoords, place.coords);
+    score -= backtrackPenalty;
+  }
+
+  // Astronomical Solar & Photographic Lighting Model
+  const solarTimes = calculateSolarTimes(place.coords?.[0] || 17.68, place.coords?.[1] || 83.21, nowBase);
+  const scenicEval = getScenicScore(place, arrivalMin, solarTimes, weather);
+  score += (scenicEval.score - 50) * 0.22;
+
+  // Unified Climate Strategy Evaluation (Monsoon & Heat Escape)
+  if (state.climateStrategy) {
+    const climateEval = scorePlaceUnderClimate(place, arrivalMin, state.climateStrategy, weather);
+    score += climateEval.delta;
+  }
+
   // Weather-based dynamic climate protection (Heat & Rain Awareness):
   const outdoor = place.indoor_outdoor === 'outdoor' || OUTDOOR.has(cat) || place.is_outdoor === true;
   const condition = String(intel.weather?.condition || '').toLowerCase();
@@ -445,6 +464,25 @@ function buildStop(place, scored, arrivalMin, state) {
   const scenicBadge = intel.scenic?.scenicBadge || (place.is_sunset_spot ? '🌅 Sunset View' : (['scenic', 'beach', 'hill'].includes(category) ? '🏞️ Scenic Stop' : '📍 Tourist Spot'));
   const goldenHourRating = Number(intel.scenic?.goldenHourRating || 0);
 
+  const coords = place.coords || [17.6868, 83.2185];
+  const solarTimes = calculateSolarTimes(coords[0], coords[1], state.now || new Date());
+  const scenicEval = getScenicScore(place, arrivalMin, solarTimes, state.weather || {});
+  const climateEval = state.climateStrategy
+    ? scorePlaceUnderClimate(place, arrivalMin, state.climateStrategy, state.weather || {})
+    : { delta: 0, reasons: [] };
+
+  const allWhyNowReasons = [
+    ...scored.reasons,
+    ...scenicEval.reasons,
+    ...climateEval.reasons,
+  ];
+
+  const nearbySpots = state.allCandidates
+    ? getNearbyRecommendations(place, state.allCandidates, { preferredCategories: state.preferredCategories })
+    : [];
+
+  const timePhaseBadge = scenicEval.badge || '🌤️ Standard';
+
   return {
     key: placeIdentity(place),
     id: place.id ?? place.placeId ?? place.name,
@@ -476,15 +514,22 @@ function buildStop(place, scored, arrivalMin, state) {
     weather: intel.weather,
     weatherComfortBadge,
     scenicBadge,
+    timePhaseBadge,
     goldenHourRating,
     cultural: intel.cultural || null,
     signatureDish: intel.signatureDish || null,
     entryProtocol: intel.entryProtocol || null,
-    nearbySpots: [],
+    nearbySpots,
     open: intel.isOpenNow,
-    reasons: scored.reasons,
+    reasons: allWhyNowReasons.slice(0, 5),
+    whyNow: {
+      timePhase: timePhaseBadge,
+      phaseLabel: scenicEval.label,
+      reasons: allWhyNowReasons.slice(0, 5),
+      confidence: Number(intel.confidence?.confidence ?? intel.confidence ?? 85),
+    },
     whyThisPlace: scored.reasons,
-    whyThisTime: scored.reasons.filter((r) => /time|window|meal|golden|weather|crowd|wait|sunset|heat|proximity/i.test(r)),
+    whyThisTime: allWhyNowReasons.filter((r) => /time|window|meal|golden|weather|crowd|wait|sunset|heat|proximity|monsoon|lighting/i.test(r)),
     whyNotOtherTime: intel.scenic?.bestScenicWindow ? [`Chosen around the best available temporal window (${intel.scenic.bestScenicWindow.start || 'time window'})`] : ['Earlier/later candidates scored lower under the current constraints'],
     whyNotAlternative: ['Alternatives were evaluated against the same arrival-time, route, requirement and feasibility state'],
     confidence: Number(intel.confidence?.confidence ?? intel.confidence ?? 50),
@@ -591,6 +636,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   });
 
   const candidates = filterCandidates(tourismEligible, requirements);
+  const climateStrategy = analyzeClimateStrategy(requirements.weather);
   const now = rawOptions.now instanceof Date ? rawOptions.now : new Date(rawOptions.now || Date.now());
   const startMin = requirements.hard.startMin;
   const endMin = requirements.hard.endMin;
@@ -612,9 +658,11 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const startOrigin = Array.isArray(rawOptions.currentCoords) ? rawOptions.currentCoords : (completedStops.at(-1)?.coords || origin);
   const memo = new Map();
   const warnings = [];
+  const preferredCategories = requirements.soft.preferredCategories || [];
   let beam = [{
     cursor: startCursor,
     prevCoords: startOrigin,
+    prevPrevCoords: null,
     prevKey: completedStops.at(-1)?.name || 'origin',
     stops: [],
     used: new Set(completedKeys),
@@ -625,9 +673,12 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     costDataIncomplete: completedStops.some((s) => !Number.isFinite(Number(s.cost))),
     travelMinutes: 0,
     waitMinutes: 0,
+    climateStrategy,
+    now,
+    weather: requirements.weather,
+    allCandidates: candidates,
+    preferredCategories,
   }];
-
-  const preferredCategories = requirements.soft.preferredCategories || [];
 
   for (let depth = 0; depth < maxStops && beam.length; depth += 1) {
     const expanded = [];
@@ -697,6 +748,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
           }, actualArrival, stopState);
           const next = {
             cursor: leave + buffer,
+            prevPrevCoords: state.prevCoords,
             prevCoords: place.coords || state.prevCoords,
             prevKey: place.name,
             stops: [...state.stops, stop],
@@ -708,6 +760,11 @@ function planAdvancedItinerary(places, rawOptions = {}) {
             costDataIncomplete: state.costDataIncomplete || !rescored.costKnown,
             travelMinutes: state.travelMinutes + travelMinutes,
             waitMinutes: state.waitMinutes + wait,
+            climateStrategy,
+            now,
+            weather: requirements.weather,
+            allCandidates: candidates,
+            preferredCategories,
           };
           if (isFood(place)) {
             const meal = mealAt(actualArrival);
@@ -776,23 +833,12 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const confidenceValues = state.stops.map((s) => Number(s.confidence)).filter(Number.isFinite);
   const confidence = confidenceValues.length ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length) : 0;
 
-  const usedIds = new Set(state.stops.map((s) => placeIdentity(s)));
   const dnaProfile = requirements.travelDna || requirements.dnaProfile || requirements.soft.travelDna;
   const finalizedStops = state.stops.map((stop) => {
     const dnaInfo = computeDnaMatch(stop, dnaProfile);
-    if (!Array.isArray(stop.coords) || stop.coords.length < 2) return { ...stop, dnaMatch: dnaInfo };
-    const nearby = candidates
-      .filter((c) => !usedIds.has(placeIdentity(c)) && Array.isArray(c.coords) && c.coords.length >= 2)
-      .map((c) => ({
-        id: c.id ?? c.placeId ?? c.name,
-        name: c.name,
-        category: c.cat || c.category || 'default',
-        coords: c.coords,
-        distanceM: Math.round(distKm(stop.coords[0], stop.coords[1], c.coords[0], c.coords[1]) * 1000),
-      }))
-      .filter((c) => c.distanceM <= 1200)
-      .sort((a, b) => a.distanceM - b.distanceM)
-      .slice(0, 3);
+    const nearby = (stop.nearbySpots && stop.nearbySpots.length)
+      ? stop.nearbySpots
+      : getNearbyRecommendations(stop, candidates, { preferredCategories });
     return { ...stop, nearbySpots: nearby, dnaMatch: dnaInfo };
   });
 
@@ -802,6 +848,8 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     algorithm: 'geo-temporal-beam-search-v5-world-class',
     objective: 'maximize whole-itinerary experience under hard constraints, time-dependent place states, meals, routing, weather, crowd, scenic windows and budget/accessibility/safety requirements',
     status: 'FEASIBLE',
+    climateBanner: climateStrategy.banner || null,
+    climateMode: climateStrategy.mode,
     stopCount: finalizedStops.length,
     totalScore: Math.round(state.score),
     totalTravelMinutes: Math.round(state.travelMinutes),
