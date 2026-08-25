@@ -1,23 +1,15 @@
 'use strict';
 
 /**
- * Personal Travel DNA Engine
+ * services/travelIntelligence/personalTravelDna.js
+ * Travel DNA 2.0 — Privacy-Preserving Traveler Preference Model.
  *
- * Implements a persistent, privacy-preserving traveler preference vector.
- * Evaluates candidate destinations against the traveler's intrinsic travel DNA:
- * - scenic (0-100)
- * - photography (0-100)
- * - food (0-100)
- * - culture / heritage (0-100)
- * - adventure / trekking (0-100)
- * - shopping (0-100)
- * - crowdTolerance (0-100, low = prefers quiet/peaceful gems)
- * - walkingTolerance (0-100)
- * - pacePreference ('relaxed' | 'balanced' | 'packed')
- *
- * Privacy Principles:
- * - No PII is collected or persisted.
- * - Profiles can be inspected, adjusted, reset, or disabled at any time.
+ * Implements:
+ * 1. Persistent preference vectors across 9 travel dimensions.
+ * 2. Explicit (user-set) vs Inferred (behavioral) preference separation.
+ * 3. Confidence scoring per attribute.
+ * 4. Recency-weighted behavioral decay (half-life = 60 days).
+ * 5. Full user control (inspect, edit, reset, disable, delete).
  */
 
 const DEFAULT_TRAVEL_DNA = Object.freeze({
@@ -31,6 +23,27 @@ const DEFAULT_TRAVEL_DNA = Object.freeze({
   walkingTolerance: 65,
   pacePreference: 'balanced',
   enabled: true,
+  sources: {
+    scenic: 'default',
+    photography: 'default',
+    food: 'default',
+    culture: 'default',
+    adventure: 'default',
+    shopping: 'default',
+    crowdTolerance: 'default',
+    walkingTolerance: 'default',
+  },
+  confidences: {
+    scenic: 88,
+    photography: 85,
+    food: 88,
+    culture: 85,
+    adventure: 82,
+    shopping: 80,
+    crowdTolerance: 85,
+    walkingTolerance: 86,
+  },
+  lastUpdated: new Date().toISOString(),
 });
 
 function clamp(val, min = 0, max = 100, defaultVal = min) {
@@ -47,8 +60,12 @@ function sanitizeDnaProfile(input = {}) {
     return { ...DEFAULT_TRAVEL_DNA };
   }
 
-  const validPaces = new Set(['relaxed', 'balanced', 'packed']);
-  const pace = validPaces.has(input.pacePreference) ? input.pacePreference : 'balanced';
+  const validPaces = new Set(['relaxed', 'balanced', 'packed', 'active']);
+  let pace = validPaces.has(input.pacePreference) ? input.pacePreference : 'balanced';
+  if (pace === 'active') pace = 'packed'; // normalize active to packed/active
+
+  const sources = typeof input.sources === 'object' && input.sources ? input.sources : DEFAULT_TRAVEL_DNA.sources;
+  const confidences = typeof input.confidences === 'object' && input.confidences ? input.confidences : DEFAULT_TRAVEL_DNA.confidences;
 
   return {
     scenic: clamp(input.scenic, 0, 100, DEFAULT_TRAVEL_DNA.scenic),
@@ -61,6 +78,27 @@ function sanitizeDnaProfile(input = {}) {
     walkingTolerance: clamp(input.walkingTolerance, 0, 100, DEFAULT_TRAVEL_DNA.walkingTolerance),
     pacePreference: pace,
     enabled: input.enabled !== false,
+    sources: {
+      scenic: sources.scenic || 'default',
+      photography: sources.photography || 'default',
+      food: sources.food || 'default',
+      culture: sources.culture || 'default',
+      adventure: sources.adventure || 'default',
+      shopping: sources.shopping || 'default',
+      crowdTolerance: sources.crowdTolerance || 'default',
+      walkingTolerance: sources.walkingTolerance || 'default',
+    },
+    confidences: {
+      scenic: clamp(confidences.scenic, 20, 100, DEFAULT_TRAVEL_DNA.confidences.scenic),
+      photography: clamp(confidences.photography, 20, 100, DEFAULT_TRAVEL_DNA.confidences.photography),
+      food: clamp(confidences.food, 20, 100, DEFAULT_TRAVEL_DNA.confidences.food),
+      culture: clamp(confidences.culture, 20, 100, DEFAULT_TRAVEL_DNA.confidences.culture),
+      adventure: clamp(confidences.adventure, 20, 100, DEFAULT_TRAVEL_DNA.confidences.adventure),
+      shopping: clamp(confidences.shopping, 20, 100, DEFAULT_TRAVEL_DNA.confidences.shopping),
+      crowdTolerance: clamp(confidences.crowdTolerance, 20, 100, DEFAULT_TRAVEL_DNA.confidences.crowdTolerance),
+      walkingTolerance: clamp(confidences.walkingTolerance, 20, 100, DEFAULT_TRAVEL_DNA.confidences.walkingTolerance),
+    },
+    lastUpdated: input.lastUpdated || new Date().toISOString(),
   };
 }
 
@@ -70,41 +108,117 @@ function sanitizeDnaProfile(input = {}) {
 function deriveDnaFromPersonas(personas = [], tripMode = 'solo', baseProfile = null) {
   const profile = { ...(baseProfile || DEFAULT_TRAVEL_DNA) };
   const personaSet = new Set((personas || []).map(p => String(p).toLowerCase().trim()));
+  const sources = { ...(profile.sources || DEFAULT_TRAVEL_DNA.sources) };
+  const confidences = { ...(profile.confidences || DEFAULT_TRAVEL_DNA.confidences) };
 
   if (personaSet.has('photographer')) {
     profile.photography = Math.max(profile.photography, 92);
     profile.scenic = Math.max(profile.scenic, 90);
+    sources.photography = 'explicit_persona';
+    sources.scenic = 'explicit_persona';
+    confidences.photography = 95;
+    confidences.scenic = 90;
   }
   if (personaSet.has('adventure')) {
     profile.adventure = Math.max(profile.adventure, 88);
     profile.walkingTolerance = Math.max(profile.walkingTolerance, 85);
+    sources.adventure = 'explicit_persona';
+    sources.walkingTolerance = 'explicit_persona';
+    confidences.adventure = 90;
+    confidences.walkingTolerance = 85;
   }
   if (personaSet.has('food_lover') || personaSet.has('foodie')) {
     profile.food = Math.max(profile.food, 95);
+    sources.food = 'explicit_persona';
+    confidences.food = 95;
   }
   if (personaSet.has('history') || personaSet.has('spiritual') || personaSet.has('culture')) {
     profile.culture = Math.max(profile.culture, 90);
+    sources.culture = 'explicit_persona';
+    confidences.culture = 90;
   }
   if (personaSet.has('nature')) {
     profile.scenic = Math.max(profile.scenic, 92);
     profile.crowdTolerance = Math.min(profile.crowdTolerance, 35);
+    sources.scenic = 'explicit_persona';
+    sources.crowdTolerance = 'explicit_persona';
+    confidences.scenic = 92;
+    confidences.crowdTolerance = 85;
   }
   if (personaSet.has('family')) {
     profile.walkingTolerance = Math.min(profile.walkingTolerance, 55);
     profile.crowdTolerance = Math.max(profile.crowdTolerance, 45);
     profile.pacePreference = 'relaxed';
+    sources.walkingTolerance = 'explicit_mode';
+    sources.crowdTolerance = 'explicit_mode';
   }
 
   const mode = String(tripMode || '').toLowerCase();
   if (mode === 'relaxed') profile.pacePreference = 'relaxed';
-  if (mode === 'packed') profile.pacePreference = 'packed';
+  if (mode === 'packed' || mode === 'active') profile.pacePreference = 'packed';
 
+  profile.sources = sources;
+  profile.confidences = confidences;
+  return sanitizeDnaProfile(profile);
+}
+
+/**
+ * Applies recency decay to inferred preferences.
+ * Inferred preferences decay toward the baseline (50) over time (half-life = 60 days).
+ * Explicit preferences do not decay.
+ */
+function applyRecencyDecay(profile, now = new Date()) {
+  const sanitized = sanitizeDnaProfile(profile);
+  const lastUpdated = new Date(sanitized.lastUpdated || now);
+  const daysDiff = Math.max(0, (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
+  const decayFactor = Math.pow(0.5, daysDiff / 60); // half-life of 60 days
+
+  const dimensions = ['scenic', 'photography', 'food', 'culture', 'adventure', 'shopping', 'crowdTolerance', 'walkingTolerance'];
+  const decayed = { ...sanitized };
+
+  dimensions.forEach(dim => {
+    if (sanitized.sources[dim] === 'inferred') {
+      const delta = sanitized[dim] - 50;
+      decayed[dim] = clamp(50 + Math.round(delta * decayFactor));
+      decayed.confidences[dim] = clamp(Math.round(sanitized.confidences[dim] * (0.6 + 0.4 * decayFactor)));
+    }
+  });
+
+  return decayed;
+}
+
+/**
+ * Records a user behavioral interaction (e.g. visiting, saving, or skipping a place)
+ * and updates inferred preferences with confidence increments.
+ */
+function recordBehaviorInteraction(currentProfile, place, interactionType = 'visit') {
+  const profile = { ...sanitizeDnaProfile(currentProfile) };
+  const cat = String(place.cat || place.category || '').toLowerCase();
+  const name = String(place.name || '').toLowerCase();
+  const multiplier = interactionType === 'save' ? 1.2 : interactionType === 'visit' ? 1.0 : interactionType === 'skip' ? -0.8 : 0.5;
+
+  const updateDim = (dim, delta) => {
+    if (profile.sources[dim] !== 'explicit') {
+      profile[dim] = clamp(profile[dim] + Math.round(delta * multiplier));
+      profile.sources[dim] = 'inferred';
+      profile.confidences[dim] = clamp(profile.confidences[dim] + 3, 20, 95);
+    }
+  };
+
+  if (cat === 'scenic' || cat === 'beach' || cat === 'viewpoint' || place.is_sunset_spot) updateDim('scenic', 4);
+  if (place.is_sunset_spot || place.is_sunrise_spot || cat === 'viewpoint') updateDim('photography', 4);
+  if (cat === 'food' || cat === 'restaurant' || cat === 'cafe') updateDim('food', 5);
+  if (cat === 'temple' || cat === 'museum' || cat === 'monument' || cat === 'fort') updateDim('culture', 4);
+  if (cat === 'trekking' || cat === 'hiking' || /trek|trail|hike/i.test(name)) updateDim('adventure', 5);
+  if (cat === 'shopping' || cat === 'market' || cat === 'bazaar') updateDim('shopping', 4);
+
+  profile.lastUpdated = new Date().toISOString();
   return sanitizeDnaProfile(profile);
 }
 
 /**
  * Evaluates how well a place matches a given Travel DNA profile.
- * Returns { score: 0-100, reasons: string[], componentMatches: object }
+ * Returns { score: 0-100, reasons: string[], componentMatches: object, confidence: number }
  */
 function computeDnaMatch(place = {}, dnaProfile = null) {
   const dna = sanitizeDnaProfile(dnaProfile);
@@ -175,11 +289,13 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
   }
 
   const finalScore = clamp(Math.round(score), 10, 100);
+  const avgConfidence = Math.round(Object.values(dna.confidences || {}).reduce((a, b) => a + b, 0) / 8);
+
   return {
     score: finalScore,
     reasons: reasons.length ? reasons : ['Well-rounded fit for your travel preferences'],
     dnaSummary: `Scenic: ${dna.scenic}% · Photo: ${dna.photography}% · Food: ${dna.food}% · Pace: ${dna.pacePreference}`,
-    confidence: 88,
+    confidence: avgConfidence || 85,
   };
 }
 
@@ -187,5 +303,7 @@ module.exports = {
   DEFAULT_TRAVEL_DNA,
   sanitizeDnaProfile,
   deriveDnaFromPersonas,
+  applyRecencyDecay,
+  recordBehaviorInteraction,
   computeDnaMatch,
 };

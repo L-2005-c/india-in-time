@@ -32,6 +32,11 @@ const { analyzeClimateStrategy, scorePlaceUnderClimate } = require('./climateEng
 const { evaluateBacktrackingPenalty, getNearbyRecommendations } = require('./proximityGraph');
 const { critiqueItinerary } = require('./selfCriticEngine');
 const { computeReplanningDiff, shouldTriggerReplan } = require('./adaptiveReplanner');
+const { generatePredictiveCrowdCurve } = require('./crowdCurve');
+const { evaluateWeatherOpportunityWindows } = require('./weatherOpportunity');
+const { findRouteAwareDining } = require('./mealIntelligence');
+const { evaluateTravelLoad } = require('./fatigueModel');
+const { simulateScenario } = require('./whatIfSimulator');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },
@@ -836,13 +841,26 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const confidence = confidenceValues.length ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length) : 0;
 
   const dnaProfile = requirements.travelDna || requirements.dnaProfile || requirements.soft.travelDna;
-  const finalizedStops = state.stops.map((stop) => {
+  const finalizedStops = state.stops.map((stop, idx) => {
     const dnaInfo = computeDnaMatch(stop, dnaProfile);
     const nearby = (stop.nearbySpots && stop.nearbySpots.length)
       ? stop.nearbySpots
       : getNearbyRecommendations(stop, candidates, { preferredCategories });
-    return { ...stop, nearbySpots: nearby, dnaMatch: dnaInfo };
+    const crowdCurve = generatePredictiveCrowdCurve(stop, { arrivalMin: stop.arriveMin, weather: requirements.weather });
+    const nextStop = state.stops[idx + 1];
+    const routeDining = nextStop ? findRouteAwareDining(stop.coords, nextStop.coords, candidates, { timeMin: stop.leaveMin, weather: requirements.weather }) : [];
+
+    return {
+      ...stop,
+      nearbySpots: nearby,
+      dnaMatch: dnaInfo,
+      crowdForecast: crowdCurve,
+      routeDining,
+    };
   });
+
+  const travelLoad = evaluateTravelLoad(finalizedStops, { weather: requirements.weather, tripMode: requirements.soft?.tripMode });
+  const weatherOpportunity = evaluateWeatherOpportunityWindows(requirements.hourlyWeather, requirements.hard?.startMin || 540);
 
   const result = {
     generatedAt: new Date().toISOString(),
@@ -852,6 +870,8 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     status: 'FEASIBLE',
     climateBanner: climateStrategy.banner || null,
     climateMode: climateStrategy.mode,
+    travelLoad,
+    weatherOpportunity,
     stopCount: finalizedStops.length,
     totalScore: Math.round(state.score),
     totalTravelMinutes: Math.round(state.travelMinutes),
@@ -929,6 +949,7 @@ module.exports = {
   replanAdvanced,
   shouldTriggerReplan,
   critiqueItinerary,
+  simulateScenario,
   scoreAtArrival: (place, arrivalMin, state, requirements, weather, nowBase) => {
     const travel = estimateTravel({ fromCoords: state?.prevCoords || requirements.originCoords, toCoords: place.coords, departMin: state?.cursor || requirements.hard.startMin, isFirstStop: !(state?.stops?.length) });
     return scoreTransition(place, arrivalMin, state || { cursor: requirements.hard.startMin, prevCoords: requirements.originCoords, stops: [], meals: new Set(), categories: new Set(), cost: 0, travelMinutes: 0, waitMinutes: 0 }, requirements, weather, nowBase || new Date(), travel, 0, new Map());

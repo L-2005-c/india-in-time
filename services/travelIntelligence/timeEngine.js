@@ -89,10 +89,10 @@ function inWindow(min, windows) {
 }
 function isInGoldenHour(nowMin, golden) {
   if (!golden) return { morning: false, evening: false, blue: false, any: false };
-  const morning = nowMin >= golden.morningGolden.startMin && nowMin <= golden.morningGolden.endMin;
-  const evening = nowMin >= golden.eveningGolden.startMin && nowMin <= golden.eveningGolden.endMin;
+  const morning = golden.morningGolden && nowMin >= golden.morningGolden.startMin && nowMin <= golden.morningGolden.endMin;
+  const evening = golden.eveningGolden && nowMin >= golden.eveningGolden.startMin && nowMin <= golden.eveningGolden.endMin;
   const blueM = golden.morningBlue && nowMin >= golden.morningBlue.startMin && nowMin <= golden.morningBlue.endMin;
   const blueE = golden.eveningBlue && nowMin >= golden.eveningBlue.startMin && nowMin <= golden.eveningBlue.endMin;
-  return { morning, evening, blue: !!(blueM || blueE), any: morning || evening || blueM || blueE };
+  return { morning: !!morning, evening: !!evening, blue: !!(blueM || blueE), any: !!(morning || evening || blueM || blueE) };
 }
 module.exports = { t2m, m2t, DAY_NAMES, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour };
