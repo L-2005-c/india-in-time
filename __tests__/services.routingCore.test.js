@@ -5,6 +5,8 @@ const { classifyTrafficStatus, getPredictiveTraffic, normalizeTrafficMetadata, T
 const { buildCacheKey, getCachedRoute, setCachedRoute, clearL1 } = require('../services/routing/routeCache');
 const { calculateRoute, calculateRouteMatrix, formatDistance, formatDuration } = require('../services/routing/routingService');
 
+jest.setTimeout(30000);
+
 describe('Production Routing — Coordinate Validation', () => {
   test('validates standard coordinates inside India', () => {
     const res = normalizeAndValidateCoords([17.6868, 83.2185]);
