@@ -636,6 +636,14 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       for (const place of candidates) {
         const key = placeIdentity(place);
         if (state.used.has(key)) continue;
+
+        // Fast spatial bounding pre-check: skip candidates unreasonably far for a single urban hop
+        if (state.prevCoords && place.coords) {
+          const dLat = Math.abs(state.prevCoords[0] - place.coords[0]);
+          const dLon = Math.abs(state.prevCoords[1] - place.coords[1]);
+          if (dLat > 0.8 || dLon > 0.8) continue;
+        }
+
         const hard = candidateMatchesHardRequirements(place, requirements);
         if (!hard.ok) continue;
 

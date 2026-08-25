@@ -2254,7 +2254,9 @@ body::after{
 }
 .stop-card{
   border-left:3.5px solid var(--gold);
-  transition:all .25s cubic-bezier(.4, 0, .2, 1);
+  transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  content-visibility:auto;
+  contain-intrinsic-size:0 115px;
 }
 .stop-card:hover{
   border-color:var(--gold-border);
@@ -2265,6 +2267,13 @@ body::after{
   border-left-color:var(--teal);
   background:linear-gradient(160deg, rgba(6,182,212,0.12), rgba(6,182,212,0.02)), var(--bg-layer1);
   box-shadow:0 12px 36px rgba(6,182,212,.18), inset 0 1px 0 rgba(255,255,255,.1);
+}
+@media (max-width: 640px) {
+  .stop-card, .tool-card, .planner-config-card, .lingo-card, .emer-card,
+  .budget-card, .passport-stamp, .login-card, .insight-card {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
 }
 .tool-card{
   transition:all .25s cubic-bezier(.4, 0, .2, 1);

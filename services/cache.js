@@ -18,6 +18,7 @@ class LRUCache {
     this._map        = new Map();      // key → { value, expiresAt }
     this._stats      = { hits: 0, misses: 0, evictions: 0, sets: 0, redisWarmHits: 0 };
     this._redis      = opts.redis || null;
+    this._inFlight   = new Map();      // key -> Promise (for single-flight request coalescing)
   }
 
   _redisKey(key) {
@@ -27,15 +28,6 @@ class LRUCache {
   /**
    * Get a cached value. Returns undefined if expired or missing.
    * Moves the entry to the "most recently used" position.
-   *
-   * This stays fully synchronous even with Redis enabled — every existing
-   * caller across the app (routes/places.js, routes/geocode.js,
-   * services/gemini.js, routes/analytics.js) calls get()/set() as plain
-   * sync calls, and changing that contract would mean touching every one
-   * of those call sites and their tests. Instead, on a local miss with
-   * Redis enabled, this kicks off a background Redis lookup that — if it
-   * hits — warms the LOCAL cache for the *next* call on this process. The
-   * current call still returns undefined synchronously, same as today.
    */
   get(key) {
     const entry = this._map.get(key);
@@ -56,6 +48,56 @@ class LRUCache {
     this._map.set(key, entry);
     this._stats.hits++;
     return entry.value;
+  }
+
+  /**
+   * Async get that awaits Redis if not present in local memory.
+   */
+  async getAsync(key) {
+    const local = this.get(key);
+    if (local !== undefined) return local;
+    if (!this._redis) return undefined;
+
+    try {
+      const raw = await this._redis.get(this._redisKey(key));
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.expiresAt !== 'number' || Date.now() > parsed.expiresAt) return undefined;
+      
+      this.set(key, parsed.value, parsed.expiresAt - Date.now());
+      this._stats.redisWarmHits++;
+      return parsed.value;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Single-flight read-through cache fetcher.
+   * Eliminates cache stampedes by sharing the same in-flight Promise among concurrent callers.
+   */
+  async getOrFetch(key, fetcher, ttlMs) {
+    const cached = await this.getAsync(key);
+    if (cached !== undefined) return cached;
+
+    if (this._inFlight.has(key)) {
+      return this._inFlight.get(key);
+    }
+
+    const task = (async () => {
+      try {
+        const fresh = await fetcher();
+        if (fresh !== undefined && fresh !== null) {
+          this.set(key, fresh, ttlMs);
+        }
+        return fresh;
+      } finally {
+        this._inFlight.delete(key);
+      }
+    })();
+
+    this._inFlight.set(key, task);
+    return task;
   }
 
   _warmFromRedisInBackground(key) {
