@@ -30,6 +30,8 @@ const {
 const { calculateSolarTimes, getScenicScore } = require('./astronomyTime');
 const { analyzeClimateStrategy, scorePlaceUnderClimate } = require('./climateEngine');
 const { evaluateBacktrackingPenalty, getNearbyRecommendations } = require('./proximityGraph');
+const { critiqueItinerary } = require('./selfCriticEngine');
+const { computeReplanningDiff, shouldTriggerReplan } = require('./adaptiveReplanner');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },
@@ -842,7 +844,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     return { ...stop, nearbySpots: nearby, dnaMatch: dnaInfo };
   });
 
-  return {
+  const result = {
     generatedAt: new Date().toISOString(),
     referenceTime: now.toISOString(),
     algorithm: 'geo-temporal-beam-search-v5-world-class',
@@ -888,6 +890,13 @@ function planAdvancedItinerary(places, rawOptions = {}) {
       softPreferences: requirements.soft,
     },
   };
+
+  const selfCritique = critiqueItinerary(result, requirements, { now });
+  result.selfCritique = selfCritique;
+  result.itineraryQualityScore = selfCritique.overallQualityScore;
+  result.itineraryQualityBreakdown = selfCritique.breakdown;
+
+  return result;
 }
 
 function replanAdvanced(remainingPlaces, options = {}) {
@@ -907,32 +916,19 @@ function replanAdvanced(remainingPlaces, options = {}) {
   const previousStops = Array.isArray(options.previousStops) ? options.previousStops : (options.previousPlan?.stops || []);
   const newStops = newPlan.stops || [];
   
-  // Calculate adaptive replanning diff
-  const changes = [];
-  if (previousStops.length && newStops.length) {
-    const prevNames = previousStops.map(s => s.name);
-    const newNames = newStops.map(s => s.name);
-    const added = newNames.filter(n => !prevNames.includes(n));
-    const dropped = prevNames.filter(n => !newNames.includes(n));
-    if (added.length) changes.push(`Added ${added.join(', ')}`);
-    if (dropped.length) changes.push(`Adjusted route from ${dropped.join(', ')}`);
-  }
+  const replanningDiff = computeReplanningDiff(previousStops, newStops, options.replanReason);
 
   return {
     ...newPlan,
-    replanningDiff: {
-      hasChanges: changes.length > 0,
-      changes,
-      previousStopCount: previousStops.length,
-      updatedStopCount: newStops.length,
-      reason: options.replanReason || 'Itinerary dynamically adapted to live travel pacing & conditions',
-    },
+    replanningDiff,
   };
 }
 
 module.exports = {
   planAdvancedItinerary,
   replanAdvanced,
+  shouldTriggerReplan,
+  critiqueItinerary,
   scoreAtArrival: (place, arrivalMin, state, requirements, weather, nowBase) => {
     const travel = estimateTravel({ fromCoords: state?.prevCoords || requirements.originCoords, toCoords: place.coords, departMin: state?.cursor || requirements.hard.startMin, isFirstStop: !(state?.stops?.length) });
     return scoreTransition(place, arrivalMin, state || { cursor: requirements.hard.startMin, prevCoords: requirements.originCoords, stops: [], meals: new Set(), categories: new Set(), cost: 0, travelMinutes: 0, waitMinutes: 0 }, requirements, weather, nowBase || new Date(), travel, 0, new Map());
