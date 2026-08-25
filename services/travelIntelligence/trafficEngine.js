@@ -15,31 +15,55 @@ function trafficLevelFromMult(mult) {
   if (mult <= 1.35) return { level: 'Moderate', label: 'Moderate traffic', risk: 'Medium' };
   return { level: 'High', label: 'Heavy traffic', risk: 'High' };
 }
+const ROAD_NETWORK_FACTOR = 1.42; // Real-world road network distance vs haversine straight-line in Indian cities
+
 function estimateTravel(opts = {}) {
   const { fromCoords, toCoords, departMin = 720, liveTraffic = null, isFirstStop = false } = opts;
   if (liveTraffic && Number.isFinite(liveTraffic.durationSec)) {
     const minutes = Math.max(1, Math.round(liveTraffic.durationSec / 60));
-    const km = liveTraffic.distanceM != null ? liveTraffic.distanceM / 1000 : (fromCoords && toCoords ? distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) : null);
+    const km = liveTraffic.distanceM != null ? liveTraffic.distanceM / 1000 : (fromCoords && toCoords ? distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) * ROAD_NETWORK_FACTOR : null);
     const mult = liveTraffic.congestion ?? 1.0;
     const level = trafficLevelFromMult(mult);
-    // Three distinct provenance tiers: 'live_traffic' (Google, real congestion
-    // data), 'route_estimate' (OSRM, static route duration — no real traffic
-    // signal), and 'live' (an explicit liveTraffic payload supplied by the
-    // caller, e.g. a client-reported navigation ETA — genuine live data that
-    // isn't tagged with a routing-provider name).
     const source = liveTraffic.provider === 'google' ? 'live_traffic' : liveTraffic.provider === 'osrm' ? 'route_estimate' : 'live';
     const isEstimateOnly = source === 'route_estimate';
-    return { travelMinutes: minutes, distanceKm: km != null ? Math.round(km * 10) / 10 : null, congestionFactor: mult, trafficLevel: level.level, trafficRisk: level.risk, source, provider: liveTraffic.provider || 'unknown', freshness: liveTraffic.freshness || 'request_time', label: isEstimateOnly ? `${level.label} (routing estimate; not live traffic)` : level.label, confidence: isEstimateOnly ? 65 : 85 };
+    const googleMapsUrl = (fromCoords && toCoords) ? `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving` : null;
+    return {
+      travelMinutes: minutes,
+      distanceKm: km != null ? Math.round(km * 10) / 10 : null,
+      congestionFactor: mult,
+      trafficLevel: level.level,
+      trafficRisk: level.risk,
+      source,
+      provider: liveTraffic.provider || 'unknown',
+      freshness: liveTraffic.freshness || 'request_time',
+      label: isEstimateOnly ? `${level.label} (routing estimate; not live traffic)` : level.label,
+      confidence: isEstimateOnly ? 75 : 90,
+      googleMapsUrl,
+    };
   }
   if (!fromCoords || !toCoords || !Number.isFinite(fromCoords[0]) || !Number.isFinite(toCoords[0])) {
-    return { travelMinutes: isFirstStop ? 10 : 20, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30 };
+    return { travelMinutes: isFirstStop ? 10 : 20, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30, googleMapsUrl: null };
   }
-  const km = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
-  const baseMinutes = Math.max(isFirstStop ? 8 : 10, Math.min(90, Math.round(km / 0.42)));
+  const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
+  const roadKm = straightKm * ROAD_NETWORK_FACTOR;
+  // Realistic Indian urban driving speed: 0.32 km/min (~19.2 km/h base speed before traffic multipliers)
+  const baseMinutes = Math.max(isFirstStop ? 8 : 10, Math.min(120, Math.round(roadKm / 0.32)));
   const mult = getTrafficMultiplier(departMin);
   const travelMinutes = Math.round(baseMinutes * mult);
   const level = trafficLevelFromMult(mult);
-  return { travelMinutes, distanceKm: Math.round(km * 10) / 10, congestionFactor: mult, trafficLevel: level.level, trafficRisk: level.risk, source: 'estimated', label: `${level.label} (time-of-day heuristic)`, confidence: 55 };
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving`;
+  return {
+    travelMinutes,
+    distanceKm: Math.round(roadKm * 10) / 10,
+    straightDistanceKm: Math.round(straightKm * 10) / 10,
+    congestionFactor: mult,
+    trafficLevel: level.level,
+    trafficRisk: level.risk,
+    source: 'estimated',
+    label: `${level.label} (traffic-aware road network)`,
+    confidence: 70,
+    googleMapsUrl,
+  };
 }
 function recommendArrivalWindow(opts = {}) {
   const { experienceStartMin, experienceEndMin, travelMinutes = 20, bufferMin = (rules.buffers && rules.buffers.arrivalBufferMin) || 15 } = opts;

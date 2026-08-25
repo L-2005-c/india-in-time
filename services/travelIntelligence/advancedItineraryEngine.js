@@ -354,12 +354,12 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   if (Number.isFinite(tempC) && tempC >= 33) {
     if (isMiddayHeat) {
       if (outdoor) {
-        score -= tempC >= 37 ? 32 : 22; // Penalize direct outdoor midday sun
+        score -= tempC >= 37 ? 55 : 30; // Decisively penalize direct outdoor midday scorching sun
       } else {
-        score += 18; // Reward air-conditioned / covered indoor midday refuge
+        score += tempC >= 37 ? 30 : 18; // Strong reward for air-conditioned / covered indoor midday refuge
       }
-    } else if (outdoor && (arrivalMin <= 10 * 60 || arrivalMin >= 16 * 60 + 30)) {
-      score += 12; // Pleasant morning/evening outdoor window
+    } else if (outdoor && (arrivalMin <= 10 * 60 || arrivalMin >= 16 * 60)) {
+      score += 16; // Pleasant morning/evening outdoor window
     }
   }
 

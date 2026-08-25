@@ -43,10 +43,14 @@ export function getCrowdLevel(multiplier) {
   return { level: 'extreme', label: 'Very Crowded', emoji: '🔴' };
 }
 
+export const ROAD_NETWORK_FACTOR = 1.42;
+
 export function getSmartTravelTime(fromCoords, toCoords, congestionBase, arriveMin, isFirstStop, hvKm) {
   if (!fromCoords || !toCoords) return isFirstStop ? 10 : 20;
-  const km = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
-  const baseMinutes = Math.max(isFirstStop ? 10 : 12, Math.min(45, Math.round(km / 0.42)));
+  const straightKm = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
+  const roadKm = straightKm * ROAD_NETWORK_FACTOR;
+  // Realistic urban transit speed: ~19.2 km/h base driving speed before rush-hour multipliers
+  const baseMinutes = Math.max(isFirstStop ? 8 : 10, Math.min(90, Math.round(roadKm / 0.32)));
   const trafficMult = getTrafficMultiplier(congestionBase, arriveMin);
   return Math.round(baseMinutes * trafficMult);
 }
