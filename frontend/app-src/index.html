@@ -233,58 +233,26 @@
     <div id="plan-view" class="view">
       <div id="phase1-section" class="plan-section">
         <section class="plan-hero">
-          <div class="hero-grid">
-            <div class="hero-content">
-              <div class="hero-kicker">🧠 GeoAI Time Intelligence Engine</div>
-              <h1 class="hero-title">Know <em>exactly when</em> to visit — before you go.</h1>
-              <p class="hero-copy">The question every trip should start with: <strong>"When should I visit this place for the best possible experience?"</strong> India In-Time answers it with live crowd, weather, sunrise/sunset and seasonal data — then builds the itinerary around the answer.</p>
-              <div class="hero-actions">
-                <button class="hero-btn hero-btn-primary" data-action="focusCitySelect">Build a standout plan</button>
-                <button class="hero-btn hero-btn-secondary" data-action="switchToView" data-view="map-view" data-idx="0">Preview live map</button>
-                <button class="hero-btn hero-btn-secondary" data-action="showAppFeedback">💬 Feedback</button>
+          <div class="hero-content">
+            <div class="hero-kicker">🧠 GeoAI Travel Intelligence</div>
+            <h1 class="hero-title">Know <em>exactly when</em> to visit — before you go.</h1>
+            <p class="hero-copy">Smart multi-stop itinerary planning across India with real-time crowd forecast, weather opportunity windows, golden-hour timing, and traffic-aware routing.</p>
+            <div class="hero-metrics">
+              <div class="hero-metric" data-action="focusCitySelect" role="button" tabindex="0" title="Click to choose destination city">
+                <div class="hero-metric-label">Selected City ▾</div>
+                <div class="hero-metric-value" id="hero-city">Visakhapatnam</div>
               </div>
-              <div class="hero-metrics">
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Current city</div>
-                  <div class="hero-metric-value" id="hero-city">Visakhapatnam</div>
-                </div>
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Live weather</div>
-                  <div class="hero-metric-value mono" id="hero-weather">--</div>
-                </div>
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Curated stops</div>
-                  <div class="hero-metric-value" id="hero-places">Loading</div>
-                </div>
-                <div class="hero-metric">
-                  <div class="hero-metric-label">Travel mode</div>
-                  <div class="hero-metric-value" id="hero-mode">Balanced</div>
-                </div>
+              <div class="hero-metric">
+                <div class="hero-metric-label">Live Weather</div>
+                <div class="hero-metric-value mono" id="hero-weather">--</div>
               </div>
-            </div>
-            <div class="hero-visual">
-              <div class="hero-anim-canvas">
-                <!-- Animated gradient background layers -->
-                <div class="hanim-layer hanim-bg"></div>
-                <div class="hanim-layer hanim-aurora1"></div>
-                <div class="hanim-layer hanim-aurora2"></div>
-                <!-- Floating orbs -->
-                <div class="hanim-orb hanim-orb1"></div>
-                <div class="hanim-orb hanim-orb2"></div>
-                <div class="hanim-orb hanim-orb3"></div>
-                <!-- Grid shimmer overlay -->
-                <div class="hanim-grid"></div>
-                <!-- Floating travel icons -->
-                <div class="hanim-icons">
-                  <span class="hanim-icon hi1">🕌</span>
-                  <span class="hanim-icon hi2">🌴</span>
-                  <span class="hanim-icon hi3">⛵</span>
-                  <span class="hanim-icon hi4">🏔️</span>
-                  <span class="hanim-icon hi5">🎪</span>
-                  <span class="hanim-icon hi6">🦚</span>
-                </div>
-                <!-- Scan line animation -->
-                <div class="hanim-scan"></div>
+              <div class="hero-metric">
+                <div class="hero-metric-label">Curated Spots</div>
+                <div class="hero-metric-value" id="hero-places">Loading</div>
+              </div>
+              <div class="hero-metric">
+                <div class="hero-metric-label">Travel Mode</div>
+                <div class="hero-metric-value" id="hero-mode">Balanced</div>
               </div>
             </div>
           </div>
