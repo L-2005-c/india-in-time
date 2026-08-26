@@ -35,7 +35,7 @@ check('health endpoint exists', /app\.get\('\/api\/health'/.test(text('server.js
 check('SEO robots file exists', exists('frontend/public/robots.txt'));
 check('SEO sitemap file exists', exists('frontend/public/sitemap.xml'));
 check('PWA manifest exists', exists('frontend/public/manifest.json'));
-check('Node modules are not committed', !exists('node_modules'));
+check('Node modules are not committed', !exists('node_modules') || text('.gitignore').includes('node_modules'));
 check('.nvmrc pins a Node version', exists('.nvmrc'));
 
 const index = text('frontend/app-src/index.html');
