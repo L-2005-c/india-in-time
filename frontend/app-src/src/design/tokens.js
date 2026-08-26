@@ -1,0 +1,75 @@
+/**
+ * Design Tokens for India In-Time
+ * Single source of truth for all spatial, color, motion, and typography constants.
+ */
+export const tokens = {
+  colors: {
+    neutral: {
+      0: '#ffffff',
+      50: '#f8fafc',
+      100: '#f1f5f9',
+      200: '#e2e8f0',
+      300: '#cbd5e1',
+      400: '#94a3b8',
+      500: '#64748b',
+      600: '#475569',
+      700: '#334155',
+      800: '#1e293b',
+      900: '#0f172a',
+      950: '#020617',
+    },
+    brand: {
+      primary: '#2563eb',
+      primaryGlow: 'rgba(37, 99, 235, 0.25)',
+      accent: '#06b6d4',
+      accentGlow: 'rgba(6, 182, 212, 0.25)',
+      purple: '#8b5cf6',
+      emerald: '#10b981',
+      amber: '#f59e0b',
+      rose: '#ef4444',
+    },
+  },
+  spacing: {
+    0: '0px',
+    1: '4px',
+    2: '8px',
+    3: '12px',
+    4: '16px',
+    5: '20px',
+    6: '24px',
+    8: '32px',
+    10: '40px',
+    12: '48px',
+  },
+  radii: {
+    none: '0px',
+    xs: '4px',
+    sm: '8px',
+    md: '12px',
+    lg: '16px',
+    xl: '24px',
+    full: '9999px',
+  },
+  shadows: {
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.35)',
+    md: '0 4px 12px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.30)',
+    lg: '0 12px 32px -4px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.40)',
+    glowPrimary: '0 0 24px -2px rgba(37, 99, 235, 0.35)',
+    glowAccent: '0 0 24px -2px rgba(6, 182, 212, 0.35)',
+  },
+  motion: {
+    durationFast: '150ms',
+    durationNormal: '250ms',
+    durationSlow: '400ms',
+    easeSpring: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    easeSmooth: 'cubic-bezier(0.16, 1, 0.3, 1)',
+  },
+  zIndex: {
+    base: 1,
+    mapControls: 100,
+    header: 400,
+    drawer: 600,
+    modal: 900,
+    toast: 1100,
+  },
+};

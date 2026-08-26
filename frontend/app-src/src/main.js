@@ -3,6 +3,7 @@
  */
 import { browserLogger } from './utils/browser-logger.js';
 import { ensureFocusVisibleStyles, announce } from './a11y/helpers.js';
+import { initializeThemeSystem } from './design/theme.js';
 import { state } from './state/appState.js';
 import * as modules from './modules/index.js';
 import { initConnectivityObserver } from './utils/connectivity.js';
@@ -15,6 +16,7 @@ if (typeof document !== 'undefined') {
   const boot = async () => {
     try {
       mark('boot-start');
+      initializeThemeSystem();
       ensureFocusVisibleStyles();
       initConnectivityObserver();
       await hydrateFlagsFromServer();
