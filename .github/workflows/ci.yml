@@ -35,12 +35,12 @@ jobs:
       # so a newly-disclosed CVE in a dependency could merge to main undetected.
       - name: Dependency vulnerability audit
         run: npm run security:audit:prod
-      - name: Unit tests
-        run: npm run test:ci
       - name: Frontend build
         run: npm run build:frontend
       - name: Bundle check
         run: npm run check:bundle
+      - name: Unit tests
+        run: npm run test:ci
 
   # End-to-end + accessibility gate. Previously `test:e2e` / `test:accessibility`
   # existed only as local-only scripts and were not run anywhere in CI, so a

@@ -16,9 +16,30 @@ describe('config.resolveIndexHtmlPath', () => {
   const distAssetsDir = path.join(__dirname, '..', 'frontend', 'public', 'dist', 'assets');
   // Mirrors config's own distIsHealthy(): the index.html existing on disk
   // isn't enough — the JS/CSS assets it references must exist too.
-  const distHealthy = fs.existsSync(distIndexPath)
-    && fs.existsSync(distAssetsDir)
-    && fs.readdirSync(distAssetsDir).length > 0;
+  function isDistHealthy() {
+    if (!fs.existsSync(distIndexPath) || !fs.existsSync(distAssetsDir)) return false;
+    try {
+      const html = fs.readFileSync(distIndexPath, 'utf8');
+      const refs = [];
+      const re = /(?:src|href)=["']([^"']*assets\/[^"']+)["']/g;
+      let m;
+      while ((m = re.exec(html)) !== null) refs.push(m[1]);
+      if (!refs.length) return false;
+      const publicDir = path.join(__dirname, '..', 'frontend', 'public');
+      for (const ref of refs) {
+        const rel = ref.replace(/^\//, '');
+        const candidates = [
+          path.join(publicDir, rel),
+          path.join(publicDir, 'dist', rel.replace(/^dist\//, '')),
+          path.join(publicDir, 'dist', 'assets', path.basename(rel)),
+        ];
+        if (!candidates.some((c) => fs.existsSync(c))) return false;
+      }
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
 
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV };
@@ -53,16 +74,16 @@ describe('config.resolveIndexHtmlPath', () => {
     process.env.USE_DIST_FRONTEND = '1';
     const config = loadConfigFresh();
     // dist is only usable when the assets it references actually exist
-    if (distHealthy) {
+    if (isDistHealthy()) {
       expect(config.resolveIndexHtmlPath()).toBe(distIndexPath);
     } else {
       expect(() => config.resolveIndexHtmlPath()).toThrow(/missing or unhealthy/i);
     }
   });
 
-  test('in production with healthy dist assets, prefers dist', () =>{
+  test('in production with healthy dist assets, prefers dist', () => {
     process.env.NODE_ENV = 'production';
-    if (distHealthy) {
+    if (isDistHealthy()) {
       const config = loadConfigFresh();
       // After build:frontend, dist should be healthy
       expect(config.resolveIndexHtmlPath()).toBe(distIndexPath);
