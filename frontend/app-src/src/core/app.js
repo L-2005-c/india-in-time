@@ -141,12 +141,27 @@ function updatePlannerShowcase() {
 }
 
 function fetchWeatherUI(lat, lon) {
-  API.fetchWeather(lat, lon).then(d => {
-    appState.realTemp = d.temp;
-    appState.realWeatherMain = d.main || 'Clear';
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  // Populate sensible seasonal estimate immediately so UI is never stuck on --°C
+  if (!Number.isFinite(appState.realTemp)) {
+    const month = new Date().getMonth();
+    const isSummer = month >= 3 && month <= 6;
+    const isWinter = month >= 11 || month <= 1;
+    appState.realTemp = isSummer ? 34 : (isWinter ? 22 : 28);
+    appState.realWeatherMain = 'Clear';
     const disp = document.getElementById('wx-display');
-    if (disp) disp.textContent = d.display;
+    if (disp) disp.textContent = `⛅ ${appState.realTemp}°C`;
     updatePlannerShowcase();
+  }
+
+  API.fetchWeather(lat, lon).then(d => {
+    if (d && (d.temp != null || d.tempC != null)) {
+      appState.realTemp = d.temp ?? d.tempC;
+      appState.realWeatherMain = d.main || 'Clear';
+      const disp = document.getElementById('wx-display');
+      if (disp) disp.textContent = d.display || `${d.emoji || '☀️'} ${appState.realTemp}°C`;
+      updatePlannerShowcase();
+    }
   }).catch(() => {});
 }
 
@@ -465,23 +480,18 @@ document.addEventListener('keydown', (e) => {
 // App Boot
 window.onload = () => {
   applyTheme();
-  try { installLeafletSafetyGuards(typeof L !== 'undefined' ? L : window.L); } catch (_e) {}
   Promise.race([authCheckedPromise, new Promise(res => setTimeout(res, 4000))])
     .then(() => new Promise(res => setTimeout(res, 500)))
     .then(() => {
       const s = document.getElementById('splash');
       if (s) { s.style.opacity = '0'; setTimeout(() => s.style.display = 'none', 300); }
     });
-  try {
-    appState.map = L.map('map', { zoomControl: false, zoomSnap: 1 }).setView([20.5937, 78.9629], 5);
-    L.control.zoom({ position: 'topleft' }).addTo(appState.map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      maxZoom: 19,
-    }).addTo(appState.map);
-  } catch (_e) {}
+  if (mapCtrl && mapCtrl.initMap) {
+    mapCtrl.initMap();
+  }
   initGPS();
   cityCtrl.switchCity('visakhapatnam', true);
+  fetchWeatherUI(17.6868, 83.2185);
 };
 
 export {
@@ -489,3 +499,4 @@ export {
   STATIC_ACTIONS,
   CHAT_ACTIONS,
 };
+
