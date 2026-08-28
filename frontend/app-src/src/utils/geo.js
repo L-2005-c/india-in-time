@@ -322,39 +322,12 @@ function interpolatePathPoint(path, ratio){
   return path[path.length-1];
 }
 
-const t2m = (s, fallback = 0) => {
-  const raw = String(s || '').trim(); if (!raw) return fallback;
-  const ampm = raw.match(/\b(am|pm)\b/i);
-  const parts = raw.replace(/\s*(am|pm)\s*/i, '').split(':');
-  let h = Number(parts[0]); const m = Number(parts[1] || 0);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
-  if (ampm) { h = h % 12; if (/pm/i.test(ampm[1])) h += 12; }
-  return Math.max(0, Math.min(23, h)) * 60 + Math.max(0, Math.min(59, m));
-};
+function getRouteStopsForDay(dayStops){return (dayStops||[]).filter(stop=>!stop?.isBreak);}
 
-const m2t = m => {
-  const safe = ((m % (24 * 60)) + (24 * 60)) % (24 * 60);
-  const hh = String(Math.floor(safe / 60)).padStart(2, '0');
-  const mm = String(safe % 60).padStart(2, '0');
-  return `${hh}:${mm}`;
-};
-
-const fmtM = m => {
-  if (!m || isNaN(m)) return '0m';
-  const a = Math.abs(m);
-  return a < 60 ? `${a}m` : `${Math.floor(a / 60)}h${a % 60 ? ` ${a % 60}m` : ''}`;
-};
-
-function getRouteStopsForDay(dayStops) {
-  return (dayStops || []).filter(stop => !stop?.isBreak);
-}
-
-function estimateStopLoadMinutes(stops) {
-  return (stops || []).reduce((sum, stop) => sum + (stop?.vt || 60) + 20, 0);
+function estimateStopLoadMinutes(stops){
+  return (stops||[]).reduce((sum, stop) => sum + (stop?.vt || 60) + 20, 0);
 }
 
 export {
-  hvKm, hasValidCoords, isFiniteLatLon, normalizeLatLon, significantWords, dedupePlacesByProximity, withHiddenGems, mergePlacePools, sortNearestNeighbor, routeDistanceKm, centroidOfStops, clusterStopsByArea, orderStopsAreaWise, estimateTimeFitPenaltyKm, optimizeStopOrder, bearingBetween, keepNearbyCluster, famousPlaceScore, prioritizePlanStops, interpolatePathPoint, getRouteStopsForDay, estimateStopLoadMinutes, t2m, m2t, fmtM,
+  hvKm, hasValidCoords, isFiniteLatLon, normalizeLatLon, significantWords, dedupePlacesByProximity, withHiddenGems, mergePlacePools, sortNearestNeighbor, routeDistanceKm, centroidOfStops, clusterStopsByArea, orderStopsAreaWise, estimateTimeFitPenaltyKm, optimizeStopOrder, bearingBetween, keepNearbyCluster, famousPlaceScore, prioritizePlanStops, interpolatePathPoint, getRouteStopsForDay, estimateStopLoadMinutes,
 };
-
-

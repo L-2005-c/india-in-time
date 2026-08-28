@@ -875,7 +875,6 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     generatedAt: new Date().toISOString(),
     referenceTime: now.toISOString(),
     algorithm: 'geo-temporal-beam-search-v5-world-class',
-    optimizer: 'beam-search-2-opt',
     objective: 'maximize whole-itinerary experience under hard constraints, time-dependent place states, meals, routing, weather, crowd, scenic windows and budget/accessibility/safety requirements',
     status: 'FEASIBLE',
     climateBanner: climateStrategy.banner || null,

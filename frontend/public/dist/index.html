@@ -49,7 +49,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-  <script type="module" crossorigin src="/assets/index-DgKITg6I.js"></script>
+  <script type="module" crossorigin src="/assets/index-B_Eo9XQT.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-CQP0wkkN.css">
 </head>
 <body>
@@ -266,7 +266,7 @@
         </div>
 
         <div class="sec-label">Popular Destinations</div>
-        <select class="city-select" id="city-select" data-action="switchCity" aria-label="Popular destinations">
+        <select class="city-select" id="city-select" data-action="switchCity">
           <optgroup label="Andhra Pradesh"><option value="vizag">🌴 Visakhapatnam</option></optgroup>
           <optgroup label="Telangana"><option value="hyderabad">🕌 Hyderabad</option></optgroup>
           <optgroup label="Delhi"><option value="delhi">🏛️ New Delhi</option></optgroup>
@@ -295,25 +295,25 @@
             <div class="setting-stack">
               <div class="setting-card">
                 <div class="setting-lbl">Days</div>
-                <input type="number" class="setting-inp" id="n-days" value="1" min="1" max="7" aria-label="Trip days">
+                <input type="number" class="setting-inp" id="n-days" value="1" min="1" max="7">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Start Time</div>
-                <input type="time" class="setting-inp" id="s-time" value="09:00" aria-label="Start time">
+                <input type="time" class="setting-inp" id="s-time" value="09:00">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">End Time</div>
-                <input type="time" class="setting-inp" id="e-time" value="19:00" aria-label="End time">
+                <input type="time" class="setting-inp" id="e-time" value="19:00">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Duration Hours</div>
-                <input type="number" class="setting-inp" id="t-hours" value="10" min="0" max="23" aria-label="Duration hours">
+                <input type="number" class="setting-inp" id="t-hours" value="10" min="0" max="23">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Duration Minutes</div>
-                <input type="number" class="setting-inp" id="t-minutes" value="0" min="0" max="59" step="15" aria-label="Duration minutes">
+                <input type="number" class="setting-inp" id="t-minutes" value="0" min="0" max="59" step="15">
               </div>
-              <input type="number" class="setting-inp setting-hidden" id="t-time" value="600" step="30" aria-label="Total duration in minutes">
+              <input type="number" class="setting-inp setting-hidden" id="t-time" value="600" step="30">
             </div>
           </div>
           <div class="planner-config-card">
@@ -324,11 +324,11 @@
             <div class="setting-stack">
               <div class="setting-card">
                 <div class="setting-lbl">Break Every</div>
-                <input type="number" class="setting-inp" id="break-every" value="120" min="0" step="15" aria-label="Break interval in minutes">
+                <input type="number" class="setting-inp" id="break-every" value="120" min="0" step="15">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Break For</div>
-                <input type="number" class="setting-inp" id="break-duration" value="15" min="0" step="5" aria-label="Break duration in minutes">
+                <input type="number" class="setting-inp" id="break-duration" value="15" min="0" step="5">
               </div>
             </div>
             <div class="setting-inline-note">Set either field to `0` if you want a nonstop day.</div>
@@ -341,7 +341,7 @@
             <div class="setting-stack three">
               <div class="setting-card">
                 <div class="setting-lbl">Drink Water Every</div>
-                <input type="number" class="setting-inp" id="water-every" value="90" min="0" step="15" aria-label="Water reminder interval in minutes">
+                <input type="number" class="setting-inp" id="water-every" value="90" min="0" step="15">
               </div>
             </div>
             <div class="setting-inline-note">Notifications include hydration reminders plus stop closing alerts.</div>
