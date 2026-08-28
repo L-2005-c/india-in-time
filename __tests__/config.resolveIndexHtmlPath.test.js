@@ -13,12 +13,30 @@ describe('config.resolveIndexHtmlPath', () => {
   // under public/ was retired so it can't be confused with the built dist
   // output.
   const sourceIndexPath = path.join(__dirname, '..', 'frontend', 'public', 'dev-index.html');
-  const distAssetsDir = path.join(__dirname, '..', 'frontend', 'public', 'dist', 'assets');
   // Mirrors config's own distIsHealthy(): the index.html existing on disk
   // isn't enough — the JS/CSS assets it references must exist too.
-  const distHealthy = fs.existsSync(distIndexPath)
-    && fs.existsSync(distAssetsDir)
-    && fs.readdirSync(distAssetsDir).length > 0;
+  const distHealthy = (() => {
+    if (!fs.existsSync(distIndexPath)) return false;
+    try {
+      const html = fs.readFileSync(distIndexPath, 'utf8');
+      const refs = [];
+      const re = /(?:src|href)=["']([^"']*assets\/[^"']+)["']/g;
+      let match;
+      while ((match = re.exec(html)) !== null) refs.push(match[1]);
+      if (!refs.length) return false;
+      return refs.every((ref) => {
+        const rel = ref.replace(/^\//, '');
+        const candidates = [
+          path.join(__dirname, '..', 'frontend', 'public', rel),
+          path.join(__dirname, '..', 'frontend', 'public', 'dist', rel.replace(/^dist\//, '')),
+          path.join(__dirname, '..', 'frontend', 'public', 'dist', 'assets', path.basename(rel)),
+        ];
+        return candidates.some((candidate) => fs.existsSync(candidate));
+      });
+    } catch (_error) {
+      return false;
+    }
+  })();
 
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV };
