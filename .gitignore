@@ -19,9 +19,10 @@ playwright/.cache/
 data/analytics-spill.jsonl
 
 # Build artifacts
-dist/
-build/
-frontend/public/dist/
+/dist/
+/build/
+!frontend/public/dist/
+!frontend/public/dist/**
 *.tsbuildinfo
 
 # Logs & Debug

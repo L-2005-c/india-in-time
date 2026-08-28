@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node server.js",
+    "build": "node scripts/check-frontend-runtime.js && node scripts/build-frontend.js",
     "dev": "nodemon server.js",
     "backup": "node scripts/backup-db.js",
     "test": "jest --runInBand",
