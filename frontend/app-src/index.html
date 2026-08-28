@@ -265,7 +265,7 @@
         </div>
 
         <div class="sec-label">Popular Destinations</div>
-        <select class="city-select" id="city-select" data-action="switchCity">
+        <select class="city-select" id="city-select" data-action="switchCity" aria-label="Popular destinations">
           <optgroup label="Andhra Pradesh"><option value="vizag">🌴 Visakhapatnam</option></optgroup>
           <optgroup label="Telangana"><option value="hyderabad">🕌 Hyderabad</option></optgroup>
           <optgroup label="Delhi"><option value="delhi">🏛️ New Delhi</option></optgroup>
@@ -294,25 +294,25 @@
             <div class="setting-stack">
               <div class="setting-card">
                 <div class="setting-lbl">Days</div>
-                <input type="number" class="setting-inp" id="n-days" value="1" min="1" max="7">
+                <input type="number" class="setting-inp" id="n-days" value="1" min="1" max="7" aria-label="Trip days">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Start Time</div>
-                <input type="time" class="setting-inp" id="s-time" value="09:00">
+                <input type="time" class="setting-inp" id="s-time" value="09:00" aria-label="Start time">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">End Time</div>
-                <input type="time" class="setting-inp" id="e-time" value="19:00">
+                <input type="time" class="setting-inp" id="e-time" value="19:00" aria-label="End time">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Duration Hours</div>
-                <input type="number" class="setting-inp" id="t-hours" value="10" min="0" max="23">
+                <input type="number" class="setting-inp" id="t-hours" value="10" min="0" max="23" aria-label="Duration hours">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Duration Minutes</div>
-                <input type="number" class="setting-inp" id="t-minutes" value="0" min="0" max="59" step="15">
+                <input type="number" class="setting-inp" id="t-minutes" value="0" min="0" max="59" step="15" aria-label="Duration minutes">
               </div>
-              <input type="number" class="setting-inp setting-hidden" id="t-time" value="600" step="30">
+              <input type="number" class="setting-inp setting-hidden" id="t-time" value="600" step="30" aria-label="Total duration in minutes">
             </div>
           </div>
           <div class="planner-config-card">
@@ -323,11 +323,11 @@
             <div class="setting-stack">
               <div class="setting-card">
                 <div class="setting-lbl">Break Every</div>
-                <input type="number" class="setting-inp" id="break-every" value="120" min="0" step="15">
+                <input type="number" class="setting-inp" id="break-every" value="120" min="0" step="15" aria-label="Break interval in minutes">
               </div>
               <div class="setting-card">
                 <div class="setting-lbl">Break For</div>
-                <input type="number" class="setting-inp" id="break-duration" value="15" min="0" step="5">
+                <input type="number" class="setting-inp" id="break-duration" value="15" min="0" step="5" aria-label="Break duration in minutes">
               </div>
             </div>
             <div class="setting-inline-note">Set either field to `0` if you want a nonstop day.</div>
@@ -340,7 +340,7 @@
             <div class="setting-stack three">
               <div class="setting-card">
                 <div class="setting-lbl">Drink Water Every</div>
-                <input type="number" class="setting-inp" id="water-every" value="90" min="0" step="15">
+                <input type="number" class="setting-inp" id="water-every" value="90" min="0" step="15" aria-label="Water reminder interval in minutes">
               </div>
             </div>
             <div class="setting-inline-note">Notifications include hydration reminders plus stop closing alerts.</div>

@@ -1,133 +1,34 @@
-// routes/itinerary-optimizer.js — Smart itinerary planning with nearby place optimization
+// routes/itinerary-optimizer.js — Spatial proximity clustering & unified itinerary optimization
 'use strict';
+
 const express = require('express');
 const router = express.Router();
 const appLogger = require('../lib/logger');
-const { distKm } = require('../utils/geo');
+const {
+  distance,
+  findNearbyPlaces,
+  clusterNearbyPlaces,
+  optimizeClusterRoute,
+} = require('../services/travelIntelligence/proximityClustering');
+const { planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');
 
 /**
- * Calculate distance between two coordinates [lat, lon]
- */
-function distance(coord1, coord2) {
-  if (!coord1 || !coord2 || coord1.length < 2 || coord2.length < 2) return Infinity;
-  return distKm(coord1[0], coord1[1], coord2[0], coord2[1]);
-}
-
-/**
- * Find nearby places within radius (km) of a given location
- * Groups places by proximity clusters
- */
-function findNearbyPlaces(places, centerCoord, radiusKm = 2) {
-  if (!Array.isArray(places) || !centerCoord) return [];
-  
-  return places
-    .map(place => ({
-      ...place,
-      distFromCenter: distance(centerCoord, place.coords),
-    }))
-    .filter(place => place.distFromCenter <= radiusKm)
-    .sort((a, b) => a.distFromCenter - b.distFromCenter);
-}
-
-/**
- * Group places into proximity clusters
- * Each cluster represents nearby places that can be visited together
- */
-function clusterNearbyPlaces(places, clusterRadiusKm = 1.5) {
-  if (!Array.isArray(places) || places.length === 0) return [];
-  
-  const clusters = [];
-  const visited = new Set();
-
-  for (let i = 0; i < places.length; i++) {
-    if (visited.has(i)) continue;
-    
-    const cluster = {
-      mainPlace: places[i],
-      nearbyPlaces: [],
-      clusterCenter: places[i].coords,
-      radius: clusterRadiusKm,
-      totalPlaces: 1,
-    };
-    
-    visited.add(i);
-
-    // Find all unvisited places within cluster radius
-    for (let j = i + 1; j < places.length; j++) {
-      if (visited.has(j)) continue;
-      
-      const dist = distance(places[i].coords, places[j].coords);
-      if (dist <= clusterRadiusKm) {
-        cluster.nearbyPlaces.push({
-          place: places[j],
-          distFromMain: dist,
-        });
-        cluster.totalPlaces++;
-        visited.add(j);
-      }
-    }
-
-    // Sort nearby places by distance
-    cluster.nearbyPlaces.sort((a, b) => a.distFromMain - b.distFromMain);
-    clusters.push(cluster);
-  }
-
-  return clusters;
-}
-
-/**
- * Optimize route through place clusters
- * Uses nearest-neighbor algorithm to minimize travel distance
- */
-function optimizeClusterRoute(clusters) {
-  if (!Array.isArray(clusters) || clusters.length === 0) return [];
-
-  const route = [];
-  const visited = new Set();
-
-  let current = clusters[0];
-  route.push(current);
-  visited.add(0);
-
-  while (visited.size < clusters.length) {
-    let nearest = null;
-    let nearestDist = Infinity;
-    let nearestIdx = -1;
-
-    for (let i = 0; i < clusters.length; i++) {
-      if (visited.has(i)) continue;
-      
-      const dist = distance(current.clusterCenter, clusters[i].clusterCenter);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearest = clusters[i];
-        nearestIdx = i;
-      }
-    }
-
-    if (nearest) {
-      route.push(nearest);
-      visited.add(nearestIdx);
-      current = nearest;
-    }
-  }
-
-  return route;
-}
-
-/**
- * Build optimized itinerary with time allocation
+ * Build optimized itinerary with time allocation using authoritative advancedItineraryEngine
  */
 async function buildOptimizedItinerary(req) {
   const {
-    places,           // Array of places with coords
-    startCoord,       // [lat, lon]
-    endCoord,         // [lat, lon] - optional
-    totalMinutes,     // Total time available
+    places,              // Array of places with coords
+    startCoord,          // [lat, lon]
+    endCoord,            // [lat, lon] - optional
+    totalMinutes,        // Total time available
     preferNearby = true, // Group nearby places together
     clusterRadiusKm = 1.5,
-    minPlacesPerCluster: _minPlacesPerCluster = 2,
-  } = req.body;
+    weather = null,
+    personas = [],
+    tripMode = null,
+    startMin,
+    endMin,
+  } = req.body || {};
 
   if (!Array.isArray(places) || places.length === 0) {
     return { error: 'No places provided' };
@@ -138,8 +39,13 @@ async function buildOptimizedItinerary(req) {
   }
 
   try {
-    // Step 1: Cluster nearby places
-    const clusters = preferNearby 
+    const originCoords = [Number(startCoord[0]), Number(startCoord[1])];
+    const destinationCoords = (endCoord && endCoord.length >= 2)
+      ? [Number(endCoord[0]), Number(endCoord[1])]
+      : null;
+
+    // Optional cluster pre-processing for spatial grouping
+    const clusters = preferNearby
       ? clusterNearbyPlaces(places, clusterRadiusKm)
       : places.map(p => ({
           mainPlace: p,
@@ -148,88 +54,58 @@ async function buildOptimizedItinerary(req) {
           totalPlaces: 1,
         }));
 
-    // Step 2: Optimize route through clusters
-    const optimizedClusters = optimizeClusterRoute(clusters);
+    // Authoritative time-aware itinerary planning via advancedItineraryEngine
+    const effectiveStartMin = Number.isFinite(startMin) ? startMin : 540; // 09:00 default
+    const effectiveEndMin = Number.isFinite(endMin)
+      ? endMin
+      : (Number.isFinite(totalMinutes) ? effectiveStartMin + totalMinutes : 1260);
 
-    // Step 3: Allocate time based on distance and cluster size
-    const timePerMinute = totalMinutes / (optimizedClusters.length || 1);
-    const itinerary = [];
-    let currentTime = 0;
+    const advancedPlan = planAdvancedItinerary(places, {
+      now: req.body?.at ? new Date(req.body.at) : new Date(),
+      originCoords,
+      destinationCoords,
+      startMin: effectiveStartMin,
+      endMin: effectiveEndMin,
+      weather,
+      personas,
+      tripMode,
+      preferNearby,
+      clusters,
+    });
 
-    for (let i = 0; i < optimizedClusters.length; i++) {
-      const cluster = optimizedClusters[i];
-      const prevCoord = i === 0 ? startCoord : optimizedClusters[i - 1].clusterCenter;
-      
-      // Estimate travel time to cluster
-      const travelDist = distance(prevCoord, cluster.clusterCenter);
-      const travelTimeMin = Math.max(5, Math.ceil(travelDist * 4)); // ~15km/h average speed
-
-      currentTime += travelTimeMin;
-
-      // Time for main place + nearby places
-      const placeCount = cluster.totalPlaces;
-      const timePerPlace = Math.floor(timePerMinute / placeCount);
-      
-      const clusterEntry = {
-        order: i + 1,
-        mainPlace: cluster.mainPlace,
-        nearbyPlaces: cluster.nearbyPlaces.slice(0, Math.min(3, cluster.nearbyPlaces.length)), // Top 3 nearby
-        visitTime: {
-          startTime: currentTime,
-          mainPlaceMinutes: Math.max(20, timePerPlace),
-          nearbyPlaceMinutesEach: Math.max(10, Math.floor(timePerPlace / 2)),
-          totalClusterMinutes: timePerPlace * placeCount,
-        },
-        distance: {
-          travelToClusterKm: travelDist,
-          travelTimeMinutes: travelTimeMin,
-        },
-        stats: {
-          totalInCluster: placeCount,
-          nearbyCount: cluster.nearbyPlaces.length,
-        },
-      };
-
-      itinerary.push(clusterEntry);
-      currentTime += clusterEntry.visitTime.totalClusterMinutes;
-    }
-
-    // Add return journey if end coordinate provided
-    if (endCoord && endCoord.length >= 2) {
-      const lastCluster = optimizedClusters[optimizedClusters.length - 1];
-      const returnDist = distance(lastCluster.clusterCenter, endCoord);
-      const returnTime = Math.max(5, Math.ceil(returnDist * 4));
-      
-      currentTime += returnTime;
-      
-      return {
-        itinerary,
-        summary: {
-          totalPlaces: places.length,
-          clusterCount: optimizedClusters.length,
-          totalTime: currentTime,
-          allocatedMinutes: totalMinutes,
-          strategy: 'nearby-clustering',
-        },
-        returnJourney: {
-          destination: endCoord,
-          distanceKm: returnDist,
-          estimatedMinutes: returnTime,
-        },
-      };
-    }
+    const returnDist = destinationCoords && advancedPlan.stops?.length
+      ? distance(advancedPlan.stops[advancedPlan.stops.length - 1].coords, destinationCoords)
+      : 0;
 
     return {
-      itinerary,
+      itinerary: advancedPlan.stops || [],
+      stops: advancedPlan.stops || [],
+      stopCount: advancedPlan.stopCount || 0,
+      totalScore: advancedPlan.totalScore || 0,
+      totalTravelMinutes: advancedPlan.totalTravelMinutes || 0,
+      totalVisitMinutes: advancedPlan.totalVisitMinutes || 0,
       summary: {
         totalPlaces: places.length,
-        clusterCount: optimizedClusters.length,
-        totalTime: currentTime,
-        allocatedMinutes: totalMinutes,
-        strategy: 'nearby-clustering',
+        clusterCount: clusters.length,
+        totalTime: (advancedPlan.totalTravelMinutes || 0) + (advancedPlan.totalVisitMinutes || 0),
+        allocatedMinutes: totalMinutes || (effectiveEndMin - effectiveStartMin),
+        strategy: 'authoritative-advanced-beam-search',
+        optimizer: 'beam-search-2-opt',
       },
+      clusters: clusters.map((c, i) => ({
+        order: i + 1,
+        mainPlace: c.mainPlace,
+        nearbyCount: c.nearbyPlaces.length,
+        totalInCluster: c.totalPlaces,
+      })),
+      ...(destinationCoords ? {
+        returnJourney: {
+          destination: destinationCoords,
+          distanceKm: returnDist,
+          estimatedMinutes: Math.max(5, Math.ceil(returnDist * 4)),
+        },
+      } : {}),
     };
-
   } catch (err) {
     appLogger.error('[itinerary-optimizer] Error:', err.message);
     return { error: err.message };
@@ -237,8 +113,8 @@ async function buildOptimizedItinerary(req) {
 }
 
 /**
- * POST /itinerary/optimize
- * Build optimized itinerary with nearby place grouping
+ * POST /api/itinerary/optimize
+ * Authoritative itinerary planning with nearby place grouping (delegates to advancedItineraryEngine)
  */
 router.post('/optimize', async (req, res) => {
   try {
@@ -256,12 +132,12 @@ router.post('/optimize', async (req, res) => {
 });
 
 /**
- * POST /itinerary/cluster
- * Find nearby places clustered around a location
+ * POST /api/itinerary/cluster
+ * Spatial proximity clustering endpoint (groups places within radiusKm)
  */
 router.post('/cluster', (req, res) => {
   try {
-    const { places, centerCoord, radiusKm = 2 } = req.body;
+    const { places, centerCoord, radiusKm = 2 } = req.body || {};
 
     if (!Array.isArray(places) || places.length === 0) {
       return res.status(400).json({ error: 'No places provided' });

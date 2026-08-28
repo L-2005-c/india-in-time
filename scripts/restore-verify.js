@@ -32,6 +32,12 @@ const pool = new Pool({
   query_timeout: 30000,
 });
 
+const ALLOWED_TABLES = new Set([
+  'trips', 'favorites', 'api_usage', 'place_cache', 'ai_cache',
+  'place_feedback', 'app_feedback', 'historical_crowd', 'gemini_usage',
+  'audit_log', 'ml_model_weights',
+]);
+
 const quoteIdent = (name) => `"${String(name).replaceAll('"', '""')}"`;
 const schemaName = `restore_verify_${Date.now()}`;
 
@@ -43,6 +49,9 @@ const schemaName = `restore_verify_${Date.now()}`;
     await client.query(`CREATE SCHEMA ${quoteIdent(schemaName)}`);
 
     for (const item of manifest.tables) {
+      if (!ALLOWED_TABLES.has(item.table)) {
+        throw new Error(`Unauthorized table in restore manifest: ${item.table}`);
+      }
       const table = quoteIdent(item.table);
       const target = `${quoteIdent(schemaName)}.${table}`;
       await client.query(`CREATE TABLE ${target} (LIKE public.${table} INCLUDING ALL)`);

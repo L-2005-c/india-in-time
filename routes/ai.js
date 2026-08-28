@@ -20,28 +20,21 @@ const express = require('express');
 const router  = express.Router();
 const { callGeminiText, callGeminiVision } = require('../services/gemini');
 const logger = require('../lib/logger');
+const {
+  wrapUserPrompt,
+  sanitizePromptInput,
+  stripMarkdownCodeFences,
+  safeParseJson,
+  aiStats,
+  getAiStats,
+} = require('../lib/aiSecurity');
 
 // ── Generic wrapper to handle errors uniformly ───────────────────────────────
-// IMPORTANT: this used to send err.message straight to the client on every
-// failure (`res.json({ error: err.message })`). That's how a Gemini network
-// hiccup could leak the API key (see services/gemini.js for the underlying
-// fix) — but even with that patched, raw internal error text (Gemini's own
-// API error bodies, stack-trace fragments, etc.) still has no business going
-// to the browser. middleware/errorHandler.js already hides this correctly
-// for every other route in the app; this wrapper caught errors itself and
-// skipped right past it. Only a small allow-list of messages we wrote
-// ourselves (meant to be user-facing) are passed through as-is.
 const USER_SAFE_MESSAGES = [
   'Gemini service temporarily unavailable (circuit breaker open). Try again shortly.',
 ];
 
 // ── Trip mode → prompt guidance ──────────────────────────────────────────────
-// The frontend lets a traveler pick who they're with (solo/duo/trio/family/
-// group) — see window.selectedTripMode in client-api.js. Rather than plumbing
-// a bespoke prompt branch through every AI endpoint, this one small helper
-// turns that selection into a single guidance line any endpoint can append.
-// Unknown/missing values are silently ignored (returns ''), so this is always
-// safe to call even for older clients that don't send tripMode at all.
 const TRIP_MODE_GUIDANCE = {
   solo:   'The traveler is going SOLO. Favor safe, self-paced, easy-to-navigate-alone suggestions.',
   duo:    'The traveler is on a DUO trip (2 people, often a couple). Favor scenic, romantic, or shareable picks.',
@@ -72,7 +65,8 @@ function tripModeLine(tripMode) {
 function handler(fn) {
   return async (req, res) => {
     try {
-      const result = await fn(req.body);
+      const rawResult = await fn(req.body);
+      const result = typeof rawResult === 'string' ? stripMarkdownCodeFences(rawResult) : rawResult;
       res.json({ text: result });
     } catch (err) {
       logger.error({ path: req.path, err: { message: err.message, status: err.statusCode || err.status || 503 } }, 'AI endpoint failed');
@@ -85,16 +79,24 @@ function handler(fn) {
   };
 }
 
+// ── GET /api/ai/stats ────────────────────────────────────────────────────────
+router.get('/stats', (_req, res) => {
+  res.json(getAiStats());
+});
+
 // ── /api/ai/chat ─────────────────────────────────────────────────────────────
 // General travel Q&A chatbot
 
 router.post('/chat', handler(({ message, city, plan, currentTime, tripMode, facts }) => {
   const planStr = Array.isArray(plan) && plan.length
-    ? plan.join(', ')
+    ? plan.map(sanitizePromptInput).join(', ')
     : 'none';
+  const cleanCity = sanitizePromptInput(city || 'India');
+  const userMsgBlock = wrapUserPrompt('traveler-query', message || '');
 
   return callGeminiText(`You are a friendly India travel assistant. Never invent live traffic, weather, opening, crowd, ETA, or geospatial facts. Use the FACT CONTRACT when provided and say when a value is unavailable.
-Tourist in ${city || 'India'} asked: "${message}"
+Tourist is visiting ${cleanCity}.
+${userMsgBlock}
 Current itinerary stops: ${planStr}.
 Current Local Time: ${currentTime || 'Unknown'}
 ${tripModeLine(tripMode)}
@@ -108,8 +110,11 @@ Answer in max 3 short lines. Use emojis. Be specific and helpful.`, { cache: tru
 // Rank locations by vibe/mood match
 
 router.post('/vibe', handler(({ vibe, city, locations }) => {
-  const locList = (locations || []).join(', ');
-  return callGeminiText(`I am visiting ${city}. My mood/vibe is: "${vibe}".
+  const locList = (locations || []).map(sanitizePromptInput).join(', ');
+  const cleanCity = sanitizePromptInput(city || 'India');
+  const userVibeBlock = wrapUserPrompt('vibe-preference', vibe || '');
+  return callGeminiText(`I am visiting ${cleanCity}.
+${userVibeBlock}
 Out of these places: [${locList}], pick the best ones that match the vibe.
 Return ONLY their exact names separated by commas. No explanation.`, { cache: true });
 }));
