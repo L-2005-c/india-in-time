@@ -2081,10 +2081,11 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
         const d = await res.json();
         if (d.success && Array.isArray(d.route?.geometry) && d.route.geometry.length >= 2) {
           fullGeometry = d.route.geometry;
-          if (routeStops[0]) {
-            routeStops[0].tt = d.duration?.trafficAwareMinutes || d.duration?.minutes || routeStops[0].tt;
+          const targetIdx = tripActive ? 0 : 1;
+          if (routeStops[targetIdx]) {
+            routeStops[targetIdx].tt = d.duration?.trafficAwareMinutes || d.duration?.minutes || routeStops[targetIdx].tt;
             distanceFormatted = d.distance?.formatted || `${(d.distance?.kilometers || 0).toFixed(1)} km`;
-            durationFormatted = d.duration?.formatted || fmtM(routeStops[0].tt);
+            durationFormatted = d.duration?.formatted || fmtM(routeStops[targetIdx].tt);
           }
           if (d.route.steps?.[0]?.instruction) nextStepInstruction = d.route.steps[0].instruction;
         }
@@ -2097,11 +2098,13 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
           const geometries = [];
           d.legs.forEach((leg, idx) => {
             if (leg?.success && Array.isArray(leg.route?.geometry)) geometries.push(...leg.route.geometry);
-            if (routeStops[idx] && leg?.duration) routeStops[idx].tt = leg.duration.trafficAwareMinutes || leg.duration.minutes || routeStops[idx].tt;
+            const targetIdx = tripActive ? idx : idx + 1;
+            if (routeStops[targetIdx] && leg?.duration) routeStops[targetIdx].tt = leg.duration.trafficAwareMinutes || leg.duration.minutes || routeStops[targetIdx].tt;
           });
           if (geometries.length >= 2) {
             fullGeometry = geometries;
-            if (d.legs[0]?.distance?.formatted) { distanceFormatted = d.legs[0].distance.formatted; durationFormatted = d.legs[0].duration?.formatted || fmtM(routeStops[0]?.tt || 10); }
+            const firstTargetIdx = tripActive ? 0 : 1;
+            if (d.legs[0]?.distance?.formatted) { distanceFormatted = d.legs[0].distance.formatted; durationFormatted = d.legs[0].duration?.formatted || fmtM(routeStops[firstTargetIdx]?.tt || 10); }
             if (d.legs[0]?.route?.steps?.[0]?.instruction) nextStepInstruction = d.legs[0].route.steps[0].instruction;
           }
         }
@@ -2137,10 +2140,15 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
         try { map.fitBounds(rLine.getBounds(), { padding: [60, 100] }); } catch (_e) {}
       }
       if (d.routes[0].legs?.[0]) {
-        const activeLeg = d.routes[0].legs[0];
-        if (routeStops[0]) routeStops[0].tt = Math.ceil(activeLeg.duration / 60);
-        nsDist = ((activeLeg.distance || 0) / 1000).toFixed(1) + 'km';
-        nsEta = fmtM(routeStops[0]?.tt || Math.ceil(activeLeg.duration / 60));
+        if (tripActive) {
+          const activeLeg = d.routes[0].legs[0];
+          if (routeStops[0]) routeStops[0].tt = Math.ceil(activeLeg.duration / 60);
+          nsDist = ((activeLeg.distance || 0) / 1000).toFixed(1) + 'km';
+          nsEta = fmtM(routeStops[0]?.tt || Math.ceil(activeLeg.duration / 60));
+        } else {
+          d.routes[0].legs.forEach((leg, idx) => { if (routeStops[idx + 1]) routeStops[idx + 1].tt = Math.ceil((leg.duration || 0) / 60); });
+          if (d.routes[0].legs[0]) { nsDist = ((d.routes[0].legs[0].distance || 0) / 1000).toFixed(1) + 'km'; nsEta = fmtM(routeStops[1]?.tt || Math.ceil(d.routes[0].legs[0].duration / 60)); }
+        }
       }
       const ns = d.routes[0].legs[0]?.steps?.find(step => step?.name || step?.maneuver?.modifier || step?.maneuver?.type);
       if (ns) {
@@ -2162,7 +2170,7 @@ async function renderRoute(){
   let routeStops=getRouteStopsForDay(itin);
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}
   const routeStart=getPreviewRouteStart();
-  routeStops.forEach((s,i)=>{ if(!s.tt){ const prev=i===0?routeStart:routeStops[i-1]?.coords; const dKm = prev && hasValidCoords(prev) && hasValidCoords(s.coords) ? (hvKm(prev[0],prev[1],s.coords[0],s.coords[1]) * 1.42) : 2; s.tt=prev?Math.max(6,Math.round(dKm / 0.32)):10; } });
+  routeStops.forEach((s,i)=>{ if(!s.tt){ const prev=i===0?routeStart:routeStops[i-1]?.coords; const dKm = prev && hasValidCoords(prev) && hasValidCoords(s.coords) ? (hvKm(prev[0],prev[1],s.coords[0],s.coords[1]) * 1.42) : 2; const minM = i === 0 ? Math.max(2, Math.min(8, Math.round(dKm * 2.5))) : Math.max(1, Math.min(4, Math.round(dKm * 2.0))); s.tt=prev?Math.max(minM,Math.round(dKm / 0.32)):10; } });
   if(recalcTimes({trimToWindow:true})>0){ sync(); routeStops=getRouteStopsForDay(itin); }
   routeStops = routeStops.filter(stop => hasValidCoords(stop.coords));
   if(!routeStops.length){document.getElementById('nav-next').textContent=tripActive?'Trip Complete! 🎉':'Generate a plan above';document.getElementById('nav-turn').textContent=tripActive?'All stops reached!':'Select preferences to start.';document.getElementById('nav-dist').textContent='--';document.getElementById('nav-eta').textContent='--';updateItinUI();return;}

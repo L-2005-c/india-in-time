@@ -47,9 +47,11 @@ function estimateTravel(opts = {}) {
   const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
   const roadKm = straightKm * ROAD_NETWORK_FACTOR;
   // Realistic Indian urban driving speed: 0.32 km/min (~19.2 km/h base speed before traffic multipliers)
-  const baseMinutes = Math.max(isFirstStop ? 8 : 10, Math.min(120, Math.round(roadKm / 0.32)));
+  // Distance-scaled minimum floor: adjacent spots (<0.5km) take 1-2 mins, not an arbitrary 10-min flat penalty
+  const minMinutes = isFirstStop ? Math.max(2, Math.min(8, Math.round(roadKm * 2.5))) : Math.max(1, Math.min(4, Math.round(roadKm * 2.0)));
+  const baseMinutes = Math.max(minMinutes, Math.min(120, Math.round(roadKm / 0.32)));
   const mult = getTrafficMultiplier(departMin);
-  const travelMinutes = Math.round(baseMinutes * mult);
+  const travelMinutes = Math.max(1, Math.round(baseMinutes * mult));
   const level = trafficLevelFromMult(mult);
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving`;
   return {

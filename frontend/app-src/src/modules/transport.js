@@ -21,7 +21,7 @@ export function getTransportOptions(fromCoords, toCoords, cityId, arriveMin) {
       label: 'Walk',
       fare: 0,
       fareStr: 'Free',
-      time: Math.max(3, Math.round(km * 13.5)),
+      time: Math.max(1, Math.round(km * 13.5)),
       link: toCoords ? `${gmapBase}&travelmode=walking` : '#',
     });
   }
@@ -33,7 +33,7 @@ export function getTransportOptions(fromCoords, toCoords, cityId, arriveMin) {
     label: 'Bus',
     fare: Math.round(busFare[0] + (busFare[1] - busFare[0]) * Math.min(1, km / 12)),
     get fareStr() { return `₹${this.fare}`; },
-    time: Math.max(8, Math.round((km / 0.23) * trafficMult)),
+    time: Math.max(3, Math.round((km / 0.23) * trafficMult)),
     link: toCoords ? `${gmapBase}&travelmode=transit` : '#',
   });
 
@@ -43,7 +43,7 @@ export function getTransportOptions(fromCoords, toCoords, cityId, arriveMin) {
     label: 'Auto',
     fare: Math.round((config.autoBase || 30) + km * (config.autoPerKm || 13)),
     get fareStr() { return `₹${this.fare}`; },
-    time: Math.max(6, Math.round((km / 0.33) * trafficMult)),
+    time: Math.max(1, Math.round((km / 0.33) * trafficMult)),
     link: toCoords ? `${gmapBase}&travelmode=driving` : '#',
   });
 
@@ -53,7 +53,7 @@ export function getTransportOptions(fromCoords, toCoords, cityId, arriveMin) {
     label: 'Cab',
     fare: Math.round((config.cabBase || 55) + km * (config.cabPerKm || 19)),
     get fareStr() { return `₹${this.fare}`; },
-    time: Math.max(5, Math.round((km / 0.38) * trafficMult)),
+    time: Math.max(1, Math.round((km / 0.38) * trafficMult)),
     link: toCoords ? `${gmapBase}&travelmode=driving` : '#',
   });
 

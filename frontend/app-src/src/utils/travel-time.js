@@ -50,9 +50,10 @@ export function getSmartTravelTime(fromCoords, toCoords, congestionBase, arriveM
   const straightKm = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
   const roadKm = straightKm * ROAD_NETWORK_FACTOR;
   // Realistic urban transit speed: ~19.2 km/h base driving speed before rush-hour multipliers
-  const baseMinutes = Math.max(isFirstStop ? 8 : 10, Math.min(90, Math.round(roadKm / 0.32)));
+  const minMinutes = isFirstStop ? Math.max(2, Math.min(8, Math.round(roadKm * 2.5))) : Math.max(1, Math.min(4, Math.round(roadKm * 2.0)));
+  const baseMinutes = Math.max(minMinutes, Math.min(90, Math.round(roadKm / 0.32)));
   const trafficMult = getTrafficMultiplier(congestionBase, arriveMin);
-  return Math.round(baseMinutes * trafficMult);
+  return Math.max(1, Math.round(baseMinutes * trafficMult));
 }
 
 export function getSmartVisitTime(stop, arriveMin, dayOfWeek) {
