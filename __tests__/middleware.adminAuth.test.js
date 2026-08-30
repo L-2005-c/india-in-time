@@ -81,29 +81,50 @@ describe('requireAdminAuth — Firebase-only administrator authentication', () =
     expect(req.adminAuthMethod).toBe('firebase-claim');
   });
 
-  test('accepts a verified Firebase token for whitelisted founder admin email', async () => {
+  test('accepts a verified Firebase token for whitelisted admin email and defaults to analytics role', async () => {
     process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    process.env.ADMIN_EMAILS = 'security-admin@example.com';
     verifyToken.mockResolvedValue({
-      uid: 'lokesh-uid',
-      email: 'chilukurilokesh231@gmail.com',
+      uid: 'sec-uid',
+      email: 'security-admin@example.com',
       admin: false,
     });
 
-    const req = { headers: { authorization: 'Bearer founder-token' } };
+    const req = { headers: { authorization: 'Bearer whitelist-token' } };
     const res = mockRes();
     const next = jest.fn();
 
     await requireAdminAuth(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(req.uid).toBe('lokesh-uid');
-    expect(req.adminEmail).toBe('chilukurilokesh231@gmail.com');
-    expect(req.adminRole).toBe('owner');
+    expect(req.uid).toBe('sec-uid');
+    expect(req.adminEmail).toBe('security-admin@example.com');
+    expect(req.adminRole).toBe('analytics');
     expect(req.adminAuthMethod).toBe('admin-whitelist');
+  });
+
+  test('whitelist-only admin without owner custom claim is denied on owner-only route', async () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    process.env.ADMIN_EMAILS = 'analyst@example.com';
+    verifyToken.mockResolvedValue({
+      uid: 'analyst-uid',
+      email: 'analyst@example.com',
+      admin: false,
+    });
+
+    const req = { headers: { authorization: 'Bearer analyst-token' } };
+    const res = mockRes();
+    const next = jest.fn();
+
+    await requireAdminRole('owner')(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
   });
 
   test('rejects a valid Firebase token without the admin claim or whitelist email', async () => {
     process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"test"}';
+    process.env.ADMIN_EMAILS = 'other@example.com';
     verifyToken.mockResolvedValue({
       uid: 'user-uid',
       email: 'user@example.com',

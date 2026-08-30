@@ -14,16 +14,11 @@ const app = initializeApp(firebaseConfig, 'india-in-time-admin');
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-const ADMIN_EMAILS = [
-  'chilukurilokesh231@gmail.com',
-];
-
 export function watchAdminAuth({ onSignedIn, onSignedOut }) {
   return onAuthStateChanged(auth, async (user) => {
     if (!user) { onSignedOut?.(); return; }
     const tokenResult = await user.getIdTokenResult();
-    const email = (user.email || '').toLowerCase().trim();
-    const isAdmin = tokenResult.claims?.admin === true || ADMIN_EMAILS.includes(email);
+    const isAdmin = tokenResult.claims?.admin === true;
     if (!isAdmin) {
       await auth.signOut();
       onSignedOut?.('Your account does not have the admin role.');

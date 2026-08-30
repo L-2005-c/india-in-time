@@ -10,10 +10,13 @@
 const { verifyToken } = require('./auth');
 const logger = require('../lib/logger');
 
-const ADMIN_WHITELIST = new Set([
-  'chilukurilokesh231@gmail.com',
-  ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [])
-]);
+function getAdminWhitelist() {
+  return new Set(
+    process.env.ADMIN_EMAILS
+      ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+      : []
+  );
+}
 
 async function tryFirebaseAdminAuth(req) {
   const header = req.headers.authorization || '';
@@ -23,11 +26,16 @@ async function tryFirebaseAdminAuth(req) {
   try {
     const decoded = await verifyToken(match[1]);
     const email = (decoded?.email || '').toLowerCase().trim();
-    if (decoded && (decoded.admin === true || (email && ADMIN_WHITELIST.has(email)))) {
+    const whitelist = getAdminWhitelist();
+    const isClaimAdmin = decoded?.admin === true;
+    const isWhitelisted = email && whitelist.has(email);
+
+    if (decoded && (isClaimAdmin || isWhitelisted)) {
       req.uid = decoded.uid;
       req.adminEmail = email || null;
-      req.adminRole = decoded.role || 'owner';
-      req.adminAuthMethod = decoded.admin === true ? 'firebase-claim' : 'admin-whitelist';
+      // Whitelist admins default to lowest privilege ('analytics') unless claim specifies higher role
+      req.adminRole = decoded.role || (isClaimAdmin ? 'owner' : 'analytics');
+      req.adminAuthMethod = isClaimAdmin ? 'firebase-claim' : 'admin-whitelist';
       return true;
     }
 
