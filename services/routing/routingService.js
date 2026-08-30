@@ -3,16 +3,19 @@
 /**
  * services/routing/routingService.js
  * Authoritative, production-grade routing and travel-time engine.
- * Single source of truth for distances, durations, ETAs, and traffic intelligence.
+ * Single source of truth for distances, durations, ETAs, traffic intelligence,
+ * and route quality across Indian road corridors.
  */
 
 const { distKm } = require('../../utils/geo');
 const { validateRouteCoordinates } = require('./coordinateValidator');
-const { normalizeTrafficMetadata, TRAFFIC_STATUS, TRAFFIC_PROVENANCE } = require('./trafficClassifier');
+const { normalizeTrafficMetadata, TRAFFIC_STATUS } = require('./trafficClassifier');
 const { buildCacheKey, getCachedRoute, setCachedRoute } = require('./routeCache');
+const { computeCalibratedCorridorMetrics, classifyCorridor } = require('./corridorSpeedModel');
+const { raceOsrmMirrors } = require('./mirrorRacer');
+const { evaluateScenicQuality, enrichTurnByTurnSteps, evaluateComfortRating } = require('./routeQualityEngine');
 
-const ROAD_NETWORK_FACTOR = 1.42; // Real-world Indian road distance vs haversine straight-line
-const ROUTING_TIMEOUT_MS = Number(process.env.ROUTING_TIMEOUT_MS) || 4500;
+const ROUTING_TIMEOUT_MS = Number(process.env.ROUTING_TIMEOUT_MS) || 4000;
 
 /**
  * Formats distance into a clean user-facing string.
@@ -88,102 +91,32 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
 }
 
 /**
- * Public OSRM Multi-Mirror Adapter.
- */
-async function fetchOsrmRoute(fromCoords, toCoords, opts = {}) {
-  const mode = opts.mode || 'driving';
-  const profile = mode === 'walking' ? 'foot' : (mode === 'bicycling' ? 'bike' : 'driving');
-  const mirrorSub = mode === 'walking' ? 'routed-foot' : (mode === 'bicycling' ? 'routed-bike' : 'routed-car');
-  const coords = `${fromCoords[1]},${fromCoords[0]};${toCoords[1]},${toCoords[0]}`;
-
-  const mirrors = [
-    `https://routing.openstreetmap.de/${mirrorSub}`,
-    'https://router.project-osrm.org',
-  ];
-
-  for (const mirror of mirrors) {
-    const url = `${mirror}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=true`;
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), opts.timeoutMs || ROUTING_TIMEOUT_MS);
-
-    try {
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: { Accept: 'application/json', 'User-Agent': 'IndiaInTime-RoutingEngine/2.0' },
-      });
-      if (!res.ok) continue;
-      const body = await res.json();
-      if (body.code !== 'Ok' || !body.routes?.[0]) continue;
-
-      const route = body.routes[0];
-      const leg = route.legs?.[0];
-      const distanceM = Math.round(route.distance);
-      const durationSec = Math.round(route.duration);
-
-      const geometry = Array.isArray(route.geometry?.coordinates)
-        ? route.geometry.coordinates.map(c => [c[1], c[0]]) // GeoJSON lon,lat to Leaflet lat,lon
-        : null;
-
-      const steps = (leg?.steps || []).map(s => ({
-        instruction: s.name ? `via ${s.name}` : (s.maneuver?.type || 'continue'),
-        distanceM: Math.round(s.distance || 0),
-        durationSec: Math.round(s.duration || 0),
-        maneuver: s.maneuver?.modifier || s.maneuver?.type || 'continue',
-      }));
-
-      return {
-        provider: 'osrm',
-        distanceMeters: distanceM,
-        durationSeconds: durationSec,
-        durationInTrafficSeconds: null,
-        hasRealtimeTraffic: false,
-        geometry,
-        summary: leg?.summary || (steps[0]?.instruction ? steps[0].instruction : 'Standard route'),
-        steps,
-        confidenceScore: 78,
-      };
-    } catch (_err) {
-      // Try next mirror
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  return null;
-}
-
-/**
- * Calibrated Geodesic Heuristic Fallback Engine.
+ * Calibrated Terrain & Corridor Physics Fallback Engine.
  * Explicitly labeled as a heuristic fallback (NOT a road-network truth).
  */
 function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
-  const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
-  const roadKm = straightKm * ROAD_NETWORK_FACTOR;
-  const distanceMeters = Math.round(roadKm * 1000);
-
-  const mode = opts.mode || 'driving';
-  let speedKmPerMin = 0.32; // ~19.2 km/h urban driving
-  if (mode === 'walking') speedKmPerMin = 0.075; // 4.5 km/h
-  else if (mode === 'bicycling') speedKmPerMin = 0.20; // 12 km/h
-  else if (mode === 'transit') speedKmPerMin = 0.24; // 14.4 km/h
-
-  const baseMinutes = Math.max(mode === 'walking' ? 3 : 6, Math.round(roadKm / speedKmPerMin));
-  const durationSeconds = baseMinutes * 60;
+  const metrics = computeCalibratedCorridorMetrics(fromCoords, toCoords, opts);
 
   return {
     provider: 'geodesic_heuristic',
     isRoadNetworkTruth: false,
-    distanceMeters,
-    durationSeconds,
+    distanceMeters: metrics.distanceMeters,
+    durationSeconds: metrics.totalEstimatedSec,
     durationInTrafficSeconds: null,
     hasRealtimeTraffic: false,
     provenance: 'GEODESIC_HEURISTIC_ESTIMATE',
     geometry: [fromCoords, toCoords],
-    summary: 'Estimated travel time (direct road heuristic)',
-    steps: [{ instruction: 'Direct route estimate to destination', distanceM: distanceMeters, durationSec: durationSeconds, maneuver: 'depart' }],
-    confidenceScore: null,
-    limitations: 'Calculated using geodesic distance * empirical winding factor without road-network topology verification.',
+    summary: `Estimated travel time (${metrics.corridor.description})`,
+    steps: [{
+      instruction: `Direct route estimate via ${metrics.corridor.corridorType.toLowerCase().replace(/_/g, ' ')}`,
+      distanceM: metrics.distanceMeters,
+      durationSec: metrics.totalEstimatedSec,
+      maneuver: 'depart',
+    }],
+    confidenceScore: 72,
+    corridorType: metrics.corridor.corridorType,
+    bottleneckDelayMinutes: metrics.bottleneck.delayMinutes,
+    limitations: 'Calculated using terrain-calibrated road winding factor without road-network topology verification.',
   };
 }
 
@@ -192,7 +125,7 @@ function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
  *
  * @param {Array|Object} origin - [lat, lon] or {lat, lon}
  * @param {Array|Object} destination - [lat, lon] or {lat, lon}
- * @param {Object} opts - Routing options (mode, departureTime, preference, bypassCache)
+ * @param {Object} opts - Routing options (mode, departureTime, preference, bypassCache, city)
  * @returns {Promise<Object>} Canonical Route Response
  */
 async function calculateRoute(origin, destination, opts = {}) {
@@ -214,9 +147,12 @@ async function calculateRoute(origin, destination, opts = {}) {
       origin: { lat: from[0], lon: from[1], name: opts.originName || 'Origin' },
       destination: { lat: to[0], lon: to[1], name: opts.destName || 'Destination' },
       travelMode: opts.mode || 'driving',
+      distanceMeters: 0,
+      durationSeconds: 0,
+      trafficDurationSeconds: 0,
       distance: { meters: 0, kilometers: 0, formatted: '0 km' },
       duration: { seconds: 0, minutes: 0, trafficAwareSeconds: 0, trafficAwareMinutes: 0, formatted: '0 mins' },
-      traffic: { status: TRAFFIC_STATUS.LOW, congestionFactor: 1.0, delayMinutes: 0, provenance: TRAFFIC_PROVENANCE.ROUTE_ESTIMATE, freshness: new Date().toISOString(), label: 'Same location' },
+      traffic: { status: TRAFFIC_STATUS.LOW, congestionFactor: 1.0, delayMinutes: 0, provenance: 'route_estimate', freshness: new Date().toISOString(), label: 'Same location' },
       timestamps: { departure: opts.departureTime || new Date().toISOString(), projectedArrival: opts.departureTime || new Date().toISOString() },
       route: { geometry: [from, to], summary: 'At destination', steps: [], googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${to[0]},${to[1]}` },
       confidence: { score: 100, source: 'exact_point' },
@@ -225,6 +161,7 @@ async function calculateRoute(origin, destination, opts = {}) {
 
   const departureDate = opts.departureTime ? new Date(opts.departureTime) : new Date();
   const departureMinute = departureDate.getHours() * 60 + departureDate.getMinutes();
+  const dayOfWeek = departureDate.getDay();
   const mode = opts.mode || 'driving';
   const preference = opts.preference || 'balanced';
 
@@ -250,16 +187,22 @@ async function calculateRoute(origin, destination, opts = {}) {
   if (!isLiveDisabled) {
     // 1. Google Routes
     rawRoute = await fetchGoogleRoute(from, to, { ...opts, mode });
-    // 2. OSRM Multi-Mirror
+    // 2. High-Concurrency OSRM Mirror Racing
     if (!rawRoute) {
-      rawRoute = await fetchOsrmRoute(from, to, { ...opts, mode });
+      rawRoute = await raceOsrmMirrors(from, to, { ...opts, mode });
     }
   }
 
-  // 3. Fallback Heuristic
+  // 3. Calibrated Terrain Fallback
   if (!rawRoute) {
     rawRoute = calculateHeuristicEstimateFallback(from, to, { ...opts, mode });
   }
+
+  // Corridor & Quality Assessment
+  const corridorMeta = classifyCorridor(from, to, { mode });
+  const scenicMeta = evaluateScenicQuality(from, to, rawRoute.steps || [], corridorMeta.corridorType);
+  const comfortMeta = evaluateComfortRating(corridorMeta.corridorType, mode);
+  const enrichedSteps = enrichTurnByTurnSteps(rawRoute.steps || [], rawRoute.geometry);
 
   // Traffic Enrichment
   const trafficMeta = normalizeTrafficMetadata({
@@ -267,7 +210,9 @@ async function calculateRoute(origin, destination, opts = {}) {
     durationInTrafficSec: rawRoute.durationInTrafficSeconds,
     provider: rawRoute.provider,
     departureMinute,
-    baseCongestion: opts.cityCongestion || 1.15,
+    dayOfWeek,
+    city: opts.city || '',
+    weatherRainMm: opts.weatherRainMm || 0,
     hasRealtimeSignal: rawRoute.hasRealtimeTraffic,
   });
 
@@ -315,12 +260,16 @@ async function calculateRoute(origin, destination, opts = {}) {
     route: {
       geometry: rawRoute.geometry || [from, to],
       summary: rawRoute.summary,
-      steps: rawRoute.steps || [],
+      steps: enrichedSteps,
       googleMapsUrl,
+      corridorType: corridorMeta.corridorType,
+      isScenicRoute: scenicMeta.isScenic,
+      scenicScore: scenicMeta.score,
+      comfortTier: comfortMeta.tier,
     },
     confidence: {
       score: rawRoute.confidenceScore,
-      level: rawRoute.confidenceScore >= 90 ? 'HIGH' : (rawRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW'),
+      level: rawRoute.confidenceScore >= 85 ? 'HIGH' : (rawRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW'),
       source: rawRoute.provider,
       isRoadNetworkTruth: rawRoute.isRoadNetworkTruth !== false,
       provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
@@ -337,59 +286,88 @@ async function calculateRoute(origin, destination, opts = {}) {
 
 /**
  * Multi-Stop Matrix Routing for Day Itineraries.
- * Sequential calculation propagating actual arrival time & visit durations
- * across consecutive legs for accurate temporal and traffic modeling.
+ * Parallelized calculation with chronological timestamp propagation.
  *
  * @param {Array<Object>} stops - Array of stops with coords [lat, lon]
- * @param {Object} opts - Global options (departureTime, mode, preference)
+ * @param {Object} opts - Global options (departureTime, mode, preference, city)
  */
 async function calculateRouteMatrix(stops = [], opts = {}) {
   if (!Array.isArray(stops) || stops.length < 2) {
     return { success: false, error: 'At least two stops required for matrix routing', legs: [] };
   }
 
-  let currentDeparture = opts.departureTime ? new Date(opts.departureTime) : new Date();
-  const legs = [];
+  const departureBase = opts.departureTime ? new Date(opts.departureTime) : new Date();
 
+  // Phase 1: Fast Parallel Evaluation of Leg Geometry & Base Metrics
+  const legPairs = [];
   for (let i = 0; i < stops.length - 1; i++) {
     const originStop = stops[i];
     const destStop = stops[i + 1];
     const originCoords = originStop.coords || [originStop.lat, originStop.lon];
     const destCoords = destStop.coords || [destStop.lat, destStop.lon];
 
-    const legResult = await calculateRoute(originCoords, destCoords, {
-      ...opts,
-      originName: originStop.name,
-      destName: destStop.name,
-      departureTime: currentDeparture.toISOString(),
+    legPairs.push({
+      originStop,
+      destStop,
+      originCoords,
+      destCoords,
+      legIndex: i,
     });
-
-    legs.push(legResult);
-
-    if (legResult && legResult.success) {
-      const legDurationSec = legResult.duration.trafficAwareSeconds || legResult.duration.seconds || 600;
-      const visitMinutes = Number(destStop.vt || destStop.durationMin || destStop.visitMinutes || 45);
-      // Propagate departure time for next leg: arrival + visit duration
-      currentDeparture = new Date(currentDeparture.getTime() + (legDurationSec * 1000) + (visitMinutes * 60 * 1000));
-    }
   }
 
+  const rawLegs = await Promise.all(
+    legPairs.map(pair =>
+      calculateRoute(pair.originCoords, pair.destCoords, {
+        ...opts,
+        originName: pair.originStop.name,
+        destName: pair.destStop.name,
+        departureTime: departureBase.toISOString(),
+      })
+    )
+  );
+
+  // Phase 2: Chronological Timestamp & Visit Propagation
+  let currentDeparture = new Date(departureBase.getTime());
+  const finalLegs = [];
   let totalDistanceMeters = 0;
   let totalDurationSeconds = 0;
   let totalTrafficDelayMinutes = 0;
 
-  legs.forEach(legResult => {
+  for (let i = 0; i < rawLegs.length; i++) {
+    const legResult = rawLegs[i];
+    const destStop = legPairs[i].destStop;
+
     if (legResult && legResult.success) {
+      const legDurationSec = legResult.duration.trafficAwareSeconds || legResult.duration.seconds || 600;
+      const legArrival = new Date(currentDeparture.getTime() + (legDurationSec * 1000));
+      const visitMinutes = Number(destStop.vt || destStop.durationMin || destStop.visitMinutes || 45);
+      const nextDeparture = new Date(legArrival.getTime() + (visitMinutes * 60 * 1000));
+
+      const updatedLeg = {
+        ...legResult,
+        departureAt: currentDeparture.toISOString(),
+        arrivalAt: legArrival.toISOString(),
+        timestamps: {
+          departure: currentDeparture.toISOString(),
+          projectedArrival: legArrival.toISOString(),
+        },
+      };
+
+      finalLegs.push(updatedLeg);
       totalDistanceMeters += legResult.distance.meters;
-      totalDurationSeconds += legResult.duration.trafficAwareSeconds;
-      totalTrafficDelayMinutes += legResult.traffic.delayMinutes;
+      totalDurationSeconds += legDurationSec;
+      totalTrafficDelayMinutes += (legResult.traffic?.delayMinutes || 0);
+
+      currentDeparture = nextDeparture;
+    } else {
+      finalLegs.push(legResult);
     }
-  });
+  }
 
   return {
     success: true,
-    legs,
-    totalLegs: legs.length,
+    legs: finalLegs,
+    totalLegs: finalLegs.length,
     totals: {
       distance: {
         meters: totalDistanceMeters,
@@ -411,6 +389,5 @@ module.exports = {
   calculateRouteMatrix,
   formatDistance,
   formatDuration,
-  ROAD_NETWORK_FACTOR,
   ROUTING_TIMEOUT_MS,
 };

@@ -2,21 +2,30 @@
 
 /**
  * services/routing/routeCache.js
- * Tiered routing cache with strict freshness enforcement and dynamic TTLs.
+ *
+ * High-performance tiered routing cache with spatial quantization,
+ * dynamic TTLs, sub-millisecond L1 memory lookups, and L2 Redis backing.
  */
 
 const { getAsync, setAsync } = require('../cache');
 
 const LIVE_TTL_SEC = 3 * 60;          // 3 minutes for live traffic
-const PRED_TTL_SEC = 20 * 60;         // 20 minutes for predictive traffic
+const PRED_TTL_SEC = 25 * 60;         // 25 minutes for predictive traffic
 const STATIC_TTL_SEC = 24 * 60 * 60;  // 24 hours for static road geometry
 
-// In-Memory L1 Cache
+// In-Memory L1 Cache (Map with LRU eviction)
 const l1Cache = new Map();
-const MAX_L1_SIZE = 800;
+const MAX_L1_SIZE = 1200;
 
 /**
- * Generates a normalized cache key.
+ * Quantizes coordinates to ~110m resolution (3 decimal places).
+ */
+function quantizeCoord(val) {
+  return Number(val).toFixed(3);
+}
+
+/**
+ * Generates a normalized spatial cache key.
  */
 function buildCacheKey(opts = {}) {
   const {
@@ -28,16 +37,16 @@ function buildCacheKey(opts = {}) {
     preference = 'balanced',
   } = opts;
 
-  const fLat = Number(from[0]).toFixed(4);
-  const fLon = Number(from[1]).toFixed(4);
-  const tLat = Number(to[0]).toFixed(4);
-  const tLon = Number(to[1]).toFixed(4);
+  const fLat = quantizeCoord(from[0]);
+  const fLon = quantizeCoord(from[1]);
+  const tLat = quantizeCoord(to[0]);
+  const tLon = quantizeCoord(to[1]);
 
-  // Time bucketing: 2 min buckets for live traffic, 15 min buckets for predictive
-  const bucketSize = hasLive ? 2 : 15;
+  // Time bucketing: 2 min buckets for live traffic, 10 min buckets for predictive
+  const bucketSize = hasLive ? 2 : 10;
   const timeBucket = Math.floor(departureMin / bucketSize) * bucketSize;
 
-  return `route:v2:${mode}:${fLat},${fLon}>${tLat},${tLon}:t${timeBucket}:${preference}`;
+  return `route:v3:${mode}:${fLat},${fLon}>${tLat},${tLon}:t${timeBucket}:${preference}`;
 }
 
 /**
@@ -46,24 +55,24 @@ function buildCacheKey(opts = {}) {
 async function getCachedRoute(key) {
   if (!key) return null;
 
-  // L1 In-Memory check
+  // 1. L1 In-Memory Fast Check (<0.1ms)
   const l1Hit = l1Cache.get(key);
   if (l1Hit) {
     if (Date.now() < l1Hit.expiresAt) {
-      return { ...l1Hit.data, fromCache: 'L1' };
+      return { ...l1Hit.data, fromCache: 'L1_MEMORY' };
     }
     l1Cache.delete(key);
   }
 
-  // L2 Redis check
+  // 2. L2 Redis Check
   try {
     const raw = await getAsync(key);
     if (raw) {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
       if (parsed && (!parsed.expiresAt || Date.now() < parsed.expiresAt)) {
-        // Populate L1 for subsequent hot hits
-        setL1(key, parsed.data || parsed, parsed.expiresAt || (Date.now() + 60000));
-        return { ...(parsed.data || parsed), fromCache: 'L2_REDIS' };
+        const routeData = parsed.data || parsed;
+        setL1(key, routeData, parsed.expiresAt || (Date.now() + 60000));
+        return { ...routeData, fromCache: 'L2_REDIS' };
       }
     }
   } catch (_err) {
@@ -115,7 +124,5 @@ module.exports = {
   getCachedRoute,
   setCachedRoute,
   clearL1,
-  LIVE_TTL_SEC,
-  PRED_TTL_SEC,
-  STATIC_TTL_SEC,
+  quantizeCoord,
 };
