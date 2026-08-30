@@ -61,10 +61,20 @@ async function initDatabase() {
     );
   }
 
-  // Pool sizing is deliberately conservative PER WORKER PROCESS: in cluster
-  // mode (see server.js) there can be one of these pools per CPU core, so the
-  // effective total is (max * numCPUs). Override via DB_POOL_MAX if you know
-  // your Neon plan's connection ceiling.
+  // Pool sizing verification against hosting provider ceiling
+  const workers = Math.max(1, parseInt(process.env.CLUSTER_WORKERS, 10) || 1);
+  const poolMaxPerWorker = Math.max(2, parseInt(process.env.DB_POOL_MAX, 10) || 8);
+  const maxDbCeiling = parseInt(process.env.MAX_DB_CONNECTIONS, 10) || 20;
+  const totalExpectedConns = workers * poolMaxPerWorker;
+
+  if (totalExpectedConns > maxDbCeiling) {
+    const warnMsg = `⚠️ [db] Total connection pool size (${workers} workers × ${poolMaxPerWorker} = ${totalExpectedConns}) exceeds MAX_DB_CONNECTIONS ceiling (${maxDbCeiling}). Ensure you are using Neon pooled endpoint or increase MAX_DB_CONNECTIONS.`;
+    appLogger.warn(warnMsg);
+    if (process.env.STRICT_POOL_CHECK === 'true') {
+      throw new Error(warnMsg);
+    }
+  }
+
   const sslRejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
   if (process.env.NODE_ENV === 'production' && !sslRejectUnauthorized) {
     throw new Error('DATABASE_SSL_REJECT_UNAUTHORIZED=false is not allowed in production.');
@@ -73,7 +83,7 @@ async function initDatabase() {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NEON_LOCAL_PROXY === 'true' ? false : { rejectUnauthorized: sslRejectUnauthorized },
-    max: Math.max(2, parseInt(process.env.DB_POOL_MAX, 10) || 8),
+    max: poolMaxPerWorker,
     idleTimeoutMillis: 30000,       // release idle clients back after 30s
     connectionTimeoutMillis: 8000,  // fail fast instead of queuing forever if the pool is exhausted
     statement_timeout: 15000,       // kill any single query running >15s so it can't hold a connection hostage under load
