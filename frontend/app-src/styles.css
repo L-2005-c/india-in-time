@@ -3507,12 +3507,32 @@ body::after{
 .map-hud-dock {
   position: absolute;
   top: 14px;
-  left: 14px;
-  z-index: 1000;
+  left: 56px;
+  z-index: 550;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   pointer-events: auto;
+  max-width: calc(100% - 130px);
+}
+
+.leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(10, 15, 29, 0.88) !important;
+  color: #f8fafc !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.15s ease !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(30, 41, 59, 0.95) !important;
+  color: #38bdf8 !important;
 }
 
 .map-hud-pill {
