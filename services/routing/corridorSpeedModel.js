@@ -30,22 +30,19 @@ const DENSE_BAZAAR_ZONES = [
   { name: 'Mumbai Crawford Market / Kalbadevi', bounds: { minLat: 18.940, maxLat: 18.955, minLon: 72.825, maxLon: 72.840 } },
 ];
 
-// Known Hill / Ghat Routes
+// Known Hill / Ghat Routes (Specific high-elevation ascent zones)
 const HILL_GHAT_ZONES = [
-  { name: 'Visakhapatnam Kailasagiri / Dolphin Hill', bounds: { minLat: 17.650, maxLat: 17.760, minLon: 83.260, maxLon: 83.350 }, minAltDiff: true },
-  { name: 'Jaipur Nahargarh / Jaigarh Hills', bounds: { minLat: 26.930, maxLat: 27.010, minLon: 75.830, maxLon: 75.860 } },
+  { name: 'Visakhapatnam Dolphin Nose / Yarada Ghat', bounds: { minLat: 17.640, maxLat: 17.685, minLon: 83.250, maxLon: 83.305 } },
+  { name: 'Jaipur Nahargarh / Jaigarh Fort Ascent', bounds: { minLat: 26.935, maxLat: 26.995, minLon: 75.835, maxLon: 75.858 } },
   { name: 'Pune Sinhagad / Lavasa Ghats', bounds: { minLat: 18.350, maxLat: 18.450, minLon: 73.720, maxLon: 73.800 } },
   { name: 'Goa Western Ghats / Dudhsagar', bounds: { minLat: 15.280, maxLat: 15.350, minLon: 74.250, maxLon: 74.350 } },
 ];
 
 // Known High-Congestion Tourist POI Bottleneck Hotspots (Approach / Parking Delay)
 const BOTTLENECK_POIS = [
-  { id: 'vtz_kailasagiri', name: 'Kailasagiri', lat: 17.7492, lon: 83.3418, delayMin: 4, label: 'Ropeway / Hill Gate approach delay' },
-  { id: 'hyd_charminar', name: 'Charminar', lat: 17.3616, lon: 78.4747, delayMin: 6, label: 'Old City pedestrianization & parking delay' },
-  { id: 'del_red_fort', name: 'Red Fort', lat: 28.6562, lon: 77.2410, delayMin: 5, label: 'Chandni Chowk approach & security checkpoint' },
-  { id: 'mum_gateway', name: 'Gateway of India', lat: 18.9220, lon: 72.8347, delayMin: 5, label: 'Colaba Causeway & security perimeter delay' },
-  { id: 'jai_amber_fort', name: 'Amber Fort', lat: 26.9855, lon: 75.8513, delayMin: 5, label: 'Amer ascent & elephant trail approach delay' },
-  { id: 'goa_baga', name: 'Baga Beach', lat: 15.5553, lon: 73.7517, delayMin: 6, label: 'Tito Lane bottleneck & beach parking delay' },
+  { id: 'hyd_charminar', name: 'Charminar', lat: 17.3616, lon: 78.4747, delayMin: 2, label: 'Old City pedestrianization approach delay' },
+  { id: 'del_red_fort', name: 'Red Fort', lat: 28.6562, lon: 77.2410, delayMin: 2, label: 'Chandni Chowk approach delay' },
+  { id: 'mum_gateway', name: 'Gateway of India', lat: 18.9220, lon: 72.8347, delayMin: 2, label: 'Colaba Causeway security perimeter delay' },
 ];
 
 /**
@@ -58,22 +55,17 @@ function isCoordInZone(lat, lon, zone) {
 
 /**
  * Classifies the road corridor and terrain for two endpoints.
- *
- * @param {Array<number>} fromCoords - [lat, lon]
- * @param {Array<number>} toCoords - [lat, lon]
- * @param {Object} opts - Options (mode, originName, destName)
- * @returns {{ corridorType: string, windingFactor: number, baseSpeedKmH: number, signalsPerKm: number }}
  */
 function classifyCorridor(fromCoords, toCoords, opts = {}) {
   const mode = opts.mode || 'driving';
   const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
 
-  if (mode === 'walking' || straightKm <= 1.2) {
+  if (mode === 'walking') {
     return {
       corridorType: CORRIDOR_TYPE.PEDESTRIAN_WALK,
-      windingFactor: 1.15, // Walking shortcuts through alleys/crossings
-      baseSpeedKmH: 4.6,
-      signalsPerKm: 0.2,
+      windingFactor: 1.15,
+      baseSpeedKmH: 4.8,
+      signalsPerKm: 0,
       description: 'Pedestrian walkway / urban walking path',
     };
   }
@@ -83,8 +75,8 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
     if (isCoordInZone(fromCoords[0], fromCoords[1], g) || isCoordInZone(toCoords[0], toCoords[1], g)) {
       return {
         corridorType: CORRIDOR_TYPE.HILL_GHAT,
-        windingFactor: 1.72, // Severe hairpin curves & elevation gain
-        baseSpeedKmH: 22.0,
+        windingFactor: 1.48,
+        baseSpeedKmH: 26.0,
         signalsPerKm: 0.1,
         description: `Winding hill ghat route (${g.name})`,
       };
@@ -93,69 +85,50 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
 
   // 2. Check Walled Bazaar Zones
   for (const b of DENSE_BAZAAR_ZONES) {
-    if (isCoordInZone(fromCoords[0], fromCoords[1], b) || isCoordInZone(toCoords[0], toCoords[1], b)) {
+    if (isCoordInZone(fromCoords[0], fromCoords[1], b) && isCoordInZone(toCoords[0], toCoords[1], b)) {
       return {
         corridorType: CORRIDOR_TYPE.WALLED_BAZAAR,
-        windingFactor: 1.48, // Tight heritage lanes
-        baseSpeedKmH: 12.5,
-        signalsPerKm: 2.2,
+        windingFactor: 1.30,
+        baseSpeedKmH: 16.0,
+        signalsPerKm: 1.0,
         description: `High-density bazaar corridor (${b.name})`,
       };
     }
   }
 
-  // 3. Check Coastal Highway Corridor (long seaside roads)
-  const isCoastal = (
-    (fromCoords[0] >= 17.65 && fromCoords[0] <= 17.90 && fromCoords[1] >= 83.25 && fromCoords[1] <= 83.48) || // Vizag Beach Rd
-    (fromCoords[0] >= 15.40 && fromCoords[0] <= 15.65 && fromCoords[1] >= 73.70 && fromCoords[1] <= 73.85) || // Goa Coast
-    (fromCoords[0] >= 18.90 && fromCoords[0] <= 19.10 && fromCoords[1] >= 72.80 && fromCoords[1] <= 72.84)    // Mumbai Marine / Sea Link
-  );
-  if (isCoastal && straightKm >= 3.0) {
-    return {
-      corridorType: CORRIDOR_TYPE.COASTAL_DRIVE,
-      windingFactor: 1.44,
-      baseSpeedKmH: 34.0,
-      signalsPerKm: 0.7,
-      description: 'Scenic coastal highway corridor',
-    };
-  }
-
-  // 4. Distance-based classification
-  if (straightKm >= 22.0) {
+  // 3. Distance & Alignment Based Classification
+  if (straightKm >= 20.0) {
     return {
       corridorType: CORRIDOR_TYPE.HIGHWAY_EXPRESSWAY,
-      windingFactor: 1.20, // Straight alignment on national highways & expressways
-      baseSpeedKmH: 68.0,
-      signalsPerKm: 0.15,
+      windingFactor: 1.18,
+      baseSpeedKmH: 60.0,
+      signalsPerKm: 0.1,
       description: 'Inter-city arterial / national highway',
     };
   }
 
-  if (straightKm >= 6.0) {
+  if (straightKm >= 5.0) {
     return {
       corridorType: CORRIDOR_TYPE.URBAN_ARTERIAL,
-      windingFactor: 1.34, // Major city radial & ring roads
-      baseSpeedKmH: 32.0,
-      signalsPerKm: 0.9,
+      windingFactor: 1.26,
+      baseSpeedKmH: 34.0,
+      signalsPerKm: 0.5,
       description: 'Primary urban arterial / ring road',
     };
   }
 
-  // Default: Dense Downtown Urban Grid
+  // Short Urban Hop (< 5 km)
   return {
     corridorType: CORRIDOR_TYPE.DENSE_DOWNTOWN,
-    windingFactor: 1.42,
-    baseSpeedKmH: 20.5,
-    signalsPerKm: 1.6,
+    windingFactor: 1.28,
+    baseSpeedKmH: 24.0,
+    signalsPerKm: 0.6,
     description: 'Central city urban street network',
   };
 }
 
 /**
  * Checks for tourist hotspot parking/approach bottleneck delays.
- *
- * @param {Array<number>} destCoords - [lat, lon]
- * @returns {{ hasBottleneck: boolean, delayMinutes: number, reason: string|null }}
  */
 function evaluateDestinationBottleneck(destCoords) {
   if (!destCoords || !Number.isFinite(destCoords[0])) {
@@ -164,7 +137,7 @@ function evaluateDestinationBottleneck(destCoords) {
 
   for (const b of BOTTLENECK_POIS) {
     const d = distKm(destCoords[0], destCoords[1], b.lat, b.lon);
-    if (d <= 0.65) { // Within 650m radius of major tourist hotspot
+    if (d <= 0.4) {
       return {
         hasBottleneck: true,
         delayMinutes: b.delayMin,
@@ -178,44 +151,40 @@ function evaluateDestinationBottleneck(destCoords) {
 
 /**
  * Calculates a physics-calibrated road distance and duration estimate.
- *
- * @param {Array<number>} fromCoords
- * @param {Array<number>} toCoords
- * @param {Object} opts
- * @returns {{ distanceMeters: number, baseDurationSec: number, signalDelaySec: number, bottleneckDelaySec: number, corridor: Object }}
  */
 function computeCalibratedCorridorMetrics(fromCoords, toCoords, opts = {}) {
   const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
   const corridor = classifyCorridor(fromCoords, toCoords, opts);
 
   const roadKm = straightKm * corridor.windingFactor;
-  const distanceMeters = Math.round(roadKm * 1000);
+  const distanceMeters = Math.max(100, Math.round(roadKm * 1000));
 
   // Speed adjustments by mode
   const mode = opts.mode || 'driving';
   let speedKmH = corridor.baseSpeedKmH;
-  if (mode === 'walking') speedKmH = 4.6;
-  else if (mode === 'bicycling') speedKmH = 13.5;
-  else if (mode === 'transit') speedKmH = Math.min(speedKmH * 0.75, 24.0); // Transit stopping time
+  if (mode === 'walking') speedKmH = 4.8;
+  else if (mode === 'bicycling') speedKmH = 14.0;
+  else if (mode === 'transit') speedKmH = Math.min(speedKmH * 0.75, 22.0);
 
   const transitHours = roadKm / speedKmH;
-  const baseDurationSec = Math.round(transitHours * 3600);
+  const baseDurationSec = Math.max(mode === 'walking' ? 60 : 60, Math.round(transitHours * 3600));
 
-  // Signal & Junction Delays
-  const totalSignals = Math.max(0, roadKm * corridor.signalsPerKm);
-  const avgSignalWaitSec = corridor.corridorType === CORRIDOR_TYPE.DENSE_DOWNTOWN ? 45 : 30;
-  const signalDelaySec = mode === 'walking' ? 0 : Math.round(totalSignals * avgSignalWaitSec);
+  // Signal delay (only applied to non-walking on longer urban trips)
+  const totalSignals = roadKm >= 3.0 ? Math.max(0, roadKm * corridor.signalsPerKm) : 0;
+  const signalDelaySec = mode === 'walking' ? 0 : Math.round(totalSignals * 20);
 
-  // Hotspot Bottleneck Approach Delay
+  // Hotspot approach delay
   const bottleneck = evaluateDestinationBottleneck(toCoords);
-  const bottleneckDelaySec = bottleneck.hasBottleneck ? bottleneck.delayMinutes * 60 : 0;
+  const bottleneckDelaySec = (mode !== 'walking' && bottleneck.hasBottleneck) ? bottleneck.delayMinutes * 60 : 0;
+
+  const totalEstimatedSec = Math.max(mode === 'walking' ? 60 : 60, baseDurationSec + signalDelaySec + bottleneckDelaySec);
 
   return {
     distanceMeters,
     baseDurationSec,
     signalDelaySec,
     bottleneckDelaySec,
-    totalEstimatedSec: baseDurationSec + signalDelaySec + bottleneckDelaySec,
+    totalEstimatedSec,
     corridor,
     bottleneck,
   };
