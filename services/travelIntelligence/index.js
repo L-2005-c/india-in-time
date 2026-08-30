@@ -1,21 +1,11 @@
 // Travel Intelligence Engine — orchestrator
-const rules = require('../../data/time-intelligence-rules.json');
-const { t2m, m2t, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour } = require('./timeEngine');
-const { getOpeningStatus, categoryRules } = require('./openingHoursEngine');
-const { computeCrowd, predictCrowdLegacy } = require('./crowdEngine');
-const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier } = require('./trafficEngine');
-const { computeWeatherIntelligence, buildWeatherExperienceWindows } = require('./weatherEngine');
-const { computeScenic } = require('./scenicEngine');
-const { computeVisitScore, computeTimeScore, openingToScore, trafficToScore, computePreferenceScore } = require('./scoringEngine');
-const { getCulturalRitualIntel } = require('./culturalRitualEngine');
-const { getSignatureDish } = require('./signatureDishEngine');
-const { getEntryProtocol } = require('./entryProtocolEngine');
-const { computeConfidence } = require('./confidenceEngine');
+const { t2m, m2t, getISTParts, getSeason, computeSunTimes, getDaypart } = require('./timeEngine');
+const { categoryRules } = require('./openingHoursEngine');
+const { predictCrowdLegacy } = require('./crowdEngine');
 const { dynamicAdvice, multiDayAdvice } = require('./advisoryEngine');
 const { buildMultiDayItinerary } = require('./multiDayPlanner');
 const festivalEngine = require('./festivalEngine');
 const historicalCrowdStore = require('./historicalCrowdStore');
-const { generateExperienceWindows } = require('./experienceWindows');
 const { getTravelIntelligence } = require('./decisionEngine');
 
 function getBatchTravelIntelligence(places, now = new Date(), weather = null, options = {}) {
