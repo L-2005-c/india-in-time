@@ -140,6 +140,14 @@ const credits=50;
 let mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
 
+function safeInvalidateMapSize(animate = false) {
+  if (map && typeof map.invalidateSize === 'function') {
+    try { map.invalidateSize(animate); } catch (_e) { /* ignore */ }
+  } else if (map && typeof map.resize === 'function') {
+    try { map.resize(); } catch (_e) { /* ignore */ }
+  }
+}
+
 // …
 function isFiniteLatLon(lat, lon) {
   return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
@@ -896,7 +904,7 @@ function switchCity(cityId, silent=false){
     } else {
       browserLogger.warn('[switchCity] skipped flyTo — invalid coordinates for city:', cityId, city.lat, city.lon);
     }
-    setTimeout(()=>map.invalidateSize(),100);
+    setTimeout(()=>safeInvalidateMapSize(),100);
   }
   fetchWeatherUI(city.lat,city.lon);
   resetPlanUI();
@@ -1034,7 +1042,7 @@ async function searchCity(q){
     document.getElementById('city-input').value=currentCityName;
     const citySelect=document.getElementById('city-select');
     if(citySelect) citySelect.value='';
-    if(map){map.setView([lat,lon],12);setTimeout(()=>map.invalidateSize(),100);}
+    if(map){if(typeof map.setView==='function')map.setView([lat,lon],12);setTimeout(()=>safeInvalidateMapSize(),100);}
     fetchWeatherUI(lat,lon);
     updatePlannerShowcase();
     typing.remove();
@@ -1430,7 +1438,7 @@ const STATIC_ACTIONS = {
   exportGoogleMapsTrip: () => { const url = _mapHud.generateMultiStopGoogleMapsUrl(itin, getCityCenter()); if (url && url !== '#') { window.open(url, '_blank', 'noopener,noreferrer'); _showMicroToast('🧭 Opening multi-stop trip in Google Maps', { icon: '🗺️' }); } else { _showMicroToast('⚠️ Build an itinerary first to sync with Google Maps', { icon: '📍' }); } },
   exportGpxTrack: () => { const ok = _mapHud.exportItineraryAsGpx(itin, currentCityName || 'India'); if (ok) _showMicroToast('📥 GPX GPS track downloaded', { icon: '✅' }); else _showMicroToast('⚠️ Build an itinerary first to export GPX', { icon: '📍' }); },
   toggleMapLayer: () => { const lbl = document.getElementById('map-layer-label'); if (lbl) { lbl.textContent = lbl.textContent === 'Vector' ? 'Satellite' : 'Vector'; _showMicroToast(`Map layer: ${lbl.textContent}`, { icon: '🗺️' }); } },
-  toggleMapFullscreen: () => { const mapEl = document.getElementById('map-view'); const lbl = document.getElementById('map-fullscreen-label'); if (mapEl) { const isF = mapEl.classList.toggle('map-fullscreen'); if (lbl) lbl.textContent = isF ? 'Collapse' : 'Expand'; _showMicroToast(isF ? 'Map expanded to fullscreen' : 'Map restored', { icon: '⛶' }); if (window.map) setTimeout(() => window.map.invalidateSize(), 150); } },
+  toggleMapFullscreen: () => { const mapEl = document.getElementById('map-view'); const lbl = document.getElementById('map-fullscreen-label'); if (mapEl) { const isF = mapEl.classList.toggle('map-fullscreen'); if (lbl) lbl.textContent = isF ? 'Collapse' : 'Expand'; _showMicroToast(isF ? 'Map expanded to fullscreen' : 'Map restored', { icon: '⛶' }); setTimeout(() => safeInvalidateMapSize(), 150); } },
   highlightStopOnMap: (btn) => { const idx = Number(btn?.dataset?.stopIdx || 0); _mapHud.highlightStopOnTimelineAndMap(idx); },
   openDishModal: (btn) => { const dish = btn?.dataset?.dish || 'Local Specialty'; _showMicroToast(`Must-try food: ${dish}`, { icon: '🍛' }); },
   sendCopilotPrompt: (btn) => { const prompt = btn?.dataset?.prompt; const input = document.getElementById('chat-in'); if (input && prompt) { input.value = prompt; handleChat(); } },
@@ -1993,7 +2001,7 @@ function switchToView(viewId,idx,skipRenderHome=false){
     target.style.display=viewId==='tools-view'?'block':'flex';
   }
   document.querySelectorAll('.nav-item').forEach((n,i)=>{const on=i===idx||i===3&&idx>=3;n.classList.toggle('active',on);if(on)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
-  if(viewId==='map-view'&&map){map.invalidateSize();setTimeout(()=>map.invalidateSize(),50);setTimeout(()=>map.invalidateSize(),300);}
+  if(viewId==='map-view'){safeInvalidateMapSize();setTimeout(()=>safeInvalidateMapSize(),50);setTimeout(()=>safeInvalidateMapSize(),300);}
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
   else if(!skipRenderHome && (idx===3||viewId==='tools-view')) renderToolsHome();
@@ -3389,12 +3397,12 @@ window.onload=()=>{
     }).catch(e=>browserLogger.warn('[map] /api/config fetch failed, staying on fallback tiles:', e));
     // Leaflet computes its tile grid from the container's size at creation
 // …
-    [0,150,400,900].forEach(delay=>setTimeout(()=>{ if(map) map.invalidateSize(false); }, delay));
+    [0,150,400,900].forEach(delay=>setTimeout(()=>safeInvalidateMapSize(false), delay));
     const mapEl = document.getElementById('map');
     if(mapEl && 'ResizeObserver' in window){
-      new ResizeObserver(()=>{ if(map) map.invalidateSize(false); }).observe(mapEl);
+      new ResizeObserver(()=>safeInvalidateMapSize(false)).observe(mapEl);
     }
-    window.addEventListener('resize', () => { if(map) map.invalidateSize(); });
+    window.addEventListener('resize', () => safeInvalidateMapSize());
     map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
     map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
   } catch(mapInitErr) {
