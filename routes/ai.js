@@ -19,7 +19,10 @@
 const express = require('express');
 const router  = express.Router();
 const { callGeminiText, callGeminiVision } = require('../services/gemini');
+const { promptInjectionGuard } = require('../middleware/promptInjectionGuard');
 const logger = require('../lib/logger');
+
+router.use(promptInjectionGuard);
 
 // ── Generic wrapper to handle errors uniformly ───────────────────────────────
 // IMPORTANT: this used to send err.message straight to the client on every
