@@ -11,7 +11,7 @@
  * insertion is allowed.
  */
 
-const { getTravelIntelligence } = require('./index');
+const { getTravelIntelligence } = require('./decisionEngine');
 const { estimateTravel } = require('./trafficEngine');
 const { m2t, t2m } = require('./timeEngine');
 const dayStructure = require('./dayStructure');
@@ -36,10 +36,8 @@ const { generatePredictiveCrowdCurve } = require('./crowdCurve');
 const { evaluateWeatherOpportunityWindows } = require('./weatherOpportunity');
 const { findRouteAwareDining } = require('./mealIntelligence');
 const { evaluateTravelLoad } = require('./fatigueModel');
-const { simulateScenario } = require('./whatIfSimulator');
 const { evaluateGroupSatisfaction, createGroupProfile } = require('./groupTravelEngine');
 const { computeDestinationFingerprint, findSimilarDestinations } = require('./destinationFingerprints');
-const { optimizePlanWithAbCandidates } = require('./abItineraryOptimizer');
 
 const MEALS = {
   breakfast: { start: 7 * 60, end: 10 * 60 + 30, label: 'breakfast' },

@@ -1,240 +1,230 @@
 'use strict';
 
-function clamp(value, min = 0, max = 100) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return min;
-  return Math.max(min, Math.min(max, n));
-}
-
-function sourceQuality(source) {
-  switch (source) {
-    case 'live_traffic':
-    case 'observed': return 1.0;
-    case 'forecast':
-    case 'predicted': return 0.88;
-    case 'historical-db': return 0.78;
-    case 'route_estimate':
-    case 'estimated': return 0.68;
-    case 'astronomical_rules': return 0.82;
-    case 'unavailable': return 0.25;
-    default: return 0.55;
-  }
-}
-
-function freshnessFactor(ageMinutes) {
-  const age = Number(ageMinutes);
-  if (!Number.isFinite(age)) return 0.7;
-  if (age <= 15) return 1;
-  if (age <= 60) return 0.95;
-  if (age <= 180) return 0.85;
-  if (age <= 720) return 0.7;
-  return 0.55;
-}
-
-function signalConfidence({ source = 'unavailable', ageMinutes, samples = 0, calibration = null } = {}) {
-  let score = 100 * sourceQuality(source) * freshnessFactor(ageMinutes);
-  if (samples > 0) score += Math.min(12, Math.log10(samples + 1) * 7);
-  // BUGFIX: `calibration` defaults to `null`, and `Number(null) === 0` is a
-  // *finite* number — without the explicit `calibration != null` guard, every
-  // call that omits calibration silently fell into this branch and had its
-  // score multiplied by clamp(0, 0.5, 1.05) = 0.5, halving the result. Only
-  // apply the calibration multiplier when a real calibration value was given.
-  if (calibration != null && Number.isFinite(Number(calibration))) score *= clamp(Number(calibration), 0.5, 1.05);
-  return clamp(Math.round(score), 0, 100);
-}
-
-function weightedMean(values) {
-  const valid = values.filter(v => Number.isFinite(v.value) && Number.isFinite(v.weight) && v.weight > 0);
-  if (!valid.length) return 0;
-  const weight = valid.reduce((s, v) => s + v.weight, 0);
-  return valid.reduce((s, v) => s + v.value * v.weight, 0) / weight;
-}
-
-function uncertaintyFromSignals(signals = []) {
-  const confidences = signals.map(s => Number(s.confidence)).filter(Number.isFinite);
-  if (!confidences.length) return { score: 70, band: 30 };
-  const avg = confidences.reduce((a, b) => a + b, 0) / confidences.length;
-  const spread = confidences.length > 1
-    ? Math.sqrt(confidences.reduce((s, c) => s + ((c - avg) ** 2), 0) / confidences.length)
-    : 0;
-  const band = clamp(Math.round((100 - avg) * 0.55 + spread * 0.25 + 4), 4, 45);
-  return { score: clamp(Math.round(100 - band), 0, 100), band };
-}
-
-function computeDecisionScore({
-  experience = 50,
-  temporalFit = 50,
-  routeFit = 50,
-  robustness = 50,
-  preferenceFit = 50,
-  diversity = 50,
-  openingFeasibility = 50,
-} = {}) {
-  const components = {
-    experience: clamp(experience),
-    temporalFit: clamp(temporalFit),
-    routeFit: clamp(routeFit),
-    robustness: clamp(robustness),
-    preferenceFit: clamp(preferenceFit),
-    diversity: clamp(diversity),
-    openingFeasibility: clamp(openingFeasibility),
-  };
-  const weights = {
-    experience: 0.33,
-    temporalFit: 0.20,
-    routeFit: 0.13,
-    robustness: 0.12,
-    preferenceFit: 0.09,
-    diversity: 0.05,
-    openingFeasibility: 0.08,
-  };
-  const score = Object.entries(weights).reduce((sum, [k, w]) => sum + components[k] * w, 0);
-  return { score: clamp(Math.round(score)), components, weights };
-}
-
-function scenarioRobustness(baseScore, uncertaintyBand, scenarios = 5) {
-  const base = clamp(baseScore);
-  const band = clamp(uncertaintyBand, 1, 45);
-  const n = Math.max(3, Math.min(9, scenarios));
-  const values = [];
-  for (let i = 0; i < n; i += 1) {
-    const p = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
-    values.push(clamp(base + p * band));
-  }
-  const worst = Math.min(...values);
-  const best = Math.max(...values);
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  return {
-    worstCase: Math.round(worst),
-    expected: Math.round(mean),
-    bestCase: Math.round(best),
-    robustness: clamp(Math.round((worst * 0.55) + (mean * 0.35) + (best * 0.10))),
-    uncertaintyBand: Math.round(band),
-    scenarios: values.map(v => Math.round(v)),
-  };
-}
-
-function temporalRegret(arrivalScore, bestFutureScore) {
-  const a = clamp(arrivalScore);
-  const b = clamp(bestFutureScore);
-  return {
-    regret: Math.max(0, Math.round(b - a)),
-    opportunity: Math.max(0, Math.round(b - a)),
-    label: b - a >= 20 ? 'HIGH_OPPORTUNITY_TO_WAIT' : b - a >= 10 ? 'MODERATE_OPPORTUNITY' : 'LOW_OPPORTUNITY',
-  };
-}
-
 /**
- * Authoritative Unified Travel Value Score calculation.
- * Synthesizes all 5 intelligence systems with intent-adaptive weighting.
+ * services/travelIntelligence/decisionEngine.js
+ *
+ * Core Travel Intelligence Evaluator & Visit Decision Scorer.
+ * Evaluates place candidates against live/historical temporal rules, weather,
+ * scenic windows, crowd models, and transit heuristics.
  */
-function computeTravelValueScore({
-  tourismQuality = 60,
-  temporalSuitability = 60,
-  scenicValue = 50,
-  weatherFit = 75,
-  crowdFit = 70,
-  dnaMatch = 65,
-  routeEfficiency = 70,
-  openingAvailability = 90,
-  intent = 'balanced',
-  confidence = 85,
-} = {}) {
-  const components = {
-    tourismQuality: clamp(tourismQuality),
-    temporalSuitability: clamp(temporalSuitability),
-    scenicValue: clamp(scenicValue),
-    weatherFit: clamp(weatherFit),
-    crowdFit: clamp(crowdFit),
-    dnaMatch: clamp(dnaMatch),
-    routeEfficiency: clamp(routeEfficiency),
-    openingAvailability: clamp(openingAvailability),
-  };
 
-  const INTENT_WEIGHTS = {
-    photography: {
-      scenicValue: 0.28,
-      temporalSuitability: 0.24,
-      weatherFit: 0.16,
-      tourismQuality: 0.12,
-      dnaMatch: 0.10,
-      routeEfficiency: 0.05,
-      crowdFit: 0.05,
-      openingAvailability: 0.00,
-    },
-    food: {
-      tourismQuality: 0.32,
-      temporalSuitability: 0.25,
-      dnaMatch: 0.20,
-      openingAvailability: 0.10,
-      routeEfficiency: 0.08,
-      weatherFit: 0.05,
-      crowdFit: 0.00,
-      scenicValue: 0.00,
-    },
-    family: {
-      openingAvailability: 0.20,
-      routeEfficiency: 0.22,
-      tourismQuality: 0.20,
-      crowdFit: 0.15,
-      weatherFit: 0.12,
-      temporalSuitability: 0.08,
-      dnaMatch: 0.03,
-      scenicValue: 0.00,
-    },
-    adventure: {
-      scenicValue: 0.25,
-      dnaMatch: 0.22,
-      weatherFit: 0.20,
-      temporalSuitability: 0.15,
-      tourismQuality: 0.10,
-      routeEfficiency: 0.08,
-      crowdFit: 0.00,
-      openingAvailability: 0.00,
-    },
-    balanced: {
-      tourismQuality: 0.22,
-      temporalSuitability: 0.20,
-      scenicValue: 0.15,
-      dnaMatch: 0.14,
-      routeEfficiency: 0.11,
-      weatherFit: 0.08,
-      crowdFit: 0.05,
-      openingAvailability: 0.05,
-    },
-  };
+const rules = require('../../data/time-intelligence-rules.json');
+const { t2m, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour } = require('./timeEngine');
+const { getOpeningStatus, categoryRules } = require('./openingHoursEngine');
+const { computeCrowd } = require('./crowdEngine');
+const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier } = require('./trafficEngine');
+const { computeWeatherIntelligence, buildWeatherExperienceWindows } = require('./weatherEngine');
+const { computeScenic } = require('./scenicEngine');
+const { computeVisitScore, computeTimeScore, openingToScore, trafficToScore, computePreferenceScore } = require('./scoringEngine');
+const { getCulturalRitualIntel } = require('./culturalRitualEngine');
+const { getSignatureDish } = require('./signatureDishEngine');
+const { getEntryProtocol } = require('./entryProtocolEngine');
+const { computeConfidence } = require('./confidenceEngine');
+const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
+const historicalCrowdStore = require('./historicalCrowdStore');
+const { generateExperienceWindows } = require('./experienceWindows');
 
-  const weights = INTENT_WEIGHTS[intent] || INTENT_WEIGHTS.balanced;
-  const scoreRaw = Object.entries(weights).reduce((sum, [k, w]) => sum + components[k] * w, 0);
-  const score = clamp(Math.round(scoreRaw));
+function getTravelIntelligence(place, now = new Date(), weather = null, options = {}) {
+  // Attach historical crowd hints when not already provided on the place object
+  if (!place.historicalCrowd) {
+    const hist = historicalCrowdStore.lookupHistoricalCrowd(place, options.region || options.city || null);
+    if (hist) place = { ...place, historicalCrowd: hist };
+  }
+  const cat = place.cat || 'default';
+  const catRule = categoryRules(cat);
+  const [lat, lon] = place.coords || [20.5937, 78.9629];
+  const hasCoords = Array.isArray(place.coords) && place.coords.length >= 2 && Number.isFinite(place.coords[0]) && Number.isFinite(place.coords[1]);
+  const ist = getISTParts(now);
+  const nowMin = ist.minutesOfDay;
+  const isWeekend = ist.dayIndex === 0 || ist.dayIndex === 6;
+  const season = getSeason(ist.month);
+  const sun = computeSunTimes(lat, lon, now);
+  const golden = computeGoldenHours(sun.sunriseMin, sun.sunsetMin);
+  const daypart = getDaypart(nowMin, sun.sunsetMin);
+  const bestHours = place.best_hours || catRule.bestHours;
+  const peakHours = place.peak_hours || catRule.peakHours;
+  const isBestTimeNow = inWindow(nowMin, bestHours);
+  const isPeakHourNow = inWindow(nowMin, peakHours);
+  const ghState = isInGoldenHour(nowMin, golden);
+  const opening = getOpeningStatus(place, now, sun);
+  const crowd = computeCrowd({ daypart, isWeekend, isPeakHourNow, cat, month: ist.month, publicHoliday: !!options.publicHoliday, weather, historicalObservations: place.historicalCrowd || null, date: now, region: options.region || place.region || place.city || null });
+  const weatherIntel = computeWeatherIntelligence(weather, place, daypart);
+  const weatherWindows = buildWeatherExperienceWindows(weather, place);
+  const scenic = computeScenic(place, { nowMin, sun, golden, weatherIntel, now });
+  let traffic = null;
+  if (options.fromCoords || options.liveTraffic) {
+    traffic = estimateTravel({ fromCoords: options.fromCoords, toCoords: place.coords, departMin: nowMin, liveTraffic: options.liveTraffic || null, isFirstStop: !!options.isFirstStop });
+  } else {
+    const mult = getTrafficMultiplier(nowMin);
+    traffic = { travelMinutes: null, distanceKm: null, congestionFactor: mult, trafficLevel: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Moderate' : 'High', trafficRisk: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Medium' : 'High', source: 'estimated', label: 'Area traffic heuristic (no origin provided)', confidence: 40 };
+  }
+  const openingScore = openingToScore(opening);
+  const timeScore = computeTimeScore(place, { nowMin, isBestTimeNow, isPeakHourNow, daypart, goldenIn: ghState.any });
+  const preferenceScore = computePreferenceScore(place, options.personas || [], options.tripMode || null);
+  const trafficScore = trafficToScore(traffic);
+  const scored = computeVisitScore({ weatherScore: weatherIntel.score, crowdScore: crowd.crowdScore, trafficScore, scenicScore: scenic.scenicScore, timeScore, openingScore, preferenceScore }, place);
+  let targetStart = null, targetEnd = null;
+  if (scenic.bestScenicWindow) {
+    targetStart = scenic.bestScenicWindow.startMin ?? t2m(scenic.bestScenicWindow.start);
+    targetEnd = scenic.bestScenicWindow.endMin ?? t2m(scenic.bestScenicWindow.end);
+  } else if (bestHours?.[0]) {
+    targetStart = t2m(bestHours[0][0]);
+    targetEnd = t2m(bestHours[0][1]);
+  }
+  const travelMin = traffic?.travelMinutes ?? 20;
+  const arrival = targetStart != null ? recommendArrivalWindow({ experienceStartMin: targetStart, experienceEndMin: targetEnd, travelMinutes: travelMin }) : null;
+  const confidence = computeConfidence({
+    hasWeather: !!(weather && (weather.tempC != null || weather.condition || weather.weathercode != null || weather.windKph != null)),
+    hasCoords, hasOpeningHours: opening.dataQuality === 'provided',
+    hasCategoryRules: !!rules.categories[cat],
+    hasTrafficEstimate: traffic?.source === 'estimated' || traffic?.source === 'live',
+    hasLiveTraffic: traffic?.source === 'live',
+    hasHistoricalHint: !!(place.historicalCrowd && place.historicalCrowd.sampleSize),
+  });
+  const explanation = buildExplanation({ visitScore: scored.visitScore, visitLabel: scored.label, opening, crowd, weather: weatherIntel, traffic, scenic, arrival });
+  const statusLabel = buildStatusLabel({ opening, visitLabel: scored.label, crowd, weather: weatherIntel, scenic, daypart, nightAvailable: opening.nightAvailable });
+  const cultural = getCulturalRitualIntel(place, nowMin, ist.dayIndex);
+  const signatureDish = getSignatureDish(place, options.region || place.region || place.city || '');
+  const entryProtocol = getEntryProtocol(place);
 
-  // Determine top contributing explainability reasons
-  const reasons = [];
-  if (components.temporalSuitability >= 80) reasons.push('Optimal time window & solar conditions');
-  if (components.tourismQuality >= 80) reasons.push('Verified high-quality destination');
-  if (components.dnaMatch >= 80) reasons.push('Strong alignment with your Travel DNA');
-  if (components.scenicValue >= 80) reasons.push('Exceptional scenic / visual vantage');
-  if (components.routeEfficiency >= 85) reasons.push('Minimizes travel time in current cluster');
+  const badges = [];
+  if (opening.isOpenNow === true) badges.push('🟢 Open');
+  else if (opening.isOpenNow === false) badges.push('🔴 Closed');
+  else badges.push('❓ Hours unknown');
+  if (opening.status === 'CLOSING_SOON') badges.push('🟡 Closing Soon');
+  if (place.is_sunrise_spot) badges.push('🌅 Best at Sunrise');
+  if (place.is_sunset_spot) badges.push('🌇 Best at Sunset');
+  if (cultural?.culturalBadge) badges.push(cultural.culturalBadge);
+  if (weather && weather.tempC >= 38) badges.push('🔥 Hot Weather');
+  if (weather && /rain/i.test(weather.condition || '')) badges.push('🌧 Rain Alert');
+  if (crowd.level === 'High' || crowd.level === 'Very High') badges.push('👥 Peak Crowd');
+  if (weather && weather.windKph != null && weather.windKph >= 30 && (cat === 'beach' || cat === 'scenic' || place.is_sunset_spot)) badges.push('💨 Strong Wind');
+  if (isBestTimeNow && opening.isOpenNow) badges.push('✨ Best Time Now');
+  if (scored.visitScore >= 85) badges.push('⭐ Top Recommendation');
+  const experienceWindows = options.disableExperienceWindows ? { windows: [], source: 'suppressed' } : generateExperienceWindows({
+    referenceDate: now,
+    referenceStartMin: nowMin,
+    currentMin: nowMin,
+    startMin: Math.max(6 * 60, nowMin - 2 * 60),
+    endMin: Math.min(22 * 60, nowMin + 8 * 60),
+    stepMin: 60,
+    weatherResolver: (at) => {
+      const hourly = Array.isArray(weather?.hourly) ? weather.hourly : [];
+      if (!hourly.length) return null;
+      const target = at.getTime();
+      let best = null;
+      let bestDelta = Infinity;
+      for (const item of hourly) {
+        const t = new Date(item.time || item.timestamp || item.datetime || NaN);
+        const delta = Math.abs(t.getTime() - target);
+        if (!Number.isNaN(t.getTime()) && delta < bestDelta) {
+          best = item;
+          bestDelta = delta;
+        }
+      }
+      return bestDelta <= 90 * 60 * 1000 ? best : null;
+    },
+    place,
+    daypart,
+    season,
+    holiday: !!options.publicHoliday,
+    regionalCalendar: options.regionalCalendar || null,
+    city: options.city || place.city || null,
+    region: options.region || place.region || null,
+    state: options.state || place.state || null,
+    scenicContext: { sun, golden, weatherIntel },
+  });
+
+  const notifications = [];
+  if (opening.isOpenNow && opening.minutesToClose != null && opening.minutesToClose <= 60) notifications.push(`This attraction closes in ${opening.minutesToClose} minutes.`);
+  if (place.is_sunset_spot && nowMin < sun.sunsetMin && sun.sunsetMin - nowMin <= 30) notifications.push(`Golden hour starts in ${sun.sunsetMin - nowMin} minutes.`);
+  if (crowd.level === 'High' || crowd.level === 'Very High') notifications.push('Heavy crowd expected — consider visiting earlier or later.');
+  if (cultural?.isSanctumClosed) notifications.push(cultural.recommendation);
+  if (opening.isOpenNow === false && opening.minutesToOpen != null) {
+    const h = Math.floor(opening.minutesToOpen / 60), m = opening.minutesToOpen % 60;
+    notifications.push(`Opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`} — best time around ${sun.sunrise}.`);
+  }
+
+  const recommendations = [];
+  if (place.is_sunrise_spot && daypart === 'earlyMorning') recommendations.push('Sunrise viewpoint — arrive 15 min before sunrise');
+  if (place.is_sunset_spot && (daypart === 'evening' || ghState.evening)) recommendations.push('Golden hour photography tips');
+  if (cultural?.recommendation && !cultural.isSanctumClosed) recommendations.push(cultural.recommendation);
+  if (signatureDish?.mustTryReason) recommendations.push(`Must-try nearby: ${signatureDish.dishName} at ${signatureDish.iconicSpot}`);
+  if (daypart === 'earlyMorning') recommendations.push('Suggest breakfast nearby');
+  if (daypart === 'afternoon') recommendations.push('Suggest lunch restaurants nearby');
+  if (weatherIntel.warnings?.length) recommendations.push(...weatherIntel.warnings.slice(0, 2));
+  if (arrival?.recommendedDeparture) recommendations.push(`Leave around ${arrival.recommendedDeparture} to arrive for the best window`);
+
+  const bestSeason = place.season || catRule.season;
+  const seasonalNote = bestSeason && bestSeason !== 'any' && bestSeason !== season
+    ? `Best experienced in ${bestSeason} — visiting off-season is still fine, just set expectations`
+    : bestSeason && bestSeason !== 'any' ? `Peak season right now (${bestSeason})` : null;
 
   return {
-    score,
-    confidence: clamp(confidence),
-    components,
-    weights,
-    intent,
-    reasons: reasons.length ? reasons : ['Solid overall travel suitability fit'],
+    name: place.name,
+    category: cat,
+    visitScore: scored.visitScore,
+    visitLabel: scored.label,
+    scoringProfile: scored.profile,
+    components: scored.components,
+    isOpenNow: opening.isOpenNow,
+    statusLabel,
+    minutesToClose: opening.minutesToClose,
+    minutesToOpen: opening.minutesToOpen,
+    openTime: opening.openTime,
+    closeTime: opening.closeTime,
+    opening,
+    sunrise: sun.sunrise,
+    sunset: sun.sunset,
+    daypart,
+    isBestTimeNow,
+    isPeakHourNow,
+    goldenHours: golden,
+    inGoldenHour: ghState,
+    season,
+    bestSeason,
+    seasonalNote,
+    nightAvailable: opening.nightAvailable,
+    weeklyHoliday: opening.weeklyHoliday,
+    crowdLevel: crowd.level,
+    crowd: { level: crowd.level, score: crowd.crowdScore, crowdBadge: crowd.crowdBadge, isPeakWindow: crowd.isPeakWindow, bestOffPeakWindow: crowd.bestOffPeakWindow, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
+    weather: { ...weatherIntel, experienceWindows: weatherWindows },
+    traffic,
+    scenic,
+    arrival,
+    preferenceScore,
+    confidence,
+    explanation,
+    recommendations,
+    cultural,
+    signatureDish,
+    entryProtocol,
+    weatherWarnings: weatherIntel.warnings || [],
+    badges,
+    notifications,
+    experienceWindows,
+    dataQuality: {
+      opening: opening.dataQuality,
+      crowd: crowd.source,
+      weather: weatherIntel.source,
+      traffic: traffic?.source || 'unavailable',
+      scenic: 'rule-based',
+      dataFreshness: {
+        computedAt: now.toISOString(),
+        weather: weatherIntel.source === 'forecast' ? 'forecast' : weatherIntel.source,
+        traffic: traffic?.freshness || (traffic?.source === 'live_traffic' ? 'request_time' : traffic?.source || 'unavailable'),
+      },
+    },
+    dataSources: {
+      crowd: crowd.source,
+      weather: weatherIntel.source,
+      traffic: traffic?.provider || traffic?.source || 'unavailable',
+      scenic: 'astronomical_rules',
+    },
+    computedAt: now.toISOString(),
   };
 }
 
 module.exports = {
-  clamp,
-  sourceQuality,
-  freshnessFactor,
-  signalConfidence,
-  weightedMean,
-  uncertaintyFromSignals,
-  computeDecisionScore,
-  computeTravelValueScore,
-  scenarioRobustness,
-  temporalRegret,
+  getTravelIntelligence,
 };

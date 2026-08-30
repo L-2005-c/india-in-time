@@ -146,7 +146,7 @@ function buildTemporalProfile(place, options = {}) {
   const startOffset = Math.max(0, Number(options.startOffsetMin) || 0);
   const weather = options.weather || null;
   const points = [];
-  const { getTravelIntelligence } = require('./index');
+  const { getTravelIntelligence } = require('./decisionEngine');
 
   for (let offset = startOffset; offset <= horizonMin; offset += stepMin) {
     const at = addMinutes(referenceDate, offset);
