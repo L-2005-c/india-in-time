@@ -21,6 +21,7 @@ import * as _itineraryUiEngine from '../modules/itineraryUiEngine.js';
 import * as _whatIfSimulatorUi from '../modules/whatIfSimulatorUi.js';
 import * as _tripHealthScore from '../modules/tripHealthScore.js';
 import * as _mapHud from '../modules/mapHud.js';
+import * as _aiDrawer from '../modules/aiDrawer.js';
 import { startVoiceInput as _startVoiceInputMod, handleCaption as _handleCaptionMod, handleTranslate as _handleTranslateMod } from '../modules/aiMedia.js';
 import { getDaypartClient as _getDaypartClient, getOpeningStatusPure as _getOpeningStatusPure, getCrowdPredictionPure as _getCrowdPredictionPure, calculateExperienceScorePure as _calculateExperienceScorePure } from '../utils/experience-score.js';
 import { isPlausibleGpsFix as _isPlausibleGpsFix, createGpsFixCoordinator as _createGpsFixCoordinator } from '../utils/gps.js';
@@ -2982,9 +2983,8 @@ async function aiFoodCard(stopName, cat) {
 // AI TOOLS SIDE DRAWER
 // ═══════════════════════════════════════
 
-function openAiDrawer() { return modules.aiDrawer.openAiDrawer(); }
-function closeAiDrawer() { return modules.aiDrawer.closeAiDrawer(); }
-function renderDrawerContent() { return modules.aiDrawer.renderDrawerContent(); }
+function openAiDrawer() { return _aiDrawer.openAiDrawer(); }
+function closeAiDrawer() { return _aiDrawer.closeAiDrawer(); }
 function renderAiToolsGrid() {}
 
 // ═══════════════════════════════════════
