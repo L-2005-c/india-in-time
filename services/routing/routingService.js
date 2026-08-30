@@ -154,9 +154,10 @@ async function fetchOsrmRoute(fromCoords, toCoords, opts = {}) {
 }
 
 /**
- * Calibrated Road Network Fallback Engine.
+ * Calibrated Geodesic Heuristic Fallback Engine.
+ * Explicitly labeled as a heuristic fallback (NOT a road-network truth).
  */
-function calculateRoadNetworkFallback(fromCoords, toCoords, opts = {}) {
+function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
   const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
   const roadKm = straightKm * ROAD_NETWORK_FACTOR;
   const distanceMeters = Math.round(roadKm * 1000);
@@ -171,15 +172,18 @@ function calculateRoadNetworkFallback(fromCoords, toCoords, opts = {}) {
   const durationSeconds = baseMinutes * 60;
 
   return {
-    provider: 'road_network_model',
+    provider: 'geodesic_heuristic',
+    isRoadNetworkTruth: false,
     distanceMeters,
     durationSeconds,
     durationInTrafficSeconds: null,
     hasRealtimeTraffic: false,
+    provenance: 'GEODESIC_HEURISTIC_ESTIMATE',
     geometry: [fromCoords, toCoords],
-    summary: 'Estimated road route',
-    steps: [{ instruction: 'Follow road route to destination', distanceM: distanceMeters, durationSec: durationSeconds, maneuver: 'depart' }],
-    confidenceScore: 65,
+    summary: 'Estimated travel time (direct road heuristic)',
+    steps: [{ instruction: 'Direct route estimate to destination', distanceM: distanceMeters, durationSec: durationSeconds, maneuver: 'depart' }],
+    confidenceScore: null,
+    limitations: 'Calculated using geodesic distance * empirical winding factor without road-network topology verification.',
   };
 }
 
@@ -254,7 +258,7 @@ async function calculateRoute(origin, destination, opts = {}) {
 
   // 3. Fallback Heuristic
   if (!rawRoute) {
-    rawRoute = calculateRoadNetworkFallback(from, to, { ...opts, mode });
+    rawRoute = calculateHeuristicEstimateFallback(from, to, { ...opts, mode });
   }
 
   // Traffic Enrichment
@@ -307,6 +311,9 @@ async function calculateRoute(origin, destination, opts = {}) {
     confidence: {
       score: rawRoute.confidenceScore,
       source: rawRoute.provider,
+      isRoadNetworkTruth: rawRoute.isRoadNetworkTruth !== false,
+      provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
+      limitations: rawRoute.limitations || null,
       warnings,
     },
   };
@@ -319,7 +326,8 @@ async function calculateRoute(origin, destination, opts = {}) {
 
 /**
  * Multi-Stop Matrix Routing for Day Itineraries.
- * Computes authoritative routes for consecutive legs.
+ * Sequential calculation propagating actual arrival time & visit durations
+ * across consecutive legs for accurate temporal and traffic modeling.
  *
  * @param {Array<Object>} stops - Array of stops with coords [lat, lon]
  * @param {Object} opts - Global options (departureTime, mode, preference)
@@ -329,23 +337,31 @@ async function calculateRouteMatrix(stops = [], opts = {}) {
     return { success: false, error: 'At least two stops required for matrix routing', legs: [] };
   }
 
-  const baseDeparture = opts.departureTime ? new Date(opts.departureTime) : new Date();
-  const legPromises = [];
+  let currentDeparture = opts.departureTime ? new Date(opts.departureTime) : new Date();
+  const legs = [];
 
   for (let i = 0; i < stops.length - 1; i++) {
     const originStop = stops[i];
     const destStop = stops[i + 1];
-    legPromises.push(
-      calculateRoute(originStop.coords, destStop.coords, {
-        ...opts,
-        originName: originStop.name,
-        destName: destStop.name,
-        departureTime: baseDeparture.toISOString(),
-      })
-    );
-  }
+    const originCoords = originStop.coords || [originStop.lat, originStop.lon];
+    const destCoords = destStop.coords || [destStop.lat, destStop.lon];
 
-  const legs = await Promise.all(legPromises);
+    const legResult = await calculateRoute(originCoords, destCoords, {
+      ...opts,
+      originName: originStop.name,
+      destName: destStop.name,
+      departureTime: currentDeparture.toISOString(),
+    });
+
+    legs.push(legResult);
+
+    if (legResult && legResult.success) {
+      const legDurationSec = legResult.duration.trafficAwareSeconds || legResult.duration.seconds || 600;
+      const visitMinutes = Number(destStop.vt || destStop.durationMin || destStop.visitMinutes || 45);
+      // Propagate departure time for next leg: arrival + visit duration
+      currentDeparture = new Date(currentDeparture.getTime() + (legDurationSec * 1000) + (visitMinutes * 60 * 1000));
+    }
+  }
 
   let totalDistanceMeters = 0;
   let totalDurationSeconds = 0;

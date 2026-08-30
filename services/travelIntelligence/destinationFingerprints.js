@@ -108,7 +108,10 @@ function computeDestinationFingerprint(place = {}) {
       tourismTier: place.tourismTier || (rating >= 4.5 ? 'A' : 'B'),
     },
     evidence,
-    confidence: 88,
+    confidence: 85,
+    source: 'curated_prior',
+    method: 'CATEGORY_EXPERIENCE_PRIOR',
+    provenance: 'CURATED_PRIOR',
     lastUpdated: new Date().toISOString(),
   };
 }

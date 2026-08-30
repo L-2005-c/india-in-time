@@ -2,16 +2,25 @@
 
 /**
  * services/travelIntelligence/knowledgeGraph.js
- * Structured Tourism Knowledge Graph Engine.
+ * Structured Tourism Knowledge Graph Engine with Truthful Provenance & Spatial Candidate Pruning.
  *
  * Implements:
  * 1. Graph representation connecting tourism entities (Destinations, Dining, Scenic Views, Hubs).
- * 2. Typed relationships (NEAR, ROUTE_TO, SIMILAR_TO, GOOD_FOR, BEST_AT_TIME, NEAR_RESTAURANT, SCENIC_WITH).
- * 3. Edge provenance, confidence, and freshness tracking.
- * 4. Rich spatial and contextual graph query APIs.
+ * 2. Typed relationships (GEODESIC_NEAR, ROAD_NEAR, NEAR, ROUTE_TO, SIMILAR_TO, GOOD_FOR, BEST_AT_TIME, NEAR_RESTAURANT, SCENIC_WITH).
+ * 3. Strict separation of geodesic distance vs road-network distance.
+ * 4. Spatial grid candidate pruning to eliminate O(n²) all-pairs explosion.
+ * 5. Transparent edge provenance and evidence tracking.
  */
 
 const { distKm } = require('../../utils/geo');
+
+const GRID_SIZE_DEG = 0.05; // ~5.5 km grid cell for spatial pruning
+
+function getGridKey(lat, lon) {
+  const gy = Math.floor(lat / GRID_SIZE_DEG);
+  const gx = Math.floor(lon / GRID_SIZE_DEG);
+  return `${gy}:${gx}`;
+}
 
 class TourismKnowledgeGraph {
   constructor() {
@@ -49,10 +58,14 @@ class TourismKnowledgeGraph {
         targetId: t,
         type: relationType,
         metadata: {
-          confidence: Number(metadata.confidence || 85),
+          confidence: metadata.confidence ?? null,
           source: metadata.source || 'spatial_engine',
-          distanceM: metadata.distanceM ?? null,
+          provenance: metadata.provenance || 'HEURISTIC',
+          geodesicDistanceM: metadata.geodesicDistanceM ?? metadata.distanceM ?? null,
+          distanceM: metadata.distanceM ?? metadata.geodesicDistanceM ?? null,
+          roadDistanceM: metadata.roadDistanceM ?? null,
           travelMinutes: metadata.travelMinutes ?? null,
+          isRoadNetwork: !!metadata.isRoadNetwork,
           lastVerified: metadata.lastVerified || new Date().toISOString(),
           ...metadata,
         },
@@ -62,47 +75,103 @@ class TourismKnowledgeGraph {
   }
 
   /**
-   * Automatically populates the knowledge graph from an array of place entities.
+   * Builds the knowledge graph using spatial grid candidate pruning
+   * to avoid O(N²) all-pairs comparison.
    */
   buildCityGraph(places = []) {
     places.forEach(p => this.addNode(p));
 
     const placeList = Array.from(this.nodes.values());
-    for (let i = 0; i < placeList.length; i++) {
-      const p1 = placeList[i];
-      for (let j = i + 1; j < placeList.length; j++) {
-        const p2 = placeList[j];
-        const straightKm = distKm(p1.coords[0], p1.coords[1], p2.coords[0], p2.coords[1]);
 
-        // 1. Proximity Edge (NEAR)
-        if (straightKm <= 3.5) {
-          const roadM = Math.round(straightKm * 1.35 * 1000);
-          const travelM = Math.max(4, Math.round(straightKm * 1.35 / 0.32));
-          this.addEdge(p1.id, p2.id, 'NEAR', { distanceM: roadM, travelMinutes: travelM, source: 'geo_road_network', confidence: 92 });
-          this.addEdge(p2.id, p1.id, 'NEAR', { distanceM: roadM, travelMinutes: travelM, source: 'geo_road_network', confidence: 92 });
-        }
+    // 1. Build spatial grid index
+    const grid = new Map(); // gridKey -> Array<Node>
+    for (const p of placeList) {
+      const key = getGridKey(p.coords[0], p.coords[1]);
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(p);
+    }
 
-        // 2. Dining Edge (NEAR_RESTAURANT)
-        const isFood1 = p1.category === 'food' || p1.category === 'cafe';
-        const isFood2 = p2.category === 'food' || p2.category === 'cafe';
-        if (isFood2 && !isFood1 && straightKm <= 2.0) {
-          this.addEdge(p1.id, p2.id, 'NEAR_RESTAURANT', { distanceM: Math.round(straightKm * 1000), source: 'culinary_proximity', confidence: 90 });
-        } else if (isFood1 && !isFood2 && straightKm <= 2.0) {
-          this.addEdge(p2.id, p1.id, 'NEAR_RESTAURANT', { distanceM: Math.round(straightKm * 1000), source: 'culinary_proximity', confidence: 90 });
-        }
+    // 2. Query spatial neighbors using 3x3 grid cells around each node
+    const evaluatedPairs = new Set();
 
-        // 3. Similarity Edge (SIMILAR_TO)
-        if (p1.category === p2.category && p1.rating >= 4.3 && p2.rating >= 4.3) {
-          this.addEdge(p1.id, p2.id, 'SIMILAR_TO', { similarityScore: 88, source: 'category_rating_affinity', confidence: 85 });
-          this.addEdge(p2.id, p1.id, 'SIMILAR_TO', { similarityScore: 88, source: 'category_rating_affinity', confidence: 85 });
-        }
+    for (const p1 of placeList) {
+      const cy = Math.floor(p1.coords[0] / GRID_SIZE_DEG);
+      const cx = Math.floor(p1.coords[1] / GRID_SIZE_DEG);
 
-        // 4. Scenic Complementarity (SCENIC_WITH)
-        const isScenic1 = p1.category === 'scenic' || p1.is_sunset_spot || p1.is_sunrise_spot;
-        const isScenic2 = p2.category === 'scenic' || p2.is_sunset_spot || p2.is_sunrise_spot;
-        if (isScenic1 && isScenic2 && straightKm <= 5.0) {
-          this.addEdge(p1.id, p2.id, 'SCENIC_WITH', { source: 'scenic_corridor', confidence: 88 });
-          this.addEdge(p2.id, p1.id, 'SCENIC_WITH', { source: 'scenic_corridor', confidence: 88 });
+      // Inspect 3x3 neighbor grid cells (~15km radius)
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const neighborKey = `${cy + dy}:${cx + dx}`;
+          const cellPlaces = grid.get(neighborKey);
+          if (!cellPlaces) continue;
+
+          for (const p2 of cellPlaces) {
+            if (p1.id === p2.id) continue;
+            const pairKey = p1.id < p2.id ? `${p1.id}|${p2.id}` : `${p2.id}|${p1.id}`;
+            if (evaluatedPairs.has(pairKey)) continue;
+            evaluatedPairs.add(pairKey);
+
+            const straightKm = distKm(p1.coords[0], p1.coords[1], p2.coords[0], p2.coords[1]);
+            const geodesicM = Math.round(straightKm * 1000);
+
+            // 1. Geodesic Proximity Edge (GEODESIC_NEAR / NEAR)
+            if (straightKm <= 3.5) {
+              const edgeMeta = {
+                geodesicDistanceM: geodesicM,
+                distanceM: geodesicM,
+                isRoadNetwork: false,
+                source: 'geodesic_proximity',
+                provenance: 'GEODESIC_CALCULATED',
+              };
+              this.addEdge(p1.id, p2.id, 'NEAR', edgeMeta);
+              this.addEdge(p2.id, p1.id, 'NEAR', edgeMeta);
+              this.addEdge(p1.id, p2.id, 'GEODESIC_NEAR', edgeMeta);
+              this.addEdge(p2.id, p1.id, 'GEODESIC_NEAR', edgeMeta);
+            }
+
+            // 2. Dining Edge (NEAR_RESTAURANT)
+            const isFood1 = p1.category === 'food' || p1.category === 'cafe';
+            const isFood2 = p2.category === 'food' || p2.category === 'cafe';
+            if (isFood2 && !isFood1 && straightKm <= 2.0) {
+              this.addEdge(p1.id, p2.id, 'NEAR_RESTAURANT', {
+                geodesicDistanceM: geodesicM,
+                distanceM: geodesicM,
+                source: 'culinary_proximity',
+                provenance: 'SPATIAL_HEURISTIC',
+              });
+            } else if (isFood1 && !isFood2 && straightKm <= 2.0) {
+              this.addEdge(p2.id, p1.id, 'NEAR_RESTAURANT', {
+                geodesicDistanceM: geodesicM,
+                distanceM: geodesicM,
+                source: 'culinary_proximity',
+                provenance: 'SPATIAL_HEURISTIC',
+              });
+            }
+
+            // 3. Similarity Edge (SIMILAR_TO)
+            if (p1.category === p2.category && p1.rating >= 4.3 && p2.rating >= 4.3) {
+              const simMeta = {
+                similarityScore: 88,
+                source: 'category_rating_affinity',
+                provenance: 'SEMANTIC_SIMILARITY',
+              };
+              this.addEdge(p1.id, p2.id, 'SIMILAR_TO', simMeta);
+              this.addEdge(p2.id, p1.id, 'SIMILAR_TO', simMeta);
+            }
+
+            // 4. Scenic Complementarity (SCENIC_WITH)
+            const isScenic1 = p1.category === 'scenic' || p1.is_sunset_spot || p1.is_sunrise_spot;
+            const isScenic2 = p2.category === 'scenic' || p2.is_sunset_spot || p2.is_sunrise_spot;
+            if (isScenic1 && isScenic2 && straightKm <= 5.0) {
+              const scenicMeta = {
+                geodesicDistanceM: geodesicM,
+                source: 'scenic_corridor',
+                provenance: 'SPATIAL_HEURISTIC',
+              };
+              this.addEdge(p1.id, p2.id, 'SCENIC_WITH', scenicMeta);
+              this.addEdge(p2.id, p1.id, 'SCENIC_WITH', scenicMeta);
+            }
+          }
         }
       }
     }
@@ -118,13 +187,14 @@ class TourismKnowledgeGraph {
 
     const edges = this.edges.get(s) || [];
     return edges
-      .filter(e => e.type === 'NEAR' && (e.metadata.distanceM / 1000) <= radiusKm)
+      .filter(e => (e.type === 'NEAR' || e.type === 'GEODESIC_NEAR') && ((e.metadata.geodesicDistanceM || e.metadata.distanceM) / 1000) <= radiusKm)
       .map(e => ({
         node: this.nodes.get(e.targetId),
         relationship: e.type,
-        distanceKm: Math.round((e.metadata.distanceM / 1000) * 10) / 10,
+        distanceKm: Math.round(((e.metadata.geodesicDistanceM || e.metadata.distanceM) / 1000) * 10) / 10,
         travelMinutes: e.metadata.travelMinutes,
         confidence: e.metadata.confidence,
+        provenance: e.metadata.provenance,
       }))
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }
@@ -155,8 +225,9 @@ class TourismKnowledgeGraph {
       .filter(e => e.type === 'NEAR_RESTAURANT')
       .map(e => ({
         node: this.nodes.get(e.targetId),
-        distanceM: e.metadata.distanceM,
+        distanceM: e.metadata.distanceM || e.metadata.geodesicDistanceM,
         confidence: e.metadata.confidence,
+        provenance: e.metadata.provenance,
       }))
       .sort((a, b) => a.distanceM - b.distanceM)
       .slice(0, limit);

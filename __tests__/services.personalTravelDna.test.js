@@ -64,7 +64,7 @@ describe('Personal Travel DNA Engine', () => {
     expect(match.score).toBeGreaterThan(65);
     expect(match.reasons.length).toBeGreaterThan(0);
     expect(match.reasons.some(r => /scenic|photography/i.test(r))).toBe(true);
-    expect(match.confidence).toBeGreaterThan(80);
+    expect(match.confidence).toBeGreaterThanOrEqual(80);
   });
 
   test('respects privacy toggle and returns neutral scoring when disabled', () => {

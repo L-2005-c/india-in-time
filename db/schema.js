@@ -183,6 +183,16 @@ const SCHEMA_SQL = `
     trained_n    INTEGER DEFAULT 0,
     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Durable User Behavioral Events & Inferred Affinities
+  CREATE TABLE IF NOT EXISTS user_behavioral_profiles (
+    user_id          VARCHAR(255) PRIMARY KEY,
+    affinities_json  TEXT NOT NULL,
+    events_json      TEXT NOT NULL,
+    confidence       SMALLINT DEFAULT 50,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_behavior_time ON user_behavioral_profiles(updated_at);
 `;
 
 module.exports = { SCHEMA_SQL };

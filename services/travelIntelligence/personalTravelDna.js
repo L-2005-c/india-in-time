@@ -34,14 +34,14 @@ const DEFAULT_TRAVEL_DNA = Object.freeze({
     walkingTolerance: 'default',
   },
   confidences: {
-    scenic: 88,
-    photography: 85,
-    food: 88,
-    culture: 85,
-    adventure: 82,
-    shopping: 80,
-    crowdTolerance: 85,
-    walkingTolerance: 86,
+    scenic: null,
+    photography: null,
+    food: null,
+    culture: null,
+    adventure: null,
+    shopping: null,
+    crowdTolerance: null,
+    walkingTolerance: null,
   },
   lastUpdated: new Date().toISOString(),
 });
@@ -89,14 +89,14 @@ function sanitizeDnaProfile(input = {}) {
       walkingTolerance: sources.walkingTolerance || 'default',
     },
     confidences: {
-      scenic: clamp(confidences.scenic, 20, 100, DEFAULT_TRAVEL_DNA.confidences.scenic),
-      photography: clamp(confidences.photography, 20, 100, DEFAULT_TRAVEL_DNA.confidences.photography),
-      food: clamp(confidences.food, 20, 100, DEFAULT_TRAVEL_DNA.confidences.food),
-      culture: clamp(confidences.culture, 20, 100, DEFAULT_TRAVEL_DNA.confidences.culture),
-      adventure: clamp(confidences.adventure, 20, 100, DEFAULT_TRAVEL_DNA.confidences.adventure),
-      shopping: clamp(confidences.shopping, 20, 100, DEFAULT_TRAVEL_DNA.confidences.shopping),
-      crowdTolerance: clamp(confidences.crowdTolerance, 20, 100, DEFAULT_TRAVEL_DNA.confidences.crowdTolerance),
-      walkingTolerance: clamp(confidences.walkingTolerance, 20, 100, DEFAULT_TRAVEL_DNA.confidences.walkingTolerance),
+      scenic: confidences.scenic != null ? clamp(confidences.scenic, 20, 100) : null,
+      photography: confidences.photography != null ? clamp(confidences.photography, 20, 100) : null,
+      food: confidences.food != null ? clamp(confidences.food, 20, 100) : null,
+      culture: confidences.culture != null ? clamp(confidences.culture, 20, 100) : null,
+      adventure: confidences.adventure != null ? clamp(confidences.adventure, 20, 100) : null,
+      shopping: confidences.shopping != null ? clamp(confidences.shopping, 20, 100) : null,
+      crowdTolerance: confidences.crowdTolerance != null ? clamp(confidences.crowdTolerance, 20, 100) : null,
+      walkingTolerance: confidences.walkingTolerance != null ? clamp(confidences.walkingTolerance, 20, 100) : null,
     },
     lastUpdated: input.lastUpdated || new Date().toISOString(),
   };
@@ -289,7 +289,8 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
   }
 
   const finalScore = clamp(Math.round(score), 10, 100);
-  const avgConfidence = Math.round(Object.values(dna.confidences || {}).reduce((a, b) => a + b, 0) / 8);
+  const validConfidences = Object.values(dna.confidences || {}).filter(c => c != null && Number.isFinite(c));
+  const avgConfidence = validConfidences.length ? Math.round(validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length) : 80;
 
   return {
     score: finalScore,

@@ -58,7 +58,20 @@ function predictDestinationSuitability(place = {}, horizonKey = 'TOMORROW', opti
   const crowdScore = crowdPrediction.arrivalCrowd.level === 'Low' ? 95 : crowdPrediction.arrivalCrowd.level === 'Moderate' ? 80 : 50;
   const compositeScore = Math.round((scenic.score * 0.4) + (weatherScore * 0.35) + (crowdScore * 0.25));
 
-  const confidence = horizonKey === 'NOW' ? 92 : horizonKey === 'NEXT_HOURS' ? 86 : horizonKey === 'TOMORROW' ? 80 : 70;
+  // Evidence-based confidence evaluation
+  let confidenceLevel = 'MEDIUM';
+  let confidenceScore = 75;
+  if (options.hasLiveSensors) {
+    confidenceLevel = 'HIGH';
+    confidenceScore = 90;
+  } else if (horizonKey === 'SEASONAL' || horizonKey === 'WEEKEND') {
+    confidenceLevel = 'LOW';
+    confidenceScore = 65;
+  } else if (Array.isArray(options.historicalObservations) && options.historicalObservations.length >= 10) {
+    confidenceLevel = 'HIGH';
+    confidenceScore = 85;
+  }
+
   const telemetryType = options.hasLiveSensors ? 'LIVE_SIGNAL' : 'PREDICTED';
 
   // Opportunity Alert generation
@@ -71,6 +84,7 @@ function predictDestinationSuitability(place = {}, horizonKey = 'TOMORROW', opti
     placeId: place.id || place.name,
     placeName: place.name,
     horizon: horizon.label,
+    horizonKey: horizon.id,
     compositeSuitabilityScore: compositeScore,
     predictedCrowd: crowdPrediction.arrivalCrowd,
     predictedWeather: {
@@ -82,7 +96,10 @@ function predictDestinationSuitability(place = {}, horizonKey = 'TOMORROW', opti
     bestScenicWindow: scenic.bestWindow,
     peakScenicMoment: scenic.peakMoment,
     telemetryType,
-    confidence,
+    provenance: options.hasLiveSensors ? 'OBSERVED_LIVE_SIGNAL' : 'PREDICTED_COMPOSITE_MODEL',
+    confidence: confidenceScore,
+    confidenceLevel,
+    freshness: new Date().toISOString(),
     opportunityAlert,
   };
 }

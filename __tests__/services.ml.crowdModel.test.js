@@ -1,3 +1,5 @@
+'use strict';
+
 const {
   predictCrowd,
   updateOnline,
@@ -20,7 +22,7 @@ describe('ml/crowdModel online logistic regression', () => {
     expect(x[17]).toBe(1); // bias
   });
 
-  test('predictCrowd returns level and score', () => {
+  test('predictCrowd returns baseline and truthful provenance on cold start', () => {
     const pred = predictCrowd({
       daypart: 'evening',
       isWeekend: true,
@@ -31,14 +33,12 @@ describe('ml/crowdModel online logistic regression', () => {
     });
     expect(pred.score).toBeGreaterThanOrEqual(0);
     expect(pred.score).toBeLessThanOrEqual(100);
-    expect(pred.level).toMatch(/Low|Moderate|High/);
-    // v3 model: reports a distinct "-cold" source until it has seen at
-    // least 20 training samples, so callers can tell a fresh model apart
-    // from one with real learned signal.
-    expect(pred.source).toMatch(/^ml-logistic-v3(-cold)?$/);
+    expect(pred.level).toMatch(/Low|Moderate|High|Very High/);
+    expect(pred.isMlActive).toBe(false);
+    expect(pred.source).toMatch(/^(historical_baseline|rule_baseline|ml-logistic-v3)$/);
   });
 
-  test('online update moves prediction toward label', () => {
+  test('online update activates ML prediction after meeting minimum sample threshold', () => {
     const ctx = {
       daypart: 'afternoon',
       isWeekend: false,
@@ -47,15 +47,18 @@ describe('ml/crowdModel online logistic regression', () => {
       cat: 'beach',
       historicalScore: 50,
     };
-    const before = predictCrowd(ctx).probability;
     for (let i = 0; i < 30; i++) updateOnline(ctx, 1);
-    const after = predictCrowd(ctx).probability;
-    expect(after).toBeGreaterThanOrEqual(before - 0.05); // generally increases for high-crowd label
-    expect(getModelInfo().trainedN).toBeGreaterThan(0);
+    const after = predictCrowd(ctx);
+    expect(after.isMlActive).toBe(true);
+    expect(after.source).toBe('ml-logistic-v3');
+    expect(after.probability).toBeGreaterThanOrEqual(0.45);
+    expect(getModelInfo().trainedN).toBeGreaterThanOrEqual(30);
   });
 
-  test('feedbackToLabel maps ratings', () => {
+  test('feedbackToLabel maps ratings and explicit crowd reports', () => {
     expect(feedbackToLabel(1, false)).toBe(1);
     expect(feedbackToLabel(5, true)).toBe(0);
+    expect(feedbackToLabel(null, true, { crowdScore: 75 })).toBe(0.75);
+    expect(feedbackToLabel(null, true, { crowdLevel: 'High' })).toBe(0.75);
   });
 });
