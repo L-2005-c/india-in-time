@@ -17,6 +17,10 @@ import { readLocalPlans as _readLocalPlansMod, writeLocalPlans as _writeLocalPla
 import { generateWhatsAppShareText as _genWhatsAppText, buildOfflineTravelPassHtml as _buildOfflinePassHtml } from '../modules/offlineTravelPass.js';
 import { filterCommands, renderPaletteListHtml, PALETTE_COMMANDS } from '../modules/commandPalette.js';
 import { showToast as _showMicroToast } from '../modules/toastEngine.js';
+import * as _itineraryUiEngine from '../modules/itineraryUiEngine.js';
+import * as _whatIfSimulatorUi from '../modules/whatIfSimulatorUi.js';
+import * as _tripHealthScore from '../modules/tripHealthScore.js';
+import * as _mapHud from '../modules/mapHud.js';
 import { startVoiceInput as _startVoiceInputMod, handleCaption as _handleCaptionMod, handleTranslate as _handleTranslateMod } from '../modules/aiMedia.js';
 import { getDaypartClient as _getDaypartClient, getOpeningStatusPure as _getOpeningStatusPure, getCrowdPredictionPure as _getCrowdPredictionPure, calculateExperienceScorePure as _calculateExperienceScorePure } from '../utils/experience-score.js';
 import { isPlausibleGpsFix as _isPlausibleGpsFix, createGpsFixCoordinator as _createGpsFixCoordinator } from '../utils/gps.js';
@@ -1367,37 +1371,19 @@ let paletteSelectedIndex = 0;
 let paletteFiltered = [];
 
 function openCommandPalette() {
-  const modal = document.getElementById('command-palette-modal');
-  const input = document.getElementById('palette-search-input');
+  const modal = document.getElementById('command-palette-modal'), input = document.getElementById('palette-search-input');
   if (!modal) return;
-  modal.style.display = 'flex';
-  paletteQuery = '';
-  paletteSelectedIndex = 0;
-  if (input) {
-    input.value = '';
-    input.focus();
-  }
+  modal.style.display = 'flex'; paletteQuery = ''; paletteSelectedIndex = 0;
+  if (input) { input.value = ''; input.focus(); }
   updatePaletteUI();
 }
-
-function closeCommandPalette() {
-  const modal = document.getElementById('command-palette-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-function closePaletteOverlay(e) {
-  if (e && e.target && e.target.id === 'command-palette-modal') {
-    closeCommandPalette();
-  }
-}
-
+function closeCommandPalette() { const modal = document.getElementById('command-palette-modal'); if (modal) modal.style.display = 'none'; }
+function closePaletteOverlay(e) { if (e?.target?.id === 'command-palette-modal') closeCommandPalette(); }
 function updatePaletteUI() {
   const list = document.getElementById('palette-list');
   if (!list) return;
   paletteFiltered = filterCommands(paletteQuery);
-  if (paletteSelectedIndex >= paletteFiltered.length) {
-    paletteSelectedIndex = Math.max(0, paletteFiltered.length - 1);
-  }
+  if (paletteSelectedIndex >= paletteFiltered.length) paletteSelectedIndex = Math.max(0, paletteFiltered.length - 1);
   list.innerHTML = renderPaletteListHtml(paletteFiltered, paletteSelectedIndex);
 }
 
@@ -1436,6 +1422,15 @@ const STATIC_ACTIONS = {
   openCommandPalette, closeCommandPalette, closePaletteOverlay, execPaletteCmd, toggleTheme,
   switchCity: (btn) => switchCity(btn?.value || btn?.dataset?.city || btn?.dataset?.arg),
   continueAsGuest,
+  openWhatIfModal: () => { const root = document.getElementById('what-if-modal-root'); if (root) root.innerHTML = _whatIfSimulatorUi.renderWhatIfModal(); const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'flex'; },
+  closeWhatIfModal: () => { const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'none'; },
+  onWhatIfParamChange: () => { const timeShift = document.getElementById('what-if-time-shift')?.value || '0'; const weatherMode = document.getElementById('what-if-weather-mode')?.value || 'normal'; const delta = _whatIfSimulatorUi.calculateWhatIfDelta({ timeShiftHours: timeShift, weatherMode }); const scenicEl = document.getElementById('what-if-scenic-val'); const trafficEl = document.getElementById('what-if-traffic-val'); const crowdEl = document.getElementById('what-if-crowd-val'); if (scenicEl) scenicEl.textContent = (delta.scenicDelta >= 0 ? '+' : '') + delta.scenicDelta + '%'; if (trafficEl) trafficEl.textContent = (delta.trafficDeltaMin >= 0 ? '+' : '') + delta.trafficDeltaMin + 'm'; if (crowdEl) crowdEl.textContent = (delta.crowdDelta >= 0 ? '+' : '') + delta.crowdDelta + '%'; },
+  applyWhatIfSimulation: () => { const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'none'; _showMicroToast('⚡ What-If simulation applied!', { icon: '✨' }); generatePlan(); },
+  toggleMapLayer: () => { const lbl = document.getElementById('map-layer-label'); if (lbl) { lbl.textContent = lbl.textContent === 'Vector' ? 'Satellite' : 'Vector'; _showMicroToast(`Map layer: ${lbl.textContent}`, { icon: '🗺️' }); } },
+  toggleMapFullscreen: () => { const mapEl = document.getElementById('map-view'); if (mapEl) { mapEl.classList.toggle('map-fullscreen'); _showMicroToast('Toggled map viewport', { icon: '⛶' }); } },
+  highlightStopOnMap: (btn) => { const idx = Number(btn?.dataset?.stopIdx || 0); _mapHud.highlightStopOnTimelineAndMap(idx); },
+  openDishModal: (btn) => { const dish = btn?.dataset?.dish || 'Local Specialty'; _showMicroToast(`Must-try food: ${dish}`, { icon: '🍛' }); },
+  sendCopilotPrompt: (btn) => { const prompt = btn?.dataset?.prompt; const input = document.getElementById('chat-in'); if (input && prompt) { input.value = prompt; handleChat(); } },
   // Settings modal & onboarding
   openSettings, closeSettings, clearLocalData, advanceOnboarding, skipOnboarding,
   // Tools / AI grid (no-arg handlers — converted from onclick= for CSP)
@@ -2330,6 +2325,11 @@ function updateItinUI(){
     </div>
   `;
   list.appendChild(opsBanner);
+
+  const healthEl = document.getElementById('trip-health-container');
+  if (healthEl) { healthEl.style.display = 'block'; healthEl.innerHTML = _tripHealthScore.renderTripHealthCard({ stops: itin }); }
+  const whatIfEl = document.getElementById('what-if-trigger-container');
+  if (whatIfEl) whatIfEl.style.display = 'block';
 
   let tv=0,tt=0,dayBudgetTotal=0;
   let ft='--:--';

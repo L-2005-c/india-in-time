@@ -108,11 +108,30 @@ export function buildOfflineTravelPassHtml(mdPlan, currentCityName, dayIdx = 0, 
 
   return `
     <div class="travel-pass-modal-inner" style="max-height:85vh;overflow-y:auto;padding:16px;color:var(--text-main);">
-      <!-- Header Banner -->
-      <div style="background:linear-gradient(135deg,rgba(168,85,247,0.2),rgba(56,189,248,0.15));border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--brand);font-weight:700;">🇮🇳 INDIA IN-TIME OFFICIAL TRAVEL PASS</div>
-        <h2 style="margin:4px 0 2px 0;font-size:20px;color:#fff;">${city} — Day ${dayIdx + 1}</h2>
-        <div style="font-size:12px;color:var(--text-muted);">${day.filter((s) => !s.isBreak).length} Confirmed Stops · Offline Ready · Practical Travel Armor</div>
+      <!-- Boarding Pass Style Header -->
+      <div class="boarding-pass-card" style="margin-bottom:16px;">
+        <div class="bp-top-flight-bar">
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.85;">OFFICIAL TRAVEL PASS · DAY ${dayIdx + 1}</div>
+            <div class="bp-city-code">${city.slice(0, 3).toUpperCase()}</div>
+            <div style="font-size:13px;font-weight:700;">${city}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:0.85;">STATUS</div>
+            <div style="font-size:14px;font-weight:800;background:rgba(0,0,0,0.25);padding:3px 8px;border-radius:6px;display:inline-block;margin-top:2px;">CONFIRMED</div>
+            <div style="font-size:11px;opacity:0.9;margin-top:4px;">${day.filter((s) => !s.isBreak).length} Curated Stops</div>
+          </div>
+        </div>
+
+        <div class="bp-divider-line">
+          <div class="bp-notch bp-notch-left"></div>
+          <div class="bp-notch bp-notch-right"></div>
+        </div>
+
+        <div style="padding:12px 18px 4px;">
+          <div class="bp-barcode">||||| | |||| ||| |||||| | |||||</div>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);font-family:'Space Mono',monospace;">IIT-PASS-${Date.now().toString(36).toUpperCase()}</div>
+        </div>
       </div>
 
       <!-- Action buttons -->

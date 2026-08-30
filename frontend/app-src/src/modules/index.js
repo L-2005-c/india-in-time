@@ -21,3 +21,7 @@ export * as htmlSafe from '../utils/html-safe.js';
 export * as feedback from './feedback.js';
 export * as savedPlans from './savedPlans.js';
 export * as aiMedia from './aiMedia.js';
+export * as itineraryUiEngine from './itineraryUiEngine.js';
+export * as whatIfSimulatorUi from './whatIfSimulatorUi.js';
+export * as tripHealthScore from './tripHealthScore.js';
+export * as mapHud from './mapHud.js';

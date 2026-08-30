@@ -1,6 +1,6 @@
 /**
- * Design Tokens for India In-Time
- * Single source of truth for all spatial, color, motion, and typography constants.
+ * FAANG-Grade Design Tokens for India In-Time
+ * Single source of truth for all spatial, color, glassmorphism, motion, and typography constants.
  */
 export const tokens = {
   colors: {
@@ -19,20 +19,43 @@ export const tokens = {
       950: '#020617',
     },
     brand: {
-      primary: '#2563eb',
-      primaryGlow: 'rgba(37, 99, 235, 0.25)',
+      primary: '#8b5cf6',
+      primaryLight: '#a855f7',
+      primaryGlow: 'rgba(139, 92, 246, 0.28)',
       accent: '#06b6d4',
-      accentGlow: 'rgba(6, 182, 212, 0.25)',
-      purple: '#8b5cf6',
+      accentLight: '#22d3ee',
+      accentGlow: 'rgba(6, 182, 212, 0.28)',
       emerald: '#10b981',
+      emeraldGlow: 'rgba(16, 185, 129, 0.24)',
       amber: '#f59e0b',
+      amberGlow: 'rgba(245, 158, 11, 0.24)',
       rose: '#ef4444',
+      roseGlow: 'rgba(239, 68, 68, 0.24)',
+      indigo: '#6366f1',
+    },
+    gradients: {
+      brand: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)',
+      brandGlow: 'linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(6, 182, 212, 0.18) 100%)',
+      goldSunset: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+      emeraldSea: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+      deepNebula: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.25), transparent 70%)',
+    },
+    glass: {
+      ultra: 'rgba(255, 255, 255, 0.04)',
+      subtle: 'rgba(255, 255, 255, 0.07)',
+      medium: 'rgba(255, 255, 255, 0.12)',
+      heavy: 'rgba(255, 255, 255, 0.18)',
+      specular: 'rgba(255, 255, 255, 0.22)',
+      borderSpecular: 'rgba(255, 255, 255, 0.15)',
     },
   },
   spacing: {
     0: '0px',
+    0.5: '2px',
     1: '4px',
+    1.5: '6px',
     2: '8px',
+    2.5: '10px',
     3: '12px',
     4: '16px',
     5: '20px',
@@ -40,6 +63,7 @@ export const tokens = {
     8: '32px',
     10: '40px',
     12: '48px',
+    16: '64px',
   },
   radii: {
     none: '0px',
@@ -47,22 +71,36 @@ export const tokens = {
     sm: '8px',
     md: '12px',
     lg: '16px',
-    xl: '24px',
+    xl: '20px',
+    '2xl': '28px',
     full: '9999px',
   },
   shadows: {
-    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.35)',
-    md: '0 4px 12px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.30)',
-    lg: '0 12px 32px -4px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.40)',
-    glowPrimary: '0 0 24px -2px rgba(37, 99, 235, 0.35)',
-    glowAccent: '0 0 24px -2px rgba(6, 182, 212, 0.35)',
+    xs: '0 1px 2px 0 rgba(0, 0, 0, 0.25)',
+    sm: '0 2px 8px -1px rgba(0, 0, 0, 0.35)',
+    md: '0 6px 18px -2px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.30)',
+    lg: '0 16px 40px -6px rgba(0, 0, 0, 0.60), 0 6px 16px -2px rgba(0, 0, 0, 0.45)',
+    xl: '0 24px 56px -8px rgba(0, 0, 0, 0.75), 0 10px 24px -4px rgba(0, 0, 0, 0.55)',
+    glowPrimary: '0 0 32px -4px rgba(139, 92, 246, 0.45)',
+    glowAccent: '0 0 32px -4px rgba(6, 182, 212, 0.45)',
+    glowEmerald: '0 0 32px -4px rgba(16, 185, 129, 0.45)',
+    bevelInner: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.16)',
+    cardLayer: '0 18px 44px -8px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.15)',
   },
   motion: {
-    durationFast: '150ms',
-    durationNormal: '250ms',
-    durationSlow: '400ms',
-    easeSpring: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    durationFast: '140ms',
+    durationNormal: '240ms',
+    durationSlow: '420ms',
+    easeSpring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
     easeSmooth: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    easeOutQuint: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  },
+  typography: {
+    fonts: {
+      primary: "'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
+      display: "'Playfair Display', Georgia, serif",
+      mono: "'Space Mono', ui-monospace, SFMono-Regular, monospace",
+    },
   },
   zIndex: {
     base: 1,
@@ -70,6 +108,7 @@ export const tokens = {
     header: 400,
     drawer: 600,
     modal: 900,
+    hud: 950,
     toast: 1100,
   },
 };

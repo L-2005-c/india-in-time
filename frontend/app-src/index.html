@@ -54,6 +54,13 @@
 <body>
 <a href="#app" class="skip-link">Skip to content</a>
 
+<!-- Ambient Background Mesh Canvas -->
+<div class="ambient-glow-canvas" aria-hidden="true">
+  <div class="ambient-orb ambient-orb-1"></div>
+  <div class="ambient-orb ambient-orb-2"></div>
+  <div class="ambient-orb ambient-orb-3"></div>
+</div>
+
 
 
 <!-- LOGIN SCREEN -->
@@ -172,6 +179,14 @@
     <!-- ═══ MAP VIEW ═══ -->
     <div id="map-view" class="view active">
       <div id="map"></div>
+      <div id="map-hud-dock" class="map-hud-dock">
+        <button class="map-hud-pill" data-action="toggleMapLayer" title="Switch Map View Layer">
+          <span>🗺️</span> <span id="map-layer-label">Vector</span>
+        </button>
+        <button class="map-hud-pill" data-action="toggleMapFullscreen" title="Toggle Fullscreen Map">
+          <span>⛶</span> <span>Expand</span>
+        </button>
+      </div>
 
       <button id="locate-me-btn" data-action="locateMe" aria-label="Find my location" title="Find my location">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -430,6 +445,17 @@
       <!-- Budget Breakdown — rendered by JS after plan generation -->
       <div id="budget-breakdown" class="budget-opt-card" style="display:none;margin:0 14px 14px"></div>
 
+      <!-- FAANG-Grade Trip Health Score Gauge -->
+      <div id="trip-health-container" style="display:none;margin:0 14px 14px"></div>
+
+      <!-- What-If Travel Simulator Trigger -->
+      <div id="what-if-trigger-container" style="display:none;padding:0 14px;">
+        <button class="what-if-trigger-btn" data-action="openWhatIfModal" id="what-if-trigger-btn">
+          <span>⚡ What-If Travel Simulator</span>
+          <span style="font-size:12px;opacity:0.85">Test Schedule & Weather Shifts →</span>
+        </button>
+      </div>
+
       <!-- Phase 2 — hidden until plan generated -->
       <div id="phase2-section" class="plan-section" style="display:none">
         <div class="sec-label">Live Navigation</div>
@@ -526,6 +552,12 @@
             <strong>India In-Time ready!</strong> Select a city, generate your plan, then ask me about cab fares, food, timings, or weather!
           </div>
         </div>
+      </div>
+      <div class="copilot-prompt-chips" id="copilot-prompt-chips">
+        <button class="copilot-chip" data-action="sendCopilotPrompt" data-prompt="☕ Best chai & local food near my stops">☕ Best local food</button>
+        <button class="copilot-chip" data-action="sendCopilotPrompt" data-prompt="🌅 When is Golden Hour today?">🌅 Golden Hour</button>
+        <button class="copilot-chip" data-action="sendCopilotPrompt" data-prompt="🚕 Taxi & auto fare estimates">🚕 Taxi fares</button>
+        <button class="copilot-chip" data-action="sendCopilotPrompt" data-prompt="🌧️ Indoor rainy day backup ideas">🌧️ Rain backup</button>
       </div>
       <div class="chat-input-bar">
         <input type="text" id="chat-in" placeholder="e.g. When's the best time to visit Kailasagiri?">
@@ -706,6 +738,10 @@
 <!-- Micro-Toast Notification Container -->
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
+<!-- What-If Travel Simulator Modal -->
+<div id="what-if-modal-root"></div>
+
 <!-- Service Worker Registration -->
 <script src="/sw-register.js"></script>
+</body>
 </html>

@@ -154,7 +154,6 @@ describe('index.html data-action values <-> app.js dispatch tables — real-file
 
   test('every STATIC_ACTIONS entry is referenced in index.html OR in app.js data-action templates (no pure dead entries)', () => {
     const htmlActions = extractHtmlActions(indexHtml);
-    // Actions used only in dynamically generated HTML (app.js templates)
     const dynamicOnly = new Set([
       'renderToolsHome', 'renderLingo', 'renderSafety', 'renderBudget', 'renderPassport',
       'prepGuide', 'postcard', 'getInstaSpots', 'getSouvenirGuide', 'showTripRating',
@@ -163,6 +162,7 @@ describe('index.html data-action values <-> app.js dispatch tables — real-file
       'showFareNegotiator', 'showTripTribe', 'shareEmergency', 'addExpense', 'analyzeBudget',
       'delExp', 'delPlan', 'loadPlan', 'loadCloudPlan', 'speak', 'chatAbout', 'aiFoodCard',
       'clickFileInput', 'drawerRun', 'drawerFile', 'shareWhatsAppPass', 'printPass', 'execPaletteCmd',
+      'closeWhatIfModal', 'onWhatIfParamChange', 'applyWhatIfSimulation', 'highlightStopOnMap', 'openDishModal', 'sendCopilotPrompt',
     ]);
     const unused = [...staticActionKeys].filter(
       (k) => !htmlActions.has(k) && !dynamicOnly.has(k) && !appJs.includes(`data-action="${k}"`)
