@@ -22,7 +22,7 @@ function exists(f) { return fs.existsSync(path.join(root, f)); }
 const failures = [];
 
 // ── 1. File Inventory & Line Count Ratchets ───────────────────────────────────
-const APP_LIMIT = 3600;
+const APP_LIMIT = 3500;
 const appLines = lines('frontend/app-src/src/core/app.js');
 const serverLines = lines('server.js');
 

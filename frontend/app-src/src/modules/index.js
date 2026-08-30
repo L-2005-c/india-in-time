@@ -25,3 +25,5 @@ export * as itineraryUiEngine from './itineraryUiEngine.js';
 export * as whatIfSimulatorUi from './whatIfSimulatorUi.js';
 export * as tripHealthScore from './tripHealthScore.js';
 export * as mapHud from './mapHud.js';
+export * as aiDrawer from './aiDrawer.js';
+
