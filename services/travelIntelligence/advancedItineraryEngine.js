@@ -957,10 +957,10 @@ module.exports = {
   replanAdvanced,
   shouldTriggerReplan,
   critiqueItinerary,
-  simulateScenario,
+  simulateScenario: (...args) => require('./whatIfSimulator').simulateScenario(...args),
   createGroupProfile,
   evaluateGroupSatisfaction,
-  optimizePlanWithAbCandidates,
+  optimizePlanWithAbCandidates: (...args) => require('./abItineraryOptimizer').optimizePlanWithAbCandidates(...args),
   scoreAtArrival: (place, arrivalMin, state, requirements, weather, nowBase) => {
     const travel = estimateTravel({ fromCoords: state?.prevCoords || requirements.originCoords, toCoords: place.coords, departMin: state?.cursor || requirements.hard.startMin, isFirstStop: !(state?.stops?.length) });
     return scoreTransition(place, arrivalMin, state || { cursor: requirements.hard.startMin, prevCoords: requirements.originCoords, stops: [], meals: new Set(), categories: new Set(), cost: 0, travelMinutes: 0, waitMinutes: 0 }, requirements, weather, nowBase || new Date(), travel, 0, new Map());

@@ -1,13 +1,31 @@
-const { getTravelIntelligence, rankPlacesForDay, buildDayPlan, dynamicAdvice } = require('../services/travelIntelligence');
+'use strict';
+
+const { getTravelIntelligence, rankPlacesForDay, dynamicAdvice, multiDayAdvice } = require('../services/travelIntelligence');
+const { planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');
 const { computeCrowd } = require('../services/travelIntelligence/crowdEngine');
 const { estimateTravel, recommendArrivalWindow } = require('../services/travelIntelligence/trafficEngine');
 const { computeWeatherIntelligence } = require('../services/travelIntelligence/weatherEngine');
 const { computeVisitScore, openingToScore } = require('../services/travelIntelligence/scoringEngine');
 const { computeConfidence } = require('../services/travelIntelligence/confidenceEngine');
+const { festivalCrowdMultiplier } = require('../services/travelIntelligence/festivalEngine');
+const { estimateTravelAsync } = require('../services/travelIntelligence/trafficEngine');
+const { lookupHistoricalCrowd } = require('../services/travelIntelligence/historicalCrowdStore');
+const { computeGoldenHours, isInGoldenHour } = require('../services/travelIntelligence/timeEngine');
 
 function ist(d, t) { return new Date(`${d}T${t}:00+05:30`); }
 const JAIPUR = [26.9124, 75.7873];
-const fort = { name: 'Amber Fort', cat: 'fort', ot: '09:00', ct: '17:00', coords: JAIPUR, is_sunset_spot: true, indoor_outdoor: 'outdoor' };
+const fort = {
+  id: 'amber-fort',
+  name: 'Amber Fort',
+  cat: 'fort',
+  ot: '09:00',
+  ct: '17:00',
+  coords: JAIPUR,
+  is_sunset_spot: true,
+  indoor_outdoor: 'outdoor',
+  duration_min: 120,
+  cost: 500,
+};
 
 describe('crowdEngine', () => {
   test('structured estimate with source', () => {
@@ -68,9 +86,10 @@ describe('integration', () => {
     const intel = getTravelIntelligence(fort, ist('2026-01-15', '16:30'), { tempC: 26, condition: 'Clear' });
     expect(intel.visitScore).toBeGreaterThanOrEqual(0);
     expect(intel.explanation.bullets.length).toBeGreaterThan(0);
-    expect(['estimated','predicted']).toContain(intel.crowd.source);
+    expect(['estimated', 'predicted']).toContain(intel.crowd.source);
     expect(intel.confidence.confidence).toBeGreaterThan(40);
   });
+
   test('rankPlacesForDay sorted', () => {
     const ranked = rankPlacesForDay([
       fort,
@@ -78,16 +97,18 @@ describe('integration', () => {
     ], ist('2026-01-15', '16:00'), { tempC: 25, condition: 'Clear' });
     expect(ranked[0].score).toBeGreaterThanOrEqual(ranked[1].score);
   });
-  test('buildDayPlan returns stops', () => {
-    const plan = buildDayPlan([
+
+  test('planAdvancedItinerary returns optimized stops', () => {
+    const plan = planAdvancedItinerary([
       fort,
-      { name: 'City Palace', cat: 'monument', ot: '09:00', ct: '17:00', coords: [26.925, 75.82], is_sunset_spot: true },
-      { name: 'Local Cafe', cat: 'food', ot: '08:00', ct: '22:00', coords: [26.91, 75.79] },
-    ], { now: ist('2026-01-15', '09:00'), weather: { tempC: 24, condition: 'Clear' }, originCoords: JAIPUR, maxStops: 4 });
+      { id: 'city-palace', name: 'City Palace', cat: 'monument', ot: '09:00', ct: '17:00', coords: [26.925, 75.82], is_sunset_spot: true, duration_min: 90, cost: 300 },
+      { id: 'local-cafe', name: 'Local Cafe', cat: 'food', ot: '08:00', ct: '22:00', coords: [26.91, 75.79], duration_min: 45, cost: 200 },
+    ], { originCoords: JAIPUR, startMin: 540, endMin: 1140, weather: { tempC: 24, condition: 'Clear' } });
     expect(plan.stopCount).toBeGreaterThan(0);
     expect(plan.stops[0]).toHaveProperty('arriveAt');
-    expect(plan.stops[0]).toHaveProperty('leaveAt');
+    expect(plan.stops[0]).toHaveProperty('departAt');
   });
+
   test('dynamicAdvice for closed place', () => {
     const intel = getTravelIntelligence(
       { name: 'Museum', cat: 'museum', ot: '10:00', ct: '11:00', coords: JAIPUR },
@@ -98,9 +119,6 @@ describe('integration', () => {
     expect(advice.headline).toBeTruthy();
   });
 });
-
-const { festivalCrowdMultiplier } = require('../services/travelIntelligence/festivalEngine');
-const { estimateTravelAsync } = require('../services/travelIntelligence/trafficEngine');
 
 describe('festivalEngine', () => {
   test('Republic Day increases crowd multiplier', () => {
@@ -126,10 +144,6 @@ describe('routingEngine fallback', () => {
     expect(t.travelMinutes).toBeGreaterThan(0);
   }, 15000);
 });
-
-const { lookupHistoricalCrowd } = require('../services/travelIntelligence/historicalCrowdStore');
-const { multiDayAdvice } = require('../services/travelIntelligence/itineraryEngine');
-const { computeGoldenHours, isInGoldenHour } = require('../services/travelIntelligence/timeEngine');
 
 describe('historicalCrowdStore', () => {
   test('looks up known place', () => {
@@ -167,15 +181,14 @@ describe('multiDayAdvice', () => {
   });
 });
 
-describe('day plan 2-opt', () => {
-  test('optimizer field present for multi-stop plans', () => {
-    const { buildDayPlan } = require('../services/travelIntelligence');
-    const plan = buildDayPlan([
-      { name: 'A', cat: 'fort', ot: '09:00', ct: '18:00', coords: [26.91, 75.78] },
-      { name: 'B', cat: 'monument', ot: '09:00', ct: '18:00', coords: [26.92, 75.82] },
-      { name: 'C', cat: 'food', ot: '08:00', ct: '22:00', coords: [26.915, 75.79] },
-    ], { now: new Date('2026-01-15T09:00:00+05:30'), originCoords: [26.91, 75.78], maxStops: 5, weather: { tempC: 24, condition: 'Clear' } });
+describe('authoritative advanced itinerary solver', () => {
+  test('generates complete itinerary plan with metrics', () => {
+    const plan = planAdvancedItinerary([
+      { id: 'a', name: 'A', cat: 'fort', ot: '09:00', ct: '18:00', coords: [26.91, 75.78], duration_min: 90, cost: 200 },
+      { id: 'b', name: 'B', cat: 'monument', ot: '09:00', ct: '18:00', coords: [26.92, 75.82], duration_min: 60, cost: 100 },
+      { id: 'c', name: 'C', cat: 'food', ot: '08:00', ct: '22:00', coords: [26.915, 75.79], duration_min: 45, cost: 250 },
+    ], { originCoords: [26.91, 75.78], startMin: 540, endMin: 1140, weather: { tempC: 24, condition: 'Clear' } });
     expect(plan.stopCount).toBeGreaterThan(0);
-    expect(plan.optimizer).toMatch(/2-opt|greedy/);
+    expect(plan.itineraryQualityScore).toBeGreaterThan(0);
   });
 });

@@ -11,8 +11,7 @@ const { getCulturalRitualIntel } = require('./culturalRitualEngine');
 const { getSignatureDish } = require('./signatureDishEngine');
 const { getEntryProtocol } = require('./entryProtocolEngine');
 const { computeConfidence } = require('./confidenceEngine');
-const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
-const itineraryEngine = require('./itineraryEngine');
+const { dynamicAdvice, multiDayAdvice } = require('./advisoryEngine');
 const { buildMultiDayItinerary } = require('./multiDayPlanner');
 const festivalEngine = require('./festivalEngine');
 const historicalCrowdStore = require('./historicalCrowdStore');
@@ -98,9 +97,8 @@ function rankPlacesForDay(places, now = new Date(), weather = null, options = {}
 
 module.exports = {
   getTravelIntelligence, getBatchTravelIntelligence, suggestOpenAlternatives, rankPlacesForDay,
-  buildDayPlan: (places, opts = {}) => itineraryEngine.buildDayPlan(places, { ...opts, getTravelIntelligence: opts.getTravelIntelligence || getTravelIntelligence }),
-  dynamicAdvice: itineraryEngine.dynamicAdvice,
-  multiDayAdvice: itineraryEngine.multiDayAdvice,
+  dynamicAdvice,
+  multiDayAdvice,
   buildMultiDayItinerary,
   getTravelIntelligenceAsync,
   getActiveFestivals: festivalEngine.getActiveFestivals,
