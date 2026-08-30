@@ -14,6 +14,7 @@ const {
   getPlaces, fetchWiki, fetchCuratedCityFallback, fetchCuratedFoodFallback,
   fetchNominatimFallback, hydrateAiPlaces,
 } = require('../services/placesDiscovery');
+const { resolveCanonicalPlace } = require('../services/travelIntelligence/tourismPoi');
 function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
   return [
     String(cityName || '').trim().toLowerCase(),
@@ -193,8 +194,32 @@ router.post('/', async (req, res) => {
       });
       if (!isDup) dedupedMerged.push(place);
     }
+
+    // Canonical enrichment & quality scoring pass
+    const canonicalPlaces = [];
+    for (const p of dedupedMerged) {
+      const canonical = resolveCanonicalPlace(p, { cityHint: cityName, categoryHint: p.cat });
+      if (canonical) {
+        canonicalPlaces.push({
+          ...p,
+          id: p.id || canonical.id,
+          name: p.name,
+          canonicalName: canonical.canonicalName,
+          coords: canonical.coords || p.coords,
+          cat: canonical.category,
+          category: canonical.category,
+          tourismStatus: canonical.tourismStatus,
+          verificationStatus: canonical.verificationStatus,
+          coordinateSource: canonical.coordinateSource,
+          qualityScore: canonical.qualityScore,
+        });
+      } else {
+        canonicalPlaces.push(p);
+      }
+    }
+
     merged.length = 0;
-    merged.push(...dedupedMerged);
+    merged.push(...canonicalPlaces);
 
     appLogger.info(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 

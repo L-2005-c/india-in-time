@@ -23,12 +23,26 @@ const {
   toProductCategory,
 } = require('./tourismCategoryClassifier');
 const { computeTourismQualityScore, bayesianRating } = require('./tourismQualityScore');
+const { createCanonicalPlace, calculatePlaceDataQuality, generateDeterministicPlaceId } = require('./canonicalPlaceModel');
+const { validatePoiCoordinates, checkCoordinateTolerance, INDIA_GEO_BOUNDS } = require('./coordinateIntegrity');
+const { resolveCanonicalPlace, normalizePlaceName, dedupeCanonicalPlaces } = require('./canonicalPlaceResolver');
 
 module.exports = {
   // Core gate
   evaluateCandidate,
   filterEligibleCandidates,
   isTourismEligible,
+  // Canonical place resolution & model
+  createCanonicalPlace,
+  calculatePlaceDataQuality,
+  generateDeterministicPlaceId,
+  resolveCanonicalPlace,
+  normalizePlaceName,
+  dedupeCanonicalPlaces,
+  // Coordinate integrity
+  validatePoiCoordinates,
+  checkCoordinateTolerance,
+  INDIA_GEO_BOUNDS,
   // Classification & scoring
   classifyTourismCategory,
   computeTourismQualityScore,

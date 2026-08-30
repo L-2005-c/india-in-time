@@ -282,9 +282,19 @@ async function calculateRoute(origin, destination, opts = {}) {
 
   const canonicalResponse = {
     success: true,
-    origin: { lat: from[0], lon: from[1], name: opts.originName || 'Origin' },
-    destination: { lat: to[0], lon: to[1], name: opts.destName || 'Destination' },
+    origin: { lat: from[0], lon: from[1], name: opts.originName || 'Origin', id: opts.originId || null },
+    destination: { lat: to[0], lon: to[1], name: opts.destName || 'Destination', id: opts.destId || null },
+    distanceMeters: rawRoute.distanceMeters,
+    durationSeconds,
+    trafficDurationSeconds: trafficAwareSeconds,
+    departureAt: departureDate.toISOString(),
+    arrivalAt: projectedArrival,
     travelMode: mode,
+    provider: rawRoute.provider,
+    trafficStatus: trafficMeta.status,
+    provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
+    fallback: rawRoute.provider === 'geodesic_heuristic',
+    timestamp: new Date().toISOString(),
     distance: {
       meters: rawRoute.distanceMeters,
       kilometers: distanceKm,
@@ -310,6 +320,7 @@ async function calculateRoute(origin, destination, opts = {}) {
     },
     confidence: {
       score: rawRoute.confidenceScore,
+      level: rawRoute.confidenceScore >= 90 ? 'HIGH' : (rawRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW'),
       source: rawRoute.provider,
       isRoadNetworkTruth: rawRoute.isRoadNetworkTruth !== false,
       provenance: rawRoute.provenance || 'PROVIDER_DERIVED',

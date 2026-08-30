@@ -74,6 +74,8 @@ async function geocodeViaPhoton(q) {
     });
 }
 
+const { findGoldenPoi } = require('../data/goldenPoiDataset');
+
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'Missing query param: q' });
@@ -81,6 +83,22 @@ router.get('/', async (req, res) => {
   const key = q.toLowerCase();
   const cached = geocodeCache.get(key);
   if (cached) return res.json(cached);
+
+  // Authoritative Golden POI resolution (0ms, 100% verified, immune to rate-limits)
+  const golden = findGoldenPoi(q);
+  if (golden) {
+    const payload = [{
+      lat: String(golden.latitude),
+      lon: String(golden.longitude),
+      name: golden.displayName,
+      display_name: `${golden.displayName}, ${golden.city}, ${golden.state}, India`,
+      source: 'golden_verified',
+      isGolden: true,
+      canonicalId: golden.id,
+    }];
+    geocodeCache.set(key, payload);
+    return res.json(payload);
+  }
 
   try {
     let data;

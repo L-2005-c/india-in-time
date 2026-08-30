@@ -39,3 +39,5 @@
 {"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1787929292809}
 {"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1787929628134}
 {"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1787930624399}
+{"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1788086678452}
+{"endpoint":"/api/x","method":"GET","ip":null,"userAgent":"","statusCode":500,"responseMs":1,"requestId":null,"spilledAt":1788086850933}
