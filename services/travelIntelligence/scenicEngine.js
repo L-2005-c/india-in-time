@@ -114,7 +114,7 @@ function computeScenic(place = {}, ctx = {}) {
     types.push('waterfall');
     score += 15;
     reasons.push('Lush cascade scenery');
-  } else if (['scenic', 'hill'].includes(cat)) {
+  } else if (['scenic', 'hill', 'viewpoint'].includes(cat)) {
     types.push('landscape');
     score += 16;
     reasons.push('Panoramic landscape elevation');
