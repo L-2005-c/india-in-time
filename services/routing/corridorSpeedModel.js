@@ -33,6 +33,7 @@ const DENSE_BAZAAR_ZONES = [
 // Known Hill / Ghat Routes (Specific high-elevation ascent zones)
 const HILL_GHAT_ZONES = [
   { name: 'Visakhapatnam Dolphin Nose / Yarada Ghat', bounds: { minLat: 17.640, maxLat: 17.685, minLon: 83.250, maxLon: 83.305 } },
+  { name: 'Visakhapatnam Kailasagiri Hilltop', bounds: { minLat: 17.745, maxLat: 17.755, minLon: 83.338, maxLon: 83.348 } },
   { name: 'Jaipur Nahargarh / Jaigarh Fort Ascent', bounds: { minLat: 26.935, maxLat: 26.995, minLon: 75.835, maxLon: 75.858 } },
   { name: 'Pune Sinhagad / Lavasa Ghats', bounds: { minLat: 18.350, maxLat: 18.450, minLon: 73.720, maxLon: 73.800 } },
   { name: 'Goa Western Ghats / Dudhsagar', bounds: { minLat: 15.280, maxLat: 15.350, minLon: 74.250, maxLon: 74.350 } },
@@ -40,9 +41,9 @@ const HILL_GHAT_ZONES = [
 
 // Known High-Congestion Tourist POI Bottleneck Hotspots (Approach / Parking Delay)
 const BOTTLENECK_POIS = [
-  { id: 'hyd_charminar', name: 'Charminar', lat: 17.3616, lon: 78.4747, delayMin: 2, label: 'Old City pedestrianization approach delay' },
-  { id: 'del_red_fort', name: 'Red Fort', lat: 28.6562, lon: 77.2410, delayMin: 2, label: 'Chandni Chowk approach delay' },
-  { id: 'mum_gateway', name: 'Gateway of India', lat: 18.9220, lon: 72.8347, delayMin: 2, label: 'Colaba Causeway security perimeter delay' },
+  { id: 'hyd_charminar', name: 'Charminar', lat: 17.3616, lon: 78.4747, delayMin: 4, label: 'Old City pedestrianization approach delay' },
+  { id: 'del_red_fort', name: 'Red Fort', lat: 28.6562, lon: 77.2410, delayMin: 4, label: 'Chandni Chowk approach delay' },
+  { id: 'mum_gateway', name: 'Gateway of India', lat: 18.9220, lon: 72.8347, delayMin: 4, label: 'Colaba Causeway security perimeter delay' },
 ];
 
 /**
@@ -75,7 +76,7 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
     if (isCoordInZone(fromCoords[0], fromCoords[1], g) || isCoordInZone(toCoords[0], toCoords[1], g)) {
       return {
         corridorType: CORRIDOR_TYPE.HILL_GHAT,
-        windingFactor: 1.48,
+        windingFactor: 1.72,
         baseSpeedKmH: 26.0,
         signalsPerKm: 0.1,
         description: `Winding hill ghat route (${g.name})`,
@@ -89,7 +90,7 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
       return {
         corridorType: CORRIDOR_TYPE.WALLED_BAZAAR,
         windingFactor: 1.30,
-        baseSpeedKmH: 16.0,
+        baseSpeedKmH: 14.0,
         signalsPerKm: 1.0,
         description: `High-density bazaar corridor (${b.name})`,
       };

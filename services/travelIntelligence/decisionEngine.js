@@ -225,6 +225,223 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   };
 }
 
+function clamp(val, min = 0, max = 100) {
+  if (!Number.isFinite(val)) return min;
+  return Math.min(max, Math.max(min, val));
+}
+
+const SOURCE_QUALITY_MAP = {
+  live_traffic: 1.0,
+  observed: 1.0,
+  forecast: 0.88,
+  predicted: 0.88,
+  'historical-db': 0.78,
+  route_estimate: 0.68,
+  estimated: 0.68,
+  astronomical_rules: 0.82,
+  unavailable: 0.25,
+};
+
+function sourceQuality(source) {
+  if (source && SOURCE_QUALITY_MAP[source] !== undefined) {
+    return SOURCE_QUALITY_MAP[source];
+  }
+  return 0.55;
+}
+
+function freshnessFactor(ageMinutes) {
+  if (!Number.isFinite(ageMinutes)) return 0.7;
+  if (ageMinutes <= 15) return 1.0;
+  if (ageMinutes <= 60) return 0.95;
+  if (ageMinutes <= 180) return 0.85;
+  if (ageMinutes <= 720) return 0.7;
+  return 0.55;
+}
+
+function signalConfidence(opts = {}) {
+  const source = opts.source || 'unavailable';
+  const sq = sourceQuality(source);
+  const ff = freshnessFactor(opts.ageMinutes);
+  let base = 100 * sq * ff;
+  if (Number.isFinite(opts.samples) && opts.samples > 0) {
+    const bonus = Math.min(12, Math.log10(opts.samples) * 3);
+    base += bonus;
+  }
+  if (opts.calibration != null && Number.isFinite(opts.calibration)) {
+    const clampedCal = clamp(opts.calibration, 0.5, 1.05);
+    base *= clampedCal;
+  }
+  return clamp(Math.round(base), 0, 100);
+}
+
+function weightedMean(entries = []) {
+  if (!Array.isArray(entries) || entries.length === 0) return 0;
+  let totalWeight = 0;
+  let sum = 0;
+  for (const e of entries) {
+    if (e && Number.isFinite(e.value) && Number.isFinite(e.weight) && e.weight > 0) {
+      sum += e.value * e.weight;
+      totalWeight += e.weight;
+    }
+  }
+  if (totalWeight <= 0) return 0;
+  return sum / totalWeight;
+}
+
+function uncertaintyFromSignals(signals = []) {
+  if (!Array.isArray(signals) || signals.length === 0) {
+    return { score: 70, band: 30 };
+  }
+  const valid = signals.map(s => Number(s?.confidence)).filter(Number.isFinite);
+  if (valid.length === 0) {
+    return { score: 70, band: 30 };
+  }
+  const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+  let spread = 0;
+  if (valid.length > 1) {
+    const max = Math.max(...valid);
+    const min = Math.min(...valid);
+    spread = (max - min) * 0.25;
+  }
+  const rawBand = (100 - avg) * 0.4 + spread;
+  const band = clamp(Math.round(rawBand), 4, 45);
+  const score = clamp(Math.round(avg), 0, 100);
+  return { score, band };
+}
+
+const DECISION_WEIGHTS = {
+  experience: 0.33,
+  temporalFit: 0.22,
+  routeFit: 0.15,
+  robustness: 0.12,
+  preferenceFit: 0.08,
+  diversity: 0.05,
+  openingFeasibility: 0.05,
+};
+
+function computeDecisionScore(inputs = {}) {
+  const components = {
+    experience: clamp(inputs.experience ?? 50),
+    temporalFit: clamp(inputs.temporalFit ?? 50),
+    routeFit: clamp(inputs.routeFit ?? 50),
+    robustness: clamp(inputs.robustness ?? 50),
+    preferenceFit: clamp(inputs.preferenceFit ?? 50),
+    diversity: clamp(inputs.diversity ?? 50),
+    openingFeasibility: clamp(inputs.openingFeasibility ?? 50),
+  };
+
+  let totalScore = 0;
+  for (const [key, weight] of Object.entries(DECISION_WEIGHTS)) {
+    totalScore += components[key] * weight;
+  }
+
+  return {
+    score: Math.round(totalScore * 100) / 100,
+    components,
+    weights: { ...DECISION_WEIGHTS },
+  };
+}
+
+function scenarioRobustness(baseScore, uncertaintyBand, scenarioCount = 5) {
+  const count = clamp(scenarioCount, 3, 9);
+  const band = clamp(uncertaintyBand, 1, 100);
+  const base = clamp(baseScore, 0, 100);
+  const worstCase = clamp(Math.round(base - band), 0, 100);
+  const bestCase = clamp(Math.round(base + band), 0, 100);
+  const expected = base;
+  const scenarios = [];
+  for (let i = 0; i < count; i++) {
+    const frac = i / (count - 1);
+    scenarios.push(clamp(Math.round(worstCase + frac * (bestCase - worstCase)), 0, 100));
+  }
+  const robustness = Math.round(worstCase * 0.55 + expected * 0.35 + bestCase * 0.10);
+  return { robustness, worstCase, expected, bestCase, scenarios };
+}
+
+function temporalRegret(arrivalScore, futureScore) {
+  const arr = clamp(arrivalScore, 0, 100);
+  const fut = clamp(futureScore, 0, 100);
+  const gap = Math.max(0, fut - arr);
+  let label = 'LOW_OPPORTUNITY';
+  if (gap >= 20) label = 'HIGH_OPPORTUNITY_TO_WAIT';
+  else if (gap >= 10) label = 'MODERATE_OPPORTUNITY';
+  return {
+    regret: gap,
+    opportunity: gap,
+    label,
+  };
+}
+
+function computeTravelValueScore(inputs = {}) {
+  const intent = (inputs.intent || 'balanced').toLowerCase();
+
+  let weights = {
+    scenicValue: 0.25,
+    temporalSuitability: 0.25,
+    tourismQuality: 0.25,
+    dnaMatch: 0.15,
+    crowdPenalty: 0.10,
+  };
+
+  if (intent === 'photography' || intent === 'scenic') {
+    weights = {
+      scenicValue: 0.28,
+      temporalSuitability: 0.28,
+      tourismQuality: 0.20,
+      dnaMatch: 0.14,
+      crowdPenalty: 0.10,
+    };
+  } else if (intent === 'food' || intent === 'culinary') {
+    weights = {
+      tourismQuality: 0.32,
+      dnaMatch: 0.28,
+      temporalSuitability: 0.20,
+      scenicValue: 0.10,
+      crowdPenalty: 0.10,
+    };
+  }
+
+  const scenic = clamp(inputs.scenicValue ?? 50);
+  const temporal = clamp(inputs.temporalSuitability ?? 50);
+  const tourism = clamp(inputs.tourismQuality ?? 50);
+  const dna = clamp(inputs.dnaMatch ?? (inputs.intent ? 70 : 50));
+  const crowd = clamp(inputs.crowdPenalty ?? 0);
+
+  const rawScore =
+    scenic * weights.scenicValue +
+    temporal * weights.temporalSuitability +
+    tourism * weights.tourismQuality +
+    dna * weights.dnaMatch -
+    crowd * (weights.crowdPenalty || 0);
+
+  const score = clamp(Math.round(rawScore * 10) / 10, 0, 100);
+  const reasons = [];
+
+  if (scenic >= 80) reasons.push('High visual and landscape quality');
+  if (temporal >= 80) reasons.push('Optimal temporal arrival fit');
+  if (tourism >= 80) reasons.push('High-rated iconic tourism value');
+  if (reasons.length === 0) reasons.push('Balanced itinerary candidate');
+
+  return {
+    score,
+    weights,
+    reasons,
+    intent,
+  };
+}
+
 module.exports = {
   getTravelIntelligence,
+  clamp,
+  sourceQuality,
+  freshnessFactor,
+  signalConfidence,
+  weightedMean,
+  uncertaintyFromSignals,
+  computeDecisionScore,
+  scenarioRobustness,
+  temporalRegret,
+  computeTravelValueScore,
 };
+
+
