@@ -1,3 +1,5 @@
+> **ARCHIVED** — superseded by [STATUS.md](../STATUS.md), do not treat as current.
+
 # Final Production-Hardening Validation
 
 ## Verified in this environment

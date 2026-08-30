@@ -1,3 +1,5 @@
+> **ARCHIVED** — superseded by [STATUS.md](../STATUS.md), do not treat as current.
+
 # Current Production Status & Readiness Verification
 
 **Document Version:** 5.3.0  

@@ -1,3 +1,5 @@
+> **ARCHIVED** — superseded by [STATUS.md](../STATUS.md), do not treat as current.
+
 # India In Time v5.1.0 — Production Validation Report
 
 ## 1. Current itinerary architecture

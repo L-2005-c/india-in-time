@@ -1,3 +1,5 @@
+> **ARCHIVED** — superseded by [STATUS.md](../STATUS.md), do not treat as current.
+
 # v5.2.3 — Fixed the 3 pre-existing test failures tracked in CHANGELOG_v5.2.2_MERGE.md
 
 All 3 were investigated by running the actual code, not just editing test

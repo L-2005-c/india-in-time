@@ -1,3 +1,5 @@
+> **ARCHIVED** — superseded by [STATUS.md](../STATUS.md), do not treat as current.
+
 # India In Time — Tourism Intelligence Upgrade Report
 
 Version: 5.1.1

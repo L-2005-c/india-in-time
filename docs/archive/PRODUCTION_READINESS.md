@@ -1,3 +1,5 @@
+> **ARCHIVED** — superseded by [STATUS.md](../STATUS.md), do not treat as current.
+
 > **Historical document — not current repository status.**
 > This file records an earlier audit/build state. For current architecture, security posture, and production status, use the current documents under `docs/`.
 
