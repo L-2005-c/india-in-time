@@ -49,8 +49,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-  <script type="module" crossorigin src="/assets/index-BK9dqLvz.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DG26M0Dh.css">
+  <script type="module" crossorigin src="/assets/index-D8jvudgI.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Dbx6jStj.css">
 </head>
 <body>
 <a href="#app" class="skip-link">Skip to content</a>
@@ -183,6 +183,12 @@
       <div id="map-hud-dock" class="map-hud-dock">
         <button class="map-hud-pill" data-action="toggleMapLayer" title="Switch Map View Layer">
           <span>🗺️</span> <span id="map-layer-label">Vector</span>
+        </button>
+        <button class="map-hud-pill hud-pill-highlight" data-action="exportGoogleMapsTrip" id="hud-btn-gmaps" title="Open Full Multi-Stop Route in Google Maps">
+          <span>🧭</span> <span>Google Maps Sync</span>
+        </button>
+        <button class="map-hud-pill" data-action="exportGpxTrack" id="hud-btn-gpx" title="Download GPX GPS Track">
+          <span>📥</span> <span>GPX</span>
         </button>
         <button class="map-hud-pill" data-action="toggleMapFullscreen" title="Toggle Fullscreen Map">
           <span>⛶</span> <span id="map-fullscreen-label">Expand</span>
