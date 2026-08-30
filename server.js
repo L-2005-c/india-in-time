@@ -493,22 +493,16 @@ function startLongRunningServer() {
         process.exit(0);
       });
 
-      // Force exit after timeout
       setTimeout(() => {
-        logger.error({ timeoutMs: config.server.shutdownTimeoutMs }, '⚠️  Forced shutdown after timeout');
+        logger.error({ timeoutMs: config.server.shutdownTimeoutMs }, '⚠️ Forced shutdown after timeout');
         process.exit(1);
       }, config.server.shutdownTimeoutMs);
     }
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
-    process.on('uncaughtException', (err) => {
-      logger.fatal({ err }, '💥 Uncaught exception');
-      gracefulShutdown('uncaughtException');
-    });
-    process.on('unhandledRejection', (reason) => {
-      logger.error({ reason }, '💥 Unhandled rejection');
-    });
+    process.on('uncaughtException', (err) => { logger.fatal({ err }, '💥 Uncaught exception'); gracefulShutdown('uncaughtException'); });
+    process.on('unhandledRejection', (reason) => { logger.error({ reason }, '💥 Unhandled rejection'); });
   }).catch(err => {
     logger.fatal({ err }, '💥 Failed to start worker database');
     process.exit(1);
@@ -519,9 +513,5 @@ if (!isServerless) {
   startLongRunningServer();
 }
 
-// Exported so Vercel's Node builder (see vercel.json) can use this Express
-// app directly as the request handler. Has no effect on Render/Docker/local,
-// which run this file directly via `node server.js` and rely on
-// startLongRunningServer()'s app.listen() above instead.
 module.exports = app;
 }

@@ -1,3 +1,4 @@
+/* global Blob, URL */
 /**
  * Floating Frosted Map HUD & Spatial Interactivity Module (FAANG Grade)
  * Provides 1-tap layer switching, fullscreen toggle, custom vector pins,
