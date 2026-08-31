@@ -9,6 +9,42 @@ const CROWD_LABELS = [
   { max: 1.40, level: 'High', score: 30 },
   { max: Infinity, level: 'Very High', score: 10 },
 ];
+function computeEstimatedQueueMinutes(place = {}, crowdLevel = 'Moderate', isWeekend = false) {
+  const cat = String(place.cat || place.category || 'default').toLowerCase();
+  const baseQueue = {
+    temple: 12,
+    monument: 10,
+    fort: 10,
+    museum: 8,
+    food: 8,
+    cafe: 5,
+    viewpoint: 4,
+    beach: 0,
+    park: 2,
+    default: 4,
+  }[cat] ?? 4;
+
+  const crowdMult = {
+    'Very Low': 0.2,
+    Low: 0.5,
+    Moderate: 1.0,
+    High: 2.0,
+    'Very High': 3.2,
+  }[crowdLevel] || 1.0;
+
+  const weekendMult = isWeekend ? 1.25 : 1.0;
+  const rawWait = Math.round(baseQueue * crowdMult * weekendMult);
+  let descriptor = 'Direct Entry (No Wait)';
+  if (rawWait >= 25) descriptor = `~${rawWait}m Heavy Darshan/Entry Queue`;
+  else if (rawWait >= 12) descriptor = `~${rawWait}m Entry/Security Queue`;
+  else if (rawWait >= 5) descriptor = `~${rawWait}m Short Queue`;
+
+  return {
+    estimatedQueueMinutes: rawWait,
+    queueDescriptor: descriptor,
+  };
+}
+
 function computeCrowd(ctx = {}) {
   const w = rules.crowdWeights || {};
   const { daypart = 'afternoon', isWeekend = false, isPeakHourNow = false, cat = 'default', month = new Date().getMonth() + 1, publicHoliday = false, weather = null, historicalObservations = null, date = null, region = null } = ctx;
@@ -62,6 +98,8 @@ function computeCrowd(ctx = {}) {
     ? '07:30–09:30 or 16:30–18:00'
     : 'Morning 08:00–10:30';
 
+  const queueInfo = computeEstimatedQueueMinutes({ cat }, band.level, isWeekend);
+
   return {
     level: band.level,
     rawScore: Math.round(rawScore * 100) / 100,
@@ -69,6 +107,8 @@ function computeCrowd(ctx = {}) {
     crowdBadge,
     isPeakWindow,
     bestOffPeakWindow,
+    estimatedQueueMinutes: queueInfo.estimatedQueueMinutes,
+    queueDescriptor: queueInfo.queueDescriptor,
     source,
     confidenceBoost,
     factors,
@@ -76,7 +116,9 @@ function computeCrowd(ctx = {}) {
     reason: `${band.level} crowd expected (${parts.length ? parts.join(' + ') : 'typical patterns'}). Source: ${source === 'predicted' ? 'predicted' : 'rule-based estimate'}.`,
   };
 }
+
 function predictCrowdLegacy({ daypart, isWeekend, isPeakHourNow, cat }) {
   return computeCrowd({ daypart, isWeekend, isPeakHourNow, cat }).level;
 }
-module.exports = { computeCrowd, predictCrowdLegacy, CROWD_LABELS };
+
+module.exports = { computeCrowd, predictCrowdLegacy, computeEstimatedQueueMinutes, CROWD_LABELS };

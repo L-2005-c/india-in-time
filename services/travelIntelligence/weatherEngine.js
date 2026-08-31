@@ -1,13 +1,49 @@
-// weatherEngine.js — no invention of weather data
+function computeHeatIndex(tempC, relativeHumidity) {
+  if (tempC == null || !Number.isFinite(tempC)) return null;
+  const rh = Number.isFinite(relativeHumidity) ? Math.max(0, Math.min(100, relativeHumidity)) : 55;
+  if (tempC < 27) return Math.round(tempC * 10) / 10;
+  const T = tempC;
+  const R = rh;
+  const c1 = -8.78469475556;
+  const c2 = 1.61139411;
+  const c3 = 2.33854883889;
+  const c4 = -0.14611605;
+  const c5 = -0.012308094;
+  const c6 = -0.0164248277778;
+  const c7 = 0.002211732;
+  const c8 = 0.00072546;
+  const c9 = -0.000003582;
+  const hi = c1 + c2 * T + c3 * R + c4 * T * R + c5 * T * T + c6 * R * R + c7 * T * T * R + c8 * T * R * R + c9 * T * T * R * R;
+  return Math.round(Math.max(T, hi) * 10) / 10;
+}
+
+function computeApparentTemp(tempC, humidity, windKph) {
+  if (tempC == null || !Number.isFinite(tempC)) return null;
+  const hi = computeHeatIndex(tempC, humidity);
+  if (tempC < 15 && windKph != null && windKph > 10) {
+    const v = Math.pow(windKph, 0.16);
+    const chill = 13.12 + 0.6215 * tempC - 11.37 * v + 0.3965 * tempC * v;
+    return Math.round(chill * 10) / 10;
+  }
+  return hi;
+}
+
+// weatherEngine.js — BEAST mode micro-climate intelligence
 function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') {
   if (!weather || (weather.tempC == null && !weather.condition && weather.weathercode == null && weather.windKph == null && weather.rainMm == null)) {
     return { score: 50, suitability: 'Unknown', activityNotes: [], warnings: [], source: 'unavailable', confidence: 20, reason: 'No weather data available.', comfortBadge: '🌤️ Standard' };
   }
   let score = 70;
   const notes = [], warnings = [];
-  const isOutdoor = place.indoor_outdoor === 'outdoor' || ['beach', 'scenic', 'park', 'garden', 'waterfall', 'hill', 'fort', 'monument'].includes(place.cat);
+  const isOutdoor = place.indoor_outdoor === 'outdoor' || ['beach', 'scenic', 'park', 'garden', 'waterfall', 'hill', 'fort', 'monument', 'viewpoint'].includes(place.cat);
   const temp = weather.tempC;
+  const humidity = weather.humidity ?? (weather.rh ?? 55);
+  const wind = weather.windKph;
+  const apparentTemp = computeApparentTemp(temp, humidity, wind);
+
   let comfortBadge = '☀️ Pleasant Weather';
+  let indoorRecommended = false;
+
   if (temp != null) {
     if (temp >= 15 && temp <= 28) { score += 15; notes.push('Comfortable temperature'); comfortBadge = '🌤️ Ideal Weather'; }
     else if (temp >= 10 && temp < 15) { score += 5; notes.push('Cool — pleasant for outdoor walks'); comfortBadge = '🍃 Crisp & Cool'; }
@@ -18,6 +54,7 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
       else { notes.push('Good indoor escape from heat'); score += 8; comfortBadge = '🏛️ Cool Indoor Escape'; }
     } else if (temp >= 38) {
       score -= 30; warnings.push('Extreme heat — avoid prolonged outdoor activity');
+      indoorRecommended = true;
       if (!isOutdoor) { score += 15; notes.push('Indoor venue recommended during extreme heat'); comfortBadge = '🏛️ AC Indoor Venue'; }
       else { comfortBadge = '🔥 High Heat Advisory'; }
     } else if (temp < 10) { score -= 10; notes.push('Cold conditions'); comfortBadge = '❄️ Chilly Weather'; }
@@ -28,6 +65,7 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
   const isHeavyRain = /heavy|storm|thunder/i.test(cond) || (code != null && code >= 80);
   if (isHeavyRain) {
     score -= 35; warnings.push('Heavy rain risk — outdoor activities not recommended');
+    indoorRecommended = true;
     if (!isOutdoor) { score += 12; notes.push('Indoor venue suitable during rain'); comfortBadge = '🏛️ Covered Venue'; }
     else { comfortBadge = '⛈️ Heavy Rain Alert'; }
   } else if (isRain) {
@@ -41,7 +79,6 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
     score += 5; notes.push('Partly cloudy — good visibility for views');
     if (daypart === 'afternoon' && temp > 30) comfortBadge = '⛅ Sun-Shielded Views';
   }
-  const wind = weather.windKph;
   if (wind != null) {
     if (wind >= 30) {
       score -= wind >= 40 ? 20 : 10;
@@ -63,7 +100,21 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
   if (isOutdoor && score >= 75) notes.push('Excellent for outdoor activity');
   if (isOutdoor && score < 40) notes.push('Poor for outdoor activity');
   if ((place.is_sunrise_spot || place.is_sunset_spot) && score >= 70) notes.push('Favourable for photography');
-  return { score, suitability, activityNotes: notes, warnings, source: weather.forecast ? 'forecast' : 'observed', confidence: weather.tempC != null ? 75 : 50, reason: warnings.length ? warnings[0] : notes[0] || `${suitability} weather for this place type`, tempC: temp, condition: weather.condition || null, windKph: wind, comfortBadge };
+  return {
+    score,
+    suitability,
+    activityNotes: notes,
+    warnings,
+    source: weather.forecast ? 'forecast' : 'observed',
+    confidence: weather.tempC != null ? 75 : 50,
+    reason: warnings.length ? warnings[0] : notes[0] || `${suitability} weather for this place type`,
+    tempC: temp,
+    apparentTempC: apparentTemp,
+    condition: weather.condition || null,
+    windKph: wind,
+    comfortBadge,
+    indoorRecommended,
+  };
 }
 
 function buildWeatherExperienceWindows(weather, place = {}) {
@@ -181,6 +232,8 @@ function getDeterministicWeather(lat, lon, now = new Date()) {
 
 module.exports = {
   computeWeatherIntelligence,
+  computeHeatIndex,
+  computeApparentTemp,
   buildWeatherExperienceWindows,
   getDeterministicWeather,
   weatherEmoji,

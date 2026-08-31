@@ -169,4 +169,24 @@ describe('weatherEngine — Unit & Branch Coverage Tests', () => {
       expect(res.windows[0].confidence).toBe(75);
     });
   });
+
+  describe('computeHeatIndex & computeApparentTemp (BEAST Mode Micro-Climate)', () => {
+    const { computeHeatIndex, computeApparentTemp } = require('../services/travelIntelligence/weatherEngine');
+
+    it('calculates heat index for warm humid conditions', () => {
+      const hi = computeHeatIndex(32, 80);
+      expect(hi).toBeGreaterThan(35);
+
+      const cool = computeHeatIndex(22, 60);
+      expect(cool).toBe(22);
+    });
+
+    it('calculates apparent temperature with wind chill and humidity', () => {
+      const heat = computeApparentTemp(34, 75, 10);
+      expect(heat).toBeGreaterThan(34);
+
+      const coldWind = computeApparentTemp(8, 50, 30);
+      expect(coldWind).toBeLessThan(8);
+    });
+  });
 });

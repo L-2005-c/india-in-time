@@ -26,4 +26,13 @@ describe('Unified Crowd Intelligence Facade (services/crowd)', () => {
     expect(res).toHaveProperty('peakWindow');
     expect(res).toHaveProperty('offPeakWindow');
   });
+
+  test('computeEstimatedQueueMinutes estimates realistic temple and monument queues', () => {
+    const templeQueue = crowd.computeEstimatedQueueMinutes({ cat: 'temple' }, 'High', true);
+    expect(templeQueue.estimatedQueueMinutes).toBeGreaterThan(15);
+    expect(templeQueue.queueDescriptor).toContain('Darshan/Entry Queue');
+
+    const beachQueue = crowd.computeEstimatedQueueMinutes({ cat: 'beach' }, 'Low', false);
+    expect(beachQueue.estimatedQueueMinutes).toBe(0);
+  });
 });

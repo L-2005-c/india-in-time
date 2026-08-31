@@ -21,6 +21,7 @@ module.exports = {
   // ── 1. Core Rule & Context Engine ──────────────────────────────────────────
   computeCrowd: crowdEngine.computeCrowd,
   predictCrowdLegacy: crowdEngine.predictCrowdLegacy,
+  computeEstimatedQueueMinutes: crowdEngine.computeEstimatedQueueMinutes,
 
   // ── 2. Diurnal Crowd Curves ────────────────────────────────────────────────
   generatePredictiveCrowdCurve: crowdCurve.generatePredictiveCrowdCurve,

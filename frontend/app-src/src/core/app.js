@@ -2413,16 +2413,20 @@ function updateItinUI(){
       return `<a href="${opt.link}" target="_blank" class="transport-card">${badge}<div class="t-icon">${opt.icon}</div><div class="t-mode">${opt.label}</div><div class="t-fare">${opt.fareStr}</div><div class="t-time">~${fmtM(opt.time)}</div></a>`;
     }).join('')}</div>` : '';
 
-    // Traffic + Crowd + Weather + Scenic + Travel DNA badges
+    // Traffic + Crowd + Weather + Scenic + Travel DNA + BEAST Intelligence badges
     const weatherBadge = loc.weatherComfortBadge || loc.weather?.comfortBadge || '';
     const scenicBadge = loc.scenicBadge || (loc.is_sunset_spot ? '🌅 Sunset View' : '');
     const crowdBadgeStr = loc.crowdBadge || `${crowdInfo.emoji} ${crowdInfo.label}`;
     const dnaBadgeHTML = loc.dnaMatch?.score ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.25);font-weight:600;" title="${escapeHtml(loc.dnaMatch.reasons?.[0] || 'DNA Match')}">🧬 ${loc.dnaMatch.score}% Fit</span>` : '';
     const photoBadgeHTML = loc.photographyWindow ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.25);font-weight:600;">📸 ${loc.photographyWindow.start}–${loc.photographyWindow.end}</span>` : '';
+    const queueBadgeHTML = loc.queueDescriptor ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(245,158,11,0.15);color:#fcd34d;border:1px solid rgba(245,158,11,0.25);font-weight:600;">⏱️ ${escapeHtml(loc.queueDescriptor)}</span>` : '';
+    const rushBadgeHTML = loc.rushHourActive ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.25);font-weight:600;">🚦 ${escapeHtml(loc.rushLabel || 'Peak Rush')}</span>` : '';
+    const realFeelHTML = (loc.apparentTempC && loc.tempC && Math.abs(loc.apparentTempC - loc.tempC) >= 3) ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(249,115,22,0.15);color:#fdba74;border:1px solid rgba(249,115,22,0.25);font-weight:600;">🌡️ Feels ${Math.round(loc.apparentTempC)}°C</span>` : '';
 
     const smartBadgesHTML = `<div class="smart-time-row" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
       <span class="traffic-badge ${trafficInfo.level}">${trafficInfo.emoji} ${trafficInfo.label}</span>
       <span class="crowd-badge ${crowdInfo.level}">${crowdBadgeStr}</span>
+      ${queueBadgeHTML}${rushBadgeHTML}${realFeelHTML}
       ${weatherBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);font-weight:600;">${weatherBadge}</span>` : ''}
       ${scenicBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.25);font-weight:600;">${scenicBadge}</span>` : ''}
       ${dnaBadgeHTML}
