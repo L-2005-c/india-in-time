@@ -124,6 +124,13 @@ jobs:
           # Migrations run with node-pg-migrate over plain TCP, straight
           # against the postgres service — no wsproxy involved here.
           DATABASE_URL: postgres://iit_ci:iit_ci@localhost:5432/iit_ci
+      - name: Database connection pool load test
+        run: node scripts/db-pool-loadtest.js
+        env:
+          DATABASE_URL: postgres://iit_ci:iit_ci@postgres:5432/iit_ci
+          NEON_LOCAL_PROXY: "true"
+          NEON_LOCAL_PROXY_HOST: "localhost:4444"
+          DB_POOL_MAX: 5
       - name: Build frontend
         run: npm run build:frontend
       # Pinned e2e runner: @playwright/test@1.55.0 (see package.json devDependencies

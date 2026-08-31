@@ -8,7 +8,15 @@
  */
 
 require('dotenv').config();
-const { Pool } = require('@neondatabase/serverless');
+const { Pool, neonConfig } = require('@neondatabase/serverless');
+
+if (process.env.NEON_LOCAL_PROXY === 'true') {
+  const proxyHost = process.env.NEON_LOCAL_PROXY_HOST || 'localhost:4444';
+  neonConfig.wsProxy = (host, port) => `${proxyHost}/v1?address=${host}:${port}`;
+  neonConfig.useSecureWebSocket = false;
+  neonConfig.pipelineTLS = false;
+  neonConfig.pipelineConnect = false;
+}
 
 async function runDbPoolLoadTest() {
   console.log('\n============================================================');
@@ -25,7 +33,7 @@ async function runDbPoolLoadTest() {
   console.log(`Testing boundary saturation...\n`);
 
   if (!process.env.DATABASE_URL) {
-    console.log('ℹ️  DATABASE_URL not set — simulating mock pool queue exhaustion semantics.');
+    console.log('⚠️  MOCK SIMULATION ONLY — no DATABASE_URL was set, this did not touch a real database.');
     
     // Simulate pool saturation mechanics
     let activeClients = 0;
@@ -78,13 +86,14 @@ async function runDbPoolLoadTest() {
     console.log(`- Immediate Connections:  ${results.succeeded}`);
     console.log(`- Queued & Served:        ${results.queued}`);
     console.log(`- Graceful Timeouts:      ${results.timedOut}`);
-    console.log(`\n✅ Pool Saturation Handled Gracefully without Process Crash.`);
-    return { success: true, results };
+    console.log(`\n⚠️  MOCK SIMULATION ONLY — no DATABASE_URL was set, this did not touch a real database.`);
+    return { success: true, results, isMock: true };
   }
 
   // Real DB Test
   const testPool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NEON_LOCAL_PROXY === 'true' ? false : undefined,
     max: poolMax,
     connectionTimeoutMillis,
   });
@@ -105,13 +114,15 @@ async function runDbPoolLoadTest() {
     const outcomes = await Promise.all(tasks);
     const passed = outcomes.filter(o => o.success).length;
     const failed = outcomes.filter(o => !o.success).length;
+    const avgDuration = Math.round(outcomes.reduce((acc, o) => acc + o.durationMs, 0) / outcomes.length);
 
-    console.log(`Real Database Pool Test Results:`);
-    console.log(`- Successful Queries: ${passed}`);
-    console.log(`- Bounded Failures:   ${failed}`);
-    console.log(`\n✅ Connection Pool Sizing & Bound Verified.`);
+    console.log(`Real Database Pool Test Results (${totalConcurrent} concurrent requests against pool limit ${poolMax}):`);
+    console.log(`- Successful Queries:     ${passed}`);
+    console.log(`- Bounded/Timed-out:      ${failed}`);
+    console.log(`- Average Query Latency:  ${avgDuration}ms`);
+    console.log(`\n✅ Real Database Connection Pool Saturation & Bound Verified.`);
     await testPool.end();
-    return { success: true, passed, failed };
+    return { success: true, passed, failed, avgDuration, isMock: false };
   } catch (err) {
     await testPool.end();
     throw err;

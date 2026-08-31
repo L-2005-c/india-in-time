@@ -221,6 +221,22 @@ function validateProductionConfig() {
     missing.push('CORS_ORIGIN (must be a real frontend origin)');
   }
 
+  // Database connection pool vs hosting ceiling validation
+  const workers = Math.max(1, parseInt(process.env.CLUSTER_WORKERS, 10) || 1);
+  const poolMax = Math.max(2, parseInt(process.env.DB_POOL_MAX, 10) || 8);
+  const totalConns = workers * poolMax;
+
+  if (process.env.MAX_DB_CONNECTIONS) {
+    const maxCeiling = parseInt(process.env.MAX_DB_CONNECTIONS, 10);
+    if (Number.isFinite(maxCeiling) && totalConns > maxCeiling) {
+      missing.push(`Database connection pool (${workers} CLUSTER_WORKERS × ${poolMax} DB_POOL_MAX = ${totalConns}) exceeds MAX_DB_CONNECTIONS ceiling (${maxCeiling})`);
+    }
+  } else {
+    console.warn(
+      `⚠️ [config] MAX_DB_CONNECTIONS is not set in production. Database pool sizing (${workers} workers × ${poolMax} = ${totalConns}) is unverified against hosting provider limits.`
+    );
+  }
+
   if (missing.length) {
     throw configError(`missing/invalid: ${missing.join(', ')}`);
   }
