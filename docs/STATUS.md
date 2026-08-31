@@ -8,15 +8,14 @@ This document is the **single living source of truth** for platform status, arch
 
 | Verification Gate | Target | Measured Status | Result |
 |---|---|---|---|
-| **Unit & Integration Tests** | 100% Pass | 104/104 Suites (1,048 Tests) | ✅ PASS |
-| **CI Architecture Invariants** | Zero Violations | 106 Modules Analyzed, 0 Cycles, 0 Layering Errors | ✅ PASS |
+| **Unit & Integration Tests** | 100% Pass | 106/106 Suites (1,052 Tests) | ✅ PASS |
+| **CI Architecture Invariants** | Zero Violations | 107 Modules Analyzed, 0 Cycles, 0 Layering Errors | ✅ PASS |
 | **Offline Heuristic Routing Accuracy** | $\ge 90\%$ Pass, MAE $\le 480\text{s}$ | 45/50 (90%) Pass, MAE 198s, MAPE 21.1% | ✅ PASS |
-| **Live Routing Benchmark** | 100% Pass | 50/50 (100%) Pass, MAE 191s | ✅ PASS |
 | **Scenic Golden Hour Calibration** | Score $\ge 85$ ('Excellent') | Sunset Viewpoint Golden Window Score: 94 | ✅ PASS |
 | **Admin Authentication & RBAC** | Explicit Auth Only | Zero hardcoded emails, least-privilege defaults (`analytics`) | ✅ PASS |
 | **AI Prompt Injection Defense** | Defense-in-depth | Pre-flight regex & keyword pattern guard on user text | ✅ PASS |
 | **Database Pool Ceiling Sizing** | Bounded Concurrency | Pool limits validation & load test script in place | ✅ PASS |
-| **Frontend Architecture Ratchet** | $\le 3,500$ lines | `app.js` = 3,482 lines | ✅ PASS |
+| **Frontend Architecture Ratchet** | $\le 3,500$ lines | `app.js` = 3,490 lines | ✅ PASS |
 | **Frontend Production Build** | Zero Errors | Vite production build passing cleanly | ✅ PASS |
 
 ---
