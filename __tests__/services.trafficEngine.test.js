@@ -51,4 +51,22 @@ describe('Traffic Engine & Multi-Modal Transit Calibration (BEAST Mode)', () => 
     const levelLow = trafficLevelFromMult(1.02);
     expect(levelLow.level).toBe('Low');
   });
+
+  test('evaluates traffic transition and provides detailed ETA breakdown', () => {
+    const { evaluateTrafficTransition } = require('../services/travelIntelligence/trafficEngine');
+    const transition = evaluateTrafficTransition([17.7126, 83.3235], [17.3616, 78.4747], 9 * 60, 1.45);
+    expect(transition.toTrafficLevel).toBe('Heavy');
+    expect(transition.trafficTransition).toContain('➔');
+
+    const travel = estimateTravel({
+      fromCoords: [17.7126, 83.3235],
+      toCoords: [17.7478, 83.3364],
+      departMin: 9 * 60,
+    });
+    expect(travel).toHaveProperty('freeFlowMinutes');
+    expect(travel).toHaveProperty('trafficDelayMinutes');
+    expect(travel).toHaveProperty('etaBreakdown');
+    expect(travel).toHaveProperty('trafficTransition');
+    expect(travel.etaBreakdown).toContain('m');
+  });
 });

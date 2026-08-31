@@ -54,6 +54,63 @@ function recommendTransitMode(distanceKm, opts = {}) {
   };
 }
 
+function evaluateTrafficTransition(fromCoords, toCoords, departMin, mult) {
+  let fromLevel = 'Low';
+  let toLevel = 'Low';
+
+  const isMorningRush = departMin >= 8 * 60 + 30 && departMin <= 10 * 60 + 30;
+  const isEveningRush = departMin >= 17 * 60 + 30 && departMin <= 20 * 60 + 30;
+  const isRush = isMorningRush || isEveningRush;
+
+  let hasBottleneck = false;
+  let bottleneckReason = null;
+
+  if (toCoords && Number.isFinite(toCoords[0])) {
+    const { evaluateDestinationBottleneck } = require('../routing/corridorSpeedModel');
+    const bn = evaluateDestinationBottleneck(toCoords);
+    if (bn.hasBottleneck) {
+      hasBottleneck = true;
+      bottleneckReason = bn.reason;
+    }
+  }
+
+  if (mult >= 1.35 || isRush) {
+    toLevel = hasBottleneck ? 'Heavy' : (mult >= 1.45 ? 'Heavy' : 'Moderate');
+    fromLevel = mult >= 1.40 ? 'Moderate' : 'Low';
+  } else if (mult >= 1.15) {
+    toLevel = hasBottleneck ? 'Moderate' : 'Moderate';
+    fromLevel = 'Low';
+  } else {
+    toLevel = hasBottleneck ? 'Moderate' : 'Low';
+    fromLevel = 'Low';
+  }
+
+  const iconMap = { Low: '🟢', Moderate: '🟡', Heavy: '🔴' };
+  let transitionStr = `${iconMap[fromLevel]} ${fromLevel} ➔ ${iconMap[toLevel]} ${toLevel}`;
+  if (fromLevel === toLevel) {
+    transitionStr = `${iconMap[toLevel]} ${toLevel} Traffic`;
+  }
+
+  let description = 'Uniform traffic flow';
+  if (fromLevel === 'Low' && (toLevel === 'Moderate' || toLevel === 'Heavy')) {
+    description = hasBottleneck
+      ? `Clear start ➔ Approaching ${bottleneckReason || 'destination bottleneck'}`
+      : 'Clear origin ➔ Moderate urban corridor traffic';
+  } else if (fromLevel === 'Heavy' && toLevel === 'Low') {
+    description = 'Congested origin exit ➔ Free flow arterial';
+  } else if (isRush) {
+    description = `Peak rush hour corridor (${isMorningRush ? 'Morning rush' : 'Evening rush'})`;
+  }
+
+  return {
+    fromTrafficLevel: fromLevel,
+    toTrafficLevel: toLevel,
+    trafficTransition: transitionStr,
+    transitionDescription: description,
+    hasBottleneck,
+  };
+}
+
 function estimateTravel(opts = {}) {
   const { fromCoords, toCoords, departMin = 720, liveTraffic = null, isFirstStop = false } = opts;
   const isMorningRush = departMin >= 8 * 60 + 30 && departMin <= 10 * 60 + 30;
@@ -70,12 +127,24 @@ function estimateTravel(opts = {}) {
     const isEstimateOnly = source === 'route_estimate';
     const googleMapsUrl = (fromCoords && toCoords) ? `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving` : null;
     const transitRecommendation = recommendTransitMode(km, { congestionFactor: mult });
+    const transition = evaluateTrafficTransition(fromCoords, toCoords, departMin, mult);
+    const freeFlowMinutes = Math.max(1, Math.round(minutes / Math.max(1, mult)));
+    const trafficDelayMinutes = Math.max(0, minutes - freeFlowMinutes);
+    const etaBreakdown = trafficDelayMinutes > 0 ? `${minutes}m (${freeFlowMinutes}m base + ${trafficDelayMinutes}m rush delay)` : `${minutes}m (free flow)`;
+
     return {
       travelMinutes: minutes,
+      freeFlowMinutes,
+      trafficDelayMinutes,
+      etaBreakdown,
       distanceKm: km != null ? Math.round(km * 10) / 10 : null,
       congestionFactor: mult,
       trafficLevel: level.level,
       trafficRisk: level.risk,
+      fromTrafficLevel: transition.fromTrafficLevel,
+      toTrafficLevel: transition.toTrafficLevel,
+      trafficTransition: transition.trafficTransition,
+      transitionDescription: transition.transitionDescription,
       rushHourActive,
       rushLabel,
       transitRecommendation,
@@ -88,7 +157,7 @@ function estimateTravel(opts = {}) {
     };
   }
   if (!fromCoords || !toCoords || !Number.isFinite(fromCoords[0]) || !Number.isFinite(toCoords[0])) {
-    return { travelMinutes: isFirstStop ? 10 : 20, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', rushHourActive: false, source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30, googleMapsUrl: null };
+    return { travelMinutes: isFirstStop ? 10 : 20, freeFlowMinutes: isFirstStop ? 10 : 20, trafficDelayMinutes: 0, etaBreakdown: `${isFirstStop ? 10 : 20}m (estimated)`, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', fromTrafficLevel: 'Unknown', toTrafficLevel: 'Unknown', trafficTransition: '🟡 Unknown', transitionDescription: 'No route coordinates', rushHourActive: false, source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30, googleMapsUrl: null };
   }
   const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
   const roadKm = straightKm * ROAD_NETWORK_FACTOR;
@@ -101,13 +170,25 @@ function estimateTravel(opts = {}) {
   const level = trafficLevelFromMult(mult);
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving`;
   const transitRecommendation = recommendTransitMode(roadKm, { congestionFactor: mult });
+  const transition = evaluateTrafficTransition(fromCoords, toCoords, departMin, mult);
+  const freeFlowMinutes = baseMinutes;
+  const trafficDelayMinutes = Math.max(0, travelMinutes - freeFlowMinutes);
+  const etaBreakdown = trafficDelayMinutes > 0 ? `${travelMinutes}m (${freeFlowMinutes}m base + ${trafficDelayMinutes}m delay)` : `${travelMinutes}m (free flow)`;
+
   return {
     travelMinutes,
+    freeFlowMinutes,
+    trafficDelayMinutes,
+    etaBreakdown,
     distanceKm: Math.round(roadKm * 10) / 10,
     straightDistanceKm: Math.round(straightKm * 10) / 10,
     congestionFactor: mult,
     trafficLevel: level.level,
     trafficRisk: level.risk,
+    fromTrafficLevel: transition.fromTrafficLevel,
+    toTrafficLevel: transition.toTrafficLevel,
+    trafficTransition: transition.trafficTransition,
+    transitionDescription: transition.transitionDescription,
     rushHourActive,
     rushLabel,
     transitRecommendation,
@@ -153,6 +234,7 @@ module.exports = {
   getTrafficMultiplier,
   trafficLevelFromMult,
   recommendTransitMode,
+  evaluateTrafficTransition,
   estimateTravel,
   estimateTravelAsync,
   recommendArrivalWindow,

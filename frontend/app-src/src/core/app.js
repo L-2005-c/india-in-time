@@ -2422,11 +2422,12 @@ function updateItinUI(){
     const queueBadgeHTML = loc.queueDescriptor ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(245,158,11,0.15);color:#fcd34d;border:1px solid rgba(245,158,11,0.25);font-weight:600;">⏱️ ${escapeHtml(loc.queueDescriptor)}</span>` : '';
     const rushBadgeHTML = loc.rushHourActive ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.25);font-weight:600;">🚦 ${escapeHtml(loc.rushLabel || 'Peak Rush')}</span>` : '';
     const realFeelHTML = (loc.apparentTempC && loc.tempC && Math.abs(loc.apparentTempC - loc.tempC) >= 3) ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(249,115,22,0.15);color:#fdba74;border:1px solid rgba(249,115,22,0.25);font-weight:600;">🌡️ Feels ${Math.round(loc.apparentTempC)}°C</span>` : '';
+    const trafficTransHTML = loc.trafficTransition ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.25);font-weight:600;" title="${escapeHtml(loc.transitionDescription || 'Corridor Traffic')}">🚥 ${escapeHtml(loc.trafficTransition)}</span>` : '';
 
     const smartBadgesHTML = `<div class="smart-time-row" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
       <span class="traffic-badge ${trafficInfo.level}">${trafficInfo.emoji} ${trafficInfo.label}</span>
       <span class="crowd-badge ${crowdInfo.level}">${crowdBadgeStr}</span>
-      ${queueBadgeHTML}${rushBadgeHTML}${realFeelHTML}
+      ${trafficTransHTML}${queueBadgeHTML}${rushBadgeHTML}${realFeelHTML}
       ${weatherBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);font-weight:600;">${weatherBadge}</span>` : ''}
       ${scenicBadge ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.25);font-weight:600;">${scenicBadge}</span>` : ''}
       ${dnaBadgeHTML}
