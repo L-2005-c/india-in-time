@@ -313,10 +313,26 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
     else if (!neededMeal) score -= 72;
   }
   if (isFood(place)) {
+    const lastStop = state.stops.length ? state.stops[state.stops.length - 1] : null;
+    const isConsecutiveFood = lastStop && isFood(lastStop);
+    const onlyFoodWanted = requirements.soft.preferredCategories?.length === 1 && requirements.soft.preferredCategories[0] === 'food';
+    if (isConsecutiveFood && !onlyFoodWanted) {
+      score -= 55; // Decisive penalty against back-to-back restaurants
+    }
     const foodIntent = requirements.soft.foodFocus || requirements.soft.preferredCategories?.includes('food') || requiredMeals.includes(meal);
-    if (foodIntent && ['lunch', 'dinner', 'breakfast', 'snack'].includes(meal)) score += neededMeal ? 50 : 28;
-    else if (!foodIntent) score -= 35;
-    else score -= 12;
+    if (neededMeal) {
+      score += 50;
+    } else if (foodIntent && meal && !state.meals.has(meal)) {
+      score += 26;
+    } else if (foodIntent && onlyFoodWanted) {
+      score += 15;
+    } else if (state.meals.has(meal)) {
+      score -= 35; // Already had meal in this window
+    } else if (!foodIntent) {
+      score -= 35;
+    } else {
+      score -= 15;
+    }
   } else if (requirements.soft.foodFocus && (meal === 'lunch' || meal === 'dinner') && !state.meals.has(meal)) {
     score -= 28;
   }
@@ -381,9 +397,10 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   if (Number.isFinite(tempC) && tempC >= 33) {
     if (isMiddayHeat) {
       if (outdoor) {
-        score -= tempC >= 37 ? 55 : 30; // Decisively penalize direct outdoor midday scorching sun
+        if (tempC >= 38) return null; // Reject direct scorching sun outdoor exposures during extreme heat peak
+        score -= tempC >= 37 ? 65 : 35; // Decisively penalize direct outdoor midday scorching sun
       } else {
-        score += tempC >= 37 ? 30 : 18; // Strong reward for air-conditioned / covered indoor midday refuge
+        score += tempC >= 37 ? 35 : 20; // Strong reward for air-conditioned / covered indoor midday refuge
       }
     } else if (outdoor && (arrivalMin <= 10 * 60 || arrivalMin >= 16 * 60)) {
       score += 16; // Pleasant morning/evening outdoor window
@@ -486,7 +503,7 @@ function buildStop(place, scored, arrivalMin, state) {
   ];
 
   const nearbySpots = state.allCandidates
-    ? getNearbyRecommendations(place, state.allCandidates, { preferredCategories: state.preferredCategories })
+    ? getNearbyRecommendations(place, state.allCandidates, { preferredCategories: state.preferredCategories, maxRadiusKm: 1.2 })
     : [];
 
   const timePhaseBadge = scenicEval.badge || '🌤️ Standard';
@@ -846,7 +863,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
     const dnaInfo = computeDnaMatch(stop, dnaProfile);
     const nearby = (stop.nearbySpots && stop.nearbySpots.length)
       ? stop.nearbySpots
-      : getNearbyRecommendations(stop, candidates, { preferredCategories });
+      : getNearbyRecommendations(stop, candidates, { preferredCategories, maxRadiusKm: 1.2 });
     const crowdCurve = generatePredictiveCrowdCurve(stop, { arrivalMin: stop.arriveMin, weather: requirements.weather });
     const nextStop = state.stops[idx + 1];
     const routeDining = nextStop ? findRouteAwareDining(stop.coords, nextStop.coords, candidates, { timeMin: stop.leaveMin, weather: requirements.weather }) : [];

@@ -944,30 +944,38 @@ body::before {
   color:var(--text-secondary);
 }
 
-/* Food links */
-.food-links{display:flex;gap:5px;margin-top:8px;}
-.food-link{
-  flex:1; min-height:34px; padding:5px 4px; border-radius:8px; font-size:9.5px; font-weight:700;
-  text-align:center; text-decoration:none; border:1px solid;
-  transition:all .12s; display:flex; align-items:center; justify-content:center; gap:3px;
-  touch-action:manipulation;
+/* Stop card bottom bar */
+.sc-bottom-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-top:8px; padding-top:8px;
+  border-top:1px solid rgba(255,255,255,0.07);
+  flex-wrap:wrap;
 }
-.food-link:active{transform:scale(.93);}
-.fl-zomato{background:rgba(225,55,55,.08);border-color:rgba(225,55,55,.2);color:#f87171;}
-.fl-swiggy{background:rgba(252,128,25,.08);border-color:rgba(252,128,25,.2);color:#fb923c;}
-.fl-maps  {background:rgba(66,133,244,.08);border-color:rgba(66,133,244,.2);color:#93c5fd;}
+
+/* Food links */
+.food-links{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.food-link{
+  padding:3px 8px; border-radius:6px; font-size:10.5px; font-weight:700;
+  text-align:center; text-decoration:none; border:1px solid;
+  transition:all .12s; display:inline-flex; align-items:center; justify-content:center; gap:4px;
+  touch-action:manipulation; min-height:26px;
+}
+.food-link:active{transform:scale(.95);}
+.fl-zomato{background:rgba(225,55,55,.1);border-color:rgba(225,55,55,.25);color:#f87171;}
+.fl-swiggy{background:rgba(252,128,25,.1);border-color:rgba(252,128,25,.25);color:#fb923c;}
+.fl-maps  {background:rgba(66,133,244,.1);border-color:rgba(66,133,244,.25);color:#93c5fd;}
 
 /* Stop card actions */
-.sc-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border-subtle);}
+.sc-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
 .sc-action{
-  flex:1; min-height:40px; border-radius:10px; font-size:15px;
-  display:flex; align-items:center; justify-content:center;
+  padding:3px 9px; min-height:26px; border-radius:6px; font-size:11px; font-weight:600;
+  display:inline-flex; align-items:center; justify-content:center; gap:4px;
   cursor:pointer; text-decoration:none;
-  border:1px solid var(--border-default); background:var(--bg-glass);
-  transition:all .12s; color:var(--text-primary); touch-action:manipulation;
+  border:1px solid var(--border-default); background:rgba(255,255,255,0.04);
+  transition:all .12s; color:var(--text-secondary); touch-action:manipulation;
 }
-.sc-action:active{transform:scale(.92);}
-.sc-action:hover{border-color:var(--border-mid);background:var(--gold-glow);}
+.sc-action:active{transform:scale(.95);}
+.sc-action:hover{border-color:var(--border-mid);background:rgba(255,255,255,0.08);color:var(--text-primary);}
 
 .drive-connector{
   display:flex; align-items:center; gap:8px; padding:6px 0 6px 22px;
@@ -1797,25 +1805,25 @@ body::before {
    TRANSPORT OPTIONS GRID
 ═══════════════════════════════════════════ */
 .transport-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px;
+  display:grid;grid-template-columns:repeat(auto-fit, minmax(88px, 1fr));gap:6px;margin-top:8px;
 }
 .transport-card{
-  padding:6px 4px;border-radius:8px;text-align:center;cursor:pointer;
-  background:var(--bg-glass);border:1px solid var(--border-default);
-  transition:all .15s;text-decoration:none;display:flex;flex-direction:column;
-  align-items:center;gap:2px;position:relative;color:inherit;min-height:48px;
+  padding:5px 8px;border-radius:8px;text-align:left;cursor:pointer;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+  transition:all .15s;text-decoration:none;display:flex;flex-direction:row;
+  justify-content:space-between;align-items:center;position:relative;color:inherit;min-height:32px;
   touch-action:manipulation;
 }
-.transport-card:active{transform:scale(.95);}
-.transport-card:hover{border-color:var(--border-mid);background:var(--gold-glow);}
-.transport-card .t-icon{font-size:13px;line-height:1;}
-.transport-card .t-mode{font-size:7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);}
-.transport-card .t-fare{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:var(--text-primary);}
-.transport-card .t-time{font-size:8px;color:var(--text-secondary);}
+.transport-card:active{transform:scale(.97);}
+.transport-card:hover{border-color:var(--border-mid);background:rgba(255,255,255,0.07);}
+.transport-card .t-icon{font-size:13px;line-height:1;margin-right:2px;}
+.transport-card .t-mode{font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);}
+.transport-card .t-fare{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:var(--text-primary);margin-left:auto;padding-left:4px;}
+.transport-card .t-time{font-size:8.5px;color:var(--text-secondary);margin-left:4px;}
 .transport-badge{
   position:absolute;top:-4px;right:-4px;padding:1px 4px;border-radius:4px;
-  font-size:6px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
-  line-height:1.4;
+  font-size:6.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  line-height:1.3;
 }
 .transport-badge.fastest{background:var(--ocean);color:#000;}
 .transport-badge.cheapest{background:var(--jade);color:#000;}

@@ -637,7 +637,8 @@ function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, breakEvery=
       try {
         if (typeof getPlaceDynamicStatus === 'function') {
           const st = getPlaceDynamicStatus(loc, arriveMin);
-          return { isOpenNow: st?.open != null ? st.open : true };
+          const isOpen = st?.open != null ? st.open : (st?.status !== 'closed');
+          return { isOpenNow: isOpen, ...st };
         }
       } catch (_e) {}
       return { isOpenNow: true };
@@ -2497,7 +2498,8 @@ function updateItinUI(){
 
     const nextStop=itin[i+1];
     const gmapNav=(loc.coords && nextStop?.coords)?`https://www.google.com/maps/dir/?api=1&origin=${loc.coords[0]},${loc.coords[1]}&destination=${nextStop.coords[0]},${nextStop.coords[1]}&travelmode=driving`:`https://www.google.com/maps/dir/?api=1&destination=${loc.coords[0]},${loc.coords[1]}&travelmode=driving`;
-    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${ritualHTML}${dishHTML}${armorHTML}${whyNowBox}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${foodLinksHTML}<div class="sc-actions"><a href="${gmapNav}" target="_blank" class="sc-action" title="Navigate in Google Maps" style="font-size:18px">🗺️</a><a href="${sv}" target="_blank" class="sc-action" title="Street View" style="font-size:18px">👀</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="font-size:18px;cursor:pointer">🍽️</button></div>`;
+    const bottomBarHTML=`<div class="sc-bottom-bar">${foodLinksHTML}<div class="sc-actions"><a href="${gmapNav}" target="_blank" class="sc-action" title="Navigate in Google Maps">🗺️ Route</a><a href="${sv}" target="_blank" class="sc-action" title="Street View">👀 360°</a><button data-action="aiFoodCard" data-name="${escapeHtml(loc.name)}" data-cat="${escapeHtml(loc.cat || '')}" class="sc-action" title="AI Food Guide" style="cursor:pointer">🍽️ Food AI</button></div></div>`;
+    div.innerHTML=`<div class="dur-badge">${fmtM(loc.vt)}</div><div class="sc-row"><img src="${imgs[loc.cat]||imgs.scenic}" class="sc-img" alt="${escapeHtml(loc.name)}"><div class="sc-body"><div class="sc-name">${escapeHtml(loc.name)}</div><div class="sc-sub">${planMeta?`${planMeta}<br>`:''}🕒 ${loc.ot||'--'} – ${loc.ct||'--'}${advancedMeta?`<br>${advancedMeta}`:''}</div><div class="sc-times"><span class="time-tag">${loc.sts||loc.arriveAt||'--'}</span><span style="color:var(--text-muted);font-size:10px">→</span><span class="time-tag">${loc.ets||loc.leaveAt||'--'}</span></div>${smartBadgesHTML}${ritualHTML}${dishHTML}${armorHTML}${whyNowBox}<div style="margin-top:4px;">${getTimeBadgesHtml(loc, loc.arriveMin)}</div>${typeof getTravelIntelPanelHtml==='function'?getTravelIntelPanelHtml(loc):''}${nearbyHTML}</div></div>${wxBadgeHTML}${transportHTML}${bottomBarHTML}`;
     list.appendChild(div);
     const failedImg = div.querySelector('.sc-img');
     if (failedImg) failedImg.addEventListener('error', () => { failedImg.style.display = 'none'; }, { once: true });

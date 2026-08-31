@@ -92,24 +92,23 @@ function getNearbyRecommendations(currentStop, candidatePool = [], opts = {}) {
       if (pid === currentId) return false;
       if (!p.coords || !Array.isArray(p.coords) || p.coords.length < 2) return false;
       const d = distKm(currentCoords[0], currentCoords[1], p.coords[0], p.coords[1]);
-      return d > 0.1 && d <= maxRadiusKm;
+      return d > 0.05 && d <= maxRadiusKm;
     })
     .map(p => {
       const straightKm = distKm(currentCoords[0], currentCoords[1], p.coords[0], p.coords[1]);
       const roadKm = Math.round(straightKm * ROAD_FACTOR * 10) / 10;
-      const travelMins = Math.max(4, Math.round(roadKm / 0.32)); // ~19.2 km/h urban speed
+      const travelMins = Math.max(2, Math.round(roadKm / 0.25));
 
-      let score = 70 - (roadKm * 4);
-      if (p.importance === 'must_see' || p.rating >= 4.5) score += 15;
-      if (opts.preferredCategories?.includes(p.cat)) score += 12;
+      let score = 100 - (straightKm * 50);
+      if (p.importance === 'must_see' || p.rating >= 4.5) score += 10;
+      if (opts.preferredCategories?.includes(p.cat)) score += 10;
 
       const whyList = [];
-      if (roadKm <= 2.5) whyList.push(`Very close (${formatDistance(roadKm * 1000)})`);
-      else whyList.push(`${formatDuration(travelMins)} drive (${roadKm} km)`);
+      whyList.push(`Very close (${formatDistance(straightKm * 1000)})`);
 
       if (p.cat === 'food' || p.cat === 'cafe') whyList.push('Dining & refreshment');
       else if (p.cat === 'scenic' || p.is_sunset_spot) whyList.push('Scenic highlight');
-      else whyList.push('High-rated nearby spot');
+      else whyList.push('Nearby walking spot');
 
       return {
         id: p.id || p.name,
@@ -119,15 +118,15 @@ function getNearbyRecommendations(currentStop, candidatePool = [], opts = {}) {
         distanceM: Math.round(straightKm * 1000),
         distanceKm: roadKm,
         travelMinutes: travelMins,
-        formattedDistance: formatDistance(roadKm * 1000),
+        formattedDistance: formatDistance(straightKm * 1000),
         formattedDuration: formatDuration(travelMins),
         rating: p.rating || 4.5,
         whyRecommended: whyList.join(' • '),
-        googleMapsUrl: `https://www.google.com/maps/dir/?api=1&origin=${currentCoords[0]},${currentCoords[1]}&destination=${p.coords[0]},${p.coords[1]}&travelmode=driving`,
+        googleMapsUrl: `https://www.google.com/maps/dir/?api=1&origin=${currentCoords[0]},${currentCoords[1]}&destination=${p.coords[0]},${p.coords[1]}&travelmode=walking`,
         score: Math.round(score),
       };
     })
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => a.distanceM - b.distanceM)
     .slice(0, 4);
 
   return ranked;

@@ -27,16 +27,16 @@ export function getOpeningStatusPure(loc, nowMin) {
   const ot = timeToMinutes(loc?.ot ?? '00:00');
   const ct = timeToMinutes(loc?.ct ?? '23:59');
   if (!Number.isFinite(ot) || !Number.isFinite(ct)) {
-    return { status: 'unknown', label: 'Hours unknown', color: 'var(--text-muted)' };
+    return { status: 'unknown', label: 'Hours unknown', color: 'var(--text-muted)', open: true, isOpenNow: true };
   }
   const overnight = ct <= ot;
   const open = overnight ? (nowMin >= ot || nowMin < ct) : (nowMin >= ot && nowMin < ct);
-  if (!open) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color, #ef4444)' };
+  if (!open) return { status: 'closed', label: '🔴 Closed', color: 'var(--danger-color, #ef4444)', open: false, isOpenNow: false };
   const minsToClose = overnight ? (nowMin < ct ? ct - nowMin : (1440 - nowMin) + ct) : ct - nowMin;
   if (minsToClose <= 60 && minsToClose > 0) {
-    return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)' };
+    return { status: 'closing_soon', label: '🟡 Closing Soon', color: 'var(--warning-color)', open: true, isOpenNow: true };
   }
-  return { status: 'open', label: '🟢 Open', color: 'var(--success-color)' };
+  return { status: 'open', label: '🟢 Open', color: 'var(--success-color)', open: true, isOpenNow: true };
 }
 
 export function getCrowdPredictionPure(loc, nowMin, opts = {}) {
