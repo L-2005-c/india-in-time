@@ -11,7 +11,7 @@
 const rules = require('../../data/time-intelligence-rules.json');
 const { t2m, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour } = require('./timeEngine');
 const { getOpeningStatus, categoryRules } = require('./openingHoursEngine');
-const { computeCrowd } = require('./crowdEngine');
+const { computeCrowd, lookupHistoricalCrowd } = require('../crowd');
 const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier } = require('./trafficEngine');
 const { computeWeatherIntelligence, buildWeatherExperienceWindows } = require('./weatherEngine');
 const { computeScenic } = require('./scenicEngine');
@@ -21,13 +21,12 @@ const { getSignatureDish } = require('./signatureDishEngine');
 const { getEntryProtocol } = require('./entryProtocolEngine');
 const { computeConfidence } = require('./confidenceEngine');
 const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
-const historicalCrowdStore = require('./historicalCrowdStore');
 const { generateExperienceWindows } = require('./experienceWindows');
 
 function getTravelIntelligence(place, now = new Date(), weather = null, options = {}) {
   // Attach historical crowd hints when not already provided on the place object
   if (!place.historicalCrowd) {
-    const hist = historicalCrowdStore.lookupHistoricalCrowd(place, options.region || options.city || null);
+    const hist = lookupHistoricalCrowd(place, options.region || options.city || null);
     if (hist) place = { ...place, historicalCrowd: hist };
   }
   const cat = place.cat || 'default';

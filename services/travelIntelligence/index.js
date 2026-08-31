@@ -1,11 +1,10 @@
 // Travel Intelligence Engine — orchestrator
 const { t2m, m2t, getISTParts, getSeason, computeSunTimes, getDaypart } = require('./timeEngine');
 const { categoryRules } = require('./openingHoursEngine');
-const { predictCrowdLegacy } = require('./crowdEngine');
+const crowd = require('../crowd');
 const { dynamicAdvice, multiDayAdvice } = require('./advisoryEngine');
 const { buildMultiDayItinerary } = require('./multiDayPlanner');
 const festivalEngine = require('./festivalEngine');
-const historicalCrowdStore = require('./historicalCrowdStore');
 const { getTravelIntelligence } = require('./decisionEngine');
 
 function getBatchTravelIntelligence(places, now = new Date(), weather = null, options = {}) {
@@ -20,7 +19,7 @@ async function getTravelIntelligenceAsync(place, now = new Date(), weather = nul
   const { estimateTravelAsync } = require('./trafficEngine');
   // Prefer DB historical crowd when available
   try {
-    const hist = await historicalCrowdStore.lookupHistoricalCrowdAsync(place, options.region || options.city || null);
+    const hist = await crowd.lookupHistoricalCrowdAsync(place, options.region || options.city || null);
     if (hist) place = { ...place, historicalCrowd: hist };
   } catch (_e) { /* keep sync JSON path inside getTravelIntelligence */ }
 
@@ -28,9 +27,8 @@ async function getTravelIntelligenceAsync(place, now = new Date(), weather = nul
 
   // Blend feedback-trained ML logistic model (or rating prior if under-trained)
   try {
-    const learner = require('./crowdLearner');
     const histScore = place.historicalCrowd?.avgScore ?? place.historicalCrowd?.score;
-    const learned = await learner.getMlOrPriorCrowd(
+    const learned = await crowd.getMlOrPriorCrowd(
       place.name,
       options.city || place.city || options.region || '',
       {
@@ -43,7 +41,7 @@ async function getTravelIntelligenceAsync(place, now = new Date(), weather = nul
       }
     );
     if (learned && learned.score != null) {
-      base.crowd = learner.blendLearnedCrowd(base.crowd, learned);
+      base.crowd = crowd.blendLearnedCrowd(base.crowd, learned);
       if (learned.source) base.crowd.mlSource = learned.source;
     }
   } catch (_e) { /* learner is optional */ }
@@ -93,7 +91,7 @@ module.exports = {
   getTravelIntelligenceAsync,
   getActiveFestivals: festivalEngine.getActiveFestivals,
   festivalCrowdMultiplier: festivalEngine.festivalCrowdMultiplier,
-  lookupHistoricalCrowd: historicalCrowdStore.lookupHistoricalCrowd,
-  attachHistoricalCrowdBatch: historicalCrowdStore.attachHistoricalCrowdBatch,
-  computeSunTimes, t2m, m2t, getISTParts, getSeason, getDaypart, categoryRules, predictCrowdLegacy,
+  lookupHistoricalCrowd: crowd.lookupHistoricalCrowd,
+  attachHistoricalCrowdBatch: crowd.attachHistoricalCrowdBatch,
+  computeSunTimes, t2m, m2t, getISTParts, getSeason, getDaypart, categoryRules, predictCrowdLegacy: crowd.predictCrowdLegacy,
 };

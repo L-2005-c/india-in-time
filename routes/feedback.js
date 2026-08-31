@@ -45,15 +45,15 @@ router.post('/place', optionalAuth, async (req, res) => {
     // the production crowd model, preventing unauthenticated model poisoning.
     if (req.uid) {
       try {
-      const crowdModel = require('../services/ml/crowdModel');
-      await crowdModel.learnFromSingleFeedback({
-        rating: r,
-        accurate,
-        cat: req.body.category || req.body.cat || 'default',
-        daypart: req.body.daypart,
-        isWeekend: !!req.body.isWeekend,
-        month: new Date().getMonth() + 1,
-      });
+        const crowd = require('../services/crowd');
+        await crowd.learnFromSingleFeedback({
+          rating: r,
+          accurate,
+          cat: req.body.category || req.body.cat || 'default',
+          daypart: req.body.daypart,
+          isWeekend: !!req.body.isWeekend,
+          month: new Date().getMonth() + 1,
+        });
       } catch (_ml) { /* non-blocking */ }
     }
 

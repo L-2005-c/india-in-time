@@ -108,9 +108,9 @@ router.get('/gemini', analyticsRead, async (req, res) => {
 
 router.get('/ml/crowd', analyticsRead, async (_req, res) => {
   try {
-    const crowdModel = require('../services/ml/crowdModel');
-    await crowdModel.ensureLoaded();
-    res.json(crowdModel.getModelInfo());
+    const crowd = require('../services/crowd');
+    await crowd.ensureLoaded();
+    res.json(crowd.getModelInfo());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -118,9 +118,9 @@ router.get('/ml/crowd', analyticsRead, async (_req, res) => {
 
 router.post('/ml/crowd/train', analyticsWrite, async (req, res) => {
   try {
-    const crowdModel = require('../services/ml/crowdModel');
+    const crowd = require('../services/crowd');
     const limit = Math.min(parseInt(req.body?.limit || req.query.limit, 10) || 500, 2000);
-    const result = await crowdModel.trainFromFeedback(limit);
+    const result = await crowd.trainFromFeedback(limit);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });

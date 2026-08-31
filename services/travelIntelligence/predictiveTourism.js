@@ -11,7 +11,7 @@
  * 4. Data provenance & confidence transparency.
  */
 
-const { generatePredictiveCrowdCurve } = require('./crowdCurve');
+const { generatePredictiveCrowdCurve } = require('../crowd');
 const { computeScenic } = require('./scenicEngine');
 const { classifyWeatherWindow } = require('./weatherOpportunity');
 

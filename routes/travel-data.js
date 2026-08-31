@@ -4,7 +4,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { getActiveFestivals, festivalCrowdMultiplier } = require('../services/travelIntelligence/festivalEngine');
-const { lookupHistoricalCrowd } = require('../services/travelIntelligence/historicalCrowdStore');
+const { lookupHistoricalCrowd } = require('../services/crowd');
 const { requireAdminAuth } = require('../middleware/adminAuth');
 
 const FESTIVAL_PATH = path.join(__dirname, '..', 'data', 'india-festivals.json');
@@ -79,7 +79,7 @@ router.put('/historical-crowd', requireAdminAuth, (req, res) => {
     fs.writeFileSync(HIST_PATH, JSON.stringify(body, null, 2));
     try {
       delete require.cache[require.resolve('../data/historical-crowd-hints.json')];
-      delete require.cache[require.resolve('../services/travelIntelligence/historicalCrowdStore')];
+      delete require.cache[require.resolve('../services/crowd')];
     } catch (_e) { /* ignore */ }
     res.json({ ok: true });
   } catch (_err) {
