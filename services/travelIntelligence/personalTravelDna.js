@@ -12,36 +12,74 @@
  * 5. Full user control (inspect, edit, reset, disable, delete).
  */
 
+const SOURCE_TYPES = Object.freeze({
+  EXPLICIT: 'explicit',
+  INFERRED: 'inferred',
+  DEFAULT: 'default',
+});
+
 const DEFAULT_TRAVEL_DNA = Object.freeze({
-  scenic: 70,
+  // 10 Canonical Dimensions
   photography: 65,
   food: 70,
   culture: 65,
   adventure: 50,
+  nature: 70,
+  scenic: 70, // Alias / backward compatibility for nature
+  heritage: 65, // Explicit heritage dimension
   shopping: 45,
+  relaxation: 55,
+  family: 50,
+  nightlife: 40,
+  // Pace & Tolerances
   crowdTolerance: 50,
   walkingTolerance: 65,
   pacePreference: 'balanced',
   enabled: true,
   sources: {
-    scenic: 'default',
     photography: 'default',
     food: 'default',
     culture: 'default',
     adventure: 'default',
+    nature: 'default',
+    scenic: 'default',
+    heritage: 'default',
     shopping: 'default',
+    relaxation: 'default',
+    family: 'default',
+    nightlife: 'default',
     crowdTolerance: 'default',
     walkingTolerance: 'default',
   },
   confidences: {
-    scenic: null,
     photography: null,
     food: null,
     culture: null,
     adventure: null,
+    nature: null,
+    scenic: null,
+    heritage: null,
     shopping: null,
+    relaxation: null,
+    family: null,
+    nightlife: null,
     crowdTolerance: null,
     walkingTolerance: null,
+  },
+  evidenceCounts: {
+    photography: 0,
+    food: 0,
+    culture: 0,
+    adventure: 0,
+    nature: 0,
+    scenic: 0,
+    heritage: 0,
+    shopping: 0,
+    relaxation: 0,
+    family: 0,
+    nightlife: 0,
+    crowdTolerance: 0,
+    walkingTolerance: 0,
   },
   lastUpdated: new Date().toISOString(),
 });
@@ -66,37 +104,71 @@ function sanitizeDnaProfile(input = {}) {
 
   const sources = typeof input.sources === 'object' && input.sources ? input.sources : DEFAULT_TRAVEL_DNA.sources;
   const confidences = typeof input.confidences === 'object' && input.confidences ? input.confidences : DEFAULT_TRAVEL_DNA.confidences;
+  const evidenceCounts = typeof input.evidenceCounts === 'object' && input.evidenceCounts ? input.evidenceCounts : DEFAULT_TRAVEL_DNA.evidenceCounts;
+
+  const natureVal = input.nature != null ? input.nature : input.scenic;
+  const scenicVal = input.scenic != null ? input.scenic : natureVal;
 
   return {
-    scenic: clamp(input.scenic, 0, 100, DEFAULT_TRAVEL_DNA.scenic),
     photography: clamp(input.photography, 0, 100, DEFAULT_TRAVEL_DNA.photography),
     food: clamp(input.food, 0, 100, DEFAULT_TRAVEL_DNA.food),
     culture: clamp(input.culture, 0, 100, DEFAULT_TRAVEL_DNA.culture),
     adventure: clamp(input.adventure, 0, 100, DEFAULT_TRAVEL_DNA.adventure),
+    nature: clamp(natureVal, 0, 100, DEFAULT_TRAVEL_DNA.nature),
+    scenic: clamp(scenicVal, 0, 100, DEFAULT_TRAVEL_DNA.scenic),
+    heritage: clamp(input.heritage, 0, 100, DEFAULT_TRAVEL_DNA.heritage),
     shopping: clamp(input.shopping, 0, 100, DEFAULT_TRAVEL_DNA.shopping),
+    relaxation: clamp(input.relaxation, 0, 100, DEFAULT_TRAVEL_DNA.relaxation),
+    family: clamp(input.family, 0, 100, DEFAULT_TRAVEL_DNA.family),
+    nightlife: clamp(input.nightlife, 0, 100, DEFAULT_TRAVEL_DNA.nightlife),
     crowdTolerance: clamp(input.crowdTolerance, 0, 100, DEFAULT_TRAVEL_DNA.crowdTolerance),
     walkingTolerance: clamp(input.walkingTolerance, 0, 100, DEFAULT_TRAVEL_DNA.walkingTolerance),
     pacePreference: pace,
     enabled: input.enabled !== false,
     sources: {
-      scenic: sources.scenic || 'default',
       photography: sources.photography || 'default',
       food: sources.food || 'default',
       culture: sources.culture || 'default',
       adventure: sources.adventure || 'default',
+      nature: sources.nature || sources.scenic || 'default',
+      scenic: sources.scenic || sources.nature || 'default',
+      heritage: sources.heritage || sources.culture || 'default',
       shopping: sources.shopping || 'default',
+      relaxation: sources.relaxation || 'default',
+      family: sources.family || 'default',
+      nightlife: sources.nightlife || 'default',
       crowdTolerance: sources.crowdTolerance || 'default',
       walkingTolerance: sources.walkingTolerance || 'default',
     },
     confidences: {
-      scenic: confidences.scenic != null ? clamp(confidences.scenic, 20, 100) : null,
       photography: confidences.photography != null ? clamp(confidences.photography, 20, 100) : null,
       food: confidences.food != null ? clamp(confidences.food, 20, 100) : null,
       culture: confidences.culture != null ? clamp(confidences.culture, 20, 100) : null,
       adventure: confidences.adventure != null ? clamp(confidences.adventure, 20, 100) : null,
+      nature: confidences.nature != null ? clamp(confidences.nature, 20, 100) : (confidences.scenic != null ? clamp(confidences.scenic, 20, 100) : null),
+      scenic: confidences.scenic != null ? clamp(confidences.scenic, 20, 100) : (confidences.nature != null ? clamp(confidences.nature, 20, 100) : null),
+      heritage: confidences.heritage != null ? clamp(confidences.heritage, 20, 100) : (confidences.culture != null ? clamp(confidences.culture, 20, 100) : null),
       shopping: confidences.shopping != null ? clamp(confidences.shopping, 20, 100) : null,
+      relaxation: confidences.relaxation != null ? clamp(confidences.relaxation, 20, 100) : null,
+      family: confidences.family != null ? clamp(confidences.family, 20, 100) : null,
+      nightlife: confidences.nightlife != null ? clamp(confidences.nightlife, 20, 100) : null,
       crowdTolerance: confidences.crowdTolerance != null ? clamp(confidences.crowdTolerance, 20, 100) : null,
       walkingTolerance: confidences.walkingTolerance != null ? clamp(confidences.walkingTolerance, 20, 100) : null,
+    },
+    evidenceCounts: {
+      photography: Math.max(0, Number(evidenceCounts.photography) || 0),
+      food: Math.max(0, Number(evidenceCounts.food) || 0),
+      culture: Math.max(0, Number(evidenceCounts.culture) || 0),
+      adventure: Math.max(0, Number(evidenceCounts.adventure) || 0),
+      nature: Math.max(0, Number(evidenceCounts.nature || evidenceCounts.scenic) || 0),
+      scenic: Math.max(0, Number(evidenceCounts.scenic || evidenceCounts.nature) || 0),
+      heritage: Math.max(0, Number(evidenceCounts.heritage || evidenceCounts.culture) || 0),
+      shopping: Math.max(0, Number(evidenceCounts.shopping) || 0),
+      relaxation: Math.max(0, Number(evidenceCounts.relaxation) || 0),
+      family: Math.max(0, Number(evidenceCounts.family) || 0),
+      nightlife: Math.max(0, Number(evidenceCounts.nightlife) || 0),
+      crowdTolerance: Math.max(0, Number(evidenceCounts.crowdTolerance) || 0),
+      walkingTolerance: Math.max(0, Number(evidenceCounts.walkingTolerance) || 0),
     },
     lastUpdated: input.lastUpdated || new Date().toISOString(),
   };
@@ -173,7 +245,7 @@ function applyRecencyDecay(profile, now = new Date()) {
   const daysDiff = Math.max(0, (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
   const decayFactor = Math.pow(0.5, daysDiff / 60); // half-life of 60 days
 
-  const dimensions = ['scenic', 'photography', 'food', 'culture', 'adventure', 'shopping', 'crowdTolerance', 'walkingTolerance'];
+  const dimensions = ['scenic', 'nature', 'photography', 'food', 'culture', 'heritage', 'adventure', 'shopping', 'relaxation', 'family', 'nightlife', 'crowdTolerance', 'walkingTolerance'];
   const decayed = { ...sanitized };
 
   dimensions.forEach(dim => {
@@ -189,7 +261,7 @@ function applyRecencyDecay(profile, now = new Date()) {
 
 /**
  * Records a user behavioral interaction (e.g. visiting, saving, or skipping a place)
- * and updates inferred preferences with confidence increments.
+ * and updates inferred preferences with confidence increments and evidence counts.
  */
 function recordBehaviorInteraction(currentProfile, place, interactionType = 'visit') {
   const profile = { ...sanitizeDnaProfile(currentProfile) };
@@ -202,15 +274,23 @@ function recordBehaviorInteraction(currentProfile, place, interactionType = 'vis
       profile[dim] = clamp(profile[dim] + Math.round(delta * multiplier));
       profile.sources[dim] = 'inferred';
       profile.confidences[dim] = clamp(profile.confidences[dim] + 3, 20, 95);
+      profile.evidenceCounts[dim] = (profile.evidenceCounts[dim] || 0) + 1;
     }
   };
 
-  if (cat === 'scenic' || cat === 'beach' || cat === 'viewpoint' || place.is_sunset_spot) updateDim('scenic', 4);
+  if (cat === 'scenic' || cat === 'beach' || cat === 'viewpoint' || place.is_sunset_spot) {
+    updateDim('scenic', 4);
+    updateDim('nature', 4);
+  }
   if (place.is_sunset_spot || place.is_sunrise_spot || cat === 'viewpoint') updateDim('photography', 4);
   if (cat === 'food' || cat === 'restaurant' || cat === 'cafe') updateDim('food', 5);
-  if (cat === 'temple' || cat === 'museum' || cat === 'monument' || cat === 'fort') updateDim('culture', 4);
+  if (cat === 'temple' || cat === 'museum' || cat === 'monument' || cat === 'fort') {
+    updateDim('culture', 4);
+    updateDim('heritage', 4);
+  }
   if (cat === 'trekking' || cat === 'hiking' || /trek|trail|hike/i.test(name)) updateDim('adventure', 5);
   if (cat === 'shopping' || cat === 'market' || cat === 'bazaar') updateDim('shopping', 4);
+  if (cat === 'park' || cat === 'garden' || cat === 'beach') updateDim('relaxation', 4);
 
   profile.lastUpdated = new Date().toISOString();
   return sanitizeDnaProfile(profile);
@@ -234,9 +314,9 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
   // 1. Scenic & Landscape Alignment
   const isScenic = cat === 'scenic' || cat === 'beach' || cat === 'viewpoint' || place.is_sunset_spot || place.is_sunrise_spot;
   if (isScenic) {
-    const boost = (dna.scenic - 50) * 0.45;
+    const boost = (Math.max(dna.scenic, dna.nature) - 50) * 0.45;
     score += boost;
-    if (dna.scenic >= 75) reasons.push('Matches your strong preference for scenic landscapes');
+    if (Math.max(dna.scenic, dna.nature) >= 75) reasons.push('Matches your strong preference for scenic landscapes');
   }
 
   // 2. Photography Alignment
@@ -258,9 +338,9 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
   // 4. Heritage & Culture Alignment
   const isCulture = cat === 'temple' || cat === 'museum' || cat === 'monument' || cat === 'fort' || cat === 'heritage';
   if (isCulture) {
-    const boost = (dna.culture - 50) * 0.4;
+    const boost = (Math.max(dna.culture, dna.heritage) - 50) * 0.4;
     score += boost;
-    if (dna.culture >= 75) reasons.push('Heritage value matches your cultural curiosity');
+    if (Math.max(dna.culture, dna.heritage) >= 75) reasons.push('Heritage value matches your cultural curiosity');
   }
 
   // 5. Adventure & Trekking Alignment
@@ -301,6 +381,7 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
 }
 
 module.exports = {
+  SOURCE_TYPES,
   DEFAULT_TRAVEL_DNA,
   sanitizeDnaProfile,
   deriveDnaFromPersonas,

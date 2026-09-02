@@ -22,6 +22,7 @@ const { getEntryProtocol } = require('./entryProtocolEngine');
 const { computeConfidence } = require('./confidenceEngine');
 const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
 const { generateExperienceWindows } = require('./experienceWindows');
+const { createIntelligenceContext, evaluateContextExperience } = require('./contextEngine');
 
 function getTravelIntelligence(place, now = new Date(), weather = null, options = {}) {
   // Attach historical crowd hints when not already provided on the place object
@@ -159,70 +160,85 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
     ? `Best experienced in ${bestSeason} — visiting off-season is still fine, just set expectations`
     : bestSeason && bestSeason !== 'any' ? `Peak season right now (${bestSeason})` : null;
 
-  return {
-    name: place.name,
-    category: cat,
-    visitScore: scored.visitScore,
-    visitLabel: scored.label,
-    scoringProfile: scored.profile,
-    components: scored.components,
-    isOpenNow: opening.isOpenNow,
-    statusLabel,
-    minutesToClose: opening.minutesToClose,
-    minutesToOpen: opening.minutesToOpen,
-    openTime: opening.openTime,
-    closeTime: opening.closeTime,
-    opening,
-    sunrise: sun.sunrise,
-    sunset: sun.sunset,
-    daypart,
-    isBestTimeNow,
-    isPeakHourNow,
-    goldenHours: golden,
-    inGoldenHour: ghState,
-    season,
-    bestSeason,
-    seasonalNote,
-    nightAvailable: opening.nightAvailable,
-    weeklyHoliday: opening.weeklyHoliday,
-    crowdLevel: crowd.level,
-    crowd: { level: crowd.level, score: crowd.crowdScore, crowdBadge: crowd.crowdBadge, isPeakWindow: crowd.isPeakWindow, bestOffPeakWindow: crowd.bestOffPeakWindow, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
-    weather: { ...weatherIntel, experienceWindows: weatherWindows },
-    traffic,
-    scenic,
-    arrival,
-    preferenceScore,
-    confidence,
-    explanation,
-    recommendations,
-    cultural,
-    signatureDish,
-    entryProtocol,
-    weatherWarnings: weatherIntel.warnings || [],
-    badges,
-    notifications,
-    experienceWindows,
-    dataQuality: {
-      opening: opening.dataQuality,
-      crowd: crowd.source,
-      weather: weatherIntel.source,
-      traffic: traffic?.source || 'unavailable',
-      scenic: 'rule-based',
-      dataFreshness: {
-        computedAt: now.toISOString(),
-        weather: weatherIntel.source === 'forecast' ? 'forecast' : weatherIntel.source,
-        traffic: traffic?.freshness || (traffic?.source === 'live_traffic' ? 'request_time' : traffic?.source || 'unavailable'),
+    const intelligenceContext = createIntelligenceContext({
+      traveler: { dna: options.travelerDna || null, personas: options.personas || [] },
+      destination: place,
+      currentTime: now,
+      projectedArrival: { minuteOfDay: nowMin, daypart, isGoldenHour: ghState.any, solarTimes: sun },
+      weather: weatherIntel,
+      crowd,
+      traffic,
+      scenic,
+      openingHours: opening,
+      mealContext: { isMealTime: isBestTimeNow && cat === 'food', signatureDish },
+      comfort: { heatRisk: weather && weather.tempC >= 38 ? 'HIGH' : 'LOW', indoorRecommended: weather && (weather.tempC >= 38 || /heavy rain/i.test(weather.condition || '')) },
+    });
+
+    return {
+      name: place.name,
+      category: cat,
+      visitScore: scored.visitScore,
+      visitLabel: scored.label,
+      scoringProfile: scored.profile,
+      components: scored.components,
+      isOpenNow: opening.isOpenNow,
+      statusLabel,
+      minutesToClose: opening.minutesToClose,
+      minutesToOpen: opening.minutesToOpen,
+      openTime: opening.openTime,
+      closeTime: opening.closeTime,
+      opening,
+      sunrise: sun.sunrise,
+      sunset: sun.sunset,
+      daypart,
+      isBestTimeNow,
+      isPeakHourNow,
+      goldenHours: golden,
+      inGoldenHour: ghState,
+      season,
+      bestSeason,
+      seasonalNote,
+      nightAvailable: opening.nightAvailable,
+      weeklyHoliday: opening.weeklyHoliday,
+      crowdLevel: crowd.level,
+      crowd: { level: crowd.level, score: crowd.crowdScore, crowdBadge: crowd.crowdBadge, isPeakWindow: crowd.isPeakWindow, bestOffPeakWindow: crowd.bestOffPeakWindow, source: crowd.source, reason: crowd.reason, factors: crowd.factors },
+      weather: { ...weatherIntel, experienceWindows: weatherWindows },
+      traffic,
+      scenic,
+      arrival,
+      preferenceScore,
+      confidence,
+      explanation,
+      recommendations,
+      cultural,
+      signatureDish,
+      entryProtocol,
+      weatherWarnings: weatherIntel.warnings || [],
+      badges,
+      notifications,
+      experienceWindows,
+      intelligenceContext,
+      dataQuality: {
+        opening: opening.dataQuality,
+        crowd: crowd.source,
+        weather: weatherIntel.source,
+        traffic: traffic?.source || 'unavailable',
+        scenic: 'rule-based',
+        dataFreshness: {
+          computedAt: now.toISOString(),
+          weather: weatherIntel.source === 'forecast' ? 'forecast' : weatherIntel.source,
+          traffic: traffic?.freshness || (traffic?.source === 'live_traffic' ? 'request_time' : traffic?.source || 'unavailable'),
+        },
       },
-    },
-    dataSources: {
-      crowd: crowd.source,
-      weather: weatherIntel.source,
-      traffic: traffic?.provider || traffic?.source || 'unavailable',
-      scenic: 'astronomical_rules',
-    },
-    computedAt: now.toISOString(),
-  };
-}
+      dataSources: {
+        crowd: crowd.source,
+        weather: weatherIntel.source,
+        traffic: traffic?.provider || traffic?.source || 'unavailable',
+        scenic: 'astronomical_rules',
+      },
+      computedAt: now.toISOString(),
+    };
+  }
 
 function clamp(val, min = 0, max = 100) {
   if (!Number.isFinite(val)) return min;
@@ -441,6 +457,8 @@ module.exports = {
   scenarioRobustness,
   temporalRegret,
   computeTravelValueScore,
+  createIntelligenceContext,
+  evaluateContextExperience,
 };
 
 

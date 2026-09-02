@@ -83,8 +83,13 @@ function rankPlacesForDay(places, now = new Date(), weather = null, options = {}
 }
 // Wire itinerary after getTravelIntelligence is defined (avoid circular init issues)
 
+const { createIntelligenceContext, evaluateContextExperience, PROVENANCE_SOURCES } = require('./contextEngine');
+
 module.exports = {
   getTravelIntelligence, getBatchTravelIntelligence, suggestOpenAlternatives, rankPlacesForDay,
+  createIntelligenceContext,
+  evaluateContextExperience,
+  PROVENANCE_SOURCES,
   dynamicAdvice,
   multiDayAdvice,
   buildMultiDayItinerary,
