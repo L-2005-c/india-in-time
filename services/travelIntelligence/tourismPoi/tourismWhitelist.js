@@ -243,10 +243,16 @@ function resolveWhitelist(place, cityHint = null) {
     if (!index) return null;
     if (index.byExact.has(name)) return index.byExact.get(name);
     if (index.byAlias.has(name)) return index.byAlias.get(name);
+
+    const INFRA_WORDS = /\b(road|rd|street|colony|layout|junction|area|circle|lane|bypass|extension|ward)\b/i;
+    const hasInfraInQuery = INFRA_WORDS.test(name);
+
     for (const e of index.entries) {
       const en = e.name.toLowerCase();
+      if (hasInfraInQuery && !INFRA_WORDS.test(en)) continue;
       if (en.length >= 6 && (name.includes(en) || en.includes(name))) return e;
       for (const a of e.aliases || []) {
+        if (hasInfraInQuery && !INFRA_WORDS.test(a)) continue;
         if (a.length >= 5 && (name.includes(a) || a.includes(name))) return e;
       }
     }

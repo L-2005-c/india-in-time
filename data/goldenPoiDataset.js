@@ -10,9 +10,10 @@
  * known aliases, verified tourism categories, and coordinate tolerance radii.
  */
 
-function poi(id, canonicalName, category, city, state, lat, lon, aliases = [], toleranceMeters = 800) {
+function poi(id, canonicalName, category, city, state, lat, lon, aliases = [], toleranceMeters = 800, verificationEvidence = ['SURVEY_GROUND_TRUTH', 'MUNICIPAL_BOUNDS']) {
   return {
     id,
+    canonicalPlaceId: id,
     canonicalName,
     displayName: canonicalName,
     category,
@@ -26,6 +27,8 @@ function poi(id, canonicalName, category, city, state, lat, lon, aliases = [], t
     tourismStatus: 'VERIFIED_ATTRACTION',
     verificationStatus: 'VERIFIED',
     coordinateSource: 'AUTHORITATIVE_SURVEY',
+    datasetRole: 'CURATED_BENCHMARK_CANDIDATE',
+    verificationEvidence,
   };
 }
 
@@ -160,6 +163,7 @@ function findGoldenPoi(nameQuery, cityHint = null) {
   }
 
   // 3. Substring / Token containment match (at least 2 matching words)
+  const INFRASTRUCTURE_SUFFIXES = new Set(['road', 'street', 'colony', 'layout', 'junction', 'area', 'circle', 'lane', 'bypass', 'extension', 'ward']);
   const qWords = q.split(/\s+/).filter(w => w.length >= 3);
   let bestMatch = null;
   let bestScore = 0;
@@ -168,6 +172,11 @@ function findGoldenPoi(nameQuery, cityHint = null) {
     const allNames = [item.canonicalName, ...item.aliases];
     for (const n of allNames) {
       const nWords = n.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length >= 3);
+
+      // Guard: Disallow match if query specifies road/colony/area but destination is not a road/colony
+      const hasUnmatchedInfra = qWords.some(w => INFRASTRUCTURE_SUFFIXES.has(w) && !nWords.includes(w));
+      if (hasUnmatchedInfra) continue;
+
       let matchCount = 0;
       for (const qw of qWords) {
         if (nWords.includes(qw)) matchCount++;

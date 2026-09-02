@@ -23,9 +23,22 @@ const {
   toProductCategory,
 } = require('./tourismCategoryClassifier');
 const { computeTourismQualityScore, bayesianRating } = require('./tourismQualityScore');
-const { createCanonicalPlace, calculatePlaceDataQuality, generateDeterministicPlaceId } = require('./canonicalPlaceModel');
+const {
+  createCanonicalPlace,
+  calculatePlaceDataQuality,
+  generateDeterministicPlaceId,
+  VERIFICATION_STATUSES,
+  COORDINATE_SOURCES,
+} = require('./canonicalPlaceModel');
 const { validatePoiCoordinates, checkCoordinateTolerance, INDIA_GEO_BOUNDS } = require('./coordinateIntegrity');
 const { resolveCanonicalPlace, normalizePlaceName, dedupeCanonicalPlaces } = require('./canonicalPlaceResolver');
+const {
+  CATEGORY_TOLERANCES_METERS,
+  computeStringSimilarity,
+  scoreCandidateMatch,
+  verifyAttractionCoordinates,
+  isQuarantinedPoi,
+} = require('./coordinateVerificationEngine');
 
 module.exports = {
   // Core gate
@@ -39,6 +52,14 @@ module.exports = {
   resolveCanonicalPlace,
   normalizePlaceName,
   dedupeCanonicalPlaces,
+  VERIFICATION_STATUSES,
+  COORDINATE_SOURCES,
+  // Coordinate verification & candidate scoring
+  CATEGORY_TOLERANCES_METERS,
+  computeStringSimilarity,
+  scoreCandidateMatch,
+  verifyAttractionCoordinates,
+  isQuarantinedPoi,
   // Coordinate integrity
   validatePoiCoordinates,
   checkCoordinateTolerance,

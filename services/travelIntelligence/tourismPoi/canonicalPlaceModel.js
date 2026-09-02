@@ -9,8 +9,32 @@
 
 const { isValidCoordPair } = require('../../routing/coordinateValidator');
 
+const VERIFICATION_STATUSES = Object.freeze({
+  UNVERIFIED: 'UNVERIFIED',
+  AUTO_VALIDATED: 'AUTO_VALIDATED',
+  PROVIDER_VERIFIED: 'PROVIDER_VERIFIED',
+  HUMAN_VERIFIED: 'HUMAN_VERIFIED',
+  VERIFIED: 'VERIFIED',
+  QUARANTINED: 'QUARANTINED',
+  REJECTED: 'REJECTED',
+  INVALID_COORDINATES: 'INVALID_COORDINATES',
+});
+
+const COORDINATE_SOURCES = Object.freeze({
+  UNKNOWN: 'UNKNOWN',
+  PROVIDER: 'PROVIDER',
+  CURATED: 'CURATED',
+  HUMAN_VERIFIED: 'HUMAN_VERIFIED',
+  USER_SUBMITTED: 'USER_SUBMITTED',
+  AUTHORITATIVE_SURVEY: 'AUTHORITATIVE_SURVEY',
+  CURATED_BENCHMARK: 'CURATED_BENCHMARK',
+  CURATED_WHITELIST: 'CURATED_WHITELIST',
+  HIGH_CONFIDENCE_GEOCODER: 'HIGH_CONFIDENCE_GEOCODER',
+  HEURISTIC_FALLBACK: 'HEURISTIC_FALLBACK',
+});
+
 /**
- * Creates a Canonical Tourist Place record.
+ * Creates a Canonical Tourist Place record without dangerous auto-verified defaults.
  *
  * @param {Object} params
  * @returns {CanonicalTouristPlace}
@@ -27,15 +51,15 @@ function createCanonicalPlace({
   city = 'Unknown',
   state = 'Unknown',
   country = 'India',
-  tourismStatus = 'VERIFIED_ATTRACTION',
-  coordinateSource = 'AUTHORITATIVE_SURVEY',
-  nameSource = 'CURATED_WHITELIST',
-  verificationStatus = 'VERIFIED',
-  confidence = 95,
+  tourismStatus = 'UNVERIFIED',
+  coordinateSource = 'UNKNOWN',
+  nameSource = 'UNKNOWN',
+  verificationStatus = 'UNVERIFIED',
+  confidence = null,
   openingHours = null,
   visitMinutes = 60,
-  importance = 'famous',
-  rating = 4.5,
+  importance = 'moderate',
+  rating = 4.2,
   isSunriseSpot = false,
   isSunsetSpot = false,
   indoorOutdoor = 'mixed',
@@ -90,13 +114,13 @@ function createCanonicalPlace({
     tourismStatus,
     coordinateSource,
     nameSource,
-    verificationStatus: validCoords ? verificationStatus : 'INVALID_COORDINATES',
-    confidence: validCoords ? confidence : null,
+    verificationStatus: !validCoords ? 'INVALID_COORDINATES' : verificationStatus,
+    confidence: !validCoords ? 0 : confidence,
     qualityScore,
     openingHours: openingHours || { openTime: '06:00', closeTime: '20:00' },
     visitMinutes: Number(visitMinutes) || 60,
     importance,
-    rating: Number(rating) || 4.5,
+    rating: Number(rating) || 4.2,
     isSunriseSpot: Boolean(isSunriseSpot),
     isSunsetSpot: Boolean(isSunsetSpot),
     indoorOutdoor,
@@ -114,7 +138,7 @@ function calculatePlaceDataQuality({
   category,
   city,
   coordinateSource,
-  verificationStatus: _verificationStatus,
+  verificationStatus,
   updatedAt,
 }) {
   // 1. Name validity
@@ -139,11 +163,11 @@ function calculatePlaceDataQuality({
   const cityMatch = (city && city !== 'Unknown') ? 100 : 50;
 
   // 5. Source quality
-  let sourceQuality = 70;
-  if (coordinateSource === 'AUTHORITATIVE_SURVEY') sourceQuality = 100;
-  else if (coordinateSource === 'CURATED_WHITELIST') sourceQuality = 95;
-  else if (coordinateSource === 'HIGH_CONFIDENCE_GEOCODER') sourceQuality = 85;
-  else if (coordinateSource === 'HEURISTIC_FALLBACK') sourceQuality = 40;
+  let sourceQuality = 40;
+  if (coordinateSource === 'AUTHORITATIVE_SURVEY' || coordinateSource === 'HUMAN_VERIFIED') sourceQuality = 100;
+  else if (coordinateSource === 'CURATED_WHITELIST' || coordinateSource === 'CURATED_BENCHMARK') sourceQuality = 95;
+  else if (coordinateSource === 'HIGH_CONFIDENCE_GEOCODER' || coordinateSource === 'PROVIDER') sourceQuality = 80;
+  else if (coordinateSource === 'UNKNOWN') sourceQuality = 30;
 
   // 6. Freshness (decay over 180 days)
   let freshness = 95;
@@ -153,7 +177,7 @@ function calculatePlaceDataQuality({
     freshness = Math.max(50, Math.round(100 - Math.min(50, ageDays * 0.2)));
   }
 
-  const overall = Math.round(
+  let overall = Math.round(
     nameValidity * 0.25 +
     coordinateValidity * 0.25 +
     categoryValidity * 0.15 +
@@ -161,6 +185,10 @@ function calculatePlaceDataQuality({
     sourceQuality * 0.15 +
     freshness * 0.10
   );
+
+  if (verificationStatus === 'QUARANTINED' || verificationStatus === 'REJECTED' || verificationStatus === 'INVALID_COORDINATES') {
+    overall = Math.min(overall, 25);
+  }
 
   return {
     nameValidity,
@@ -183,6 +211,8 @@ function generateDeterministicPlaceId(city, name) {
 }
 
 module.exports = {
+  VERIFICATION_STATUSES,
+  COORDINATE_SOURCES,
   createCanonicalPlace,
   calculatePlaceDataQuality,
   generateDeterministicPlaceId,

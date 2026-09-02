@@ -218,8 +218,11 @@ function candidateMatchesHardRequirements(place, requirements) {
   // without usable coordinates can't be distanced, routed, or timed, so it
   // must never reach the beam search as a schedulable candidate. (It's
   // still surfaced upstream in multiDayPlanner's unusedPlaces with a
-  // "no coordinates" reason instead of silently vanishing.)
   if (!hasUsableCoords(place)) return { ok: false, reason: 'no_coordinates' };
+  const vStatus = String(place.verificationStatus || '').toUpperCase();
+  if (vStatus === 'QUARANTINED' || vStatus === 'REJECTED' || vStatus === 'INVALID_COORDINATES') {
+    return { ok: false, reason: 'quarantined' };
+  }
   if (isExcludedCategory(place, requirements.hard.excludedCategories)) return { ok: false, reason: 'excluded_category' };
   if ((requirements.hard.mustAvoidPlaces || []).some((ref) => {
     const target = String(ref).toLowerCase().trim();

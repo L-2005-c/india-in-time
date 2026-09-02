@@ -21,9 +21,10 @@ const { findGoldenPoi } = require('../../../data/goldenPoiDataset');
 const { resolveWhitelist } = require('./tourismWhitelist');
 const { isBlacklistedEntity, isLocalityOnlyName } = require('./tourismBlacklist');
 const { createCanonicalPlace } = require('./canonicalPlaceModel');
-const { validatePoiCoordinates } = require('./coordinateIntegrity');
 const { classifyTourismCategory } = require('./tourismCategoryClassifier');
 const { distKm } = require('../../../utils/geo');
+
+const { verifyAttractionCoordinates } = require('./coordinateVerificationEngine');
 
 /**
  * Normalizes raw name strings (removes excess punctuation, normalizes spacing).
@@ -55,9 +56,16 @@ function resolveCanonicalPlace(input, options = {}) {
   const cityHint = options.cityHint || rawObj.city || 'Unknown';
   const categoryHint = options.categoryHint || rawObj.category || rawObj.cat || 'scenic';
 
-  // 1. Locality & Noise Guard: Reject purely residential / administrative localities
+  // 1. Locality & Noise Guard: Reject purely residential / administrative localities, roads, colonies
+  const endsWithInfra = /\b(colony|road|rd|street|nagar|junction|layout|ward|suburb|circle|bypass|extension|area)\s*$/i.test(rawName);
+  const isRoadOrColony = (
+    endsWithInfra ||
+    (/\b(colony|road|street|nagar|junction|layout|ward|suburb|circle|bypass|extension)\b/i.test(rawName) &&
+     !/\b(fort|palace|temple|museum|beach|lake|park|hill|garden|zoo|aquarium|waterfall|bazaar|mandir|church|cathedral|mosque|dargah|memorial)\b/i.test(rawName))
+  );
+
   const blacklistCheck = isBlacklistedEntity({ name: rawName, type: rawObj.type, class: rawObj.class });
-  if (isLocalityOnlyName(rawName) || blacklistCheck.rejected) {
+  if (isLocalityOnlyName(rawName) || blacklistCheck.rejected || isRoadOrColony) {
     return null;
   }
 
@@ -114,40 +122,47 @@ function resolveCanonicalPlace(input, options = {}) {
     });
   }
 
-  // 4. Fallback / Discovery Resolution with Coordinate Integrity Validation
+  // 4. Fallback / Discovery Resolution with Coordinate Integrity & Zero-Trust Validation
   const rawLat = rawObj.latitude ?? rawObj.lat ?? rawObj.coords?.[0];
   const rawLon = rawObj.longitude ?? rawObj.lon ?? rawObj.coords?.[1];
-
-  const coordCheck = validatePoiCoordinates(rawLat, rawLon, {
-    cityHint,
-    category: categoryHint,
-  });
-
-  if (!coordCheck.valid || coordCheck.lat === null || coordCheck.lon === null) {
-    return null; // Reject candidate if coordinates cannot be validated
-  }
 
   const categoryResult = classifyTourismCategory({
     name: rawName,
     type: rawObj.type,
     category: categoryHint,
   });
+  const prodCategory = categoryResult.productCategory || categoryHint;
+
+  const verification = verifyAttractionCoordinates({
+    placeName: rawName,
+    city: cityHint,
+    state: rawObj.state || 'Unknown',
+    category: prodCategory,
+    candidateCoords: [rawLat, rawLon],
+    provider: rawObj.source || 'discovery',
+  });
+
+  if (!verification.verified && verification.verificationStatus === 'REJECTED') {
+    return null; // Reject candidate if coordinates cannot be validated or locality rejected
+  }
+
+  const verifiedCoords = verification.canonicalCoordinates || [rawLat, rawLon];
 
   return createCanonicalPlace({
     id: rawObj.id,
     canonicalName: rawName,
     displayName: rawName,
     aliases: rawObj.aliases || [],
-    category: categoryResult.productCategory || categoryHint,
-    latitude: coordCheck.lat,
-    longitude: coordCheck.lon,
+    category: prodCategory,
+    latitude: verifiedCoords[0],
+    longitude: verifiedCoords[1],
     city: cityHint,
     state: rawObj.state || 'Unknown',
-    tourismStatus: 'ESTIMATED_ATTRACTION',
+    tourismStatus: verification.verified ? 'VERIFIED_ATTRACTION' : 'ESTIMATED_ATTRACTION',
     coordinateSource: rawObj.source === 'nominatim' ? 'HIGH_CONFIDENCE_GEOCODER' : 'HEURISTIC_FALLBACK',
     nameSource: rawObj.nameSource || 'DISCOVERY_SERVICE',
-    verificationStatus: 'ESTIMATED',
-    confidence: coordCheck.confidence,
+    verificationStatus: verification.verificationStatus || 'AUTO_VALIDATED',
+    confidence: verification.confidence,
     visitMinutes: rawObj.visitMinutes || rawObj.visit_minutes || 60,
     openingHours: rawObj.openingHours || (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
     isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
