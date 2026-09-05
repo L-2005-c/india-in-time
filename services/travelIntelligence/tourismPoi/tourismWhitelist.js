@@ -232,6 +232,37 @@ const KOLKATA = [
   entry('South City Mall', 'shopping', 'A', 22.5016, 88.3619),
 ];
 
+const TIRUPATI = [
+  entry('Tirumala Venkateswara Temple', 'temple', 'S', 13.6833, 79.3472, ['tirumala temple', 'balaji temple', 'lord venkateswara']),
+  entry('Sri Padmavathi Ammavari Temple (Tiruchanur)', 'temple', 'S', 13.6068, 79.4475, ['padmavathi temple', 'tiruchanur temple']),
+  entry('Sri Govindaraja Swamy Temple', 'temple', 'A', 13.6298, 79.4180, ['govindaraja swamy temple']),
+  entry('Kapila Theertham & Sacred Waterfall', 'temple', 'A', 13.6520, 79.4192, ['kapila theertham']),
+  entry('Sri Srikalahasti Temple (Rahu Kethu Kshetram)', 'temple', 'S', 13.7498, 79.6984, ['srikalahasti temple']),
+  entry('Chandragiri Fort & Raja Mahal Sound Light Show', 'heritage', 'A', 13.5833, 79.3167, ['chandragiri fort']),
+  entry('Silathoranam Natural Rock Arch Tirumala', 'scenic', 'A', 13.6912, 79.3510, ['silathoranam']),
+  entry('Chakra Theertham Tirumala', 'scenic', 'B', 13.6885, 79.3412, ['chakra theertham']),
+  entry('Papavinasam Theertham & Dam', 'scenic', 'B', 13.7150, 79.3490, ['papavinasam']),
+  entry('Akasa Ganga Waterfall Tirumala', 'scenic', 'B', 13.7080, 79.3520, ['akasa ganga']),
+  entry('Talakona Waterfalls & Bio-Reserve', 'scenic', 'S', 13.8050, 79.2150, ['talakona falls', 'talakona']),
+  entry('Alipiri Footpath 3550 Steps Sacred Trek', 'trekking', 'A', 13.6620, 79.3800, ['alipiri steps', 'alipiri footpath']),
+  entry('Srivari Mettu 2388 Steps Ancient Trek', 'trekking', 'A', 13.6580, 79.3150, ['srivari mettu']),
+  entry('Bhimas Deluxe Heritage Restaurant', 'food', 'A', 13.6275, 79.4210, ['bhimas tirupati']),
+  entry('Tirupati Laddu Complex Prasadam Counter', 'food', 'S', 13.6830, 79.3480, ['tirupati laddu']),
+];
+
+const VIJAYAWADA = [
+  entry('Sri Durga Malleswara Swamy Varla Devasthanam (Kanaka Durga)', 'temple', 'S', 16.5165, 80.6095, ['kanaka durga temple', 'durga temple vijayawada', 'indrakeeladri']),
+  entry('Prakasam Barrage & Riverfront Promenade', 'scenic', 'S', 16.5085, 80.6070, ['prakasam barrage']),
+  entry('Bhavani Island & Water Sports Park', 'park', 'A', 16.5250, 80.5850, ['bhavani island']),
+  entry('Undavalli Caves Rock-Cut Architecture', 'heritage', 'S', 16.4967, 80.5802, ['undavalli caves']),
+  entry('Mogalarajapuram Caves (Ardhanariswara)', 'heritage', 'B', 16.5050, 80.6480, ['mogalarajapuram caves']),
+  entry('Bapu Museum (Victoria Jubilee Hall)', 'museum', 'A', 16.5130, 80.6320, ['bapu museum']),
+  entry('Kondapalli Fort & Heritage Ramparts', 'heritage', 'A', 16.6210, 80.5420, ['kondapalli fort']),
+  entry('Kondapalli Toy Village Crafts Center', 'shopping', 'A', 16.6180, 80.5400, ['kondapalli toys']),
+  entry('Mangalagiri Panakala Lakshmi Narasimha Swamy Temple', 'temple', 'A', 16.4350, 80.5620, ['mangalagiri temple']),
+  entry('Babai Hotel Heritage Ghee Idli', 'food', 'A', 16.5170, 80.6190, ['babai hotel']),
+];
+
 /** City key → entries. Keys match city-seeds + common aliases. */
 const CITY_WHITELISTS = {
   visakhapatnam: VIZAG,
@@ -253,6 +284,10 @@ const CITY_WHITELISTS = {
   araku: PADERU,
   lambasingi: PADERU,
   vanjangi: PADERU,
+  tirupati: TIRUPATI,
+  tirumala: TIRUPATI,
+  vijayawada: VIJAYAWADA,
+  bezawada: VIJAYAWADA,
   agra: AGRA,
   varanasi: VARANASI,
   benares: VARANASI,

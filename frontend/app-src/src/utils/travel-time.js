@@ -44,14 +44,26 @@ export function getCrowdLevel(multiplier) {
 }
 
 export const ROAD_NETWORK_FACTOR = 1.42;
+export const GHAT_ROAD_NETWORK_FACTOR = 1.68;
 
-export function getSmartTravelTime(fromCoords, toCoords, congestionBase, arriveMin, isFirstStop, hvKm) {
+export function isGhatRoadCorridor(fromCoords, toCoords, cityKey = null) {
+  const c = String(cityKey || '').toLowerCase();
+  if (['paderu', 'araku', 'lambasingi', 'vanjangi'].includes(c)) return true;
+  if (!fromCoords || !toCoords) return false;
+  const isAlluriHighlands = (coord) => coord && coord[0] >= 17.75 && coord[0] <= 18.45 && coord[1] >= 82.40 && coord[1] <= 83.15;
+  const isTirumalaGhat = (coord) => coord && coord[0] >= 13.62 && coord[0] <= 13.72 && coord[1] >= 79.30 && coord[1] <= 79.45;
+  return isAlluriHighlands(fromCoords) || isAlluriHighlands(toCoords) || (isTirumalaGhat(fromCoords) && isTirumalaGhat(toCoords));
+}
+
+export function getSmartTravelTime(fromCoords, toCoords, congestionBase, arriveMin, isFirstStop, hvKm, cityKey = null) {
   if (!fromCoords || !toCoords) return isFirstStop ? 10 : 20;
+  const isGhat = isGhatRoadCorridor(fromCoords, toCoords, cityKey);
+  const factor = isGhat ? GHAT_ROAD_NETWORK_FACTOR : ROAD_NETWORK_FACTOR;
+  const speedKmPerMin = isGhat ? 0.22 : 0.32; // 13.2 km/h crawl on ghat switchbacks vs 19.2 km/h urban
   const straightKm = hvKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
-  const roadKm = straightKm * ROAD_NETWORK_FACTOR;
-  // Realistic urban transit speed: ~19.2 km/h base driving speed before rush-hour multipliers
+  const roadKm = straightKm * factor;
   const minMinutes = isFirstStop ? Math.max(2, Math.min(8, Math.round(roadKm * 2.5))) : Math.max(1, Math.min(4, Math.round(roadKm * 2.0)));
-  const baseMinutes = Math.max(minMinutes, Math.min(90, Math.round(roadKm / 0.32)));
+  const baseMinutes = Math.max(minMinutes, Math.min(120, Math.round(roadKm / speedKmPerMin)));
   const trafficMult = getTrafficMultiplier(congestionBase, arriveMin);
   return Math.max(1, Math.round(baseMinutes * trafficMult));
 }

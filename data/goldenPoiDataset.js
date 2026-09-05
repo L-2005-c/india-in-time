@@ -166,6 +166,27 @@ const GOLDEN_POIS = [
   poi('pun_sinhagad_fort', 'Sinhagad Fort', 'scenic', 'Pune', 'Maharashtra', 18.3663, 73.7559, ['Sinhagarh Fort', 'Sinhagad']),
   poi('pun_dagdusheth', 'Shreemant Dagdusheth Halwai Ganpati Temple', 'temple', 'Pune', 'Maharashtra', 18.5164, 73.8560, ['Dagdusheth Halwai Ganpati', 'Dagdusheth Temple']),
   poi('pun_kelkar_museum', 'Raja Dinkar Kelkar Museum', 'museum', 'Pune', 'Maharashtra', 18.5108, 73.8542, ['Kelkar Museum']),
+
+  // ── TIRUPATI ─────────────────────────────────────────────────────────────
+  poi('tpt_venkateswara', 'Tirumala Venkateswara Temple', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6833, 79.3472, ['Tirumala Temple', 'Balaji Temple', 'Lord Venkateswara Swamy Temple', 'Srivari Temple Tirumala']),
+  poi('tpt_padmavathi', 'Sri Padmavathi Ammavari Temple (Tiruchanur)', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6068, 79.4475, ['Padmavathi Temple', 'Tiruchanur Temple', 'Alamelumangapuram Temple']),
+  poi('tpt_govindaraja', 'Sri Govindaraja Swamy Temple', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6298, 79.4180, ['Govindaraja Swamy Temple Tirupati']),
+  poi('tpt_kapila_theertham', 'Kapila Theertham & Sacred Waterfall', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6520, 79.4192, ['Kapila Theertham', 'Kapileswara Swamy Temple']),
+  poi('tpt_srikalahasti', 'Sri Srikalahasti Temple (Rahu Kethu Kshetram)', 'temple', 'Tirupati', 'Andhra Pradesh', 13.7498, 79.6984, ['Srikalahasti Temple', 'Kalahasteeswara Temple']),
+  poi('tpt_chandragiri_fort', 'Chandragiri Fort & Raja Mahal Sound Light Show', 'heritage', 'Tirupati', 'Andhra Pradesh', 13.5833, 79.3167, ['Chandragiri Fort', 'Raja Mahal Tirupati']),
+  poi('tpt_silathoranam', 'Silathoranam Natural Rock Arch Tirumala', 'scenic', 'Tirupati', 'Andhra Pradesh', 13.6912, 79.3510, ['Silathoranam', 'Natural Stone Arch Tirumala']),
+  poi('tpt_talakona', 'Talakona Waterfalls & Bio-Reserve', 'scenic', 'Tirupati', 'Andhra Pradesh', 13.8050, 79.2150, ['Talakona Falls', 'Talakona Waterfall']),
+  poi('tpt_alipiri_steps', 'Alipiri Footpath 3550 Steps Sacred Trek', 'trekking', 'Tirupati', 'Andhra Pradesh', 13.6620, 79.3800, ['Alipiri Steps', 'Alipiri Footpath Trek']),
+  poi('tpt_srivari_mettu', 'Srivari Mettu 2388 Steps Ancient Trek', 'trekking', 'Tirupati', 'Andhra Pradesh', 13.6580, 79.3150, ['Srivari Mettu', 'Srivari Mettu Steps']),
+
+  // ── VIJAYAWADA ───────────────────────────────────────────────────────────
+  poi('vja_kanaka_durga', 'Sri Durga Malleswara Swamy Varla Devasthanam (Kanaka Durga)', 'temple', 'Vijayawada', 'Andhra Pradesh', 16.5165, 80.6095, ['Kanaka Durga Temple', 'Durga Temple Vijayawada', 'Indrakeeladri Temple']),
+  poi('vja_prakasam_barrage', 'Prakasam Barrage & Riverfront Promenade', 'scenic', 'Vijayawada', 'Andhra Pradesh', 16.5085, 80.6070, ['Prakasam Barrage', 'Krishna River Barrage']),
+  poi('vja_bhavani_island', 'Bhavani Island & Water Sports Park', 'park', 'Vijayawada', 'Andhra Pradesh', 16.5250, 80.5850, ['Bhavani Island', 'Bhavani Dweepam']),
+  poi('vja_undavalli_caves', 'Undavalli Caves Rock-Cut Architecture', 'heritage', 'Vijayawada', 'Andhra Pradesh', 16.4967, 80.5802, ['Undavalli Caves', 'Undavalli Rock Cut Caves']),
+  poi('vja_kondapalli_fort', 'Kondapalli Fort & Heritage Ramparts', 'heritage', 'Vijayawada', 'Andhra Pradesh', 16.6210, 80.5420, ['Kondapalli Fort', 'Kondapalli Killa']),
+  poi('vja_bapu_museum', 'Bapu Museum (Victoria Jubilee Hall)', 'museum', 'Vijayawada', 'Andhra Pradesh', 16.5130, 80.6320, ['Bapu Museum', 'Victoria Jubilee Museum Vijayawada']),
+  poi('vja_mangalagiri', 'Mangalagiri Panakala Lakshmi Narasimha Swamy Temple', 'temple', 'Vijayawada', 'Andhra Pradesh', 16.4350, 80.5620, ['Mangalagiri Temple', 'Panakala Narasimha Swamy']),
 ];
 
 /** Quick index of golden POIs by city */

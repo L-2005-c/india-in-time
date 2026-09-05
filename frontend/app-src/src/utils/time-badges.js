@@ -45,6 +45,26 @@ export function getTimeBadgesHtml(loc, evalTime, ctx = {}) {
     html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(168,85,247,0.25); display:inline-block; margin-top:4px; margin-right:4px;">✨ Best Time Now</span>`;
   }
 
+  // Cloud Inversion Window (Vanjangi / Lambasingi 05:00 - 07:30)
+  if (/vanjangi|lambasingi|dallapalli/i.test(loc.name || '') && now >= 300 && now <= 450) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(99,102,241,0.25); color:#a5b4fc; border:1px solid rgba(99,102,241,0.4); display:inline-block; margin-top:4px; margin-right:4px;">☁️ Cloud Inversion Window</span>`;
+  }
+
+  // Temple Midday Sanctum Closure Warning (12:30 - 15:30)
+  if ((loc.cat === 'temple' || /temple|mandir|kovil/i.test(loc.name || '')) && now >= 750 && now <= 930) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid rgba(239,68,68,0.35); display:inline-block; margin-top:4px; margin-right:4px;">⚠️ Midday Sanctum Closure (12:30–15:30)</span>`;
+  }
+
+  // Tirumala Ghat Road Curfew (23:45 - 03:00)
+  if (/tirumala|srivari|venkateswara/i.test(loc.name || '') && (now >= 23 * 60 + 45 || now < 3 * 60)) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(220,38,38,0.25); color:#f87171; border:1px solid rgba(220,38,38,0.5); display:inline-block; margin-top:4px; margin-right:4px;">⛔ Tirumala Ghat Road Curfew</span>`;
+  }
+
+  // Highland Mountain Ghat Road corridor
+  if (/paderu|araku|katiki|vanjangi|lambasingi|borra/i.test(loc.name || '') || (loc.coords && loc.coords[0] >= 17.75 && loc.coords[0] <= 18.45 && loc.coords[1] >= 82.40 && loc.coords[1] <= 83.15)) {
+    html += `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(234,179,8,0.15); color:#fde047; border:1px solid rgba(234,179,8,0.3); display:inline-block; margin-top:4px; margin-right:4px;">⛰️ Ghat Corridor</span>`;
+  }
+
   const ti = loc._ti;
   if (ti && ti.visitScore != null) {
     const band = ti.visitLabel || '';

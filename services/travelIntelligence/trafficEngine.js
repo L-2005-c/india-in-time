@@ -41,7 +41,8 @@ function isGhatRoadCorridor(fromCoords, toCoords, cityKey) {
   const key = String(cityKey || '').toLowerCase();
   if (['paderu', 'araku', 'lambasingi', 'vanjangi'].includes(key)) return true;
   const isHighland = (c) => Array.isArray(c) && c.length >= 2 && c[0] >= 17.65 && c[0] <= 18.45 && c[1] >= 82.35 && c[1] <= 83.15;
-  return isHighland(fromCoords) || isHighland(toCoords);
+  const isTirumalaGhat = (c) => Array.isArray(c) && c.length >= 2 && c[0] >= 13.62 && c[0] <= 13.72 && c[1] >= 79.30 && c[1] <= 79.45;
+  return isHighland(fromCoords) || isHighland(toCoords) || (isTirumalaGhat(fromCoords) && isTirumalaGhat(toCoords));
 }
 
 function trafficLevelFromMult(mult) {

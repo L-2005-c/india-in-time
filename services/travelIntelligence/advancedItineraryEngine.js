@@ -1040,8 +1040,125 @@ function replanAdvanced(remainingPlaces, options = {}) {
   };
 }
 
+async function planMultiDayCircuit(candidates = [], options = {}) {
+  const numDays = Math.max(1, Math.min(5, Number(options.numDays || options.days || 2)));
+  const region = String(options.region || options.city || '').toLowerCase();
+  
+  const isPaderuCircuit = ['paderu', 'araku', 'lambasingi', 'vanjangi'].includes(region);
+  const isTirupatiCircuit = ['tirupati', 'tirumala'].includes(region);
+
+  const dayBuckets = Array.from({ length: numDays }, () => []);
+  const themes = [];
+  const hubs = [];
+
+  if (isPaderuCircuit) {
+    themes.push('Araku Valley & Borra Karst Subterranean Wonder');
+    hubs.push('Araku Valley Town / Coffee Plantation Resort');
+    if (numDays >= 2) {
+      themes.push('Vanjangi Cloud Ocean Sunrise & Tribal Heritage');
+      hubs.push('Paderu Agency Headquarters');
+    }
+    if (numDays >= 3) {
+      themes.push('Lambasingi Winter Mist, Pine Woods & Waterfalls');
+      hubs.push('Lambasingi Cottages / Narsipatnam');
+    }
+
+    for (const p of candidates) {
+      const name = String(p.name || '').toLowerCase();
+      const lat = p.coords?.[0] ?? 18.0;
+      if (/araku|borra|katiki|padmapuram|chaparai|galikonda|thatiguda/i.test(name) || lat >= 18.2) {
+        dayBuckets[0].push(p);
+      } else if (/vanjangi|paderu|modakondamma|matsyagundam|meghala|bamboo/i.test(name) || (lat >= 17.98 && lat < 18.2)) {
+        const d = numDays >= 2 ? 1 : 0;
+        dayBuckets[d].push(p);
+      } else {
+        const d = numDays >= 3 ? 2 : (numDays >= 2 ? 1 : 0);
+        dayBuckets[d].push(p);
+      }
+    }
+  } else if (isTirupatiCircuit) {
+    themes.push('Tirumala Sacred Darshan & Holy Theerthams');
+    hubs.push('Tirumala Hill Top / Alipiri Base');
+    if (numDays >= 2) {
+      themes.push('Chandragiri Imperial Heritage & Talakona Wilderness');
+      hubs.push('Tirupati City Central');
+    }
+    for (const p of candidates) {
+      const name = String(p.name || '').toLowerCase();
+      const lat = p.coords?.[0] ?? 13.6;
+      if (/tirumala|venkateswara|silathoranam|chakra|papavinasam|akasa|srivari/i.test(name) || lat > 13.67) {
+        dayBuckets[0].push(p);
+      } else {
+        const d = numDays >= 2 ? 1 : 0;
+        dayBuckets[d].push(p);
+      }
+    }
+  } else {
+    for (let i = 0; i < numDays; i++) {
+      themes.push(`Day ${i + 1} Circuit Exploration`);
+      hubs.push(`${region ? region.charAt(0).toUpperCase() + region.slice(1) : 'Central'} Hub`);
+    }
+    candidates.forEach((p, idx) => {
+      dayBuckets[idx % numDays].push(p);
+    });
+  }
+
+  // Ensure every bucket has candidates
+  dayBuckets.forEach((b, idx) => {
+    if (!b.length && candidates.length) {
+      dayBuckets[idx] = [...candidates];
+    }
+  });
+
+  const dayPlans = [];
+  let totalStopsCount = 0;
+  let totalDistanceKm = 0;
+
+  for (let i = 0; i < numDays; i++) {
+    const bucket = dayBuckets[i];
+    const isSunriseDay = isPaderuCircuit && i === 1;
+    const startTime = isSunriseDay ? '04:30' : (options.startTime || '07:30');
+    const endTime = options.endTime || '20:30';
+
+    const dayPlan = await planAdvancedItinerary(bucket, {
+      ...options,
+      startTime,
+      endTime,
+      region,
+      city: region,
+      originCoords: bucket[0]?.coords || options.originCoords,
+    });
+
+    const dayDistance = (dayPlan.stops || []).reduce((acc, s) => acc + (s.distanceKm || 0), 0);
+    totalDistanceKm += dayDistance;
+    totalStopsCount += (dayPlan.stops || []).length;
+
+    dayPlans.push({
+      dayNumber: i + 1,
+      theme: themes[i] || `Day ${i + 1}`,
+      recommendedHub: hubs[i] || 'Central Area',
+      startTime,
+      endTime,
+      stops: dayPlan.stops,
+      totalStops: (dayPlan.stops || []).length,
+      totalDistanceKm: Math.round(dayDistance * 10) / 10,
+      validation: dayPlan.validation,
+      warnings: dayPlan.warnings || [],
+    });
+  }
+
+  return {
+    circuitName: isPaderuCircuit ? 'Alluri Agency & Paderu Regional Highland Grand Circuit' : isTirupatiCircuit ? 'Tirupati & Tirumala Sacred Heritage Circuit' : `${region.toUpperCase()} Multi-Day Travel Circuit`,
+    totalDays: numDays,
+    totalStops: totalStopsCount,
+    totalDistanceKm: Math.round(totalDistanceKm * 10) / 10,
+    dayPlans,
+  };
+}
+
 module.exports = {
   planAdvancedItinerary,
+  planMultiDayCircuit,
   replanAdvanced,
   shouldTriggerReplan,
   critiqueItinerary,

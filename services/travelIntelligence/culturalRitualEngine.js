@@ -162,6 +162,34 @@ const CULTURAL_RITUAL_DATA = {
     prasad: 'Mylapore temple puliyodarai (tamarind rice) & sakkarai pongal',
     dressCode: 'Strict traditional attire (Dhoti/Shirt for men, Saree/Salwar for women)',
   },
+  // Tirupati & Tirumala
+  tirumala: {
+    name: 'Tirumala Venkateswara Temple',
+    aliases: ['tirumala', 'venkateswara', 'balaji', 'srivari'],
+    rituals: [
+      { name: 'Suprabhata Seva', start: '03:00', end: '04:00', type: 'morning_ritual', note: 'Awakening of the Lord with Venkateswara Suprabhatam chanting' },
+      { name: 'Morning Sarvadarshanam', start: '07:00', end: '11:45', type: 'darshan', note: 'General queue darshan window' },
+      { name: 'Sanctum Madhyahna Naivedyam', start: '12:00', end: '13:30', type: 'closure', note: 'Sanctum darshan halted for Rajabhoga Naivedyam offering' },
+      { name: 'Sahasra Deepalankarana Seva', start: '17:30', end: '18:30', type: 'aarti', note: 'Lord Malayappa Swami amidst 1000 brass lamps in Unjal Mandapam' },
+      { name: 'Ekanta Seva & Curfew Closure', start: '23:45', end: '03:00', type: 'curfew', note: 'Tirumala Ghat road and sanctum night curfew: Uphill road closed 23:45-03:00' },
+    ],
+    prasad: 'Authentic TTD Srivari Laddu Prasadam & Pulihora',
+    dressCode: 'Strict TTD traditional dress code (Dhoti/Uttariyam or Kurta-Pyjama for men; Saree or Chudidar for women)',
+  },
+  // Vijayawada
+  kanaka_durga: {
+    name: 'Sri Durga Malleswara Swamy Varla Devasthanam (Kanaka Durga)',
+    aliases: ['kanaka durga', 'indrakeeladri', 'durga temple vijayawada'],
+    rituals: [
+      { name: 'Suprabhata Seva & Snapanabhishekam', start: '04:00', end: '06:00', type: 'morning_ritual', note: 'Dawn holy bath ceremony atop Indrakeeladri hill overlooking the Krishna river' },
+      { name: 'Khadgamala Archana & Darshan', start: '07:00', end: '11:30', type: 'darshan', note: 'Devi sacred flower garland worship' },
+      { name: 'Sanctum Afternoon Closure (Maha Naivedyam)', start: '12:30', end: '14:30', type: 'closure', note: 'Sanctum closed for afternoon sacred bhog' },
+      { name: 'Nitya Chandi Homam & Evening Aarti', start: '17:30', end: '19:30', type: 'aarti', note: 'Evening deeparadhana and temple chariot pradakshina' },
+      { name: 'Shayana Seva', start: '21:30', end: '22:00', type: 'night_ritual', note: 'Closing ritual for the Goddess' },
+    ],
+    prasad: 'Goddess Laddu Prasadam, Daddojanam, and Kadambam',
+    dressCode: 'Traditional Indian attire',
+  },
 };
 
 function matchCulturalEntry(place = {}) {
@@ -212,13 +240,20 @@ function matchCulturalEntry(place = {}) {
 /**
  * Compute cultural ritual intelligence for a place at a given arrival time.
  * @param {object} place Place object
- * @param {number} arriveMin Arrival minute from midnight (0..1439)
+ * @param {number|Date} arriveMin Arrival minute from midnight (0..1439) or Date object
  * @param {number} dow Day of week (0=Sunday .. 6=Saturday)
  */
 function getCulturalRitualIntel(place, arriveMin = 600, dow = new Date().getDay()) {
   const entry = matchCulturalEntry(place);
   if (!entry || !Array.isArray(entry.rituals)) {
     return null;
+  }
+
+  let min = arriveMin;
+  let dayOfWeek = dow;
+  if (arriveMin instanceof Date) {
+    min = arriveMin.getHours() * 60 + arriveMin.getMinutes();
+    dayOfWeek = arriveMin.getDay();
   }
 
   const activeRituals = [];
@@ -230,34 +265,44 @@ function getCulturalRitualIntel(place, arriveMin = 600, dow = new Date().getDay(
   let culturalBadge = null;
 
   for (const ritual of entry.rituals) {
-    if (Array.isArray(ritual.daysOfWeek) && !ritual.daysOfWeek.includes(dow)) {
+    if (Array.isArray(ritual.daysOfWeek) && !ritual.daysOfWeek.includes(dayOfWeek)) {
       continue;
     }
 
     const startM = t2m(ritual.start);
     const endM = t2m(ritual.end);
 
-    if (arriveMin >= startM && arriveMin <= endM) {
+    const isActive = startM <= endM
+      ? (min >= startM && min <= endM)
+      : (min >= startM || min <= endM);
+
+    if (isActive) {
       activeRituals.push(ritual);
-      if (ritual.type === 'closure') {
+      if (ritual.type === 'closure' || ritual.type === 'curfew') {
         isSanctumClosed = true;
         sanctumClosureReason = ritual.note;
+      }
+      if (ritual.type === 'curfew') {
+        culturalBadge = `⛔ ${ritual.name}`;
       }
       if (ritual.type === 'aarti') {
         activeAarti = ritual;
         culturalBadge = `🪔 ${ritual.name}`;
       }
+      if (ritual.type === 'morning_ritual' && !culturalBadge) {
+        culturalBadge = `🌅 ${ritual.name}`;
+      }
       if (ritual.type === 'light_show' || ritual.type === 'illumination') {
         activeShow = ritual;
         culturalBadge = `✨ ${ritual.name}`;
       }
-    } else if (startM > arriveMin && startM - arriveMin <= 90) {
+    } else if (startM > min && startM - min <= 90) {
       upcomingRituals.push({
         ...ritual,
-        startsInMin: startM - arriveMin,
+        startsInMin: startM - min,
       });
       if (!culturalBadge && (ritual.type === 'aarti' || ritual.type === 'light_show')) {
-        culturalBadge = `⏳ ${ritual.name} in ${startM - arriveMin}m`;
+        culturalBadge = `⏳ ${ritual.name} in ${startM - min}m`;
       }
     }
   }
@@ -267,6 +312,7 @@ function getCulturalRitualIntel(place, arriveMin = 600, dow = new Date().getDay(
   return {
     placeName: entry.name,
     activeRituals,
+    activeRitual: activeRituals[0] || null,
     upcomingRituals,
     isSanctumClosed,
     isSanctumClosure: isSanctumClosed,

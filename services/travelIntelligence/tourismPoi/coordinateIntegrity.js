@@ -36,6 +36,10 @@ const CITY_CENTROIDS = {
   paderu: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
   araku: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
   lambasingi: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
+  tirupati: { lat: 13.6288, lon: 79.4192, maxRadiusKm: 55 },
+  tirumala: { lat: 13.6833, lon: 79.3472, maxRadiusKm: 45 },
+  vijayawada: { lat: 16.5062, lon: 80.6480, maxRadiusKm: 50 },
+  bezawada: { lat: 16.5062, lon: 80.6480, maxRadiusKm: 50 },
   kolkata: { lat: 22.5726, lon: 88.3639, maxRadiusKm: 50 },
   pune: { lat: 18.5204, lon: 73.8567, maxRadiusKm: 50 },
 };

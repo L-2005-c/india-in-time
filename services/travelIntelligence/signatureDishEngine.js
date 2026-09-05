@@ -272,6 +272,40 @@ const SIGNATURE_DISH_REGISTRY = {
     priceRange: '₹180–₹350',
     mustTryReason: 'Fiery Portuguese-Goan spiced prawn pickle preparation overlooking the lighthouse.',
   },
+  // Tirupati
+  tirumala: {
+    dishName: 'Authentic TTD Srivari Laddu Prasadam & Pulihora',
+    iconicSpot: 'TTD Laddu Complex / Annaprasadam Complex Tirumala',
+    distanceM: 50,
+    isVeg: true,
+    priceRange: '₹50–₹100',
+    mustTryReason: 'The world-renowned GI-tagged Tirupati Laddu prepared with pure cow ghee, cashew nuts, raisins, and green cardamom.',
+  },
+  chandragiri_fort: {
+    dishName: 'Rayalaseema Ragi Mudda with Natu Kodi Pulusu / Ghee Sambar',
+    iconicSpot: 'Bhimas Deluxe / Chandragiri Highway Dhabas',
+    distanceM: 150,
+    isVeg: false,
+    priceRange: '₹140–₹280',
+    mustTryReason: 'Wholesome finger millet balls paired with spicy Rayalaseema country chicken gravy or thick ghee sambar.',
+  },
+  // Vijayawada
+  kanaka_durga: {
+    dishName: 'Babai Hotel Ghee Idli & Filter Coffee with Daddojanam',
+    iconicSpot: 'Babai Hotel (Gandhinagar, est. 1942) / Temple Prasadam Counter',
+    distanceM: 180,
+    isVeg: true,
+    priceRange: '₹60–₹140',
+    mustTryReason: 'Legendary melt-in-the-mouth steamed idlis topped with a dollop of pure white butter, podi, and fragrant ghee.',
+  },
+  prakasam_barrage: {
+    dishName: 'Vijayawada Ulavacharu Biryani & Punugulu',
+    iconicSpot: 'Sweet Magic / Riverfront Street Kiosks',
+    distanceM: 80,
+    isVeg: true,
+    priceRange: '₹40–₹180',
+    mustTryReason: 'Crispy deep-fried golden urad dal fritters with ginger chutney, followed by tangy horse gram brown rice delicacy.',
+  },
 };
 
 /**
@@ -295,7 +329,7 @@ function getSignatureDish(place = {}, cityName = '') {
   }
 
   // City or category fallback heuristics
-  const cName = String(cityName || '').toLowerCase();
+  const cName = String(cityName || place.city || place.cityKey || place.region || '').toLowerCase();
   if (cat === 'temple') {
     return {
       dishName: 'Holy Temple Prasadam & Sweets',
@@ -320,6 +354,30 @@ function getSignatureDish(place = {}, cityName = '') {
     };
   }
 
+  if (cName.includes('paderu') || cName.includes('araku') || cName.includes('lambasingi') || cName.includes('vanjangi')) {
+    return {
+      dishName: 'Araku Bongu Chicken (Bamboo Chicken) & Fresh Organic Coffee',
+      iconicSpot: 'Highland Tribal Food Vendors / Araku Valley Stalls',
+      distanceM: 50,
+      isVeg: false,
+      priceRange: '₹120–₹250',
+      mustTryReason: 'Traditional tribal delicacy cooked inside hollow bamboo stems without oil over woodfire coals.',
+      matchedBy: 'city_fallback',
+    };
+  }
+
+  if (cName.includes('chennai') || cName.includes('madras')) {
+    return {
+      dishName: 'Filter Coffee & Medu Vada',
+      iconicSpot: 'Murugan Idli Shop / Rayar’s Mess Mylapore',
+      distanceM: 80,
+      isVeg: true,
+      priceRange: '₹40–₹90',
+      mustTryReason: 'Frothy aromatic chicory-blended filter coffee with crispy golden lentil vadas.',
+      matchedBy: 'city_fallback',
+    };
+  }
+
   if (cName.includes('hyderabad')) {
     return {
       dishName: 'Irani Chai & Osmania Biscuits',
@@ -340,6 +398,30 @@ function getSignatureDish(place = {}, cityName = '') {
       isVeg: true,
       priceRange: '₹30–₹60',
       mustTryReason: 'Crispy deep-fried street snacks served with spicy peanut and ginger chutneys.',
+      matchedBy: 'city_fallback',
+    };
+  }
+
+  if (cName.includes('tirupati') || cName.includes('tirumala')) {
+    return {
+      dishName: 'Tirupati Laddu Prasadam & Bhimas Andhra Thali',
+      iconicSpot: 'Bhimas Deluxe Heritage / Railway Station Road',
+      distanceM: 60,
+      isVeg: true,
+      priceRange: '₹50–₹200',
+      mustTryReason: 'Pure ghee Tirupati laddu prasadam and authentic spicy Rayalaseema vegetarian thali.',
+      matchedBy: 'city_fallback',
+    };
+  }
+
+  if (cName.includes('vijayawada') || cName.includes('bezawada')) {
+    return {
+      dishName: 'Babai Hotel Ghee Idli & Ulavacharu Biryani',
+      iconicSpot: 'Babai Hotel / Sweet Magic MG Road',
+      distanceM: 50,
+      isVeg: true,
+      priceRange: '₹50–₹220',
+      mustTryReason: 'Iconic steamed butter idlis and flavorful Krishna district horsegram biryani.',
       matchedBy: 'city_fallback',
     };
   }

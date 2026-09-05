@@ -572,7 +572,9 @@
     "jaipur": 1.0,
     "kochi": 0.95,
     "vizag": 0.9,
-    "paderu": 0.75
+    "paderu": 0.75,
+    "tirupati": 1.05,
+    "vijayawada": 1.15
   },
   "cloudInversion": {
     "startMin": 300,
