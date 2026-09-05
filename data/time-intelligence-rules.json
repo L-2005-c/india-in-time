@@ -560,5 +560,36 @@
     "arrivalBufferMin": 15,
     "departureBufferMin": 10,
     "itineraryBufferMin": 20
+  },
+  "cityTrafficBiases": {
+    "mumbai": 1.35,
+    "delhi": 1.3,
+    "bengaluru": 1.25,
+    "chennai": 1.2,
+    "hyderabad": 1.15,
+    "kolkata": 1.2,
+    "varanasi": 1.05,
+    "jaipur": 1.0,
+    "kochi": 0.95,
+    "vizag": 0.9,
+    "paderu": 0.75
+  },
+  "cloudInversion": {
+    "startMin": 300,
+    "endMin": 450,
+    "peakWindow": "05:00-07:30",
+    "description": "High-altitude cloud ocean (Meghala Kondalu) inversion before morning solar thermal dissipation"
+  },
+  "templeSanctumClosure": {
+    "startMin": 750,
+    "endMin": 930,
+    "closureWindow": "12:30-15:30",
+    "description": "Midday Naivedyam and priest rest closure of Hindu temple inner sanctums"
+  },
+  "ghatRoadTransit": {
+    "speedKmPerMin": 0.22,
+    "windingFactor": 1.68,
+    "nightFogThresholdMin": 1080,
+    "dawnFogThresholdMin": 330
   }
 }

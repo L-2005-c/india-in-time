@@ -12,7 +12,7 @@ const rules = require('../../data/time-intelligence-rules.json');
 const { t2m, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour } = require('./timeEngine');
 const { getOpeningStatus, categoryRules } = require('./openingHoursEngine');
 const { computeCrowd, lookupHistoricalCrowd } = require('../crowd');
-const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier } = require('./trafficEngine');
+const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier, getCityTrafficMultiplier } = require('./trafficEngine');
 const { computeWeatherIntelligence, buildWeatherExperienceWindows } = require('./weatherEngine');
 const { computeScenic } = require('./scenicEngine');
 const { computeVisitScore, computeTimeScore, openingToScore, trafficToScore, computePreferenceScore } = require('./scoringEngine');
@@ -52,10 +52,11 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   const weatherWindows = buildWeatherExperienceWindows(weather, place);
   const scenic = computeScenic(place, { nowMin, sun, golden, weatherIntel, now });
   let traffic = null;
+  const placeCity = options.region || options.city || place.region || place.city || null;
   if (options.fromCoords || options.liveTraffic) {
-    traffic = estimateTravel({ fromCoords: options.fromCoords, toCoords: place.coords, departMin: nowMin, liveTraffic: options.liveTraffic || null, isFirstStop: !!options.isFirstStop });
+    traffic = estimateTravel({ fromCoords: options.fromCoords, toCoords: place.coords, departMin: nowMin, liveTraffic: options.liveTraffic || null, isFirstStop: !!options.isFirstStop, cityKey: placeCity });
   } else {
-    const mult = getTrafficMultiplier(nowMin);
+    const mult = placeCity ? getCityTrafficMultiplier(placeCity, nowMin) : getTrafficMultiplier(nowMin);
     traffic = { travelMinutes: null, distanceKm: null, congestionFactor: mult, trafficLevel: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Moderate' : 'High', trafficRisk: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Medium' : 'High', source: 'estimated', label: 'Area traffic heuristic (no origin provided)', confidence: 40 };
   }
   const openingScore = openingToScore(opening);
@@ -81,11 +82,54 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
     hasLiveTraffic: traffic?.source === 'live',
     hasHistoricalHint: !!(place.historicalCrowd && place.historicalCrowd.sampleSize),
   });
-  const explanation = buildExplanation({ visitScore: scored.visitScore, visitLabel: scored.label, opening, crowd, weather: weatherIntel, traffic, scenic, arrival });
-  const statusLabel = buildStatusLabel({ opening, visitLabel: scored.label, crowd, weather: weatherIntel, scenic, daypart, nightAvailable: opening.nightAvailable });
+
   const cultural = getCulturalRitualIntel(place, nowMin, ist.dayIndex);
   const signatureDish = getSignatureDish(place, options.region || place.region || place.city || '');
   const entryProtocol = getEntryProtocol(place);
+
+  const placeNameLower = String(place.name || '').toLowerCase();
+  const isCloudInversionSpot = /vanjangi|lambasingi/.test(placeNameLower);
+  const cloudInversion = isCloudInversionSpot && nowMin >= 300 && nowMin <= 450;
+
+  const isMiddaySolarHeat = nowMin >= 11 * 60 + 30 && nowMin <= 15 * 60 + 30;
+  const isIndoorHaven = place.indoor_outdoor === 'indoor' || ['museum', 'cafe', 'food', 'shopping'].includes(cat);
+  const thermalComfort = {
+    isMiddayHaven: isMiddaySolarHeat && isIndoorHaven && weather && weather.tempC >= 32,
+    isOutdoorHeatStress: isMiddaySolarHeat && !isIndoorHaven && weather && weather.tempC >= 34,
+  };
+
+  if (cultural?.isSanctumClosure) {
+    scored.visitScore = Math.max(25, scored.visitScore - 35);
+    scored.label = scored.visitScore >= 75 ? 'Good' : scored.visitScore >= 50 ? 'Fair' : 'Poor';
+  } else if (cloudInversion) {
+    scored.visitScore = Math.min(100, scored.visitScore + 18);
+    scored.label = scored.visitScore >= 90 ? 'Exceptional' : 'Excellent';
+  }
+
+  const explanation = buildExplanation({
+    visitScore: scored.visitScore,
+    visitLabel: scored.label,
+    opening,
+    crowd,
+    weather: weatherIntel,
+    traffic,
+    scenic,
+    arrival,
+    cultural,
+    thermalComfort,
+    cloudInversion,
+  });
+  const statusLabel = buildStatusLabel({
+    opening,
+    visitLabel: scored.label,
+    crowd,
+    weather: weatherIntel,
+    scenic,
+    daypart,
+    nightAvailable: opening.nightAvailable,
+    cultural,
+    cloudInversion,
+  });
 
   const badges = [];
   if (opening.isOpenNow === true) badges.push('🟢 Open');
@@ -94,6 +138,9 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
   if (opening.status === 'CLOSING_SOON') badges.push('🟡 Closing Soon');
   if (place.is_sunrise_spot) badges.push('🌅 Best at Sunrise');
   if (place.is_sunset_spot) badges.push('🌇 Best at Sunset');
+  if (cloudInversion) badges.push('☁️ Cloud Inversion Window');
+  if (cultural?.isSanctumClosure) badges.push('🔒 Sanctum Rest (12:30–15:30)');
+  if (thermalComfort.isMiddayHaven) badges.push('❄️ Midday Heat Refuge');
   if (cultural?.culturalBadge) badges.push(cultural.culturalBadge);
   if (weather && weather.tempC >= 38) badges.push('🔥 Hot Weather');
   if (weather && /rain/i.test(weather.condition || '')) badges.push('🌧 Rain Alert');
@@ -211,6 +258,8 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
       explanation,
       recommendations,
       cultural,
+      cloudInversion: !!cloudInversion,
+      thermalComfort,
       signatureDish,
       entryProtocol,
       weatherWarnings: weatherIntel.warnings || [],

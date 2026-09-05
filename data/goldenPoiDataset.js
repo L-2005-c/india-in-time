@@ -58,6 +58,8 @@ const GOLDEN_POIS = [
   poi('hyd_ramoji', 'Ramoji Film City', 'entertainment', 'Hyderabad', 'Telangana', 17.2543, 78.6808, ['Ramoji', 'RFC']),
   poi('hyd_qutb_shahi', 'Qutb Shahi Tombs', 'heritage', 'Hyderabad', 'Telangana', 17.3894, 78.3962, ['Seven Tombs', 'Qutub Shahi Tombs']),
   poi('hyd_nehru_zoo', 'Nehru Zoological Park', 'zoo', 'Hyderabad', 'Telangana', 17.3508, 78.4516, ['Hyderabad Zoo', 'Nehru Zoo']),
+  poi('hyd_durgam_cheruvu', 'Durgam Cheruvu & Cable Bridge', 'scenic', 'Hyderabad', 'Telangana', 17.4300, 78.3895, ['Durgam Cheruvu', 'Secret Lake Hyderabad', 'Durgam Cheruvu Cable Bridge']),
+  poi('hyd_shilparamam', 'Shilparamam Cultural Crafts Village', 'heritage', 'Hyderabad', 'Telangana', 17.4520, 78.3790, ['Shilparamam', 'Shilparamam Hitec City']),
 
   // ── BENGALURU ────────────────────────────────────────────────────────────
   poi('blr_bangalore_palace', 'Bangalore Palace', 'heritage', 'Bengaluru', 'Karnataka', 12.9988, 77.5921, ['Bengaluru Palace']),
@@ -76,6 +78,9 @@ const GOLDEN_POIS = [
   poi('mum_siddhivinayak', 'Siddhivinayak Temple', 'temple', 'Mumbai', 'Maharashtra', 19.0169, 72.8304, ['Shree Siddhivinayak', 'Siddhivinayak Ganapati Temple']),
   poi('mum_bandra_fort', 'Castella de Aguada', 'heritage', 'Mumbai', 'Maharashtra', 19.0416, 72.8184, ['Bandra Fort']),
   poi('mum_kanheri_caves', 'Kanheri Caves', 'heritage', 'Mumbai', 'Maharashtra', 19.2056, 72.9067, ['Kanheri Caves Sanjay Gandhi']),
+  poi('mum_pagoda', 'Global Vipassana Pagoda', 'heritage', 'Mumbai', 'Maharashtra', 19.2282, 72.8059, ['Vipassana Pagoda Gorai', 'Global Pagoda']),
+  poi('mum_cst', 'Chhatrapati Shivaji Terminus Heritage Building', 'monument', 'Mumbai', 'Maharashtra', 18.9400, 72.8355, ['VT Station', 'Victoria Terminus', 'CST Mumbai']),
+  poi('mum_mount_mary', 'Mount Mary Basilica Bandra', 'temple', 'Mumbai', 'Maharashtra', 19.0465, 72.8225, ['Mount Mary Church', 'Basilica of Our Lady of the Mount']),
 
   // ── DELHI ────────────────────────────────────────────────────────────────
   poi('del_red_fort', 'Red Fort', 'heritage', 'Delhi', 'Delhi', 28.6562, 77.2410, ['Lal Qila', 'Red Fort Delhi']),
@@ -111,6 +116,41 @@ const GOLDEN_POIS = [
   poi('chn_fort_st_george', 'Fort St George', 'heritage', 'Chennai', 'Tamil Nadu', 13.0797, 80.2874, ['Fort St. George', 'St George Fort']),
   poi('chn_govt_museum', 'Government Museum Chennai', 'museum', 'Chennai', 'Tamil Nadu', 13.0700, 80.2560, ['Madras Museum', 'Egmore Museum']),
   poi('chn_elliots_beach', 'Edward Elliot Beach', 'beach', 'Chennai', 'Tamil Nadu', 13.0003, 80.2696, ["Elliot's Beach", 'Besant Nagar Beach']),
+  poi('chn_dakshinachitra', 'DakshinaChitra Heritage Museum', 'museum', 'Chennai', 'Tamil Nadu', 12.8258, 80.2435, ['Dakshina Chitra', 'Dakshinachitra Museum']),
+  poi('chn_guindy', 'Guindy National Park', 'park', 'Chennai', 'Tamil Nadu', 13.0067, 80.2206, ['Guindy Park', 'Guindy Zoo']),
+  poi('chn_valluvar_kottam', 'Valluvar Kottam', 'monument', 'Chennai', 'Tamil Nadu', 13.0528, 80.2417, ['Valluvar Memorial']),
+
+  // ── KOCHI ────────────────────────────────────────────────────────────────
+  poi('koc_chinese_nets', 'Chinese Fishing Nets', 'scenic', 'Kochi', 'Kerala', 9.9667, 76.2420, ['Chinese Nets', 'Cheena Vala']),
+  poi('koc_fort_kochi_beach', 'Fort Kochi Beach', 'beach', 'Kochi', 'Kerala', 9.9637, 76.2375, ['Fort Kochi Beach Walk']),
+  poi('koc_mattancherry', 'Mattancherry Palace', 'heritage', 'Kochi', 'Kerala', 9.9576, 76.2592, ['Dutch Palace', 'Mattancherry Dutch Palace']),
+  poi('koc_paradesi_synagogue', 'Paradesi Synagogue', 'heritage', 'Kochi', 'Kerala', 9.9570, 76.2596, ['Jewish Synagogue Kochi', 'Jew Town Synagogue']),
+  poi('koc_st_francis', 'St Francis Church', 'temple', 'Kochi', 'Kerala', 9.9653, 76.2417, ['St Francis Church Fort Kochi']),
+  poi('koc_santa_cruz', 'Santa Cruz Cathedral Basilica', 'temple', 'Kochi', 'Kerala', 9.9644, 76.2410, ['Santa Cruz Basilica Kochi']),
+  poi('koc_marine_drive', 'Marine Drive Kochi', 'scenic', 'Kochi', 'Kerala', 9.9772, 76.2773, ['Marine Drive Rainbow Bridge', 'Kochi Promenade']),
+  poi('koc_hill_palace', 'Hill Palace Museum Tripunithura', 'museum', 'Kochi', 'Kerala', 9.9535, 76.3638, ['Hill Palace Kochi', 'Tripunithura Palace']),
+  poi('koc_kumbalangi', 'Kumbalangi Model Eco-Tourism Village', 'scenic', 'Kochi', 'Kerala', 9.8761, 76.2871, ['Kumbalangi Village', 'Kumbalangi Backwaters']),
+  poi('koc_cherai_beach', 'Cherai Beach', 'beach', 'Kochi', 'Kerala', 10.1415, 76.1785, ['Cherai Vypin Beach']),
+
+  // ── PADERU & ALLURI DISTRICT CIRCUIT ─────────────────────────────────────
+  poi('paderu_vanjangi', 'Vanjangi Cloud Peak (Meghala Konda)', 'viewpoint', 'Paderu', 'Andhra Pradesh', 18.0062, 82.7230, ['Vanjangi Hills', 'Vanjangi Cloud Point', 'Meghala Konda', 'Vanjangi Sunrise Trek']),
+  poi('paderu_borra_caves', 'Borra Caves', 'scenic', 'Paderu', 'Andhra Pradesh', 18.2815, 83.0402, ['Borra Guhalu', 'Borra Limestone Caves', 'Borra Caves Araku']),
+  poi('paderu_katiki_waterfalls', 'Katiki Waterfalls', 'scenic', 'Paderu', 'Andhra Pradesh', 18.2910, 83.0080, ['Katiki Falls', 'Katiki Jalapatham']),
+  poi('paderu_araku_tribal_museum', 'Araku Tribal Museum', 'museum', 'Paderu', 'Andhra Pradesh', 18.3280, 82.8800, ['Tribal Museum Araku', 'Araku Museum']),
+  poi('paderu_araku_coffee_museum', 'Araku Coffee Museum & Café', 'museum', 'Paderu', 'Andhra Pradesh', 18.3275, 82.8810, ['Coffee Museum Araku', 'Araku Coffee House']),
+  poi('paderu_padmapuram', 'Padmapuram Botanical Gardens', 'park', 'Paderu', 'Andhra Pradesh', 18.3370, 82.8710, ['Padmapuram Gardens', 'Araku Treehouse Gardens']),
+  poi('paderu_chaparai', 'Chaparai Water Cascades (Dumbriguda)', 'scenic', 'Paderu', 'Andhra Pradesh', 18.2835, 82.7842, ['Chaparai Falls', 'Chaparai Waterfalls', 'Dumbriguda Waterfalls']),
+  poi('paderu_galikonda', 'Galikonda View Point', 'viewpoint', 'Paderu', 'Andhra Pradesh', 18.2370, 82.9560, ['Galikonda Peak', 'Galikonda Viewpoint Araku']),
+  poi('paderu_lambasingi', 'Lambasingi Cloud & Pine Forest Trail', 'scenic', 'Paderu', 'Andhra Pradesh', 17.8180, 82.4930, ['Lambasingi', 'Lammasingi', 'Kashmir of Andhra']),
+  poi('paderu_thajangi', 'Thajangi Reservoir Boating Lambasingi', 'scenic', 'Paderu', 'Andhra Pradesh', 17.8105, 82.4760, ['Thajangi Dam', 'Tajangi Reservoir Lambasingi']),
+  poi('paderu_kothapalli', 'Kothapalli Waterfalls Lambasingi', 'scenic', 'Paderu', 'Andhra Pradesh', 17.9358, 82.5110, ['Kothapalli Falls', 'Kothapalli Waterfalls']),
+  poi('paderu_susan_garden', 'Susan Garden Yellow Flower Fields', 'scenic', 'Paderu', 'Andhra Pradesh', 17.8310, 82.5020, ['Susan Garden Lambasingi', 'Yellow Flowers Lambasingi']),
+  poi('paderu_modakondamma', 'Sri Modakondamma Ammavari Temple', 'temple', 'Paderu', 'Andhra Pradesh', 18.0772, 82.6631, ['Modakondamma Temple', 'Modamamba Temple', 'Paderu Ammavari Gudi']),
+  poi('paderu_modamamba_padalu', 'Modamamba Padalu Stream Spot', 'scenic', 'Paderu', 'Andhra Pradesh', 18.0825, 82.6580, ['Modamamba Padalu', 'Goddess Footprints Paderu']),
+  poi('paderu_matsyagundam', 'Matsyagundam Sacred Fish Pool & Shiva Temple', 'temple', 'Paderu', 'Andhra Pradesh', 18.0412, 82.7155, ['Matsyagundam', 'Matsyalingeswara Swamy Temple']),
+  poi('paderu_coffee_plantations', 'Paderu Shaded Arabica Coffee Plantations', 'scenic', 'Paderu', 'Andhra Pradesh', 18.0715, 82.6710, ['Paderu Coffee Estates', 'Alluri Arabica Coffee Plantations']),
+  poi('paderu_thatiguda', 'Thatiguda Waterfalls Ananthagiri', 'scenic', 'Paderu', 'Andhra Pradesh', 18.2250, 83.0110, ['Tatiguda Falls', 'Ananthagiri Waterfalls']),
+  poi('paderu_ghat_viewpoint', 'Paderu Ghat Road Vaddi Chettu Viewpoint', 'viewpoint', 'Paderu', 'Andhra Pradesh', 18.0120, 82.7510, ['Paderu Ghat Viewpoint', 'Vaddi Chettu View Point']),
 
   // ── KOLKATA ──────────────────────────────────────────────────────────────
   poi('kol_victoria_memorial', 'Victoria Memorial', 'monument', 'Kolkata', 'West Bengal', 22.5448, 88.3426, ['Victoria Memorial Hall', 'Victoria Memorial Kolkata']),
@@ -193,6 +233,7 @@ function findGoldenPoi(nameQuery, cityHint = null) {
 
 module.exports = {
   GOLDEN_POIS,
+  GOLDEN_BENCHMARK_POIS: GOLDEN_POIS,
   GOLDEN_POIS_BY_CITY,
   findGoldenPoi,
 };

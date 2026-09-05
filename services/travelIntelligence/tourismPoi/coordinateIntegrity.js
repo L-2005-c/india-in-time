@@ -30,6 +30,12 @@ const CITY_CENTROIDS = {
   jaipur: { lat: 26.9124, lon: 75.7873, maxRadiusKm: 45 },
   goa: { lat: 15.2993, lon: 74.1240, maxRadiusKm: 70 },
   chennai: { lat: 13.0827, lon: 80.2707, maxRadiusKm: 50 },
+  madras: { lat: 13.0827, lon: 80.2707, maxRadiusKm: 50 },
+  kochi: { lat: 9.965, lon: 76.25, maxRadiusKm: 50 },
+  cochin: { lat: 9.965, lon: 76.25, maxRadiusKm: 50 },
+  paderu: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
+  araku: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
+  lambasingi: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
   kolkata: { lat: 22.5726, lon: 88.3639, maxRadiusKm: 50 },
   pune: { lat: 18.5204, lon: 73.8567, maxRadiusKm: 50 },
 };

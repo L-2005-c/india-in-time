@@ -87,6 +87,84 @@ const SIGNATURE_DISH_REGISTRY = {
     mustTryReason: 'Ghee roast dosa smeared with flaming red Andhra spice paste and peanut chutney.',
   },
 
+  // Paderu & Alluri Circuit
+  paderu_bamboo_chicken: {
+    dishName: 'Authentic Forest Bongu Kodi (Bamboo Chicken)',
+    iconicSpot: 'Paderu Main Road Tribal Food Hubs & Modakondamma Junction',
+    distanceM: 50,
+    isVeg: false,
+    priceRange: '₹140–₹240',
+    mustTryReason: 'Wild country chicken seasoned with local mountain herbs and woodfire-cooked inside green bamboo culms with zero added oil.',
+  },
+  vanjangi_cloud_peak: {
+    dishName: 'Woodfire Ginger Tea & Roasted Sweet Corn',
+    iconicSpot: 'Vanjangi Sunrise Trek Trailhead Kiosks',
+    distanceM: 30,
+    isVeg: true,
+    priceRange: '₹20–₹50',
+    mustTryReason: 'Steaming ginger-infused mountain tea enjoyed while watching sunrise cloud inversion over Meghala Konda.',
+  },
+  borra_caves: {
+    dishName: 'Araku Bamboo Chicken & Dum Tea',
+    iconicSpot: 'Borra Caves Entrance Food Court',
+    distanceM: 40,
+    isVeg: false,
+    priceRange: '₹120–₹220',
+    mustTryReason: 'Freshly roasted tribal bamboo chicken cooked on open firewood outside the million-year-old caves.',
+  },
+  araku_coffee_museum: {
+    dishName: 'Pure Araku Valley Organic Arabica Filter Coffee & Coffee Chocolates',
+    iconicSpot: 'Araku Coffee Museum Cafe',
+    distanceM: 20,
+    isVeg: true,
+    priceRange: '₹40–₹120',
+    mustTryReason: 'World-renowned GI-tagged shade-grown tribal Arabica coffee brewed fresh.',
+  },
+  lambasingi: {
+    dishName: 'Organic Strawberries & Pine Honey Tea',
+    iconicSpot: 'Lambasingi Orchard Shacks & Susan Garden Trail',
+    distanceM: 60,
+    isVeg: true,
+    priceRange: '₹50–₹100',
+    mustTryReason: 'Fresh cold-climate strawberries picked straight from Eastern Ghat orchards with tribal wild blossom honey.',
+  },
+  modakondamma_temple: {
+    dishName: 'Modakondamma Bellam Appalu & Paderu Ragi Sankati',
+    iconicSpot: 'Temple Devasthanam Prasadam & Paderu Mess',
+    distanceM: 40,
+    isVeg: true,
+    priceRange: '₹20–₹60',
+    mustTryReason: 'Sacred jaggery prasad and nutritious mountain finger-millet sankati with spicy ginger chutney.',
+  },
+
+  // Chennai
+  kapaleeshwarar: {
+    dishName: 'Mylapore Degree Filter Coffee & Crispy Medu Vada',
+    iconicSpot: "Rayar's Mess & Mami Tiffen Stall Mylapore",
+    distanceM: 80,
+    isVeg: true,
+    priceRange: '₹30–₹70',
+    mustTryReason: 'Frothy brass-davarah chicory-infused filter kaapi paired with golden crispy medu vadas.',
+  },
+  marina_beach_chennai: {
+    dishName: 'Thengai Manga Pattani Sundal & Murukku Sandwich',
+    iconicSpot: 'Marina Beach Stalls (near Gandhi Statue)',
+    distanceM: 30,
+    isVeg: true,
+    priceRange: '₹25–₹60',
+    mustTryReason: 'Warm spiced chickpea sundal tossed with raw mango shavings and fresh grated coconut by the waves.',
+  },
+
+  // Kochi
+  chinese_fishing_nets: {
+    dishName: 'Karimeen Pollichathu & Toddy Shop Fish Curry',
+    iconicSpot: 'Fort Kochi Seafood Shacks & Seaside Grills',
+    distanceM: 50,
+    isVeg: false,
+    priceRange: '₹200–₹450',
+    mustTryReason: 'Fresh pearl spot fish marinated in shallot-chilli masala and slow-roasted wrapped inside a green banana leaf.',
+  },
+
   // Varanasi
   varanasi_ghats: {
     dishName: 'Tamatar Chaat & Malaiyo / Blue Lassi',

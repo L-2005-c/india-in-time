@@ -1,7 +1,7 @@
 // explanationEngine.js
 function buildExplanation(intel = {}) {
   const positives = [], cautions = [], neutrals = [];
-  const { visitScore, visitLabel, opening, crowd, weather, traffic, scenic, arrival } = intel;
+  const { visitScore, visitLabel, opening, crowd, weather, traffic, scenic, arrival, cultural, thermalComfort, cloudInversion } = intel;
   if (opening) {
     if (opening.status === 'OPEN') positives.push('Place is open');
     else if (opening.status === 'CLOSING_SOON') cautions.push(`Closing soon (${opening.minutesToClose} min)`);
@@ -9,6 +9,30 @@ function buildExplanation(intel = {}) {
     else if (opening.status === 'CLOSED') cautions.push('Currently closed');
     else neutrals.push('Opening hours unknown');
   }
+
+  // Cultural & Temple Ritual Intelligence
+  if (cultural) {
+    if (cultural.activeRitual) {
+      positives.push(`Auspicious timing: ${cultural.activeRitual.name} (${cultural.activeRitual.note || 'active ritual'})`);
+    }
+    if (cultural.isSanctumClosure) {
+      cautions.push(`Temple sanctum afternoon closure (${cultural.sanctumClosureWindow || '12:30–15:30'})`);
+    }
+    if (cultural.prasad) {
+      positives.push(`Specialty Prasadam: ${cultural.prasad}`);
+    }
+  }
+
+  // Cloud Inversion & Mountain Mist
+  if (cloudInversion) {
+    positives.push('Peak cloud-ocean inversion window (dense floating mist above peaks)');
+  }
+
+  // Thermal Comfort & Heat Refuge
+  if (thermalComfort?.isMiddayHaven) {
+    positives.push('Cool indoor sanctuary during peak afternoon solar heat');
+  }
+
   if (crowd) {
     if (['Very Low', 'Low'].includes(crowd.level)) positives.push(`Low predicted crowd (${crowd.level})`);
     else if (crowd.level === 'Moderate') neutrals.push('Moderate predicted crowd');
@@ -25,9 +49,14 @@ function buildExplanation(intel = {}) {
     if (scenic.scenicTypes?.some((t) => ['golden-hour', 'sunset', 'sunrise'].includes(t))) positives.push('Favourable light / golden-hour alignment');
   }
   if (traffic) {
-    if (traffic.trafficLevel === 'Low') positives.push('Low traffic risk');
-    else if (traffic.trafficLevel === 'High') cautions.push('Elevated traffic expected');
-    else if (traffic.trafficLevel === 'Moderate') neutrals.push('Moderate traffic');
+    if (traffic.isGhatRoad) {
+      neutrals.push('Highland ghat road transit (hairpin turns & scenic mountain pass)');
+      if (traffic.ghatNightAdvisory) cautions.push(traffic.ghatNightAdvisory);
+    } else {
+      if (traffic.trafficLevel === 'Low') positives.push('Low traffic risk');
+      else if (traffic.trafficLevel === 'High') cautions.push('Elevated traffic expected');
+      else if (traffic.trafficLevel === 'Moderate') neutrals.push('Moderate traffic');
+    }
   }
   if (arrival?.recommendedDeparture) neutrals.push(`Recommended departure ~${arrival.recommendedDeparture}`);
   const summaryParts = [];
@@ -37,7 +66,9 @@ function buildExplanation(intel = {}) {
   return { summary: summaryParts.join(' · ') || 'Recommendation generated from available signals', positives, cautions, neutrals, bullets: [...positives.map((p) => ({ type: 'positive', text: p })), ...cautions.map((c) => ({ type: 'caution', text: c })), ...neutrals.map((n) => ({ type: 'neutral', text: n }))] };
 }
 function buildStatusLabel(intel = {}) {
-  const { opening, visitLabel, crowd, weather, scenic, daypart, nightAvailable } = intel;
+  const { opening, visitLabel, crowd, weather, scenic, daypart, nightAvailable, cultural, cloudInversion } = intel;
+  if (cultural?.isSanctumClosure) return 'Midday sanctum rest — visit for evening aarti';
+  if (cloudInversion) return 'Sunrise cloud inversion peak';
   if (opening?.status === 'CLOSED' || opening?.isOpenNow === false) return opening?.label || 'Currently Closed';
   if (opening?.status === 'CLOSING_SOON') return opening.label || 'Closing Soon';
   if (nightAvailable && daypart === 'night') return 'Open at night';
@@ -50,3 +81,4 @@ function buildStatusLabel(intel = {}) {
   return opening?.label || 'Good time to visit';
 }
 module.exports = { buildExplanation, buildStatusLabel };
+

@@ -61,10 +61,14 @@ const HYDERABAD = [
   entry('Charminar', 'scenic', 'S', 17.3616, 78.4747),
   entry('Golconda Fort', 'scenic', 'S', 17.3833, 78.4011, ['golkonda fort']),
   entry('Salar Jung Museum', 'museum', 'S', 17.3713, 78.4804),
-  entry('Hussain Sagar', 'scenic', 'A', 17.4239, 78.4738, ['tank bund']),
-  entry('Ramoji Film City', 'entertainment', 'A', 17.2543, 78.6808),
+  entry('Hussain Sagar', 'scenic', 'A', 17.4239, 78.4738, ['tank bund', 'hussain sagar lake']),
+  entry('Ramoji Film City', 'entertainment', 'A', 17.2543, 78.6808, ['ramoji']),
   entry('Chowmahalla Palace', 'heritage', 'A', 17.3578, 78.4717),
   entry('Birla Mandir Hyderabad', 'temple', 'A', 17.4062, 78.4691, ['birla mandir']),
+  entry('Qutb Shahi Tombs', 'heritage', 'A', 17.3894, 78.3962, ['seven tombs']),
+  entry('Nehru Zoological Park', 'zoo', 'A', 17.3508, 78.4516, ['hyderabad zoo']),
+  entry('Durgam Cheruvu & Cable Bridge', 'scenic', 'A', 17.4300, 78.3895, ['durgam cheruvu', 'secret lake']),
+  entry('Shilparamam Cultural Crafts Village', 'heritage', 'A', 17.4520, 78.3790, ['shilparamam']),
   entry('Inorbit Mall Hyderabad', 'shopping', 'A', 17.4337, 78.3862, ['inorbit mall hyderabad']),
   entry('GVK One Mall', 'shopping', 'A', 17.4193, 78.4482, ['gvk one']),
   entry('Khajaguda Hills Cave & Bouldering Trail', 'trekking', 'A', 17.4140, 78.3610, ['khajaguda trek']),
@@ -120,6 +124,9 @@ const MUMBAI = [
   entry('Haji Ali Dargah', 'temple', 'A', 18.9827, 72.8089),
   entry('Siddhivinayak Temple', 'temple', 'A', 19.0169, 72.8309),
   entry('Juhu Beach', 'beach', 'A', 19.0996, 72.8258),
+  entry('Bandra Fort (Castella de Aguada)', 'scenic', 'A', 19.0416, 72.8184, ['bandra fort']),
+  entry('Global Vipassana Pagoda', 'heritage', 'A', 19.2282, 72.8059, ['vipassana pagoda']),
+  entry('Girgaon Chowpatty Beach', 'beach', 'B', 18.9545, 72.8130, ['chowpatty']),
   entry('Phoenix Palladium', 'shopping', 'A', 18.9942, 72.8250, ['phoenix mall mumbai']),
   entry('High Street Phoenix', 'shopping', 'A', 18.9940, 72.8245),
   entry('Sanjay Gandhi National Park Kanheri Caves Trek', 'trekking', 'A', 19.2060, 72.9060, ['kanheri caves trek']),
@@ -142,12 +149,59 @@ const BENGALURU = [
 
 const KOCHI = [
   entry('Fort Kochi Beach', 'beach', 'A', 9.9658, 76.2421),
-  entry('Chinese Fishing Nets', 'scenic', 'S', 9.9681, 76.2441, ['chinese nets']),
+  entry('Chinese Fishing Nets', 'scenic', 'S', 9.9681, 76.2441, ['chinese nets', 'cheena vala']),
   entry('Mattancherry Palace', 'heritage', 'A', 9.9580, 76.2595, ['dutch palace']),
-  entry('St Francis Church Kochi', 'temple', 'A', 9.9659, 76.2411),
-  entry('Jewish Synagogue Kochi', 'heritage', 'A', 9.9575, 76.2595, ['pardesi synagogue']),
+  entry('St Francis Church Kochi', 'temple', 'A', 9.9659, 76.2411, ['st francis church']),
+  entry('Santa Cruz Cathedral Basilica', 'temple', 'A', 9.9644, 76.2410, ['santa cruz basilica']),
+  entry('Jewish Synagogue Kochi', 'heritage', 'A', 9.9575, 76.2595, ['pardesi synagogue', 'jewish synagogue']),
   entry('Marine Drive Kochi', 'scenic', 'A', 9.9816, 76.2754),
+  entry('Hill Palace Museum Tripunithura', 'museum', 'A', 9.9535, 76.3638, ['hill palace kochi']),
+  entry('Kumbalangi Model Eco-Tourism Village', 'scenic', 'A', 9.8761, 76.2871, ['kumbalangi']),
+  entry('Cherai Beach & Sunset Point', 'beach', 'A', 10.1415, 76.1785, ['cherai beach']),
   entry('Lulu Mall Kochi', 'shopping', 'A', 10.0272, 76.3081, ['lulu mall']),
+];
+
+const CHENNAI = [
+  entry('Marina Beach', 'beach', 'S', 13.0500, 80.2824, ['marina beach chennai']),
+  entry('Kapaleeshwarar Temple', 'temple', 'S', 13.0336, 80.2699, ['kapaleeswarar temple', 'mylapore temple']),
+  entry('San Thome Basilica', 'temple', 'A', 13.0337, 80.2783, ['san thome church', 'santhome cathedral']),
+  entry('Fort St George', 'heritage', 'A', 13.0797, 80.2874, ['fort st. george']),
+  entry('Government Museum Chennai', 'museum', 'S', 13.0700, 80.2560, ['egmore museum', 'madras museum']),
+  entry('Edward Elliot Beach (Besant Nagar)', 'beach', 'A', 13.0003, 80.2696, ['elliots beach', 'besant nagar beach']),
+  entry('Guindy National Park', 'park', 'A', 13.0067, 80.2206, ['guindy park']),
+  entry('Valluvar Kottam', 'monument', 'A', 13.0528, 80.2417, ['valluvar memorial']),
+  entry('Parthasarathy Temple Triplicane', 'temple', 'A', 13.0538, 80.2764, ['triplicane temple']),
+  entry('Semmozhi Poonga Botanical Garden', 'park', 'B', 13.0489, 80.2508, ['semmozhi poonga']),
+  entry('DakshinaChitra Heritage Museum', 'museum', 'S', 12.8258, 80.2435, ['dakshina chitra']),
+  entry('Theosophical Society Adyar Gardens', 'park', 'A', 13.0102, 80.2592, ['adyar gardens']),
+  entry('Express Avenue Mall', 'shopping', 'A', 13.0594, 80.2642, ['express avenue']),
+  entry('Phoenix Marketcity Chennai', 'shopping', 'A', 12.9918, 80.2170, ['phoenix marketcity chennai']),
+  entry('T. Nagar Ranganathan Street Bazaar', 'shopping', 'A', 13.0405, 80.2337, ['ranganathan street']),
+];
+
+const PADERU = [
+  entry('Vanjangi Cloud Peak (Meghala Konda)', 'viewpoint', 'S', 18.0062, 82.7230, ['vanjangi', 'vanjangi hills', 'meghala konda', 'vanjangi cloud peak', 'vanjangi trek']),
+  entry('Borra Caves', 'scenic', 'S', 18.2815, 83.0402, ['borra guhalu', 'borra caves araku', 'borra limestone caves']),
+  entry('Katiki Waterfalls', 'scenic', 'A', 18.2910, 83.0080, ['katiki falls', 'katiki', 'katiki trek']),
+  entry('Araku Tribal Museum', 'museum', 'A', 18.3280, 82.8800, ['tribal museum araku', 'araku museum']),
+  entry('Araku Coffee Museum & Café', 'museum', 'A', 18.3275, 82.8810, ['coffee museum araku', 'araku coffee house']),
+  entry('Padmapuram Botanical Gardens', 'park', 'B', 18.3370, 82.8710, ['padmapuram gardens']),
+  entry('Chaparai Water Cascades (Dumbriguda)', 'scenic', 'A', 18.2835, 82.7842, ['chaparai falls', 'chaparai waterfalls', 'dumbriguda waterfalls']),
+  entry('Galikonda View Point', 'viewpoint', 'A', 18.2370, 82.9560, ['galikonda viewpoint', 'galikonda peak']),
+  entry('Lambasingi Cloud & Pine Forest Trail', 'scenic', 'S', 17.8180, 82.4930, ['lambasingi', 'lammasingi', 'kashmir of andhra', 'lambasingi trek']),
+  entry('Thajangi Reservoir Boating Lambasingi', 'scenic', 'A', 17.8105, 82.4760, ['thajangi dam', 'tajangi reservoir']),
+  entry('Kothapalli Waterfalls Lambasingi', 'scenic', 'A', 17.9358, 82.5110, ['kothapalli falls', 'kothapalli waterfalls']),
+  entry('Susan Garden Yellow Flower Fields', 'scenic', 'B', 17.8310, 82.5020, ['susan garden', 'susan garden lambasingi']),
+  entry('Sri Modakondamma Ammavari Temple', 'temple', 'S', 18.0772, 82.6631, ['modakondamma temple', 'modamamba temple', 'paderu ammavari gudi']),
+  entry('Modamamba Padalu Stream Spot', 'scenic', 'A', 18.0825, 82.6580, ['modamamba padalu', 'goddess footprints paderu']),
+  entry('Matsyagundam Sacred Fish Pool & Shiva Temple', 'temple', 'A', 18.0412, 82.7155, ['matsyagundam', 'matsyalingeswara swamy temple']),
+  entry('Paderu Shaded Arabica Coffee Plantations', 'scenic', 'A', 18.0715, 82.6710, ['paderu coffee estates', 'alluri coffee plantations']),
+  entry('Ananthagiri Coffee Plantations & Viewpoint', 'scenic', 'A', 18.2577, 82.9893, ['ananthagiri viewpoint', 'ananthagiri coffee']),
+  entry('Thatiguda Waterfalls Ananthagiri', 'scenic', 'B', 18.2250, 83.0110, ['tatiguda falls', 'thatiguda waterfalls']),
+  entry('Paderu Ghat Road Vaddi Chettu Viewpoint', 'viewpoint', 'B', 18.0120, 82.7510, ['paderu ghat viewpoint', 'vaddi chettu view point']),
+  entry('Paderu Weekly Tribal Haat & Artisan Santha', 'shopping', 'B', 18.0790, 82.6625, ['paderu haat', 'paderu tribal santha']),
+  entry('Bongu Kodi Bamboo Chicken Center Paderu', 'food', 'B', 18.0782, 82.6640, ['bamboo chicken paderu', 'bongu kodi paderu']),
+  entry('Araku Bamboo Chicken & Spice Hub', 'food', 'B', 18.3290, 82.8790, ['araku bamboo chicken']),
 ];
 
 const AGRA = [
@@ -193,6 +247,12 @@ const CITY_WHITELISTS = {
   bangalore: BENGALURU,
   kochi: KOCHI,
   cochin: KOCHI,
+  chennai: CHENNAI,
+  madras: CHENNAI,
+  paderu: PADERU,
+  araku: PADERU,
+  lambasingi: PADERU,
+  vanjangi: PADERU,
   agra: AGRA,
   varanasi: VARANASI,
   benares: VARANASI,
@@ -289,10 +349,15 @@ function listSupportedCities() {
   return Object.keys(CITY_WHITELISTS).filter((k) => (CITY_WHITELISTS[k] || []).length > 0);
 }
 
+function isWhitelistedTourismPoi(name, cityHint = null) {
+  return resolveWhitelist({ name }, cityHint) !== null;
+}
+
 module.exports = {
   VIZAG_WHITELIST,
   CITY_WHITELISTS,
   resolveWhitelist,
+  isWhitelistedTourismPoi,
   isVerifiedShoppingDestination,
   SHOPPING_DESTINATION_NAMES,
   getCityWhitelist,

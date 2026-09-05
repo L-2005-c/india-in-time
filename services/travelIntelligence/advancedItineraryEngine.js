@@ -96,13 +96,25 @@ function formatReasons(intel, place, arrivalMin, requirements, travel, waitMinut
   const reasons = [];
   const meal = mealAt(arrivalMin);
   const cat = normalizeCat(place.cat);
+  const placeNameLower = String(place.name || '').toLowerCase();
+
   if (isFood(place) && meal) reasons.push(`Fits ${meal} window`);
   if (intel?.isBestTimeNow) reasons.push('This is a high-value time window for the place');
+  if (intel?.cloudInversion || (/vanjangi/.test(placeNameLower) && arrivalMin >= 300 && arrivalMin <= 450)) {
+    reasons.push('Captures the legendary Vanjangi cloud ocean inversion (Meghala Kondalu)');
+  }
+  if (intel?.cultural?.activeRitual) {
+    reasons.push(`Synchronized with ${intel.cultural.activeRitual.name}`);
+  }
+  if (cat === 'temple' && (arrivalMin <= 10 * 60 || arrivalMin >= 17 * 60 + 30)) {
+    reasons.push('Auspicious temple darshan & sandhya aarti window');
+  }
   if (intel?.scenic?.photographyScore >= 75 || intel?.scenic?.scenicScore >= 80) reasons.push('Strong scenic / photography conditions');
   if (['Low', 'Very Low'].includes(intel?.crowdLevel)) reasons.push('Lower predicted crowd');
   if (requirements.soft.lowCrowd && ['High', 'Very High'].includes(intel?.crowdLevel)) reasons.push('Crowd penalty applied because low crowd was requested');
   if (requirements.soft.photography && (place.is_sunset_spot || place.is_sunrise_spot || ['scenic', 'beach'].includes(cat))) reasons.push('Matches photography preference');
   if (requirements.soft.preferredCategories?.includes(cat)) reasons.push(`Matches preferred category: ${cat}`);
+  if (travel?.isGhatRoad) reasons.push('Highland ghat road scenic transit corridor');
   if (travel?.distanceKm != null && travel.distanceKm <= 3.5) reasons.push(`Near previous stop (${travel.distanceKm} km)`);
   if (waitMinutes > 0) reasons.push(`Waited ${waitMinutes} min to reach a better time window`);
   if (intel?.weather?.suitability) reasons.push(`Weather suitability: ${intel.weather.suitability}`);
@@ -343,6 +355,42 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   if (place.is_sunset_spot && isGoldenHourEvening && meal !== 'lunch') score += 24;
   else if (place.is_sunset_spot && meal !== 'lunch') score += 8;
   if (place.is_sunrise_spot && isSunriseMorning) score += 24;
+
+  // Cloud ocean inversion & highland mist windowing (e.g. Vanjangi Meghala Kondalu, Lambasingi)
+  const placeNameLower = String(place.name || '').toLowerCase();
+  const isVanjangi = placeNameLower.includes('vanjangi');
+  const isLambasingi = placeNameLower.includes('lambasingi');
+  if (isVanjangi) {
+    if (arrivalMin >= 4 * 60 + 30 && arrivalMin <= 7 * 60 + 30) {
+      score += 48; // Peak Meghala Kondalu floating cloud inversion window
+    } else if (arrivalMin > 11 * 60) {
+      score -= 32; // Inversion layers dissipate under strong midday sun
+    }
+  } else if (isLambasingi) {
+    if (arrivalMin >= 5 * 60 && arrivalMin <= 8 * 60 + 30) {
+      score += 30; // Chilly morning mist and pine forest fog window
+    }
+  }
+
+  // Spiritual timing & temple sanctum closure protection (12:30 - 15:30)
+  const isTempleMiddayShut = cat === 'temple' && (arrivalMin >= 12 * 60 + 30 && arrivalMin <= 15 * 60 + 30);
+  if (intel.cultural?.isSanctumClosure || isTempleMiddayShut) {
+    score -= 42; // Decisively steer temple visits away from midday priest rest/naivedyam closures
+  } else if (cat === 'temple' && (arrivalMin <= 10 * 60 || (arrivalMin >= 17 * 60 + 30 && arrivalMin <= 20 * 60))) {
+    score += 20; // Reward auspicious morning darshan or evening sandhya aarti window
+  }
+
+  // Exertion-aware pacing: prevent back-to-back strenuous climbs (trekking, steep cave stairs)
+  const isStrenuous = cat === 'trekking' || /trek|climb|caves|trail|hike/i.test(placeNameLower);
+  const lastStopName = state.stops.length ? String(state.stops[state.stops.length - 1].name || '').toLowerCase() : '';
+  const lastStopCat = state.stops.length ? normalizeCat(state.stops[state.stops.length - 1].category) : '';
+  const lastWasStrenuous = lastStopCat === 'trekking' || /trek|climb|caves|trail|hike/i.test(lastStopName);
+
+  if (isStrenuous && lastWasStrenuous) {
+    score -= 36; // Prevent exhausting the traveler with consecutive heavy physical climbs
+  } else if (!isStrenuous && lastWasStrenuous && (isFood(place) || ['scenic', 'garden', 'cafe'].includes(cat) || placeNameLower.includes('coffee'))) {
+    score += 22; // Reward restorative break / coffee tasting following high exertion
+  }
 
   // Personal Travel DNA matching boost
   const dnaProfile = requirements.travelDna || requirements.dnaProfile || requirements.soft.travelDna;
@@ -761,6 +809,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
           departMin: state.cursor,
           liveTraffic: rawOptions.liveTraffic || null,
           isFirstStop: state.stops.length === 0 && !completedStops.length,
+          cityKey: requirements.region || requirements.city || rawOptions.city || null,
         });
         const travelMinutes = Number(travel.travelMinutes);
         if (!Number.isFinite(travelMinutes)) continue;
@@ -999,7 +1048,13 @@ module.exports = {
   createGroupProfile,
   evaluateGroupSatisfaction,
   scoreAtArrival: (place, arrivalMin, state, requirements, weather, nowBase) => {
-    const travel = estimateTravel({ fromCoords: state?.prevCoords || requirements.originCoords, toCoords: place.coords, departMin: state?.cursor || requirements.hard.startMin, isFirstStop: !(state?.stops?.length) });
+    const travel = estimateTravel({
+      fromCoords: state?.prevCoords || requirements.originCoords,
+      toCoords: place.coords,
+      departMin: state?.cursor || requirements.hard.startMin,
+      isFirstStop: !(state?.stops?.length),
+      cityKey: requirements.region || requirements.city || null,
+    });
     return scoreTransition(place, arrivalMin, state || { cursor: requirements.hard.startMin, prevCoords: requirements.originCoords, stops: [], meals: new Set(), categories: new Set(), cost: 0, travelMinutes: 0, waitMinutes: 0 }, requirements, weather, nowBase || new Date(), travel, 0, new Map());
   },
   mealAt,

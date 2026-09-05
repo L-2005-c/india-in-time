@@ -1,6 +1,21 @@
 // trafficEngine.js — never invents live traffic
 const rules = require('../../data/time-intelligence-rules.json');
 const { distKm } = require('../../utils/geo');
+
+const CITY_CONGESTION_BIAS = rules.cityTrafficBiases || {
+  mumbai: 1.35,
+  delhi: 1.30,
+  bengaluru: 1.25,
+  chennai: 1.20,
+  hyderabad: 1.15,
+  kolkata: 1.20,
+  varanasi: 1.05,
+  jaipur: 1.0,
+  kochi: 0.95,
+  vizag: 0.90,
+  paderu: 0.75,
+};
+
 function getTrafficMultiplier(minuteOfDay) {
   const patterns = rules.trafficPatterns || {};
   for (const [key, p] of Object.entries(patterns)) {
@@ -10,6 +25,25 @@ function getTrafficMultiplier(minuteOfDay) {
   }
   return patterns.default ?? 1.0;
 }
+
+function getCityTrafficMultiplier(cityKey, minuteOfDay) {
+  const baseMult = getTrafficMultiplier(minuteOfDay);
+  const key = String(cityKey || '').toLowerCase();
+  const bias = CITY_CONGESTION_BIAS[key];
+  if (!bias) return baseMult;
+  if (baseMult > 1.2) {
+    return Math.round((1.0 + (baseMult - 1.0) * (bias >= 1.0 ? bias : 0.85)) * 100) / 100;
+  }
+  return baseMult;
+}
+
+function isGhatRoadCorridor(fromCoords, toCoords, cityKey) {
+  const key = String(cityKey || '').toLowerCase();
+  if (['paderu', 'araku', 'lambasingi', 'vanjangi'].includes(key)) return true;
+  const isHighland = (c) => Array.isArray(c) && c.length >= 2 && c[0] >= 17.65 && c[0] <= 18.45 && c[1] >= 82.35 && c[1] <= 83.15;
+  return isHighland(fromCoords) || isHighland(toCoords);
+}
+
 function trafficLevelFromMult(mult) {
   if (mult <= 1.05) return { level: 'Low', label: 'Light traffic', risk: 'Low' };
   if (mult <= 1.35) return { level: 'Moderate', label: 'Moderate traffic', risk: 'Medium' };
@@ -21,6 +55,18 @@ function recommendTransitMode(distanceKm, opts = {}) {
   const km = Number(distanceKm) || 0;
   const corridorType = opts.corridorType || 'URBAN_ARTERIAL';
   const congestionFactor = opts.congestionFactor || 1.0;
+
+  if (opts.isGhat) {
+    const cabFare = Math.min(650, Math.max(90, Math.round(70 + km * 18)));
+    return {
+      mode: 'ghat_cab',
+      label: 'Mountain Cab / 4x4',
+      icon: '🚙',
+      estimatedFare: cabFare,
+      fareStr: `₹${cabFare}`,
+      rationale: 'Experienced mountain ghat driver recommended for high-altitude hairpin curves',
+    };
+  }
 
   if (km <= 0.8) {
     return {
@@ -112,7 +158,14 @@ function evaluateTrafficTransition(fromCoords, toCoords, departMin, mult) {
 }
 
 function estimateTravel(opts = {}) {
-  const { fromCoords, toCoords, departMin = 720, liveTraffic = null, isFirstStop = false } = opts;
+  const { fromCoords, toCoords, departMin = 720, liveTraffic = null, isFirstStop = false, cityKey = null, region = null } = opts;
+  const effectiveCity = cityKey || region;
+  const isGhat = isGhatRoadCorridor(fromCoords, toCoords, effectiveCity);
+  const roadNetworkFactor = isGhat ? (rules.ghatRoadTransit?.windingFactor || 1.68) : ROAD_NETWORK_FACTOR;
+  const baseSpeedKmPerMin = isGhat ? (rules.ghatRoadTransit?.speedKmPerMin || 0.22) : 0.32;
+  const isNightGhat = isGhat && (departMin >= (rules.ghatRoadTransit?.nightFogThresholdMin || 1080) || departMin <= (rules.ghatRoadTransit?.dawnFogThresholdMin || 330));
+  const ghatNightAdvisory = isNightGhat ? 'Night mountain pass: severe fog and unlit hairpin switchbacks. Drive under 30 km/h.' : null;
+
   const isMorningRush = departMin >= 8 * 60 + 30 && departMin <= 10 * 60 + 30;
   const isEveningRush = departMin >= 17 * 60 + 30 && departMin <= 20 * 60 + 30;
   const rushHourActive = isMorningRush || isEveningRush;
@@ -120,13 +173,13 @@ function estimateTravel(opts = {}) {
 
   if (liveTraffic && Number.isFinite(liveTraffic.durationSec)) {
     const minutes = Math.max(1, Math.round(liveTraffic.durationSec / 60));
-    const km = liveTraffic.distanceM != null ? liveTraffic.distanceM / 1000 : (fromCoords && toCoords ? distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) * ROAD_NETWORK_FACTOR : null);
+    const km = liveTraffic.distanceM != null ? liveTraffic.distanceM / 1000 : (fromCoords && toCoords ? distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) * roadNetworkFactor : null);
     const mult = liveTraffic.congestion ?? 1.0;
     const level = trafficLevelFromMult(mult);
     const source = liveTraffic.provider === 'google' ? 'live_traffic' : liveTraffic.provider === 'osrm' ? 'route_estimate' : 'live';
     const isEstimateOnly = source === 'route_estimate';
     const googleMapsUrl = (fromCoords && toCoords) ? `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving` : null;
-    const transitRecommendation = recommendTransitMode(km, { congestionFactor: mult });
+    const transitRecommendation = recommendTransitMode(km, { congestionFactor: mult, isGhat });
     const transition = evaluateTrafficTransition(fromCoords, toCoords, departMin, mult);
     const freeFlowMinutes = Math.max(1, Math.round(minutes / Math.max(1, mult)));
     const trafficDelayMinutes = Math.max(0, minutes - freeFlowMinutes);
@@ -154,22 +207,23 @@ function estimateTravel(opts = {}) {
       label: isEstimateOnly ? `${level.label} (routing estimate; not live traffic)` : level.label,
       confidence: isEstimateOnly ? 75 : 90,
       googleMapsUrl,
+      isGhatRoad: isGhat,
+      ghatNightAdvisory,
     };
   }
   if (!fromCoords || !toCoords || !Number.isFinite(fromCoords[0]) || !Number.isFinite(toCoords[0])) {
-    return { travelMinutes: isFirstStop ? 10 : 20, freeFlowMinutes: isFirstStop ? 10 : 20, trafficDelayMinutes: 0, etaBreakdown: `${isFirstStop ? 10 : 20}m (estimated)`, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', fromTrafficLevel: 'Unknown', toTrafficLevel: 'Unknown', trafficTransition: '🟡 Unknown', transitionDescription: 'No route coordinates', rushHourActive: false, source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30, googleMapsUrl: null };
+    return { travelMinutes: isFirstStop ? 10 : 20, freeFlowMinutes: isFirstStop ? 10 : 20, trafficDelayMinutes: 0, etaBreakdown: `${isFirstStop ? 10 : 20}m (estimated)`, distanceKm: null, congestionFactor: 1.0, trafficLevel: 'Unknown', trafficRisk: 'Unknown', fromTrafficLevel: 'Unknown', toTrafficLevel: 'Unknown', trafficTransition: '🟡 Unknown', transitionDescription: 'No route coordinates', rushHourActive: false, source: 'estimated', label: 'Travel time estimated (no coordinates)', confidence: 30, googleMapsUrl: null, isGhatRoad: isGhat, ghatNightAdvisory: null };
   }
   const straightKm = distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
-  const roadKm = straightKm * ROAD_NETWORK_FACTOR;
-  // Realistic Indian urban driving speed: 0.32 km/min (~19.2 km/h base speed before traffic multipliers)
-  // Distance-scaled minimum floor: adjacent spots (<0.5km) take 1-2 mins, not an arbitrary 10-min flat penalty
+  const roadKm = straightKm * roadNetworkFactor;
+  // Realistic Indian driving speed: 0.32 km/min (~19.2 km/h base speed urban) vs 0.22 km/min on mountain ghats
   const minMinutes = isFirstStop ? Math.max(2, Math.min(8, Math.round(roadKm * 2.5))) : Math.max(1, Math.min(4, Math.round(roadKm * 2.0)));
-  const baseMinutes = Math.max(minMinutes, Math.min(120, Math.round(roadKm / 0.32)));
-  const mult = getTrafficMultiplier(departMin);
+  const baseMinutes = Math.max(minMinutes, Math.min(180, Math.round(roadKm / baseSpeedKmPerMin)));
+  const mult = effectiveCity ? getCityTrafficMultiplier(effectiveCity, departMin) : getTrafficMultiplier(departMin);
   const travelMinutes = Math.max(1, Math.round(baseMinutes * mult));
   const level = trafficLevelFromMult(mult);
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&travelmode=driving`;
-  const transitRecommendation = recommendTransitMode(roadKm, { congestionFactor: mult });
+  const transitRecommendation = recommendTransitMode(roadKm, { congestionFactor: mult, isGhat });
   const transition = evaluateTrafficTransition(fromCoords, toCoords, departMin, mult);
   const freeFlowMinutes = baseMinutes;
   const trafficDelayMinutes = Math.max(0, travelMinutes - freeFlowMinutes);
@@ -193,9 +247,11 @@ function estimateTravel(opts = {}) {
     rushLabel,
     transitRecommendation,
     source: 'estimated',
-    label: `${level.label} (traffic-aware road network)`,
+    label: isGhat ? `${level.label} (mountain ghat winding pass)` : `${level.label} (traffic-aware road network)`,
     confidence: 70,
     googleMapsUrl,
+    isGhatRoad: isGhat,
+    ghatNightAdvisory,
   };
 }
 function recommendArrivalWindow(opts = {}) {
@@ -231,7 +287,10 @@ async function estimateTravelAsync(opts = {}) {
 }
 
 module.exports = {
+  CITY_CONGESTION_BIAS,
   getTrafficMultiplier,
+  getCityTrafficMultiplier,
+  isGhatRoadCorridor,
   trafficLevelFromMult,
   recommendTransitMode,
   evaluateTrafficTransition,

@@ -125,6 +125,43 @@ const CULTURAL_RITUAL_DATA = {
       { name: 'Queen\'s Necklace Night Illumination', start: '18:45', end: '23:30', type: 'illumination', note: 'Iconic golden arc curve of streetlights along the Arabian Sea' },
     ],
   },
+  siddhivinayak: {
+    name: 'Siddhivinayak Temple Prabhadevi',
+    aliases: ['siddhivinayak', 'siddhi vinayak'],
+    rituals: [
+      { name: 'Kakad Aarti', start: '05:30', end: '06:00', type: 'aarti', note: 'Early morning waking aarti for Lord Ganesha' },
+      { name: 'Sanctum Midday Naivedya Rest', start: '12:15', end: '13:15', type: 'closure', note: 'Brief sanctum closure for afternoon Maha Naivedya' },
+      { name: 'Sandhya Aarti', start: '19:00', end: '19:30', type: 'aarti', note: 'Evening deeparadhana' },
+      { name: 'Shejarati', start: '21:50', end: '22:15', type: 'night_ritual', note: 'Night sleep aarti before sanctum closes' },
+    ],
+    prasad: 'Modak and coconut laddoos',
+    dressCode: 'Modest dress code',
+  },
+  // Paderu & Alluri Agency
+  modakondamma: {
+    name: 'Sri Modakondamma Temple Paderu',
+    aliases: ['modakondamma', 'paderu temple'],
+    rituals: [
+      { name: 'Giri Pradakshina & Morning Puja', start: '06:00', end: '08:00', type: 'morning_ritual', note: 'Auspicious tribal hill mother goddess blessing' },
+      { name: 'Sanctum Afternoon Closure (Bhog)', start: '12:30', end: '15:30', type: 'closure', note: 'Sanctum closed for afternoon sacred offering' },
+      { name: 'Evening Deeparadhana & Mangala Harathi', start: '18:00', end: '19:30', type: 'aarti', note: 'Evening bell resonances across the Agency valley' },
+    ],
+    prasad: 'Modakondamma Bellam Appalu & Sweet Pongal',
+    dressCode: 'Modest traditional attire recommended',
+  },
+  // Chennai
+  kapaleeshwarar: {
+    name: 'Kapaleeshwarar Temple Mylapore',
+    aliases: ['kapaleeshwarar', 'mylapore temple', 'kapali'],
+    rituals: [
+      { name: 'Ko Puja & Ushakkala Puja', start: '06:00', end: '07:30', type: 'morning_ritual', note: 'Traditional Vedic chanting and sacred cow worship at sunrise' },
+      { name: 'Sanctum Afternoon Closure (Uchikala Naivedyam)', start: '12:30', end: '16:00', type: 'closure', note: 'Inner sanctum closed for midday rest & sacred rituals' },
+      { name: 'Sayaratchai & Sandhya Aarti', start: '17:30', end: '19:00', type: 'aarti', note: 'Dravidian nadaswaram music and camphor lamp offering' },
+      { name: 'Arthajama Puja', start: '21:00', end: '21:30', type: 'night_ritual', note: 'Final nighttime closing ceremony' },
+    ],
+    prasad: 'Mylapore temple puliyodarai (tamarind rice) & sakkarai pongal',
+    dressCode: 'Strict traditional attire (Dhoti/Shirt for men, Saree/Salwar for women)',
+  },
 };
 
 function matchCulturalEntry(place = {}) {
@@ -232,7 +269,9 @@ function getCulturalRitualIntel(place, arriveMin = 600, dow = new Date().getDay(
     activeRituals,
     upcomingRituals,
     isSanctumClosed,
+    isSanctumClosure: isSanctumClosed,
     sanctumClosureReason,
+    sanctumClosureWindow: '12:30–15:30',
     activeAarti,
     activeShow,
     culturalBadge,

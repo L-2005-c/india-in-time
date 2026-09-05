@@ -1,0 +1,33 @@
+{
+  "summary": {
+    "methodology": "Deterministic synthetic candidate-selection benchmark. v3.7 and v3.8 receive identical seeded candidates; an independent oracle utility measures ranking regret. This is not field validation or real-user evidence.",
+    "scenarios": 1000,
+    "candidatesPerScenario": 8,
+    "seed": 20260816,
+    "lowerRegretWinRateV38Pct": 25.2,
+    "lowerRegretWinRateV37Pct": 4.1000000000000005,
+    "tiesPct": 70.7,
+    "meanRegret": {
+      "v37": 1.037236174501851,
+      "v38": 0.08441016750717545
+    },
+    "medianRegret": {
+      "v37": 0,
+      "v38": 0
+    },
+    "medianRobustness": {
+      "v37": 71,
+      "v38": 67
+    },
+    "meanTimingError": {
+      "v37": 21.97445665281266,
+      "v38": 21.21521437395364
+    },
+    "meanRouteCost": {
+      "v37": 32.61458516489714,
+      "v38": 27.660367355830967
+    },
+    "opportunityAwareCases": 999,
+    "opportunityRecoveredRatePct": 55.75575575575576
+  }
+}
