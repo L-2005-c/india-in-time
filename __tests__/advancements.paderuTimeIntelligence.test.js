@@ -11,7 +11,7 @@
 const { getCitySeeds, resolveCityKey } = require('../data/city-seeds');
 const { GOLDEN_BENCHMARK_POIS } = require('../data/goldenPoiDataset');
 const { isWhitelistedTourismPoi } = require('../services/travelIntelligence/tourismPoi/tourismWhitelist');
-const { getCityTrafficMultiplier, isGhatRoadCorridor, estimateTravel, recommendTransitMode } = require('../services/travelIntelligence/trafficEngine');
+const { getCityTrafficMultiplier, isGhatRoadCorridor, estimateTravel } = require('../services/travelIntelligence/trafficEngine');
 const { getCulturalRitualIntel } = require('../services/travelIntelligence/culturalRitualEngine');
 const { getTravelIntelligence } = require('../services/travelIntelligence/decisionEngine');
 const { planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');

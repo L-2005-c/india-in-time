@@ -3,7 +3,7 @@
 // temple sanctum closures (afternoon Naivedyam), light & sound shows, and weekend palace illuminations.
 'use strict';
 
-const { t2m } = require('./timeEngine');
+const { t2m, getISTParts } = require('./timeEngine');
 
 const CULTURAL_RITUAL_DATA = {
   // Visakhapatnam & AP
@@ -252,8 +252,9 @@ function getCulturalRitualIntel(place, arriveMin = 600, dow = new Date().getDay(
   let min = arriveMin;
   let dayOfWeek = dow;
   if (arriveMin instanceof Date) {
-    min = arriveMin.getHours() * 60 + arriveMin.getMinutes();
-    dayOfWeek = arriveMin.getDay();
+    const ist = getISTParts(arriveMin);
+    min = ist.minutesOfDay;
+    dayOfWeek = ist.dayIndex;
   }
 
   const activeRituals = [];
