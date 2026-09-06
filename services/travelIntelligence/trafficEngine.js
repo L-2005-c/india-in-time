@@ -121,8 +121,8 @@ function recommendTransitMode(distanceKm, opts = {}) {
   if (options.isGhat) {
     const cabFare = Math.min(650, Math.max(90, Math.round(70 + km * 18)));
     return {
-      mode: 'cab_4x4',
-      recommendedMode: 'cab_4x4',
+      mode: 'ghat_cab',
+      recommendedMode: 'ghat_cab',
       label: 'Mountain Cab / 4x4',
       modeLabel: 'Mountain Cab / 4x4',
       icon: '🚙',

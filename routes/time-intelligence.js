@@ -312,7 +312,7 @@ router.post('/circuit-plan', async (req, res) => {
       circuitId, region, city, numDays, days, fromCoords, startDate, pacing, pace, personas, tripMode, weather,
     } = req.body || {};
 
-    let targetCircuit = String(circuitId || region || city || 'vizag_araku_lambasingi').toLowerCase();
+    const targetCircuit = String(circuitId || region || city || 'vizag_araku_lambasingi').toLowerCase();
     let seedKey = 'paderu';
     let defaultId = 'vizag_araku_lambasingi';
 
