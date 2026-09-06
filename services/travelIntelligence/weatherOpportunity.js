@@ -12,13 +12,27 @@ const { m2t } = require('./timeEngine');
  * Evaluates an hourly weather data point and assigns a window classification.
  */
 function classifyWeatherWindow(hourlyData = {}) {
+  const hasTemp = hourlyData.tempC != null && Number.isFinite(Number(hourlyData.tempC));
+  const hasRain = (hourlyData.precipitationProbability != null || hourlyData.rainProb != null);
+  const hasCondition = Boolean(hourlyData.condition);
+
+  if (!hasTemp && !hasRain && !hasCondition) {
+    return {
+      tier: 'UNKNOWN',
+      label: 'Weather Unavailable',
+      icon: '⚪',
+      outdoorSuitability: 50,
+      recommendation: 'Weather data unavailable; check local conditions',
+    };
+  }
+
   const rainProb = Number(hourlyData.precipitationProbability ?? hourlyData.rainProb ?? 0);
-  const tempC = Number(hourlyData.tempC ?? 28);
+  const tempC = hasTemp ? Number(hourlyData.tempC) : null;
   const condition = String(hourlyData.condition || '').toLowerCase();
   const visibilityKm = Number(hourlyData.visibilityKm ?? 10);
   const cloudCover = Number(hourlyData.cloudCover ?? 30);
 
-  if (/thunderstorm|heavy rain|squall|cyclone/i.test(condition) || rainProb >= 70 || tempC >= 41) {
+  if (/thunderstorm|heavy rain|squall|cyclone/i.test(condition) || rainProb >= 70 || (tempC != null && tempC >= 41)) {
     return {
       tier: 'BAD',
       label: 'Adverse Window',
@@ -28,7 +42,7 @@ function classifyWeatherWindow(hourlyData = {}) {
     };
   }
 
-  if (rainProb >= 45 || tempC >= 37) {
+  if (rainProb >= 45 || (tempC != null && tempC >= 37)) {
     return {
       tier: 'NEUTRAL',
       label: 'Marginal Window',
@@ -38,7 +52,7 @@ function classifyWeatherWindow(hourlyData = {}) {
     };
   }
 
-  if (rainProb <= 20 && tempC >= 21 && tempC <= 31 && visibilityKm >= 8 && cloudCover <= 60) {
+  if (tempC != null && rainProb <= 20 && tempC >= 21 && tempC <= 31 && visibilityKm >= 8 && cloudCover <= 60) {
     return {
       tier: 'EXCELLENT',
       label: 'Excellent Outdoor Window',

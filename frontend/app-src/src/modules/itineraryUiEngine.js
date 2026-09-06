@@ -133,6 +133,11 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
         ? 'Tirupati Pilgrimage Expressway'
         : (transitNext?.mode === 'walk' ? 'Walk to next stop' : (transitNext?.isGhatRoad ? 'Highland Ghat Transit' : 'Drive via scenic corridor')));
 
+  const isLiveTraffic = transitNext?.provenance === 'LIVE_TRAFFIC' || transitNext?.source === 'live_traffic';
+  const trafficBadgeText = isLiveTraffic
+    ? (transitNext.traffic === 'slow' ? '🔴 Live: Slow' : '🟢 Live: Smooth Flow')
+    : (transitNext?.traffic === 'slow' ? '🟠 Estimated Slowdown' : '🟢 Traffic: Normal');
+
   const transitHtml = transitNext
     ? `
     <div class="transit-connector-card">
@@ -140,12 +145,15 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
       <span>${transitModeLabel}</span>
       <span class="transit-duration">${transitNext.duration || '12m'}</span>
       <span class="transit-traffic-badge ${transitNext.traffic === 'slow' ? 'traffic-slow' : 'traffic-clear'}">
-        ${transitNext.traffic === 'slow' ? '🔴 Heavy Traffic' : '🟢 Smooth Flow'}
+        ${trafficBadgeText}
       </span>
       ${transitGhatHtml}
     </div>
   `
     : '';
+
+  const isLiveCrowd = Boolean(stop?.crowd?.isLive || stop?.crowd?.source === 'live_sensors');
+  const crowdMeterTitle = isLiveCrowd ? 'Live Crowd' : (stop?.crowd?.method === 'HISTORICAL_PATTERN' ? 'Historical Pattern' : 'Predicted Crowd');
 
   return `
     <div class="faang-stop-card" id="stop-card-${index}" data-stop-idx="${index}" data-action="highlightStopOnMap">
@@ -160,7 +168,7 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
       </div>
 
       <div class="stop-intel-bar">
-        <span class="stop-intel-chip ${crowd.class}" title="Real-time predictive crowd estimate">👥 ${crowd.label}</span>
+        <span class="stop-intel-chip ${crowd.class}" title="Predictive crowd density">👥 ${crowd.label}</span>
         ${cloudInversionHtml}
         ${sanctumAlertHtml}
         ${darshanQueueHtml}
@@ -174,7 +182,7 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
       ${whyNowHtml}
 
       <div class="stop-crowd-meter">
-        <span class="crowd-meter-label">Live Crowd</span>
+        <span class="crowd-meter-label">${crowdMeterTitle}</span>
         <div class="crowd-meter-track">
           <div class="crowd-meter-fill ${crowd.fillClass}" style="width: ${crowd.percent}%;"></div>
         </div>

@@ -73,14 +73,18 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
       maneuver: s.maneuver || 'continue',
     }));
 
+    const hasLive = Boolean(leg.duration_in_traffic?.value);
     return {
       provider: 'google',
+      routeType: hasLive ? 'LIVE_TRAFFIC_ROUTE' : 'ROAD_NETWORK_ESTIMATE',
+      provenance: hasLive ? 'LIVE_TRAFFIC' : 'ROAD_NETWORK_ESTIMATE',
       distanceMeters: distanceM,
       durationSeconds: durationSec,
       durationInTrafficSeconds: durationInTrafficSec,
-      hasRealtimeTraffic: !!leg.duration_in_traffic?.value,
+      hasRealtimeTraffic: hasLive,
       summary: body.routes[0].summary || 'Fastest route',
       steps,
+      confidenceLevel: 'HIGH',
       confidenceScore: 92,
     };
   } catch (_e) {
@@ -99,12 +103,13 @@ function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
 
   return {
     provider: 'geodesic_heuristic',
+    routeType: 'GEODESIC_HEURISTIC_ESTIMATE',
+    provenance: 'GEODESIC_HEURISTIC_ESTIMATE',
     isRoadNetworkTruth: false,
     distanceMeters: metrics.distanceMeters,
     durationSeconds: metrics.totalEstimatedSec,
     durationInTrafficSeconds: null,
     hasRealtimeTraffic: false,
-    provenance: 'GEODESIC_HEURISTIC_ESTIMATE',
     geometry: [fromCoords, toCoords],
     summary: `Estimated travel time (${metrics.corridor.description})`,
     steps: [{
@@ -113,7 +118,8 @@ function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
       durationSec: metrics.totalEstimatedSec,
       maneuver: 'depart',
     }],
-    confidenceScore: 72,
+    confidenceLevel: 'LOW',
+    confidenceScore: 65,
     corridorType: metrics.corridor.corridorType,
     bottleneckDelayMinutes: metrics.bottleneck.delayMinutes,
     limitations: 'Calculated using terrain-calibrated road winding factor without road-network topology verification.',
@@ -225,6 +231,16 @@ async function calculateRoute(origin, destination, opts = {}) {
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${from[0]},${from[1]}&destination=${to[0]},${to[1]}&travelmode=${mode === 'walking' ? 'walking' : mode === 'transit' ? 'transit' : 'driving'}`;
 
+  const isFallback = rawRoute.provider === 'geodesic_heuristic';
+  const routeType = rawRoute.routeType || (
+    rawRoute.provider === 'google' && rawRoute.hasRealtimeTraffic
+      ? 'LIVE_TRAFFIC_ROUTE'
+      : (rawRoute.provider === 'osrm' ? 'ROAD_NETWORK_ESTIMATE' : 'GEODESIC_HEURISTIC_ESTIMATE')
+  );
+  const fallbackReason = isFallback
+    ? (isLiveDisabled ? 'Live routing explicitly disabled by configuration' : 'Live and road-network providers (Google, OSRM) unavailable or timed out')
+    : null;
+
   const canonicalResponse = {
     success: true,
     origin: { lat: from[0], lon: from[1], name: opts.originName || 'Origin', id: opts.originId || null },
@@ -236,9 +252,12 @@ async function calculateRoute(origin, destination, opts = {}) {
     arrivalAt: projectedArrival,
     travelMode: mode,
     provider: rawRoute.provider,
+    routeType,
+    fallbackReason,
+    dataFreshness: new Date().toISOString(),
     trafficStatus: trafficMeta.status,
     provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
-    fallback: rawRoute.provider === 'geodesic_heuristic',
+    fallback: isFallback,
     timestamp: new Date().toISOString(),
     distance: {
       meters: rawRoute.distanceMeters,
@@ -269,8 +288,9 @@ async function calculateRoute(origin, destination, opts = {}) {
     },
     confidence: {
       score: rawRoute.confidenceScore,
-      level: rawRoute.confidenceScore >= 85 ? 'HIGH' : (rawRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW'),
+      level: rawRoute.confidenceLevel || (rawRoute.confidenceScore >= 85 ? 'HIGH' : (rawRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW')),
       source: rawRoute.provider,
+      routeType,
       isRoadNetworkTruth: rawRoute.isRoadNetworkTruth !== false,
       provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
       limitations: rawRoute.limitations || null,

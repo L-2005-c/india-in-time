@@ -654,6 +654,7 @@ function stateQuality(state, requirements) {
   const remaining = Math.max(0, requirements.hard.endMin - state.cursor);
   const crowdPenalty = state.stops.reduce((sum, s) => sum + (['High', 'Very High'].includes(s.crowdLevel) ? 6 : 0), 0);
   return state.score
+    + state.stops.length * 18
     + meals * 90
     + (required.length ? (meals / required.length) * 80 : 0)
     + prefMet * 45
@@ -958,6 +959,7 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   const groupEvaluation = groupProfile ? evaluateGroupSatisfaction(finalizedStops, groupProfile) : null;
 
   const result = {
+    success: true,
     generatedAt: new Date().toISOString(),
     referenceTime: now.toISOString(),
     algorithm: 'geo-temporal-beam-search-v5-world-class',

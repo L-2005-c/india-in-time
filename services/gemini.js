@@ -336,19 +336,34 @@ async function callGemini(parts, opts = {}) {
 }
 
 /**
- * Simple text prompt helper.
+ * Sanitizes user-provided text inputs before feeding into AI prompts.
+ * Defends against prompt injection, control character abuse, and boundary escape.
+ */
+function sanitizeAiInput(input, maxLength = 4000) {
+  if (typeof input !== 'string') return '';
+  return input
+    .slice(0, maxLength)
+    .replace(/<system>[\s\S]*?<\/system>/gi, '')
+    .replace(/\b(ignore previous instructions|ignore all previous instructions|disregard previous instructions)\b/gi, '[FILTERED]')
+    .trim();
+}
+
+/**
+ * Simple text prompt helper with injection sanitization.
  */
 async function callGeminiText(prompt, opts = {}) {
-  return callGemini([{ text: prompt }], opts);
+  const cleanPrompt = opts.rawPrompt ? prompt : sanitizeAiInput(prompt);
+  return callGemini([{ text: cleanPrompt }], opts);
 }
 
 /**
  * Image + text prompt helper (for lens, food safety, AR overlay, etc.)
  */
 async function callGeminiVision(imageBase64, imageType, textPrompt, opts = {}) {
+  const cleanPrompt = opts.rawPrompt ? textPrompt : sanitizeAiInput(textPrompt);
   const parts = [
     { inline_data: { mime_type: imageType || 'image/jpeg', data: imageBase64 } },
-    { text: textPrompt },
+    { text: cleanPrompt },
   ];
   return callGemini(parts, { timeoutMs: config.gemini.imageTimeoutMs, ...opts });
 }
@@ -383,6 +398,7 @@ module.exports = {
   callGemini,
   callGeminiText,
   callGeminiVision,
+  sanitizeAiInput,
   getStats,
   resetCircuit,
 };

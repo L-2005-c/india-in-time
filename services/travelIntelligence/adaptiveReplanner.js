@@ -75,8 +75,106 @@ function computeReplanningDiff(previousStops = [], newStops = [], reason = '') {
     hasChanges: changeSummaries.length > 0,
     changes: changeSummaries,
     previousStopCount: previousStops.length,
-    updatedStopCount: newStops.length,
     reason: reason || 'Itinerary dynamically optimized around live conditions & travel pacing',
+  };
+}
+
+const { m2t, t2m } = require('./timeEngine');
+
+/**
+ * Re-evaluates only remaining unvisited stops when conditions change,
+ * strictly preserving completed stop history.
+ *
+ * @param {Object} params
+ * @returns {Object} Replanned itinerary with delta & plain-language explanation
+ */
+function replanRemainingItinerary(params = {}) {
+  const {
+    stops = [],
+    completedStopKeys = [],
+    currentMinute = null,
+    closedPlaceKeys = [],
+    weatherUpdate = null,
+    transitDelayMinutes = 0,
+    reason = 'Environmental conditions changed',
+  } = params;
+
+  const completedKeysSet = new Set(completedStopKeys.map(k => String(k).toLowerCase()));
+  const closedKeysSet = new Set(closedPlaceKeys.map(k => String(k).toLowerCase()));
+
+  const completedStops = [];
+  const remainingStops = [];
+
+  for (const s of stops) {
+    const key = String(s.key || s.id || s.name || '').toLowerCase();
+    const isCompleted = completedKeysSet.has(key) || (currentMinute != null && s.leaveAt && t2m(s.leaveAt) <= currentMinute);
+    if (isCompleted) {
+      completedStops.push({ ...s, isCompleted: true });
+    } else {
+      remainingStops.push({ ...s, isCompleted: false });
+    }
+  }
+
+  // Adjust remaining stops
+  const adjustedRemaining = [];
+  const droppedStops = [];
+  let cursorMin = currentMinute != null
+    ? currentMinute + transitDelayMinutes
+    : (completedStops.length && completedStops[completedStops.length - 1].leaveAt
+      ? t2m(completedStops[completedStops.length - 1].leaveAt) + transitDelayMinutes
+      : 540);
+
+  for (const s of remainingStops) {
+    const key = String(s.key || s.id || s.name || '').toLowerCase();
+    // Check closure
+    if (closedKeysSet.has(key)) {
+      droppedStops.push({ stop: s, reason: 'Reported closed by authority' });
+      continue;
+    }
+
+    // Check weather suitability for outdoor stops
+    const isOutdoor = s.category === 'beach' || s.category === 'scenic' || s.category === 'waterfall';
+    if (isOutdoor && weatherUpdate && /heavy rain|storm|cyclone/i.test(weatherUpdate.condition || '')) {
+      droppedStops.push({ stop: s, reason: `Unsuitable due to ${weatherUpdate.condition || 'severe weather'}` });
+      continue;
+    }
+
+    // Recompute arrival time
+    const travelMin = Math.max(5, Number(s.travelMinutes || 15));
+    const arriveMin = cursorMin + travelMin;
+    const stayMin = Number(s.stayMinutes || 60);
+    const leaveMin = arriveMin + stayMin;
+
+    adjustedRemaining.push({
+      ...s,
+      arriveAt: m2t(arriveMin),
+      leaveAt: m2t(leaveMin),
+      departAt: m2t(cursorMin),
+      travelMinutes: travelMin,
+      recalculated: true,
+    });
+
+    cursorMin = leaveMin;
+  }
+
+  const newStops = [...completedStops, ...adjustedRemaining];
+  const diff = computeReplanningDiff(stops, newStops, reason);
+
+  const plainExplanation = droppedStops.length > 0
+    ? `Your plan changed because ${droppedStops.map(d => `${d.stop.name} (${d.reason})`).join(', ')}. Remaining stops have been rescheduled without altering your completed visits.`
+    : (transitDelayMinutes > 0
+      ? `Your plan changed because transit delays added ${transitDelayMinutes} mins. Remaining stops were shifted smoothly.`
+      : `Your plan was re-optimized around live conditions.`);
+
+  return {
+    success: true,
+    stops: newStops,
+    completedStopsCount: completedStops.length,
+    remainingStopsCount: adjustedRemaining.length,
+    droppedCount: droppedStops.length,
+    droppedStops,
+    diff,
+    explanation: plainExplanation,
   };
 }
 
@@ -84,4 +182,5 @@ module.exports = {
   REPLAN_THRESHOLDS,
   shouldTriggerReplan,
   computeReplanningDiff,
+  replanRemainingItinerary,
 };

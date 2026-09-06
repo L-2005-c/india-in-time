@@ -11,27 +11,50 @@ const { isValidCoordPair } = require('../../routing/coordinateValidator');
 
 const VERIFICATION_STATUSES = Object.freeze({
   UNVERIFIED: 'UNVERIFIED',
+  CANDIDATE: 'CANDIDATE',
   AUTO_VALIDATED: 'AUTO_VALIDATED',
   PROVIDER_VERIFIED: 'PROVIDER_VERIFIED',
   HUMAN_VERIFIED: 'HUMAN_VERIFIED',
-  VERIFIED: 'VERIFIED',
   QUARANTINED: 'QUARANTINED',
   REJECTED: 'REJECTED',
-  INVALID_COORDINATES: 'INVALID_COORDINATES',
+  // Backwards compatibility mappings
+  VERIFIED: 'VERIFIED',
+  INVALID_COORDINATES: 'REJECTED',
 });
 
 const COORDINATE_SOURCES = Object.freeze({
   UNKNOWN: 'UNKNOWN',
   PROVIDER: 'PROVIDER',
-  CURATED: 'CURATED',
+  CURATED_REFERENCE: 'CURATED_REFERENCE',
+  CROSS_PROVIDER_CONSENSUS: 'CROSS_PROVIDER_CONSENSUS',
   HUMAN_VERIFIED: 'HUMAN_VERIFIED',
   USER_SUBMITTED: 'USER_SUBMITTED',
+  // Backwards compatibility mappings
   AUTHORITATIVE_SURVEY: 'AUTHORITATIVE_SURVEY',
-  CURATED_BENCHMARK: 'CURATED_BENCHMARK',
+  CURATED_BENCHMARK: 'AUTHORITATIVE_SURVEY',
   CURATED_WHITELIST: 'CURATED_WHITELIST',
-  HIGH_CONFIDENCE_GEOCODER: 'HIGH_CONFIDENCE_GEOCODER',
-  HEURISTIC_FALLBACK: 'HEURISTIC_FALLBACK',
+  HIGH_CONFIDENCE_GEOCODER: 'PROVIDER',
+  HEURISTIC_FALLBACK: 'UNKNOWN',
+  CURATED: 'CURATED_REFERENCE',
 });
+
+/**
+ * Normalizes coordinate source to standard Phase 1 taxonomy.
+ */
+function normalizeCoordinateSource(src) {
+  if (!src) return COORDINATE_SOURCES.UNKNOWN;
+  const upper = String(src).toUpperCase();
+  return COORDINATE_SOURCES[upper] || COORDINATE_SOURCES.UNKNOWN;
+}
+
+/**
+ * Normalizes verification status to standard Phase 1 taxonomy.
+ */
+function normalizeVerificationStatus(status) {
+  if (!status) return VERIFICATION_STATUSES.UNVERIFIED;
+  const upper = String(status).toUpperCase();
+  return VERIFICATION_STATUSES[upper] || VERIFICATION_STATUSES.UNVERIFIED;
+}
 
 /**
  * Creates a Canonical Tourist Place record without dangerous auto-verified defaults.
@@ -41,21 +64,31 @@ const COORDINATE_SOURCES = Object.freeze({
  */
 function createCanonicalPlace({
   id,
+  canonicalPlaceId,
   canonicalName,
   displayName,
   aliases = [],
+  entityType = 'tourist_attraction',
   category = 'scenic',
   latitude,
   longitude,
   address = null,
   city = 'Unknown',
+  district = '',
   state = 'Unknown',
   country = 'India',
+  providerIds = {},
+  source = 'unknown',
+  sourceType = 'REFERENCE',
   tourismStatus = 'UNVERIFIED',
   coordinateSource = 'UNKNOWN',
   nameSource = 'UNKNOWN',
   verificationStatus = 'UNVERIFIED',
+  verificationMethod = 'HEURISTIC_CHECK',
+  verificationTimestamp = new Date().toISOString(),
   confidence = null,
+  evidence = [],
+  lastValidatedAt = new Date().toISOString(),
   openingHours = null,
   visitMinutes = 60,
   importance = 'moderate',
@@ -75,22 +108,33 @@ function createCanonicalPlace({
     ? [...new Set(aliases.map(a => String(a || '').trim()).filter(Boolean))]
     : [];
 
+  const normCoordSource = normalizeCoordinateSource(coordinateSource);
+  let normVerificationStatus = normalizeVerificationStatus(verificationStatus);
+  if (!validCoords) {
+    normVerificationStatus = VERIFICATION_STATUSES.REJECTED;
+  }
+
+  const cleanDistrict = String(district || (address && address.district) || '').trim();
+  const placeId = canonicalPlaceId || id || generateDeterministicPlaceId(city, cleanCanonicalName);
+
   const qualityScore = calculatePlaceDataQuality({
     canonicalName: cleanCanonicalName,
     latitude: lat,
     longitude: lon,
     category,
     city,
-    coordinateSource,
-    verificationStatus,
+    coordinateSource: normCoordSource,
+    verificationStatus: normVerificationStatus,
     updatedAt,
   });
 
   return {
-    id: id || generateDeterministicPlaceId(city, cleanCanonicalName),
+    id: placeId,
+    canonicalPlaceId: placeId,
     canonicalName: cleanCanonicalName,
     displayName: cleanDisplayName,
     aliases: normalizedAliases,
+    entityType: String(entityType || 'tourist_attraction'),
     category,
     latitude: validCoords ? Math.round(lat * 1e6) / 1e6 : null,
     longitude: validCoords ? Math.round(lon * 1e6) / 1e6 : null,
@@ -98,24 +142,32 @@ function createCanonicalPlace({
     address: address && typeof address === 'object' ? {
       area: address.area || '',
       city: address.city || city,
-      district: address.district || '',
+      district: cleanDistrict,
       state: address.state || state,
       country: address.country || country,
     } : {
       area: '',
       city,
-      district: '',
+      district: cleanDistrict,
       state,
       country,
     },
     city,
+    district: cleanDistrict,
     state,
     country,
+    providerIds: typeof providerIds === 'object' && providerIds !== null ? { ...providerIds } : {},
+    source: String(source || 'unknown'),
+    sourceType: String(sourceType || 'REFERENCE'),
     tourismStatus,
-    coordinateSource,
+    coordinateSource: normCoordSource,
     nameSource,
-    verificationStatus: !validCoords ? 'INVALID_COORDINATES' : verificationStatus,
-    confidence: !validCoords ? 0 : confidence,
+    verificationStatus: normVerificationStatus,
+    verificationMethod: String(verificationMethod || 'HEURISTIC_CHECK'),
+    verificationTimestamp: verificationTimestamp || new Date().toISOString(),
+    confidence: validCoords ? (typeof confidence === 'string' ? confidence : (confidence != null ? (confidence >= 80 ? 'HIGH' : confidence >= 50 ? 'MEDIUM' : 'LOW') : null)) : null,
+    evidence: Array.isArray(evidence) ? [...evidence] : (evidence ? [evidence] : []),
+    lastValidatedAt: lastValidatedAt || updatedAt || new Date().toISOString(),
     qualityScore,
     openingHours: openingHours || { openTime: '06:00', closeTime: '20:00' },
     visitMinutes: Number(visitMinutes) || 60,

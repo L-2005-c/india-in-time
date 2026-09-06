@@ -12,36 +12,54 @@ const CROWD_LABELS = [
 function computeEstimatedQueueMinutes(place = {}, crowdLevel = 'Moderate', isWeekend = false) {
   const cat = String(place.cat || place.category || 'default').toLowerCase();
   const baseQueue = {
-    temple: 12,
-    monument: 10,
-    fort: 10,
-    museum: 8,
-    food: 8,
+    temple: 25,
+    monument: 15,
+    fort: 15,
+    museum: 10,
+    food: 10,
     cafe: 5,
-    viewpoint: 4,
+    viewpoint: 5,
     beach: 0,
     park: 2,
-    default: 4,
-  }[cat] ?? 4;
+    default: 5,
+  }[cat] ?? 5;
 
   const crowdMult = {
-    'Very Low': 0.2,
-    Low: 0.5,
+    'Very Low': 0.3,
+    Low: 0.6,
     Moderate: 1.0,
-    High: 2.0,
-    'Very High': 3.2,
+    High: 2.2,
+    'Very High': 3.5,
   }[crowdLevel] || 1.0;
 
-  const weekendMult = isWeekend ? 1.25 : 1.0;
-  const rawWait = Math.round(baseQueue * crowdMult * weekendMult);
+  const weekendMult = isWeekend ? 1.3 : 1.0;
+  const nominalWait = Math.round(baseQueue * crowdMult * weekendMult);
+
+  let minWait = nominalWait;
+  let maxWait = nominalWait;
+  let rangeLabel = 'Direct Entry (No Wait)';
   let descriptor = 'Direct Entry (No Wait)';
-  if (rawWait >= 25) descriptor = `~${rawWait}m Heavy Darshan/Entry Queue`;
-  else if (rawWait >= 12) descriptor = `~${rawWait}m Entry/Security Queue`;
-  else if (rawWait >= 5) descriptor = `~${rawWait}m Short Queue`;
+
+  if (nominalWait > 0) {
+    minWait = Math.max(0, Math.round(nominalWait * 0.75));
+    maxWait = Math.round(nominalWait * 1.35);
+    rangeLabel = `${minWait}–${maxWait} min`;
+    if (nominalWait >= 25) {
+      descriptor = `~${rangeLabel} Heavy Darshan/Entry Queue`;
+    } else if (nominalWait >= 12) {
+      descriptor = `~${rangeLabel} Entry / Security Queue`;
+    } else {
+      descriptor = `~${rangeLabel} Short Line`;
+    }
+  }
 
   return {
-    estimatedQueueMinutes: rawWait,
+    estimatedQueueMinutes: nominalWait,
+    estimatedWaitRange: rangeLabel,
+    minWaitMinutes: minWait,
+    maxWaitMinutes: maxWait,
     queueDescriptor: descriptor,
+    isModelEstimate: true,
   };
 }
 
@@ -70,13 +88,14 @@ function computeCrowd(ctx = {}) {
       factors.push(`festival:${festivalInfo.festivals.map(f => f.id).join('+')}`);
     }
   } catch (_e) { festivalInfo = null; }
-  let source = 'estimated', confidenceBoost = 0;
+  let source = 'estimated', method = 'RULE_BASED_ESTIMATE', confidence = 'LOW';
   if (historicalObservations && Number.isFinite(historicalObservations.avgScore)) {
     const hist = historicalObservations.avgScore, samples = historicalObservations.sampleSize || 0;
     const blend = samples >= 20 ? 0.6 : samples >= 5 ? 0.4 : 0.2;
     rawScore = rawScore * (1 - blend) + hist * blend;
     source = samples >= 10 ? 'predicted' : 'estimated';
-    confidenceBoost = Math.min(15, Math.floor(samples / 2));
+    method = samples >= 10 ? 'HISTORICAL_PATTERN' : 'RULE_BASED_ESTIMATE';
+    confidence = samples >= 20 ? 'HIGH' : (samples >= 5 ? 'MEDIUM' : 'LOW');
     factors.push(`historicalSamples:${samples}`);
   }
   const band = CROWD_LABELS.find((b) => rawScore < b.max) || CROWD_LABELS[CROWD_LABELS.length - 1];
@@ -108,12 +127,14 @@ function computeCrowd(ctx = {}) {
     isPeakWindow,
     bestOffPeakWindow,
     estimatedQueueMinutes: queueInfo.estimatedQueueMinutes,
+    estimatedWaitRange: queueInfo.estimatedWaitRange,
     queueDescriptor: queueInfo.queueDescriptor,
     source,
-    confidenceBoost,
+    method,
+    confidence,
     factors,
     festivals: festivalInfo?.festivals || [],
-    reason: `${band.level} crowd expected (${parts.length ? parts.join(' + ') : 'typical patterns'}). Source: ${source === 'predicted' ? 'predicted' : 'rule-based estimate'}.`,
+    reason: `${band.level} crowd expected (${parts.length ? parts.join(' + ') : 'typical patterns'}). Method: ${method.replace(/_/g, ' ').toLowerCase()}.`,
   };
 }
 

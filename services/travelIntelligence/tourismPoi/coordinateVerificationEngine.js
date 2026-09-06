@@ -270,7 +270,9 @@ function verifyAttractionCoordinates(params = {}) {
 
   const verified = !conflict && !rejectionReason && !quarantineReason;
   const verificationStatus = verified ? 'AUTO_VALIDATED' : (conflict || quarantineReason ? 'QUARANTINED' : 'REJECTED');
-  const confidence = verified ? (distanceFromCandidateMeters != null && distanceFromCandidateMeters < 300 ? 95 : 85) : 30;
+  const confidence = verified
+    ? (distanceFromCandidateMeters != null && distanceFromCandidateMeters < 300 ? 'HIGH' : 'MEDIUM')
+    : (conflict ? 'LOW' : null);
 
   return {
     verified,
@@ -279,6 +281,7 @@ function verifyAttractionCoordinates(params = {}) {
     canonicalCoordinates: [integrity.lat, integrity.lon],
     source: provider,
     evidence,
+    evidenceCount: evidence.length,
     distanceFromCandidateMeters,
     candidateScores,
     conflict,

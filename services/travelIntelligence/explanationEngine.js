@@ -76,9 +76,99 @@ function buildStatusLabel(intel = {}) {
   if (visitLabel === 'Exceptional' || visitLabel === 'Excellent') return `${visitLabel} time to visit`;
   if (scenic?.scenicTypes?.includes('sunset') && scenic.bestScenicWindow) return 'Great sunset spot — golden hour approaching';
   if (scenic?.scenicTypes?.includes('sunrise') && scenic.bestScenicWindow) return 'Excellent sunrise window';
-  if (weather?.warnings?.length) return weather.warnings[0];
   if (crowd?.level === 'Very High' || crowd?.level === 'High') return `Open — ${crowd.level} crowd expected`;
   return opening?.label || 'Good time to visit';
 }
-module.exports = { buildExplanation, buildStatusLabel };
+
+/**
+ * Generates unified, plain-language "Why India In-Time Chose This Plan" reasoning.
+ * Answers:
+ * 1. WHAT is recommended?
+ * 2. WHEN?
+ * 3. WHY?
+ * 4. BASED ON WHAT?
+ * 5. HOW FRESH IS THE INFORMATION?
+ * 6. HOW CERTAIN IS IT?
+ */
+function buildWhyThisPlanExplanation({
+  placeName = 'This destination',
+  arrivalTime = '12:00',
+  _intel = {},
+  weather = null,
+  crowd = null,
+  traffic = null,
+  scenic = null,
+  cultural = null,
+  safety = null,
+} = {}) {
+  const reasons = [];
+
+  // 1. Weather evidence
+  if (weather && weather.suitability && weather.suitability !== 'Unknown') {
+    if (weather.suitability === 'Excellent' || weather.suitability === 'Good') {
+      const tempPart = weather.tempC != null ? ` (${weather.tempC}°C)` : '';
+      reasons.push(`🌦️ Weather is favourable${tempPart}`);
+    } else if (weather.indoorRecommended) {
+      reasons.push('🏛️ Indoor venue protects from external weather');
+    }
+  }
+
+  // 2. Crowd evidence
+  if (crowd && crowd.level && crowd.level !== 'UNKNOWN') {
+    if (['Very Low', 'Low'].includes(crowd.level)) {
+      const waitStr = crowd.estimatedWaitRange ? ` (${crowd.estimatedWaitRange} wait)` : '';
+      reasons.push(`👥 Low crowd expected${waitStr}`);
+    } else if (crowd.level === 'Moderate') {
+      reasons.push('👥 Typical moderate crowd pattern');
+    }
+  }
+
+  // 3. Traffic evidence
+  if (traffic) {
+    if (traffic.trafficLevel === 'Low' || traffic.trafficStatus === 'LOW' || traffic.trafficStatus === 'FREE_FLOW') {
+      reasons.push('🚗 Road traffic is light');
+    } else if (traffic.isGhatRoad) {
+      reasons.push('⛰️ Mountain ghat corridor scheduled during daylight visibility');
+    }
+  }
+
+  // 4. Scenic / Solar / Photography
+  if (scenic) {
+    if (scenic.isBestScenicWindow || (scenic.scenicTypes && scenic.scenicTypes.includes('sunset'))) {
+      reasons.push('🌅 Optimal natural light / golden hour alignment');
+    } else if (scenic.scenicTypes && scenic.scenicTypes.includes('sunrise')) {
+      reasons.push('🌄 Crisp morning sunrise visibility');
+    }
+  }
+
+  // 5. Cultural / Darshan
+  if (cultural) {
+    if (cultural.activeRitual) {
+      reasons.push(`🛕 Aligned with ${cultural.activeRitual.name || 'ritual'}`);
+    } else if (cultural.isSanctumOpen !== false) {
+      reasons.push('🛕 Darshan & sanctum open');
+    }
+  }
+
+  // 6. Safety
+  if (safety && safety.hasHazard) {
+    reasons.push(`⚠️ Route-level safety advisory active: ${safety.alerts?.[0] || 'Exercise caution'}`);
+  }
+
+  const plainNarrative = reasons.length > 0
+    ? reasons.join(' · ')
+    : 'Selected because the attraction is open and aligns with efficient transit routing.';
+
+  return {
+    heading: `Why India In-Time chose ${arrivalTime} for ${placeName}`,
+    recommendedArrival: arrivalTime,
+    reasons,
+    narrative: plainNarrative,
+    evidenceCount: reasons.length,
+    confidence: reasons.length >= 3 ? 'HIGH' : (reasons.length >= 1 ? 'MEDIUM' : 'LOW'),
+  };
+}
+
+module.exports = { buildExplanation, buildStatusLabel, buildWhyThisPlanExplanation };
+
 

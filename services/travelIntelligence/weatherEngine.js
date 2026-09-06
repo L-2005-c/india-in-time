@@ -31,7 +31,19 @@ function computeApparentTemp(tempC, humidity, windKph) {
 // weatherEngine.js — BEAST mode micro-climate intelligence
 function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') {
   if (!weather || (weather.tempC == null && !weather.condition && weather.weathercode == null && weather.windKph == null && weather.rainMm == null)) {
-    return { score: 50, suitability: 'Unknown', activityNotes: [], warnings: [], source: 'unavailable', confidence: 20, reason: 'No weather data available.', comfortBadge: '🌤️ Standard' };
+    return {
+      score: 50,
+      suitability: 'Unknown',
+      status: 'UNAVAILABLE',
+      activityNotes: [],
+      warnings: [],
+      source: 'unavailable',
+      confidence: 20,
+      confidenceBand: 'LOW',
+      reason: 'No weather data available.',
+      comfortBadge: '⚪ Weather Unavailable',
+      isAvailable: false,
+    };
   }
   let score = 70;
   const notes = [], warnings = [];
@@ -70,8 +82,8 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
     else { comfortBadge = '⛈️ Heavy Rain Alert'; }
   } else if (isRain) {
     score -= 20; warnings.push('Rain expected — carry protection; outdoor visits may be uncomfortable');
-    if (!isOutdoor) { score += 8; comfortBadge = '☕ Indoor / Cafe'; }
-    else { comfortBadge = '🌧️ Rain Alert'; }
+    if (!isOutdoor) { score += 8; notes.push('Indoor venue good rainy-day option'); comfortBadge = '🏛️ Sheltered Venue'; }
+    else { comfortBadge = '🌧️ Rainy Conditions'; }
   } else if (/clear|sunny|fair/i.test(cond) || (code != null && code <= 1)) {
     score += 12; notes.push('Clear / sunny conditions');
     if (daypart === 'evening' || daypart === 'sunset') comfortBadge = '🌅 Golden Hour Clear';
@@ -100,13 +112,20 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
   if (isOutdoor && score >= 75) notes.push('Excellent for outdoor activity');
   if (isOutdoor && score < 40) notes.push('Poor for outdoor activity');
   if ((place.is_sunrise_spot || place.is_sunset_spot) && score >= 70) notes.push('Favourable for photography');
+  const evidenceSignals = (weather.tempC != null ? 1 : 0) + (weather.condition ? 1 : 0) + (weather.humidity != null ? 1 : 0) + (weather.windKph != null ? 1 : 0);
+  const confidenceBand = evidenceSignals >= 3 ? 'HIGH' : (evidenceSignals >= 1 ? 'MEDIUM' : 'LOW');
+  const confidenceScore = weather.tempC != null ? 75 : 50;
+
   return {
     score,
     suitability,
+    status: weather.forecast ? 'PREDICTED' : 'OBSERVED',
     activityNotes: notes,
     warnings,
     source: weather.forecast ? 'forecast' : 'observed',
-    confidence: weather.tempC != null ? 75 : 50,
+    confidence: confidenceScore,
+    confidenceBand,
+    evidenceCount: evidenceSignals,
     reason: warnings.length ? warnings[0] : notes[0] || `${suitability} weather for this place type`,
     tempC: temp,
     apparentTempC: apparentTemp,
@@ -114,6 +133,7 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
     windKph: wind,
     comfortBadge,
     indoorRecommended,
+    isAvailable: true,
   };
 }
 

@@ -138,6 +138,8 @@ async function raceOsrmMirrors(fromCoords, toCoords, opts = {}) {
 
       return {
         provider: 'osrm',
+        routeType: 'ROAD_NETWORK_ESTIMATE',
+        provenance: 'ROAD_NETWORK_ESTIMATE',
         distanceMeters: distanceM,
         durationSeconds: durationSec,
         durationInTrafficSeconds: null,
@@ -145,7 +147,8 @@ async function raceOsrmMirrors(fromCoords, toCoords, opts = {}) {
         geometry,
         summary: leg?.summary || (steps[0]?.instruction ? steps[0].instruction : 'Standard route'),
         steps,
-        confidenceScore: 82,
+        confidenceLevel: 'MEDIUM',
+        confidenceScore: 80,
         latencyMs: latency,
       };
     } catch (err) {

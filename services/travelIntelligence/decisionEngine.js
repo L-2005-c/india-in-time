@@ -9,7 +9,7 @@
  */
 
 const rules = require('../../data/time-intelligence-rules.json');
-const { t2m, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour } = require('./timeEngine');
+const { m2t, t2m, getISTParts, getSeason, computeSunTimes, getDaypart, computeGoldenHours, inWindow, isInGoldenHour } = require('./timeEngine');
 const { getOpeningStatus, categoryRules } = require('./openingHoursEngine');
 const { computeCrowd, lookupHistoricalCrowd } = require('../crowd');
 const { estimateTravel, recommendArrivalWindow, getTrafficMultiplier, getCityTrafficMultiplier } = require('./trafficEngine');
@@ -20,7 +20,7 @@ const { getCulturalRitualIntel } = require('./culturalRitualEngine');
 const { getSignatureDish } = require('./signatureDishEngine');
 const { getEntryProtocol } = require('./entryProtocolEngine');
 const { computeConfidence } = require('./confidenceEngine');
-const { buildExplanation, buildStatusLabel } = require('./explanationEngine');
+const { buildExplanation, buildStatusLabel, buildWhyThisPlanExplanation } = require('./explanationEngine');
 const { generateExperienceWindows } = require('./experienceWindows');
 const { createIntelligenceContext, evaluateContextExperience } = require('./contextEngine');
 
@@ -57,7 +57,7 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
     traffic = estimateTravel({ fromCoords: options.fromCoords, toCoords: place.coords, departMin: nowMin, liveTraffic: options.liveTraffic || null, isFirstStop: !!options.isFirstStop, cityKey: placeCity });
   } else {
     const mult = placeCity ? getCityTrafficMultiplier(placeCity, nowMin) : getTrafficMultiplier(nowMin);
-    traffic = { travelMinutes: null, distanceKm: null, congestionFactor: mult, trafficLevel: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Moderate' : 'High', trafficRisk: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Medium' : 'High', source: 'estimated', label: 'Area traffic heuristic (no origin provided)', confidence: 40 };
+    traffic = { travelMinutes: null, distanceKm: null, congestionFactor: mult, trafficLevel: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Moderate' : 'High', trafficRisk: mult <= 1.05 ? 'Low' : mult <= 1.35 ? 'Medium' : 'High', source: 'estimated', label: 'Area traffic heuristic (no origin provided)', confidence: 'LOW', evidenceCount: 1 };
   }
   const openingScore = openingToScore(opening);
   const timeScore = computeTimeScore(place, { nowMin, isBestTimeNow, isPeakHourNow, daypart, goldenIn: ghState.any });
@@ -256,6 +256,16 @@ function getTravelIntelligence(place, now = new Date(), weather = null, options 
       preferenceScore,
       confidence,
       explanation,
+      whyThisPlan: buildWhyThisPlanExplanation({
+        placeName: place.name || 'This destination',
+        arrivalTime: m2t(nowMin),
+        intel: scored,
+        weather: weatherIntel,
+        crowd,
+        traffic,
+        scenic,
+        cultural,
+      }),
       recommendations,
       cultural,
       cloudInversion: !!cloudInversion,

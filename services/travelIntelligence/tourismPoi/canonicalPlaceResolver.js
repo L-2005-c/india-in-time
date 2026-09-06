@@ -69,25 +69,47 @@ function resolveCanonicalPlace(input, options = {}) {
     return null;
   }
 
-  // 2. Check Golden Benchmark Dataset (Highest priority authoritative survey)
+  // 2. Check Golden Benchmark Dataset (Reference Candidate — requires verification)
   const goldenMatch = findGoldenPoi(rawName, cityHint);
   if (goldenMatch) {
+    const verification = verifyAttractionCoordinates({
+      placeName: goldenMatch.canonicalName,
+      city: goldenMatch.city || cityHint,
+      state: goldenMatch.state || 'Unknown',
+      category: goldenMatch.category,
+      candidateCoords: [goldenMatch.latitude, goldenMatch.longitude],
+      provider: 'GOLDEN_BENCHMARK',
+    });
+
+    if (!verification.verified && verification.verificationStatus === 'REJECTED') {
+      return null;
+    }
+
     return createCanonicalPlace({
       id: goldenMatch.id,
+      canonicalPlaceId: goldenMatch.id,
       canonicalName: goldenMatch.canonicalName,
       displayName: goldenMatch.displayName,
       aliases: goldenMatch.aliases,
       category: goldenMatch.category,
-      latitude: goldenMatch.latitude,
-      longitude: goldenMatch.longitude,
+      latitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : goldenMatch.latitude,
+      longitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : goldenMatch.longitude,
       city: goldenMatch.city,
       state: goldenMatch.state,
       country: goldenMatch.country,
-      tourismStatus: goldenMatch.tourismStatus,
+      tourismStatus: goldenMatch.tourismStatus || 'VERIFIED_ATTRACTION',
       coordinateSource: 'AUTHORITATIVE_SURVEY',
+      source: 'golden_poi_dataset',
+      sourceType: 'AUTHORITATIVE_SURVEY',
       nameSource: 'GOLDEN_BENCHMARK',
-      verificationStatus: 'VERIFIED',
-      confidence: 99,
+      verificationStatus: verification.verified ? 'VERIFIED' : verification.verificationStatus,
+      verificationMethod: 'AUTHORITATIVE_GROUND_SURVEY',
+      confidence: verification.verified ? 'HIGH' : (verification.verificationStatus === 'QUARANTINED' ? 'LOW' : null),
+      evidence: [
+        'Curated benchmark reference candidate',
+        ...(verification.evidence || []),
+      ],
+      lastValidatedAt: new Date().toISOString(),
       visitMinutes: rawObj.visitMinutes || rawObj.visit_minutes || 60,
       openingHours: rawObj.openingHours || (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
       isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
@@ -96,24 +118,47 @@ function resolveCanonicalPlace(input, options = {}) {
     });
   }
 
-  // 3. Check Multi-City Whitelist
+  // 3. Check Multi-City Whitelist (Reference Candidate — requires verification)
   const whitelistMatch = resolveWhitelist({ name: rawName, category: categoryHint }, cityHint);
   if (whitelistMatch) {
+    const targetCity = cityHint !== 'Unknown' ? cityHint : (whitelistMatch.city || 'Visakhapatnam');
+    const verification = verifyAttractionCoordinates({
+      placeName: whitelistMatch.canonicalName || whitelistMatch.name,
+      city: targetCity,
+      state: whitelistMatch.state || 'Andhra Pradesh',
+      category: whitelistMatch.category || categoryHint,
+      candidateCoords: [whitelistMatch.lat, whitelistMatch.lon],
+      provider: 'TOURISM_WHITELIST',
+    });
+
+    if (!verification.verified && verification.verificationStatus === 'REJECTED') {
+      return null;
+    }
+
     return createCanonicalPlace({
       id: whitelistMatch.id,
+      canonicalPlaceId: whitelistMatch.id,
       canonicalName: whitelistMatch.canonicalName || whitelistMatch.name,
       displayName: whitelistMatch.name,
       aliases: whitelistMatch.aliases || [],
       category: whitelistMatch.category || categoryHint,
-      latitude: whitelistMatch.lat,
-      longitude: whitelistMatch.lon,
-      city: cityHint !== 'Unknown' ? cityHint : (whitelistMatch.city || 'Visakhapatnam'),
+      latitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : whitelistMatch.lat,
+      longitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : whitelistMatch.lon,
+      city: targetCity,
       state: whitelistMatch.state || 'Andhra Pradesh',
       tourismStatus: 'VERIFIED_ATTRACTION',
       coordinateSource: 'CURATED_WHITELIST',
+      source: 'tourism_whitelist',
+      sourceType: 'CURATED_WHITELIST',
       nameSource: 'CURATED_WHITELIST',
-      verificationStatus: 'VERIFIED',
-      confidence: 95,
+      verificationStatus: verification.verified ? 'VERIFIED' : verification.verificationStatus,
+      verificationMethod: 'MULTI_SIGNAL_WHITELIST_CHECK',
+      confidence: verification.verified ? 'HIGH' : (verification.verificationStatus === 'QUARANTINED' ? 'LOW' : null),
+      evidence: [
+        'Curated tourism whitelist candidate',
+        ...(verification.evidence || []),
+      ],
+      lastValidatedAt: new Date().toISOString(),
       visitMinutes: rawObj.visitMinutes || rawObj.visit_minutes || 60,
       openingHours: rawObj.openingHours || (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
       isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
@@ -142,7 +187,7 @@ function resolveCanonicalPlace(input, options = {}) {
     provider: rawObj.source || 'discovery',
   });
 
-  if (!verification.verified && verification.verificationStatus === 'REJECTED') {
+  if (!verification.verified && (verification.verificationStatus === 'REJECTED' || (!options.allowQuarantined && verification.verificationStatus === 'QUARANTINED'))) {
     return null; // Reject candidate if coordinates cannot be validated or locality rejected
   }
 
@@ -150,6 +195,7 @@ function resolveCanonicalPlace(input, options = {}) {
 
   return createCanonicalPlace({
     id: rawObj.id,
+    canonicalPlaceId: rawObj.id,
     canonicalName: rawName,
     displayName: rawName,
     aliases: rawObj.aliases || [],
@@ -159,10 +205,15 @@ function resolveCanonicalPlace(input, options = {}) {
     city: cityHint,
     state: rawObj.state || 'Unknown',
     tourismStatus: verification.verified ? 'VERIFIED_ATTRACTION' : 'ESTIMATED_ATTRACTION',
-    coordinateSource: rawObj.source === 'nominatim' ? 'HIGH_CONFIDENCE_GEOCODER' : 'HEURISTIC_FALLBACK',
+    coordinateSource: rawObj.source === 'nominatim' ? 'PROVIDER' : 'UNKNOWN',
+    source: rawObj.source || 'discovery_service',
+    sourceType: 'PROVIDER',
     nameSource: rawObj.nameSource || 'DISCOVERY_SERVICE',
     verificationStatus: verification.verificationStatus || 'AUTO_VALIDATED',
+    verificationMethod: 'MULTI_SIGNAL_DISCOVERY_CHECK',
     confidence: verification.confidence,
+    evidence: verification.evidence || [],
+    lastValidatedAt: new Date().toISOString(),
     visitMinutes: rawObj.visitMinutes || rawObj.visit_minutes || 60,
     openingHours: rawObj.openingHours || (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
     isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
