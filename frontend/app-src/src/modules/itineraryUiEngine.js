@@ -192,3 +192,51 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
     ${transitHtml}
   `;
 }
+
+/**
+ * Renders glassmorphic shimmer skeleton cards while GeoAI optimizer runs.
+ * Provides immediate visual feedback, eliminates layout shift, and ensures 60fps UX.
+ * @param {HTMLElement} container
+ */
+export function renderPlanSkeleton(container) {
+  if (!container) return;
+  const count = 3;
+  let html = `
+    <div class="skeleton-optimizing-banner">
+      <span class="skeleton-pulse-dot"></span>
+      <span>GeoAI Engine is computing optimal times & crowd windows…</span>
+    </div>
+    <div class="plan-skeleton-wrapper" aria-busy="true" aria-label="Loading itinerary">
+  `;
+  for (let i = 0; i < count; i++) {
+    html += `
+      <div class="skeleton-card">
+        <div class="skeleton-header">
+          <div class="skeleton-circle shimmer"></div>
+          <div class="skeleton-bar skeleton-title shimmer"></div>
+          <div class="skeleton-pill skeleton-time shimmer"></div>
+        </div>
+        <div class="skeleton-chips">
+          <div class="skeleton-pill shimmer" style="width: 80px;"></div>
+          <div class="skeleton-pill shimmer" style="width: 110px;"></div>
+          <div class="skeleton-pill shimmer" style="width: 95px;"></div>
+        </div>
+        <div class="skeleton-meter-row">
+          <div class="skeleton-bar shimmer" style="width: 70px; height: 12px;"></div>
+          <div class="skeleton-bar skeleton-progress shimmer"></div>
+        </div>
+      </div>
+    `;
+    if (i < count - 1) {
+      html += `
+        <div class="skeleton-transit-connector">
+          <div class="skeleton-transit-track"></div>
+          <div class="skeleton-pill skeleton-transit-pill shimmer"></div>
+        </div>
+      `;
+    }
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+}
+

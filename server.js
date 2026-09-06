@@ -205,31 +205,50 @@ app.get('/api/health', (_req, res) => {
 // be wide open — see the technical due-diligence notes on this endpoint).
 // Gated with the same admin auth as the feedback dashboard; not wired into
 // any platform healthcheck path, so this doesn't affect deploy healthchecks.
-// Kubernetes-style readiness (public, no secrets) — fails if DB unreachable
-app.get('/api/ready', async (_req, res) => {
-  const checks = { db: false, redis: null, maintenance: getFlag('maintenanceMode') };
+let lastDbHealth = { ts: 0, ok: false };
+async function checkDbHealth() {
+  const now = Date.now();
+  if (now - lastDbHealth.ts < 3000 && lastDbHealth.ok) return true;
   try {
     const { getDb } = require('./db/init');
     const pool = getDb();
     if (pool) {
       await pool.query('SELECT 1');
-      checks.db = true;
+      lastDbHealth = { ts: now, ok: true };
+      return true;
     }
   } catch (_e) {
-    checks.db = false;
+    lastDbHealth = { ts: now, ok: false };
   }
-  if (process.env.REDIS_URL) {
-    try {
-      const Redis = require('ioredis');
-      const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
-      await r.connect();
-      await r.ping();
-      checks.redis = true;
-      r.disconnect();
-    } catch (_e) {
-      checks.redis = false;
-    }
+  return false;
+}
+
+let lastRedisHealth = { ts: 0, ok: null };
+async function checkRedisHealth() {
+  if (!process.env.REDIS_URL) return null;
+  const now = Date.now();
+  if (now - lastRedisHealth.ts < 3000 && lastRedisHealth.ok !== null) return lastRedisHealth.ok;
+  try {
+    const Redis = require('ioredis');
+    const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
+    await r.connect();
+    await r.ping();
+    await r.quit().catch(() => r.disconnect());
+    lastRedisHealth = { ts: now, ok: true };
+    return true;
+  } catch (_e) {
+    lastRedisHealth = { ts: now, ok: false };
+    return false;
   }
+}
+
+// Kubernetes-style readiness (public, no secrets) — fails if DB unreachable
+app.get('/api/ready', async (_req, res) => {
+  const checks = {
+    db: await checkDbHealth(),
+    redis: await checkRedisHealth(),
+    maintenance: getFlag('maintenanceMode'),
+  };
   const ok = checks.db && !checks.maintenance && (checks.redis !== false);
   res.status(ok ? 200 : 503).json({ status: ok ? 'ready' : 'not_ready', checks, ts: Date.now() });
 });
@@ -237,29 +256,10 @@ app.get('/api/ready', async (_req, res) => {
 app.get('/api/health/ready', requireAdminAuth, async (_req, res) => {
   const memMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
   const gemini = geminiService.getStats();
-  const checks = { db: false, redis: null };
-  try {
-    const { getDb } = require('./db/init');
-    const pool = getDb();
-    if (pool) {
-      await pool.query('SELECT 1');
-      checks.db = true;
-    }
-  } catch (_e) {
-    checks.db = false;
-  }
-  if (process.env.REDIS_URL) {
-    try {
-      const Redis = require('ioredis');
-      const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
-      await r.connect();
-      await r.ping();
-      checks.redis = true;
-      r.disconnect();
-    } catch (_e) {
-      checks.redis = false;
-    }
-  }
+  const checks = {
+    db: await checkDbHealth(),
+    redis: await checkRedisHealth(),
+  };
 
   res.json({
     status:   checks.db ? 'ready' : 'degraded',

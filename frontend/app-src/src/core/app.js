@@ -1167,7 +1167,7 @@ async function generatePlan(){
   if(onlyFood){
     avail=keepNearbyCluster(avail,routeStart,4);
   }
-  switchToView('plan-view',1);
+  switchToView('plan-view',1); _itineraryUiEngine.renderPlanSkeleton(document.getElementById('plan-list'));
   if(vibe){
     const typing=addTypingIndicator();
     addMsg(`✨ Analyzing your vibe: "<em>${vibe}</em>"...`);

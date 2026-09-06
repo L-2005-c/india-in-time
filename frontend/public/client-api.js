@@ -43,24 +43,68 @@
     return res.json();
   }
 
+  // ── Client-side In-Memory Cache & Coalescing ───────────────────────────────
+  // Coalesces duplicate in-flight requests (single-flight) and caches responses
+  // with a TTL. Prevents redundant API calls, protects external rate-limits,
+  // and makes repeated searches and tab switches instantaneous (0ms).
+  const apiCache = new Map();
+  const inFlightRequests = new Map();
+
+  function cachedRequest(cacheKey, ttlMs, requestFn) {
+    const cached = apiCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return Promise.resolve(cached.data);
+    }
+    if (inFlightRequests.has(cacheKey)) {
+      return inFlightRequests.get(cacheKey);
+    }
+    const promise = requestFn()
+      .then((data) => {
+        if (ttlMs > 0 && data) {
+          apiCache.set(cacheKey, { data, expiresAt: Date.now() + ttlMs });
+        }
+        return data;
+      })
+      .finally(() => {
+        inFlightRequests.delete(cacheKey);
+      });
+    inFlightRequests.set(cacheKey, promise);
+    return promise;
+  }
+
   // ── Geocoding ────────────────────────────────────────────────────────────────
 
   async function geocode(query) {
-    return get('/api/geocode', { q: query });
+    const qStr = String(query || '').trim();
+    const key = `geo:${qStr.toLowerCase()}`;
+    return cachedRequest(key, 30 * 60 * 1000, () => get('/api/geocode', { q: query }));
   }
 
   // ── Places ───────────────────────────────────────────────────────────────────
 
   async function fetchPlaces(lat, lon, cityName = '', totalMinutes = 600, opts = {}) {
     const { refresh = false, prefs = [] } = opts;
-    // Cold Render + Gemini + sequential Nominatim can exceed 90s; client retries once in loadCityPlaces.
-    return post('/api/places', { lat, lon, cityName, totalMinutes, refresh, prefs }, 90000);
+    if (refresh) {
+      return post('/api/places', { lat, lon, cityName, totalMinutes, refresh, prefs }, 90000);
+    }
+    const cName = String(cityName || '').trim().toLowerCase();
+    const latNum = Number(lat).toFixed(3);
+    const lonNum = Number(lon).toFixed(3);
+    const key = `places:${cName}:${latNum}:${lonNum}:${totalMinutes}:${JSON.stringify(prefs)}`;
+    // 5-minute TTL for non-refresh places queries
+    return cachedRequest(key, 5 * 60 * 1000, () =>
+      post('/api/places', { lat, lon, cityName, totalMinutes, refresh, prefs }, 90000)
+    );
   }
 
   // ── Weather ──────────────────────────────────────────────────────────────────
 
   async function fetchWeather(lat, lon) {
-    return get('/api/weather', { lat, lon });
+    const latNum = Number(lat).toFixed(2);
+    const lonNum = Number(lon).toFixed(2);
+    const key = `weather:${latNum}:${lonNum}`;
+    // 5-minute TTL for weather queries
+    return cachedRequest(key, 5 * 60 * 1000, () => get('/api/weather', { lat, lon }));
   }
 
   async function fetchWeatherAlerts(lat, lon, stops = []) {
@@ -314,6 +358,7 @@
     saveTrip, listTrips, loadTrip, deleteTrip, shareTrip, loadSharedTrip,
     addFavorite, listFavorites, removeFavorite,
     getAnalytics, healthCheck,
+    clearCache: () => apiCache.clear(),
   };
 })();
 
