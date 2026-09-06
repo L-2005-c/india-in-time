@@ -1,7 +1,7 @@
 // frontend/app-src/src/modules/offlineTravelPass.js
 // Generates rich WhatsApp travel share cards and interactive offline printable travel passes.
 
-const EMERGENCY_DIRECTORIES = {
+export const EMERGENCY_DIRECTORIES = {
   national: [
     { title: 'National Emergency', num: '112', icon: '🚨' },
     { title: 'Police Assistance', num: '100', icon: '👮' },
@@ -10,7 +10,39 @@ const EMERGENCY_DIRECTORIES = {
     { title: 'Tourist Helpline (Multi-lingual)', num: '1363', icon: '🧭' },
     { title: 'Railway Helpline', num: '139', icon: '🚆' },
   ],
+  alluri_paderu: [
+    { title: 'ITDA Control Room (Tribal Dev)', num: '08935-250022', icon: '🏛️' },
+    { title: 'Paderu Area Hospital Emergency', num: '08935-250100', icon: '🏥' },
+    { title: 'AP Forest Dept / Ghat Emergency', num: '1800-425-4700', icon: '🌲' },
+    { title: 'Araku Valley Police Station', num: '08936-249633', icon: '👮' },
+  ],
+  tirupati: [
+    { title: 'TTD Vigilance & Security (Tirumala)', num: '1800-425-4141', icon: '🛕' },
+    { title: 'Tirupati Pilgrim Helpdesk', num: '0877-2277777', icon: '📞' },
+    { title: 'Alipiri Toll & Ghat Emergency', num: '0877-2264222', icon: '🚗' },
+    { title: 'SVIMS Super Specialty Emergency', num: '0877-2877777', icon: '🏥' },
+  ],
+  visakhapatnam: [
+    { title: 'Vizag Marine Police / Beach Patrol', num: '0891-2565454', icon: '🌊' },
+    { title: 'King George Hospital (KGH) Casualty', num: '0891-2564891', icon: '🏥' },
+    { title: 'Vizag City Traffic Control', num: '0891-2525555', icon: '🚦' },
+    { title: 'Vizag Port Disaster Cell', num: '0891-2874000', icon: '⚓' },
+  ],
 };
+
+export function resolveRegionKey(cityName = '', cityId = '') {
+  const norm = (String(cityName) + ' ' + String(cityId)).toLowerCase();
+  if (norm.includes('paderu') || norm.includes('araku') || norm.includes('lambasingi') || norm.includes('alluri') || norm.includes('borra')) {
+    return 'alluri_paderu';
+  }
+  if (norm.includes('tirupati') || norm.includes('tirumala') || norm.includes('alipiri')) {
+    return 'tirupati';
+  }
+  if (norm.includes('visakhapatnam') || norm.includes('vizag')) {
+    return 'visakhapatnam';
+  }
+  return null;
+}
 
 const SURVIVAL_LINGO = {
   hindi: [
@@ -44,10 +76,12 @@ const SURVIVAL_LINGO = {
 /**
  * Generate a beautifully structured, emoji-rich WhatsApp itinerary text.
  */
-export function generateWhatsAppShareText(mdPlan, currentCityName, dayIdx = 0) {
+export function generateWhatsAppShareText(mdPlan, currentCityName, dayIdx = 0, cityId = '') {
   if (!mdPlan || !mdPlan.length) return '';
   const day = mdPlan[dayIdx] || mdPlan[0] || [];
   const city = currentCityName || 'India';
+  const regionKey = resolveRegionKey(city, cityId);
+  const regionalEmer = regionKey ? EMERGENCY_DIRECTORIES[regionKey] : null;
 
   let text = `🇮🇳 *INDIA IN-TIME TRAVEL PASS*\n`;
   text += `📍 *Destination:* ${city} (Day ${dayIdx + 1} of ${mdPlan.length})\n`;
@@ -79,6 +113,20 @@ export function generateWhatsAppShareText(mdPlan, currentCityName, dayIdx = 0) {
     }
     text += `\n`;
   });
+
+  if (regionalEmer && regionalEmer.length) {
+    const regionTitle = regionKey === 'alluri_paderu'
+      ? 'ALLURI SITHARAMA RAJU / PADERU / ARAKU'
+      : regionKey === 'tirupati'
+        ? 'TIRUPATI & TIRUMALA PILGRIM ARMOR'
+        : 'VISAKHAPATNAM COASTAL & MARINE';
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `🛡️ *REGIONAL EMERGENCY ARMOR (${regionTitle})*\n`;
+    regionalEmer.forEach(em => {
+      text += `• ${em.title}: ${em.num}\n`;
+    });
+    text += `\n`;
+  }
 
   text += `━━━━━━━━━━━━━━━━━━━━\n`;
   text += `🚨 *EMERGENCY HELPLINES (INDIA)*\n`;
@@ -200,6 +248,33 @@ export function buildOfflineTravelPassHtml(mdPlan, currentCityName, dayIdx = 0, 
           `;
         }).join('')}
       </div>
+
+      <!-- Regional Emergency Armor (Alluri / Tirupati / Vizag) -->
+      ${(() => {
+        const regionKey = resolveRegionKey(city, cityId);
+        const regionalEmer = regionKey ? EMERGENCY_DIRECTORIES[regionKey] : null;
+        if (!regionalEmer || !regionalEmer.length) return '';
+        const regionTitle = regionKey === 'alluri_paderu'
+          ? 'Alluri Sitharama Raju / Paderu / Araku'
+          : regionKey === 'tirupati'
+            ? 'Tirupati & Tirumala Pilgrim Security'
+            : 'Visakhapatnam Coastal & Marine Ops';
+        return `
+          <div style="background:rgba(245,158,11,0.09);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:12px;margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:700;color:#fde047;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>🛡️ Regional Emergency Armor: ${regionTitle}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11.5px;">
+              ${regionalEmer.map((em) => `
+                <div style="display:flex;justify-content:space-between;background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:4px;">
+                  <span>${em.icon} ${em.title}</span>
+                  <a href="tel:${em.num}" style="color:#fde047;font-weight:800;text-decoration:none;">${em.num}</a>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      })()}
 
       <!-- Emergency Directory -->
       <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:12px;margin-bottom:16px;">

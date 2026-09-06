@@ -108,6 +108,14 @@
     return post('/api/time-intelligence/multi-day-advice', { places, ...opts }, 15000);
   }
 
+  async function timeIntelligenceMultiDayPlan(places = [], opts = {}) {
+    return post('/api/time-intelligence/multi-day-plan', { places, ...opts }, 60000);
+  }
+
+  async function timeIntelligenceCircuitPlan(places = [], opts = {}) {
+    return post('/api/time-intelligence/circuit-plan', { places, ...opts }, 60000);
+  }
+
   // ── Feedback ─────────────────────────────────────────────────────────────────
   async function submitPlaceFeedback(placeName, city, rating, accurate, comment) {
     return post('/api/feedback/place', { userId: (window.currentUser && window.currentUser.uid) || null, placeName, city, rating, accurate, comment });
@@ -295,7 +303,7 @@
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
-    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice,
+    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

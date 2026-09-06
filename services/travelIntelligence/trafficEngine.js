@@ -53,16 +53,80 @@ function trafficLevelFromMult(mult) {
 const ROAD_NETWORK_FACTOR = 1.42; // Real-world road network distance vs haversine straight-line in Indian cities
 
 function recommendTransitMode(distanceKm, opts = {}) {
-  const km = Number(distanceKm) || 0;
-  const corridorType = opts.corridorType || 'URBAN_ARTERIAL';
-  const congestionFactor = opts.congestionFactor || 1.0;
+  let km = 0;
+  let fromName = '';
+  let toName = '';
+  let options = opts || {};
 
-  if (opts.isGhat) {
+  if (typeof distanceKm === 'object' && distanceKm !== null) {
+    const fromPlace = distanceKm;
+    const toPlace = opts || {};
+    options = arguments[2] || {};
+    fromName = String(fromPlace.name || fromPlace.title || '').toLowerCase();
+    toName = String(toPlace.name || toPlace.title || '').toLowerCase();
+    km = Number(options.distanceKm) || 25;
+  } else {
+    km = Number(distanceKm) || 0;
+    fromName = String(options.fromName || '').toLowerCase();
+    toName = String(options.toName || '').toLowerCase();
+  }
+
+  const corridorType = options.corridorType || 'URBAN_ARTERIAL';
+  const congestionFactor = options.congestionFactor || 1.0;
+
+  // 1. Iconic Scenic Rail: Visakhapatnam <-> Araku / Borra Caves Vistadome Express
+  const isVizagAraku = (fromName.includes('visakhapatnam') || fromName.includes('vizag')) && (toName.includes('araku') || toName.includes('borra'));
+  const isArakuVizag = (fromName.includes('araku') || fromName.includes('borra')) && (toName.includes('visakhapatnam') || toName.includes('vizag'));
+  if (options.isVistadome || options.corridor === 'vizag_araku' || isVizagAraku || isArakuVizag) {
+    return {
+      mode: 'vistadome_rail',
+      recommendedMode: 'vistadome_rail',
+      label: 'Vistadome Glass-Coach (Train 18551/18552)',
+      modeLabel: 'Vistadome Scenic Rail (Train 18551/18552)',
+      icon: '🚆',
+      modeIcon: '🚆',
+      corridorTag: 'Train 18551/18552 VSKP-KRDL Express',
+      scenicFeatures: '58 tunnels & 84 bridges through the Ananthagiri Eastern Ghats',
+      bookingTip: 'Advance IRCTC Vistadome booking essential; departs 06:45 AM from Visakhapatnam',
+      estimatedFare: 670,
+      fareStr: '₹670',
+      durationMinutes: 195,
+      isScenicRail: true,
+      rationale: 'Panoramic glass-roof train crossing 58 tunnels and 84 bridges through the Ananthagiri Eastern Ghats',
+      bookingNotice: 'IRCTC booking opens 120 days in advance; morning departure from Visakhapatnam (VSKP) at 06:45 AM',
+    };
+  }
+
+  // 2. Pilgrim Express Corridor: Chennai <-> Tirupati
+  const isChennaiTirupati = (fromName.includes('chennai') || fromName.includes('madras')) && (toName.includes('tirupati') || toName.includes('tirumala'));
+  const isTirupatiChennai = (fromName.includes('tirupati') || fromName.includes('tirumala')) && (toName.includes('chennai') || toName.includes('madras'));
+  if (options.corridor === 'chennai_tirupati' || isChennaiTirupati || isTirupatiChennai) {
+    const fare = Math.round(1800 + km * 12);
+    return {
+      mode: 'pilgrim_express',
+      recommendedMode: 'pilgrim_express',
+      label: 'Tirupati Pilgrimage Expressway (NH716) / Sapthagiri Express',
+      modeLabel: 'Interstate Pilgrim Express (NH716 / Sapthagiri)',
+      icon: '🚆',
+      modeIcon: '🚆',
+      corridorTag: 'Chennai-Tirupati Pilgrim Corridor',
+      bookingTip: 'TTD Special Entry Darshan booking recommended prior to arrival',
+      estimatedFare: fare,
+      fareStr: `₹${fare}`,
+      isPilgrimCorridor: true,
+      rationale: 'Smooth 4-lane highway transit from Chennai Central to Alipiri Tollgate check-post',
+    };
+  }
+
+  if (options.isGhat) {
     const cabFare = Math.min(650, Math.max(90, Math.round(70 + km * 18)));
     return {
-      mode: 'ghat_cab',
+      mode: 'cab_4x4',
+      recommendedMode: 'cab_4x4',
       label: 'Mountain Cab / 4x4',
+      modeLabel: 'Mountain Cab / 4x4',
       icon: '🚙',
+      modeIcon: '🚙',
       estimatedFare: cabFare,
       fareStr: `₹${cabFare}`,
       rationale: 'Experienced mountain ghat driver recommended for high-altitude hairpin curves',
@@ -72,8 +136,11 @@ function recommendTransitMode(distanceKm, opts = {}) {
   if (km <= 0.8) {
     return {
       mode: 'walk',
+      recommendedMode: 'walk',
       label: 'Pedestrian Walk',
+      modeLabel: 'Pedestrian Walk',
       icon: '🚶',
+      modeIcon: '🚶',
       estimatedFare: 0,
       fareStr: 'Free',
       rationale: 'Very close — fastest on foot through local walkways',
@@ -83,8 +150,11 @@ function recommendTransitMode(distanceKm, opts = {}) {
     const fare = Math.min(90, Math.max(30, Math.round(25 + km * 14)));
     return {
       mode: 'auto',
+      recommendedMode: 'auto',
       label: 'Auto-Rickshaw',
+      modeLabel: 'Auto-Rickshaw',
       icon: '🛺',
+      modeIcon: '🛺',
       estimatedFare: fare,
       fareStr: `₹${fare}`,
       rationale: 'Nimble navigation through dense market traffic & bazaar lanes',
@@ -93,8 +163,11 @@ function recommendTransitMode(distanceKm, opts = {}) {
   const cabFare = Math.min(450, Math.max(60, Math.round(50 + km * 18)));
   return {
     mode: 'cab',
+    recommendedMode: 'cab',
     label: 'Cab / Ride-Hailing',
+    modeLabel: 'Cab / Ride-Hailing',
     icon: '🚗',
+    modeIcon: '🚗',
     estimatedFare: cabFare,
     fareStr: `₹${cabFare}`,
     rationale: 'Air-conditioned comfort on arterial city road',

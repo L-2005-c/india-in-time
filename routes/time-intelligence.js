@@ -6,8 +6,9 @@ const { getBatchState, personalizeScore, suggestOpenAlternatives, getTravelIntel
 const { rankPlacesForDay, dynamicAdvice, multiDayAdvice, getTravelIntelligenceAsync } = require('../services/travelIntelligence');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const { buildTemporalProfile, generateSuitabilityCurve } = require('../services/travelIntelligence/temporalEngine');
-const { planAdvancedItinerary, replanAdvanced } = require('../services/travelIntelligence/advancedItineraryEngine');
+const { planAdvancedItinerary, replanAdvanced, planMultiDayCircuit } = require('../services/travelIntelligence/advancedItineraryEngine');
 const { buildMultiDayItinerary } = require('../services/travelIntelligence/multiDayPlanner');
+const { getCitySeeds } = require('../data/city-seeds');
 const { computeDnaMatch, deriveDnaFromPersonas, sanitizeDnaProfile } = require('../services/travelIntelligence/personalTravelDna');
 const { detectConflictingRequirements } = require('../services/travelIntelligence/requirementEngine');
 const MAX_PLACES = 50;
@@ -301,6 +302,97 @@ router.post('/multi-day-plan', async (req, res) => {
   } catch (err) {
     logger.error('[time-intelligence:multi-day-plan]', err.message);
     res.status(500).json({ error: 'Failed to build multi-day itinerary' });
+  }
+});
+
+// ── Regional multi-day circuit planner (e.g. Paderu, Tirupati) ──────────────
+router.post('/circuit-plan', async (req, res) => {
+  try {
+    const {
+      circuitId, region, city, numDays, days, fromCoords, startDate, pacing, pace, personas, tripMode, weather,
+    } = req.body || {};
+
+    let targetCircuit = String(circuitId || region || city || 'vizag_araku_lambasingi').toLowerCase();
+    let seedKey = 'paderu';
+    let defaultId = 'vizag_araku_lambasingi';
+
+    if (targetCircuit.includes('tirupati') || targetCircuit.includes('tirumala')) {
+      defaultId = 'tirupati_chandragiri';
+      seedKey = 'tirupati';
+    } else if (targetCircuit.includes('vijayawada') || targetCircuit.includes('bezawada')) {
+      defaultId = 'vijayawada_heritage';
+      seedKey = 'vijayawada';
+    } else {
+      defaultId = 'vizag_araku_lambasingi';
+      seedKey = 'paderu';
+    }
+
+    const requestedDays = parseInt(numDays || days, 10) || 3;
+    const effectiveDays = Math.max(1, Math.min(3, requestedDays));
+
+    let candidates = Array.isArray(req.body?.places) && req.body.places.length > 0
+      ? req.body.places
+      : getCitySeeds(seedKey);
+
+    if (!candidates || !candidates.length) {
+      candidates = getCitySeeds('paderu');
+    }
+
+    const result = await planMultiDayCircuit(candidates, {
+      numDays: effectiveDays,
+      region: seedKey,
+      city: seedKey,
+      originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
+      startDate: startDate ? new Date(startDate) : new Date(),
+      pacing: pacing || pace || 'moderate',
+      personas: Array.isArray(personas) ? personas : [],
+      tripMode: tripMode || null,
+      weather: weather || null,
+    });
+
+    // Enhance titles to include coastal & urban gateway, highland coffee, misty cloud valleys
+    const titles = defaultId === 'vizag_araku_lambasingi' ? [
+      'Vizag to Araku Valley: Coastal & Urban Gateway',
+      'Araku Valley & Vanjangi: Highland Coffee & Tribal Valleys',
+      'Lambasingi & Paderu: Misty Cloud Valleys & Highlands',
+    ] : [
+      'Day 1 Exploration',
+      'Day 2 Exploration',
+      'Day 3 Exploration',
+    ];
+
+    const daysList = (result.dayPlans || []).map((dp, idx) => ({
+      day: dp.dayNumber,
+      title: titles[idx] || dp.theme,
+      theme: titles[idx] || dp.theme,
+      hub: dp.recommendedHub,
+      recommendedHub: dp.recommendedHub,
+      itinerary: dp.stops || [],
+      stops: dp.stops || [],
+      totalStops: dp.totalStops,
+      totalDistanceKm: dp.totalDistanceKm,
+      startTime: dp.startTime,
+      endTime: dp.endTime,
+      warnings: dp.warnings || [],
+    }));
+
+    res.json({
+      success: true,
+      circuit: {
+        id: defaultId,
+        name: result.circuitName,
+        totalDays: result.totalDays,
+      },
+      days: daysList,
+      ...result,
+      dayPlans: (result.dayPlans || []).map((dp, idx) => ({
+        ...dp,
+        theme: titles[idx] || dp.theme,
+      })),
+    });
+  } catch (err) {
+    logger.error('[time-intelligence:circuit-plan]', err.message);
+    res.status(500).json({ success: false, error: 'Failed to plan regional circuit' });
   }
 });
 

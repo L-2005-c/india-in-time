@@ -99,9 +99,14 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
     : '';
 
   let transitGhatHtml = '';
-  if (transitNext?.isGhatRoad || transitNext?.vehicleAdvisory || transitNext?.nightFogAdvisory) {
+  const isVistadome = transitNext?.mode === 'vistadome_rail';
+  const isPilgrim = transitNext?.mode === 'pilgrim_express';
+
+  if (transitNext?.isGhatRoad || transitNext?.vehicleAdvisory || transitNext?.nightFogAdvisory || isVistadome || isPilgrim) {
     transitGhatHtml = `
       <div class="transit-mountain-advisory" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;font-size:10px;">
+        ${isVistadome ? '<span class="chip-vistadome-rail" style="padding:1px 6px;border-radius:4px;background:rgba(6,182,212,0.15);color:#22d3ee;border:1px solid rgba(6,182,212,0.35);">🚆 Vistadome Glass-Coach (58 Tunnels)</span>' : ''}
+        ${isPilgrim ? '<span class="chip-pilgrim-express" style="padding:1px 6px;border-radius:4px;background:rgba(245,158,11,0.15);color:#fcd34d;border:1px solid rgba(245,158,11,0.35);">🛕 Pilgrim Express Corridor</span>' : ''}
         ${transitNext.isGhatRoad ? '<span class="chip-ghat-road" style="padding:1px 6px;border-radius:4px;background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);">⛰️ Mountain Ghat Road</span>' : ''}
         ${transitNext.vehicleAdvisory ? `<span class="chip-4x4-cab" style="padding:1px 6px;border-radius:4px;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);">${transitNext.vehicleAdvisory}</span>` : ''}
         ${transitNext.nightFogAdvisory ? '<span class="chip-fog-warning" style="padding:1px 6px;border-radius:4px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);">⚠️ Night Mountain Fog Caution</span>' : ''}
@@ -109,11 +114,18 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
     `;
   }
 
+  const transitModeIcon = isVistadome ? '🚆' : (isPilgrim ? '🚗' : (transitNext?.mode === 'walk' ? '🚶' : '🚗'));
+  const transitModeLabel = isVistadome
+    ? 'Vistadome Panoramic Railway'
+    : (isPilgrim
+        ? 'Tirupati Pilgrimage Expressway'
+        : (transitNext?.mode === 'walk' ? 'Walk to next stop' : (transitNext?.isGhatRoad ? 'Highland Ghat Transit' : 'Drive via scenic corridor')));
+
   const transitHtml = transitNext
     ? `
     <div class="transit-connector-card">
-      <span class="transit-mode-icon">${transitNext.mode === 'walk' ? '🚶' : '🚗'}</span>
-      <span>${transitNext.mode === 'walk' ? 'Walk to next stop' : (transitNext.isGhatRoad ? 'Highland Ghat Transit' : 'Drive via scenic corridor')}</span>
+      <span class="transit-mode-icon">${transitModeIcon}</span>
+      <span>${transitModeLabel}</span>
       <span class="transit-duration">${transitNext.duration || '12m'}</span>
       <span class="transit-traffic-badge ${transitNext.traffic === 'slow' ? 'traffic-slow' : 'traffic-clear'}">
         ${transitNext.traffic === 'slow' ? '🔴 Heavy Traffic' : '🟢 Smooth Flow'}

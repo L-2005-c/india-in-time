@@ -8,6 +8,7 @@
 
 export const PALETTE_COMMANDS = [
   // ─── TRAVEL INTELLIGENCE ACTIONS ───
+  { id: 'action-circuit-3day', category: 'Intelligence', title: 'Plan 3-Day Regional Circuit', subtitle: 'Auto-decompose into Araku Valley, Vanjangi 04:30 AM Sunrise & Lambasingi Mist sub-circuits', icon: '⛰️', actionKey: 'planRegionalCircuit' },
   { id: 'action-monsoon', category: 'Intelligence', title: '1-Tap Monsoon Mode Pivot', subtitle: 'Replace outdoor stops with covered havelis, museums & indoor cafes', icon: '🌧️', actionKey: 'pivotMonsoonMode' },
   { id: 'action-heat', category: 'Intelligence', title: '1-Tap Midday Heat Escape', subtitle: 'Shift 12:00–15:30 outdoor legs to air-conditioned heritage venues', icon: '☀️', actionKey: 'pivotHeatEscapeMode' },
   { id: 'action-wa-pass', category: 'Intelligence', title: 'Export Visual WhatsApp Pass', subtitle: 'Generate emoji-rich itinerary card for travel companions', icon: '💬', actionKey: 'shareWhatsAppPass' },
