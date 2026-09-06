@@ -1430,7 +1430,7 @@ const STATIC_ACTIONS = {
   openOfflinePass, closeOfflinePassModal, shareWhatsAppPass, pivotMonsoonMode, pivotHeatEscapeMode,
   printPass: () => window.print(),
   openCommandPalette, closeCommandPalette, closePaletteOverlay, execPaletteCmd, toggleTheme,
-  planRegionalCircuit: () => import('../modules/circuitPlannerUi.js').then(m => m.executeRegionalCircuit()),
+  planRegionalCircuit: () => import('../modules/circuitPlannerUi.js').then(m => m.openCircuitSelectionModal()),
   switchCity: (btn) => switchCity(btn?.value || btn?.dataset?.city || btn?.dataset?.arg),
   continueAsGuest,
   openWhatIfModal: () => { const root = document.getElementById('what-if-modal-root'); if (root) root.innerHTML = _whatIfSimulatorUi.renderWhatIfModal(); const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'flex'; },

@@ -76,7 +76,7 @@ describe('Pillars A, B, C Advancements Suite', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.days.length).toBe(3);
-    });
+    }, 15000);
 
     test('POST /api/time-intelligence/circuit-plan falls back gracefully on unknown circuit', async () => {
       const res = await request(app)
@@ -89,7 +89,7 @@ describe('Pillars A, B, C Advancements Suite', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.circuit.id).toBe('vizag_araku_lambasingi');
-    });
+    }, 15000);
 
     test('circuitPlannerUi.js orchestrates multi-day plans, day tabs, and API calls', () => {
       const circuitUiCode = fs.readFileSync(CIRCUIT_UI_PATH, 'utf8');

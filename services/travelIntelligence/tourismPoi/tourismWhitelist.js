@@ -263,6 +263,33 @@ const VIJAYAWADA = [
   entry('Babai Hotel Heritage Ghee Idli', 'food', 'A', 16.5170, 80.6190, ['babai hotel']),
 ];
 
+const MYSORE = [
+  entry('Mysore Palace (Amba Vilas Palace)', 'heritage', 'S', 12.3051, 76.6551, ['amba vilas palace', 'mysuru palace', 'mysore palace']),
+  entry('Chamundi Hill & Sri Chamundeshwari Temple', 'temple', 'S', 12.2753, 76.6701, ['chamundi hill', 'chamundeshwari temple', 'chamundi betta']),
+  entry('Brindavan Gardens & Musical Dancing Fountain', 'park', 'S', 12.4228, 76.5724, ['brindavan gardens', 'krs dam gardens']),
+  entry("St. Philomena's Cathedral", 'temple', 'A', 12.3208, 76.6579, ['st philomena church mysore', 'st philomenas cathedral']),
+  entry('Sri Chamarajendra Zoological Gardens (Mysore Zoo)', 'zoo', 'S', 12.3025, 76.6645, ['mysore zoo', 'chamarajendra zoo']),
+  entry('Ranganathittu Bird Sanctuary & Boating', 'wildlife', 'S', 12.4245, 76.6550, ['ranganathittu bird sanctuary', 'pakshi kashi']),
+  entry('Srirangapatna Sri Ranganathaswamy Temple', 'temple', 'A', 12.4230, 76.6950, ['srirangapatna temple', 'ranganathaswamy temple']),
+  entry('Jaganmohan Palace & Art Gallery', 'museum', 'A', 12.3080, 76.6505, ['jaganmohan palace']),
+  entry('Karanji Lake & Nature Butterfly Park', 'park', 'A', 12.3060, 76.6740, ['karanji lake']),
+  entry('Devaraja Heritage Spices & Flower Market', 'shopping', 'A', 12.3115, 76.6515, ['devaraja market']),
+  entry('Guru Sweet Mart Original Mysore Pak', 'food', 'A', 12.3090, 76.6520, ['guru sweet mart', 'mysore pak guru sweets']),
+];
+
+const MUNNAR = [
+  entry('Eravikulam National Park (Nilgiri Tahr)', 'wildlife', 'S', 10.1500, 77.0600, ['eravikulam national park', 'rajamalai']),
+  entry('Mattupetty Dam & Lake Speed Boating', 'scenic', 'S', 10.1080, 77.1250, ['mattupetty dam', 'mattupetti lake']),
+  entry('Top Station Cloud Viewpoint', 'viewpoint', 'S', 10.1245, 77.2440, ['top station', 'top station munnar']),
+  entry('Tata Tea Museum Nallathanni Estate', 'museum', 'S', 10.0880, 77.0540, ['tea museum munnar', 'tata tea museum']),
+  entry('Kundala Dam Lake & Shikara Rides', 'scenic', 'A', 10.1280, 77.1720, ['kundala lake', 'kundala arch dam']),
+  entry('Kolukkumalai Highest Organic Tea Estate', 'scenic', 'S', 10.0930, 77.2280, ['kolukkumalai tea estate', 'kolukkumalai sunrise point']),
+  entry('Attukad Waterfalls Mountain Cascades', 'scenic', 'A', 10.0480, 77.0420, ['attukad falls', 'attukal waterfalls']),
+  entry('Pothamedu View Point (Tea & Cardamom Hills)', 'viewpoint', 'A', 10.0570, 77.0520, ['pothamedu viewpoint']),
+  entry('Chokramudi Peak Sunrise Ridge Trek', 'trekking', 'S', 10.0410, 77.0850, ['chokramudi trek']),
+  entry('Meesapulimala Mountain Cloud Ridge Trek', 'trekking', 'S', 10.0980, 77.2050, ['meesapulimala trek']),
+];
+
 /** City key → entries. Keys match city-seeds + common aliases. */
 const CITY_WHITELISTS = {
   visakhapatnam: VIZAG,
@@ -293,6 +320,9 @@ const CITY_WHITELISTS = {
   benares: VARANASI,
   kolkata: KOLKATA,
   calcutta: KOLKATA,
+  mysore: MYSORE,
+  mysuru: MYSORE,
+  munnar: MUNNAR,
   udaipur: [], // seeds-only for now; classifier still applies
 };
 

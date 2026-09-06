@@ -21,6 +21,8 @@ const CITIES = {
   agra:      {id:"agra",      name:"Agra",          emoji:"🕌", lat:27.1767, lon:78.0081, locs:[]},
   varanasi:  {id:"varanasi",  name:"Varanasi",      emoji:"🛕", lat:25.3176, lon:82.9739, locs:[]},
   kolkata:   {id:"kolkata",   name:"Kolkata",       emoji:"🚊", lat:22.5726, lon:88.3639, locs:[]},
+  mysore:    {id:"mysore",    name:"Mysuru",        emoji:"🏰", lat:12.2958, lon:76.6394, locs:[]},
+  munnar:    {id:"munnar",    name:"Munnar",        emoji:"⛰️", lat:10.0889, lon:77.0595, locs:[]},
 };
 
 const LOCAL_PLACE_SEEDS = {
@@ -393,6 +395,50 @@ const LOCAL_PLACE_SEEDS = {
     ['Silver Spoon Restaurant','food',16.5110,80.6280,45,'11:30','22:30'],
     ['Crossroads Restaurant Vijayawada','food',16.5080,80.6450,45,'12:00','23:00'],
   ],
+  mysore: [
+    ['Mysore Palace (Amba Vilas Palace)','scenic',12.3051,76.6551,90,'10:00','17:30'],
+    ['Chamundi Hill & Sri Chamundeshwari Temple','temple',12.2753,76.6701,75,'07:30','21:00'],
+    ['Brindavan Gardens & Musical Dancing Fountain','scenic',12.4228,76.5724,90,'06:30','20:30'],
+    ['St. Philomenas Cathedral','temple',12.3208,76.6579,45,'05:00','18:00'],
+    ['Jaganmohan Palace & Art Gallery','scenic',12.3080,76.6505,60,'08:30','17:30'],
+    ['Sri Chamarajendra Zoological Gardens (Mysore Zoo)','scenic',12.3025,76.6645,120,'08:30','17:30'],
+    ['Karanji Lake & Nature Butterfly Park','scenic',12.3060,76.6740,60,'08:30','17:30'],
+    ['Ranganathittu Bird Sanctuary & Boating','scenic',12.4245,76.6550,90,'09:00','18:00'],
+    ['Srirangapatna Sri Ranganathaswamy Temple','temple',12.4230,76.6950,60,'06:00','21:00'],
+    ['Tipu Sultan Summer Palace Dariya Daulat Bagh','scenic',12.4190,76.7020,60,'09:00','17:00'],
+    ['Lalitha Mahal Palace Heritage Vista','scenic',12.2980,76.6850,45,'10:00','18:00'],
+    ['Rail Museum Mysore','scenic',12.3160,76.6435,60,'10:00','17:30'],
+    ['Chamundi Hill 1000 Steps & Nandi Monolith Trek','trekking',12.2850,76.6690,90,'05:30','18:30'],
+    ['Devaraja Heritage Spices & Flower Market','shopping',12.3115,76.6515,60,'06:30','21:30'],
+    ['Cauvery Arts & Crafts Silk Emporium','shopping',12.3095,76.6510,45,'10:00','20:30'],
+    ['Guru Sweet Mart Original Mysore Pak','food',12.3090,76.6520,30,'08:30','22:00'],
+    ['Hotel Original Vinayaka Mylari Dosa','food',12.3105,76.6610,35,'06:30','21:00'],
+    ['RRR Mysore Andhra Style Biryani','food',12.3085,76.6540,45,'11:30','22:30'],
+    ['Gayatri Tiffin Room (GTR) Chamundipuram','food',12.2945,76.6530,35,'07:00','21:30'],
+    ['Poojari Fish Land Mysore Highway','food',12.3550,76.6410,50,'11:30','23:00'],
+  ],
+  munnar: [
+    ['Eravikulam National Park (Nilgiri Tahr)','scenic',10.1500,77.0600,120,'07:00','16:00'],
+    ['Mattupetty Dam & Lake Speed Boating','scenic',10.1080,77.1250,75,'09:00','17:00'],
+    ['Top Station Cloud Viewpoint','scenic',10.1245,77.2440,90,'06:00','18:00'],
+    ['Kundala Dam Lake & Shikara Rides','scenic',10.1280,77.1720,60,'09:00','17:30'],
+    ['Tata Tea Museum Nallathanni Estate','scenic',10.0880,77.0540,60,'09:00','17:00'],
+    ['Anamudi Peak Base & Western Ghats Vista','scenic',10.1700,77.0630,60,'07:00','17:00'],
+    ['Pothamedu View Point (Tea & Cardamom Hills)','scenic',10.0570,77.0520,45,'06:00','18:30'],
+    ['Attukad Waterfalls Mountain Cascades','scenic',10.0480,77.0420,60,'08:00','18:00'],
+    ['Lakkam Waterfalls Marayoor','scenic',10.2310,77.1680,60,'08:00','17:00'],
+    ['Kolukkumalai Highest Organic Tea Estate','scenic',10.0930,77.2280,90,'05:00','17:30'],
+    ['Lock Heart Gap Cloud View Point','scenic',10.0450,77.1420,45,'06:00','18:30'],
+    ['Blossom Hydel Park & River Walk','scenic',10.0680,77.0590,60,'09:00','19:00'],
+    ['Carmelagiri Elephant Forest Park','scenic',10.1190,77.0980,60,'09:00','17:00'],
+    ['Chokramudi Peak Sunrise Ridge Trek','trekking',10.0410,77.0850,150,'05:00','14:00'],
+    ['Meesapulimala Mountain Cloud Ridge Trek','trekking',10.0980,77.2050,180,'05:30','15:00'],
+    ['Chinnar Wildlife Sanctuary Scrub Forest Trail','trekking',10.3300,77.2000,120,'06:30','17:00'],
+    ['Munnar Town Spice & Homemade Chocolate Market','shopping',10.0860,77.0610,60,'09:30','21:00'],
+    ['Rapsy Restaurant Munnar Town','food',10.0870,77.0600,40,'07:00','22:00'],
+    ['Saravana Bhavan Munnar Central','food',10.0865,77.0615,40,'07:00','22:00'],
+    ['Hotel Gurubhavan Kanthalloor Flavors','food',10.0820,77.0650,45,'11:30','22:30'],
+  ],
 };
 
 // ══════════════════════════════════════════════════
@@ -625,6 +671,22 @@ const HIDDEN_GEM_SEEDS = {
     { name:'Rabindra Sarovar Lake', cat:'scenic', coords:[22.5110,88.3561], vt:60, ot:'05:00', ct:'19:00',
       why:'South Kolkata\'s favourite lake for a morning walk — locals call it "the lungs of Kolkata," and it barely registers with visiting tourists.',
       reviewGap:'~4,710 Google reviews vs Victoria Memorial\'s 100,000+', bestFor:'Morning walks, birdwatching, jogging' },
+    ],
+  mysore: [
+    { name:'Karanji Lake Butterfly Park', cat:'scenic', coords:[12.3060,76.6740], vt:60, ot:'08:30', ct:'17:30',
+      why:'India\'s largest walk-through aviary and tranquil butterfly park flanking Chamundi hills — frequently bypassed by palace-only tourists.',
+      reviewGap:'~6,200 Google reviews vs Mysore Palace 200,000+', bestFor:'Nature walk, walk-through aviary, serene lake boating' },
+    { name:'Lalitha Mahal Palace Heritage Vista', cat:'scenic', coords:[12.2980,76.6850], vt:45, ot:'10:00', ct:'18:00',
+      why:'A gleaming white Italian-renaissance palace inspired by St Paul\'s London, nestled peacefully below Chamundi Hill.',
+      reviewGap:'~4,100 Google reviews vs Amba Vilas Palace', bestFor:'Classic architecture, afternoon tea, quiet panorama' },
+  ],
+  munnar: [
+    { name:'Kolukkumalai Sunrise Organic Tea Trail', cat:'scenic', coords:[10.0930,77.2280], vt:120, ot:'05:00', ct:'17:30',
+      why:'The highest organic tea plantation in the world (7,900ft) with an adrenaline-pumping 4x4 rugged jeep climb and cloud sunrise.',
+      reviewGap:'~3,800 Google reviews vs Mattupetty Dam 50,000+', bestFor:'Above-cloud sunrise, orthodox tea tasting, off-road jeep trail' },
+    { name:'Attukad Waterfalls Mountain Trail', cat:'scenic', coords:[10.0480,77.0420], vt:60, ot:'08:00', ct:'18:00',
+      why:'A secluded cascade tumbling through lush rolling hills and cardamom plantations across a rustic wooden bridge.',
+      reviewGap:'~2,100 Google reviews vs Top Station', bestFor:'Monsoon cascades, photography, plantation stroll' },
   ],
 };
 
@@ -657,6 +719,8 @@ const CITY_TRANSPORT_CONFIG = {
   agra:      { hasMetro:false, hasTrain:true,  busFare:[10,25],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,25], congestion:1.0  },
   varanasi:  { hasMetro:false, hasTrain:true,  busFare:[10,20],  autoBase:20, autoPerKm:10, cabBase:40,  cabPerKm:13, trainFare:[10,20], congestion:1.05 },
   kolkata:   { hasMetro:true,  hasTrain:true,  busFare:[7,25],   autoBase:25, autoPerKm:12, cabBase:40,  cabPerKm:14, trainFare:[5,15],  metroFare:[5,30],  congestion:1.2  },
+  mysore:    { hasMetro:false, hasTrain:true,  busFare:[10,25],  autoBase:30, autoPerKm:12, cabBase:50,  cabPerKm:14, trainFare:[10,25], congestion:0.95 },
+  munnar:    { hasMetro:false, hasTrain:false, busFare:[15,35],  autoBase:30, autoPerKm:14, cabBase:70,  cabPerKm:18, congestion:0.8, isGhatRoad:true },
 };
 const DEFAULT_TRANSPORT_CONFIG = { hasMetro:false, hasTrain:false, busFare:[10,30], autoBase:25, autoPerKm:12, cabBase:50, cabPerKm:15, congestion:1.0 };
 

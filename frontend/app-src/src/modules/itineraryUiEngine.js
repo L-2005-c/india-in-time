@@ -46,6 +46,8 @@ export function getSignatureDish(stop) {
     varanasi: 'Banarasi Paan & Malaiyo',
     kolkata: 'Kathi Roll & Mishti Doi',
     udaipur: 'Gatte ki Sabzi & Ker Sangri',
+    mysore: 'Guru Sweets Mysore Pak & Hotel Mylari Dosa',
+    munnar: 'Kerala Appam with Stew & Cardamom Tea',
   };
   const cityKey = (stop?.cityKey || window.__appState?.selectedCity || '').toLowerCase();
   return foodHints[cityKey] || 'Local Street Specialty';
@@ -77,6 +79,16 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
 
   const sanctumAlertHtml = (stop?.cultural?.isSanctumClosed || stop?.sanctumClosureAlert)
     ? `<span class="stop-intel-chip chip-sanctum-closure" title="Sanctum afternoon closure (12:30-15:30)">🛕 Midday Sanctum Closure (12:30–15:30)</span>`
+    : '';
+
+  const sunHarshness = stop?.sunExposure || stop?.sunHarshness;
+  const sunHarshnessHtml = (sunHarshness?.isHarshSun || stop?.harshSunWarning)
+    ? `<span class="stop-intel-chip chip-sun-harshness" title="${sunHarshness?.guidance || 'Severe midday solar radiation — unshaded stone/beach surface'}">☀️ Midday Sun Warning (Low Shade)</span>`
+    : '';
+
+  const darshanQueue = stop?.darshanQueue;
+  const darshanQueueHtml = (darshanQueue?.isSacredDarshan || stop?.darshanEstimate)
+    ? `<span class="stop-intel-chip chip-darshan-queue" title="Optimal darshan: ${darshanQueue?.recommendedSlot || 'Early morning'}. ${darshanQueue?.tip || ''}">🛕 Darshan Queue ~${darshanQueue?.estimatedWaitMinutes || 45}m (${darshanQueue?.crowdFactor || 'MODERATE'})</span>`
     : '';
 
   const comfortHtml = stop?.weatherComfortBadge
@@ -151,6 +163,8 @@ export function renderFaangStopCard(stop, index, totalStops, transitNext = null)
         <span class="stop-intel-chip ${crowd.class}" title="Real-time predictive crowd estimate">👥 ${crowd.label}</span>
         ${cloudInversionHtml}
         ${sanctumAlertHtml}
+        ${darshanQueueHtml}
+        ${sunHarshnessHtml}
         ${comfortHtml}
         ${goldenHourHtml}
         ${dishHtml}

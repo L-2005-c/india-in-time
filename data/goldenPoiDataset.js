@@ -187,6 +187,24 @@ const GOLDEN_POIS = [
   poi('vja_kondapalli_fort', 'Kondapalli Fort & Heritage Ramparts', 'heritage', 'Vijayawada', 'Andhra Pradesh', 16.6210, 80.5420, ['Kondapalli Fort', 'Kondapalli Killa']),
   poi('vja_bapu_museum', 'Bapu Museum (Victoria Jubilee Hall)', 'museum', 'Vijayawada', 'Andhra Pradesh', 16.5130, 80.6320, ['Bapu Museum', 'Victoria Jubilee Museum Vijayawada']),
   poi('vja_mangalagiri', 'Mangalagiri Panakala Lakshmi Narasimha Swamy Temple', 'temple', 'Vijayawada', 'Andhra Pradesh', 16.4350, 80.5620, ['Mangalagiri Temple', 'Panakala Narasimha Swamy']),
+
+  // ── MYSURU / MYSORE ──────────────────────────────────────────────────────
+  poi('mys_palace', 'Mysore Palace (Amba Vilas Palace)', 'heritage', 'Mysore', 'Karnataka', 12.3051, 76.6551, ['Amba Vilas Palace', 'Mysuru Palace', 'Mysore Palace']),
+  poi('mys_chamundi', 'Chamundi Hill & Sri Chamundeshwari Temple', 'temple', 'Mysore', 'Karnataka', 12.2753, 76.6701, ['Chamundi Hill', 'Chamundeshwari Temple', 'Chamundi Betta']),
+  poi('mys_brindavan', 'Brindavan Gardens & Musical Dancing Fountain', 'park', 'Mysore', 'Karnataka', 12.4228, 76.5724, ['Brindavan Gardens', 'KRS Dam Gardens']),
+  poi('mys_philomenas', "St. Philomena's Cathedral", 'temple', 'Mysore', 'Karnataka', 12.3208, 76.6579, ['St Philomena Church Mysore', 'St Philomenas Cathedral']),
+  poi('mys_zoo', 'Sri Chamarajendra Zoological Gardens (Mysore Zoo)', 'zoo', 'Mysore', 'Karnataka', 12.3025, 76.6645, ['Mysore Zoo', 'Chamarajendra Zoo']),
+  poi('mys_ranganathittu', 'Ranganathittu Bird Sanctuary & Boating', 'wildlife', 'Mysore', 'Karnataka', 12.4245, 76.6550, ['Ranganathittu Bird Sanctuary', 'Pakshi Kashi']),
+  poi('mys_srirangapatna', 'Srirangapatna Sri Ranganathaswamy Temple', 'temple', 'Mysore', 'Karnataka', 12.4230, 76.6950, ['Srirangapatna Temple', 'Ranganathaswamy Temple']),
+
+  // ── MUNNAR ───────────────────────────────────────────────────────────────
+  poi('mun_eravikulam', 'Eravikulam National Park (Nilgiri Tahr)', 'wildlife', 'Munnar', 'Kerala', 10.1500, 77.0600, ['Eravikulam National Park', 'Rajamalai']),
+  poi('mun_mattupetty', 'Mattupetty Dam & Lake Speed Boating', 'scenic', 'Munnar', 'Kerala', 10.1080, 77.1250, ['Mattupetty Dam', 'Mattupetti Lake']),
+  poi('mun_top_station', 'Top Station Cloud Viewpoint', 'viewpoint', 'Munnar', 'Kerala', 10.1245, 77.2440, ['Top Station', 'Top Station Munnar']),
+  poi('mun_tea_museum', 'Tata Tea Museum Nallathanni Estate', 'museum', 'Munnar', 'Kerala', 10.0880, 77.0540, ['Tea Museum Munnar', 'Tata Tea Museum']),
+  poi('mun_kundala', 'Kundala Dam Lake & Shikara Rides', 'scenic', 'Munnar', 'Kerala', 10.1280, 77.1720, ['Kundala Lake', 'Kundala Arch Dam']),
+  poi('mun_kolukkumalai', 'Kolukkumalai Highest Organic Tea Estate', 'scenic', 'Munnar', 'Kerala', 10.0930, 77.2280, ['Kolukkumalai Tea Estate', 'Kolukkumalai Sunrise Point']),
+  poi('mun_attukad', 'Attukad Waterfalls Mountain Cascades', 'scenic', 'Munnar', 'Kerala', 10.0480, 77.0420, ['Attukad Falls', 'Attukal Waterfalls']),
 ];
 
 /** Quick index of golden POIs by city */
