@@ -24,22 +24,7 @@ async function fetchOpenMeteo(lat, lon, timeoutMs = 7000) {
   return upstream.json();
 }
 
-router.get('/', async (req, res) => {
-  const { lat, lon } = req.query;
-  if (!lat || !lon) return res.status(400).json({ error: 'Missing lat / lon params' });
-
-  const numLat = parseFloat(lat);
-  const numLon = parseFloat(lon);
-  if (!Number.isFinite(numLat) || !Number.isFinite(numLon)) {
-    return res.status(400).json({ error: 'Invalid lat / lon coordinates' });
-  }
-
-  const cacheKey = `${numLat.toFixed(2)},${numLon.toFixed(2)}`;
-  const cached = weatherCache.get(cacheKey);
-  if (cached) {
-    return res.json(cached);
-  }
-
+async function computeWeather(numLat, numLon) {
   let data;
   try {
     data = await fetchOpenMeteo(numLat, numLon);
@@ -49,18 +34,14 @@ router.get('/', async (req, res) => {
       data = await fetchOpenMeteo(numLat, numLon, 5000);
     } catch (secondErr) {
       appLogger.warn('[weather] Open-Meteo upstream unavailable; serving deterministic seasonal fallback:', secondErr.message);
-      const fallback = getDeterministicWeather(numLat, numLon);
-      weatherCache.set(cacheKey, fallback);
-      return res.json(fallback);
+      return getDeterministicWeather(numLat, numLon);
     }
   }
 
   try {
     const cw = data?.current_weather;
     if (!cw) {
-      const fallback = getDeterministicWeather(numLat, numLon);
-      weatherCache.set(cacheKey, fallback);
-      return res.json(fallback);
+      return getDeterministicWeather(numLat, numLon);
     }
 
     const temp = Math.round(cw.temperature);
@@ -79,7 +60,7 @@ router.get('/', async (req, res) => {
       weathercode: h.weather_code?.[i] ?? null,
     })) : [];
 
-    const response = {
+    return {
       temp,
       tempC: temp,
       windKph,
@@ -89,13 +70,36 @@ router.get('/', async (req, res) => {
       forecastSource: 'Open-Meteo forecast',
       hourly,
     };
-    weatherCache.set(cacheKey, response);
-    res.json(response);
   } catch (err) {
     appLogger.error('[weather] parse error, serving fallback:', err.message);
-    const fallback = getDeterministicWeather(numLat, numLon);
-    res.json(fallback);
+    return getDeterministicWeather(numLat, numLon);
   }
+}
+
+router.get('/', async (req, res) => {
+  const { lat, lon } = req.query;
+  if (!lat || !lon) return res.status(400).json({ error: 'Missing lat / lon params' });
+
+  const numLat = parseFloat(lat);
+  const numLon = parseFloat(lon);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLon)) {
+    return res.status(400).json({ error: 'Invalid lat / lon coordinates' });
+  }
+
+  const cacheKey = `${numLat.toFixed(2)},${numLon.toFixed(2)}`;
+  const cached = weatherCache.get(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+
+  let result;
+  if (typeof weatherCache.getOrFetch === 'function') {
+    result = await weatherCache.getOrFetch(cacheKey, () => computeWeather(numLat, numLon));
+  } else {
+    result = await computeWeather(numLat, numLon);
+    weatherCache.set(cacheKey, result);
+  }
+  return res.json(result);
 });
 
 module.exports = router;

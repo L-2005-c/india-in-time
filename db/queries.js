@@ -116,12 +116,21 @@ async function flushAnalyticsBuffer() {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const text = `
-        INSERT INTO api_usage (endpoint, method, ip, user_agent, status_code, response_ms, request_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `;
-      for (const row of batch) {
-        await client.query(text, [row.endpoint, row.method, row.ip, row.userAgent, row.statusCode, row.responseMs, row.requestId]);
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < batch.length; i += CHUNK_SIZE) {
+        const chunk = batch.slice(i, i + CHUNK_SIZE);
+        const valuePlaceholders = [];
+        const params = [];
+        let paramIdx = 1;
+        for (const row of chunk) {
+          valuePlaceholders.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
+          params.push(row.endpoint, row.method, row.ip, row.userAgent, row.statusCode, row.responseMs, row.requestId);
+        }
+        const text = `
+          INSERT INTO api_usage (endpoint, method, ip, user_agent, status_code, response_ms, request_id)
+          VALUES ${valuePlaceholders.join(', ')}
+        `;
+        await client.query(text, params);
       }
       await client.query('COMMIT');
     } catch (e) {

@@ -63,47 +63,7 @@ function canRefresh(key) {
   return true;
 }
 
-router.post('/', async (req, res) => {
-  const { lat, lon, cityName, totalMinutes, refresh, prefs = [] } = req.body;
-  const wantFoodOnly = Array.isArray(prefs) && prefs.length === 1 && prefs[0] === 'food';
-  // Food is one of several preferences on a mixed trip (e.g. beach + scenic +
-  // temple + food) far more often than it's the sole preference. The curated
-  // restaurant seed list (real named places per city) previously only ran
-  // for wantFoodOnly, so mixed-preference trips had no guaranteed food
-  // candidates at all — AI/Wiki/Nominatim discovery alone often returns zero
-  // restaurants, leaving the itinerary optimizer with nothing to schedule at
-  // lunch/dinner despite the user explicitly asking for local food.
-  const wantsFood = Array.isArray(prefs) && prefs.includes('food');
-  if (lat==null||lon==null) return res.status(400).json({ error:'Missing lat/lon' });
-  appLogger.info(`\n[places] ${cityName} (${lat},${lon})`);
-  const key = cacheKey(cityName, lat, lon, totalMinutes, prefs);
-
-  // `refresh: true` is meant for "my data looks stale, force a re-fetch" —
-  // it bypasses the cache and triggers Gemini + Wikipedia + Nominatim all at
-  // once. Since it's caller-controlled with no ownership check, anyone could
-  // otherwise force that expensive multi-source fetch on every request just
-  // by always sending refresh:true (the per-IP rate limiter still applies,
-  // but that alone still allows a steady drip of full-cost fetches, and
-  // multiple IPs can target the same popular city). Cap actual bypasses to
-  // once per cache key per minute — everyone past the first refresher in
-  // that window still gets a fast, fresh-enough cached response.
-  const requestedRefresh = !!refresh;
-  const effectiveRefresh = requestedRefresh && canRefresh(key);
-  if (requestedRefresh && !effectiveRefresh) {
-    appLogger.info(`[places] Refresh requested for ${cityName} but throttled (already refreshed recently) — serving cache instead`);
-  }
-  const refreshNow = effectiveRefresh;
-
-  if (refreshNow) {
-    appLogger.info(`[places] Refresh requested for ${cityName}; bypassing cache`);
-    deleteCachedPlaces(key);
-  }
-  const cached = refreshNow ? null : getCachedPlaces(key);
-  if (!refreshNow && cached) {
-    appLogger.info(`[places] Cache hit for ${cityName}`);
-    return res.json(cached);
-  }
-  const staticPlaces = filterPlacesByPrefs(staticCityPlaces(cityName), prefs);
+async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFoodOnly, wantsFood, staticPlaces }) {
   try {
     // ── Fetch ALL sources in parallel ────────────────────────────────────────────
     // Strategy: gather every reliable source simultaneously, then merge & dedup.
@@ -175,12 +135,6 @@ router.post('/', async (req, res) => {
     appLogger.info(`[places] Final merged pool before proximity-dedup: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
     // ── Proximity dedup ─────────────────────────────────────────────────────
-    // Exact-name dedup above misses the SAME physical place listed under a
-    // different name variant from another source (e.g. "Sri Kanaka Mahalakshmi
-    // Temple" vs "Sri Kanaka Mahalakshmi Ammavari Temple" — one static seed,
-    // one AI/Nominatim discovery). If two places are within ~180m of each
-    // other AND share a significant name word, they're almost certainly the
-    // same spot — keep only the first (higher-priority source).
     const PROX_STOP = new Set(['the','of','and','temple','beach','fort','park','museum','lake','garden','road','street','point','view','city','centre','center']);
     const sigWords = n => String(n || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !PROX_STOP.has(w));
     const dedupedMerged = [];
@@ -224,20 +178,14 @@ router.post('/', async (req, res) => {
     appLogger.info(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
     if (merged.length >= 3) {
-      const payload = { places: merged, source: 'ranked_sources', count: merged.length };
-      setCachedPlaces(key, payload);
-      return res.json(payload);
+      return { places: merged, source: 'ranked_sources', count: merged.length };
     }
 
     // Last resort: below the 3-result threshold, but `merged` here is
     // already fully deduped (exact-name + proximity) — just relax the
-    // count requirement rather than rebuilding from raw, non-deduped
-    // sources (that previously reintroduced near-duplicate places that
-    // the proximity-dedup step above had just removed).
+    // count requirement rather than rebuilding from raw, non-deduped sources.
     const anything = merged;
-    const payload = { places: anything, source: 'last_resort', count: anything.length };
-    setCachedPlaces(key, payload);
-    return res.json(payload);
+    return { places: anything, source: 'last_resort', count: anything.length };
 
   } catch(err) {
     appLogger.error('[places] Error:', err.message);
@@ -253,13 +201,52 @@ router.post('/', async (req, res) => {
         ),
         prefs
       );
-      const payload = { places: all, source: 'error_fallback', count: all.length };
-      setCachedPlaces(key, payload);
-      return res.json(payload);
-    } catch (err) {
-      appLogger.error('[places] fetch failed:', err.message);
-      return res.status(500).json({ error: 'Places fetch failed' });
+      return { places: all, source: 'error_fallback', count: all.length };
+    } catch (innerErr) {
+      appLogger.error('[places] fetch failed:', innerErr.message);
+      throw innerErr;
     }
+  }
+}
+
+router.post('/', async (req, res) => {
+  const { lat, lon, cityName, totalMinutes, refresh, prefs = [] } = req.body;
+  const wantFoodOnly = Array.isArray(prefs) && prefs.length === 1 && prefs[0] === 'food';
+  const wantsFood = Array.isArray(prefs) && prefs.includes('food');
+  if (lat==null||lon==null) return res.status(400).json({ error:'Missing lat/lon' });
+  appLogger.info(`\n[places] ${cityName} (${lat},${lon})`);
+  const key = cacheKey(cityName, lat, lon, totalMinutes, prefs);
+
+  const requestedRefresh = !!refresh;
+  const effectiveRefresh = requestedRefresh && canRefresh(key);
+  if (requestedRefresh && !effectiveRefresh) {
+    appLogger.info(`[places] Refresh requested for ${cityName} but throttled (already refreshed recently) — serving cache instead`);
+  }
+  const refreshNow = effectiveRefresh;
+
+  if (refreshNow) {
+    appLogger.info(`[places] Refresh requested for ${cityName}; bypassing cache`);
+    deleteCachedPlaces(key);
+  }
+  const cached = refreshNow ? null : getCachedPlaces(key);
+  if (!refreshNow && cached) {
+    appLogger.info(`[places] Cache hit for ${cityName}`);
+    return res.json(cached);
+  }
+  const staticPlaces = filterPlacesByPrefs(staticCityPlaces(cityName), prefs);
+
+  try {
+    const fetcher = () => computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFoodOnly, wantsFood, staticPlaces });
+    let payload;
+    if (refreshNow || typeof placesCache.getOrFetch !== 'function') {
+      payload = await fetcher();
+      setCachedPlaces(key, payload);
+    } else {
+      payload = await placesCache.getOrFetch(key, fetcher, PLACE_CACHE_TTL_MS);
+    }
+    return res.json(payload);
+  } catch (_err) {
+    return res.status(500).json({ error: 'Places fetch failed' });
   }
 });
 

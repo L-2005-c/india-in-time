@@ -229,13 +229,15 @@ async function checkRedisHealth() {
   const now = Date.now();
   if (now - lastRedisHealth.ts < 3000 && lastRedisHealth.ok !== null) return lastRedisHealth.ok;
   try {
-    const Redis = require('ioredis');
-    const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 2000, lazyConnect: true });
-    await r.connect();
-    await r.ping();
-    await r.quit().catch(() => r.disconnect());
-    lastRedisHealth = { ts: now, ok: true };
-    return true;
+    const { getSharedRedis } = require('./services/cache');
+    const r = getSharedRedis();
+    if (r) {
+      await r.ping();
+      lastRedisHealth = { ts: now, ok: true };
+      return true;
+    }
+    lastRedisHealth = { ts: now, ok: false };
+    return false;
   } catch (_e) {
     lastRedisHealth = { ts: now, ok: false };
     return false;

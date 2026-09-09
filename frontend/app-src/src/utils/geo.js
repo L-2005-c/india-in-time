@@ -1,7 +1,29 @@
 // Geometry, route-ordering and place-list helper functions.
 // All pure functions — no shared app state, no DOM access.
 
-const hvKm=(la1,lo1,la2,lo2)=>{const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
+const _hvMemo = new Map();
+const HV_MEMO_MAX = 2000;
+
+function rawHvKm(la1, lo1, la2, lo2) {
+  const R = 6371, dL = (la2 - la1) * Math.PI / 180, dO = (lo2 - lo1) * Math.PI / 180;
+  const a = Math.sin(dL / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dO / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const hvKm = (la1, lo1, la2, lo2) => {
+  const p1 = `${Number(la1).toFixed(4)},${Number(lo1).toFixed(4)}`;
+  const p2 = `${Number(la2).toFixed(4)},${Number(lo2).toFixed(4)}`;
+  const key = p1 < p2 ? `${p1}|${p2}` : `${p2}|${p1}`;
+  const cached = _hvMemo.get(key);
+  if (cached !== undefined) return cached;
+  const val = rawHvKm(la1, lo1, la2, lo2);
+  if (_hvMemo.size >= HV_MEMO_MAX) {
+    const firstKey = _hvMemo.keys().next().value;
+    _hvMemo.delete(firstKey);
+  }
+  _hvMemo.set(key, val);
+  return val;
+};
 
 const hasValidCoords = c => Array.isArray(c) && c.length === 2 && c.every(n => Number.isFinite(n));
 

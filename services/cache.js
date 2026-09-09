@@ -290,4 +290,5 @@ module.exports = {
   geminiCache,
   weatherCache,
   geocodeCache,
+  getSharedRedis: () => redis,
 };

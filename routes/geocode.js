@@ -76,6 +76,45 @@ async function geocodeViaPhoton(q) {
 
 const { findGoldenPoi } = require('../data/goldenPoiDataset');
 
+async function computeGeocode(q) {
+  let data;
+  try {
+    data = await throttledNominatimCall(async () => {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}+India&format=json&limit=1`;
+      const upstream = await fetch(url, {
+        headers: {
+          'Accept-Language': 'en-US,en',
+          'User-Agent': config.nominatim.userAgent,
+        },
+        signal: AbortSignal.timeout(config.nominatim.timeoutMs),
+        agent: keepAliveAgent,
+      });
+
+      if (!upstream.ok) {
+        const err = new Error('Nominatim upstream error');
+        err.upstreamStatus = upstream.status;
+        throw err;
+      }
+      return upstream.json();
+    });
+  } catch (nominatimErr) {
+    appLogger.warn('[geocode] Nominatim failed, falling back to Photon:', nominatimErr.message);
+    data = null;
+  }
+
+  // Nominatim errored, or came back with nothing — try Photon before giving up
+  if (!Array.isArray(data) || data.length === 0) {
+    try {
+      data = await geocodeViaPhoton(q);
+    } catch (photonErr) {
+      appLogger.warn('[geocode] Photon fallback also failed:', photonErr.message);
+      data = [];
+    }
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'Missing query param: q' });
@@ -102,48 +141,17 @@ router.get('/', async (req, res) => {
 
   try {
     let data;
-    try {
-      data = await throttledNominatimCall(async () => {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}+India&format=json&limit=1`;
-        const upstream = await fetch(url, {
-          headers: {
-            'Accept-Language': 'en-US,en',
-            // Nominatim requires a valid, identifying User-Agent in production
-            'User-Agent': config.nominatim.userAgent,
-          },
-          signal: AbortSignal.timeout(config.nominatim.timeoutMs),
-          agent: keepAliveAgent,
-        });
-
-        if (!upstream.ok) {
-          const err = new Error('Nominatim upstream error');
-          err.upstreamStatus = upstream.status;
-          throw err;
-        }
-        return upstream.json();
+    if (typeof geocodeCache.getOrFetch === 'function') {
+      data = await geocodeCache.getOrFetch(key, async () => {
+        const fresh = await computeGeocode(q);
+        return fresh && fresh.length > 0 ? fresh : undefined;
       });
-    } catch (nominatimErr) {
-      appLogger.warn('[geocode] Nominatim failed, falling back to Photon:', nominatimErr.message);
-      data = null;
-    }
-
-    // Nominatim errored, or came back with nothing — try Photon before
-    // giving up. This is what keeps city search from being fully broken
-    // whenever Nominatim is having a bad day.
-    if (!Array.isArray(data) || data.length === 0) {
-      try {
-        data = await geocodeViaPhoton(q);
-      } catch (photonErr) {
-        appLogger.warn('[geocode] Photon fallback also failed:', photonErr.message);
-        data = [];
+      if (!data) data = await computeGeocode(q);
+    } else {
+      data = await computeGeocode(q);
+      if (Array.isArray(data) && data.length > 0) {
+        geocodeCache.set(key, data);
       }
-    }
-
-    // Only cache non-empty results — an empty [] is often a transient typo,
-    // not worth locking in for an hour.
-    // Shape: [{ lat, lon, name, display_name, ... }]
-    if (Array.isArray(data) && data.length > 0) {
-      geocodeCache.set(key, data);
     }
     res.json(data);
   } catch (err) {

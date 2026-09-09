@@ -461,10 +461,28 @@ export function initSplash3D(onComplete) {
     }
     ctx.globalAlpha = 1.0;
 
+    if (isDismissed || (typeof document !== 'undefined' && document.hidden)) {
+      animId = null;
+      return;
+    }
     animId = requestAnimationFrame(render);
   }
 
   animId = requestAnimationFrame(render);
+
+  const onVisibilityChange = () => {
+    if (isDismissed) return;
+    if (document.hidden) {
+      if (animId) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    } else if (!animId) {
+      animId = requestAnimationFrame(render);
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  cleanupFns.push(() => document.removeEventListener('visibilitychange', onVisibilityChange));
 
   // Telemetry Progress Sequence
   const stages = [
