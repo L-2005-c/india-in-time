@@ -1,6 +1,6 @@
 {
   "name": "india-in-time-backend",
-  "version": "5.2.2",
+  "version": "2.2.0",
   "description": "Production-ready adaptive GeoAI itinerary decision engine for India In Time",
   "main": "server.js",
   "engines": {
