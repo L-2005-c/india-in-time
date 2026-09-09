@@ -3,18 +3,18 @@
 //  Enables offline mode + fast loading
 // ─────────────────────────────────────────────
 
-const CACHE_NAME = 'india-in-time-v20260811-review';
+const CACHE_NAME = 'india-in-time-v20260910-logo';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/client-api.js?v=20260811-review',
-  '/logo-mark.png?v=20260603-logo',
-  '/favicon-32.png?v=20260603-logo',
-  '/apple-touch-icon.png?v=20260603-logo',
-  '/icon-192.png?v=20260603-logo',
-  '/icon-512.png?v=20260603-logo',
+  '/logo-mark.png?v=20260910-logo',
+  '/favicon-32.png?v=20260910-logo',
+  '/apple-touch-icon.png?v=20260910-logo',
+  '/icon-192.png?v=20260910-logo',
+  '/icon-512.png?v=20260910-logo',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
@@ -151,8 +151,8 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'India In-Time', {
       body: data.body || '',
-      icon: '/icon-192.png?v=20260603-logo',
-      badge: '/icon-192.png?v=20260603-logo',
+      icon: '/icon-192.png?v=20260910-logo',
+      badge: '/icon-192.png?v=20260910-logo',
       vibrate: [200, 100, 200],
     })
   );
