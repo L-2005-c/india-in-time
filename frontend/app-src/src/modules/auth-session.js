@@ -158,7 +158,11 @@ export function createAuthSession({
     } else {
       setUser(null);
       window.currentUser = null;
-      document.getElementById('login-screen').style.display = 'flex';
+      const splash = document.getElementById('splash');
+      const splashActive = splash && splash.style.display !== 'none' && !splash.classList.contains('splash-warp-exit');
+      if (!splashActive) {
+        document.getElementById('login-screen').style.display = 'flex';
+      }
       document.getElementById('user-avatar').style.display = 'none';
     }
   });

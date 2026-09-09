@@ -1249,7 +1249,7 @@ body::before {
    SPLASH SCREEN
 ═══════════════════════════════════════════ */
 #splash{
-  position:fixed; inset:0; z-index:99999;
+  position:fixed; inset:0; z-index:100005;
   background:radial-gradient(circle at 50% 45%, #0d081c 0%, #06030c 55%, #020104 100%);
   display:flex; align-items:center; justify-content:center;
   perspective:1200px; overflow:hidden;
@@ -1287,23 +1287,23 @@ body::before {
 
 /* 3D Holo Stage */
 #splash .stage-3d{
-  position:relative; width:100%; height:100%;
+  position:relative; width:100%; max-width:440px; height:auto;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   transform-style:preserve-3d; will-change:transform;
-  transition:transform 0.15s cubic-bezier(0.2, 0, 0, 1);
+  pointer-events:none;
 }
 
 /* 3D Gyroscope Container */
 #splash .gyro-wrapper{
-  position:relative; width:300px; height:300px;
+  position:relative; width:260px; height:260px;
   display:flex; align-items:center; justify-content:center;
   transform-style:preserve-3d;
 }
 
 /* Floor Grid / Emitter */
 #splash .holo-floor{
-  position:absolute; width:360px; height:360px; border-radius:50%;
-  transform:rotateX(76deg) translateZ(-90px);
+  position:absolute; inset:0; margin:auto; width:340px; height:340px; border-radius:50%;
+  transform:rotateX(76deg) translateZ(-85px);
   background:radial-gradient(circle, rgba(16,185,129,0.14) 0%, rgba(249,115,22,0.04) 40%, transparent 70%);
   border:1px dashed rgba(16,185,129,0.24);
   box-shadow:inset 0 0 40px rgba(16,185,129,0.18), 0 0 50px rgba(139,92,246,0.2);
@@ -1320,13 +1320,13 @@ body::before {
   border:1.5px solid rgba(6,182,212,0.45);
   animation:holoRipplePulse 3s cubic-bezier(0.2,0.8,0.2,1) infinite;
 }
-@keyframes holoFloorSpin{from{transform:rotateX(76deg) translateZ(-90px) rotate(0deg);}to{transform:rotateX(76deg) translateZ(-90px) rotate(360deg);}}
+@keyframes holoFloorSpin{from{transform:rotateX(76deg) translateZ(-85px) rotate(0deg);}to{transform:rotateX(76deg) translateZ(-85px) rotate(360deg);}}
 @keyframes holoRipplePulse{0%{transform:scale(0.6);opacity:0.9;}100%{transform:scale(1.6);opacity:0;}}
 
 /* Multi-Axis 3D Orbital Rings */
-#splash .ring-3d{position:absolute;border-radius:50%;transform-style:preserve-3d;pointer-events:none;}
+#splash .ring-3d{position:absolute;inset:0;margin:auto;border-radius:50%;transform-style:preserve-3d;pointer-events:none;}
 #splash .ring-outer{
-  width:275px; height:275px;
+  width:260px; height:260px;
   border:1.5px solid rgba(16,185,129,0.38);
   box-shadow:0 0 22px rgba(16,185,129,0.28), inset 0 0 15px rgba(16,185,129,0.18);
   animation:ringSpinOuter 14s linear infinite;
@@ -1454,15 +1454,19 @@ body::before {
   color:rgba(148,163,184,0.45); letter-spacing:2px; margin-top:2px;
 }
 
-/* Sound & Skip controls */
+/* Sound & Skip controls flex container */
+.splash-top-bar{
+  position:absolute; top:max(18px, env(safe-area-inset-top, 18px)); right:max(22px, env(safe-area-inset-right, 22px));
+  display:flex; align-items:center; gap:10px;
+  z-index:100010; pointer-events:auto;
+}
 .btn-sound-splash{
-  position:absolute; top:24px; right:152px;
-  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
-  color:rgba(248,250,252,0.85); width:32px; height:32px; border-radius:50%;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16);
+  color:rgba(248,250,252,0.85); width:34px; height:34px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
   font-size:14px; cursor:pointer;
   backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-  transition:all 0.25s ease; z-index:100; transform:translateZ(50px);
+  transition:all 0.25s ease;
 }
 .btn-sound-splash:hover{
   background:rgba(255,255,255,0.14); color:#ffffff;
@@ -1472,16 +1476,84 @@ body::before {
   opacity:0.65; border-color:rgba(239,68,68,0.4);
 }
 .btn-skip-splash{
-  position:absolute; top:24px; right:28px;
-  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
-  color:rgba(248,250,252,0.7); padding:6px 14px; border-radius:20px;
-  font-size:11px; font-weight:600; letter-spacing:1px; cursor:pointer;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16);
+  color:rgba(248,250,252,0.85); padding:7px 16px; border-radius:20px;
+  font-size:11px; font-weight:700; letter-spacing:1px; cursor:pointer;
   backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-  transition:all 0.25s ease; z-index:100; transform:translateZ(50px);
+  transition:all 0.25s ease;
 }
 .btn-skip-splash:hover{
-  background:rgba(255,255,255,0.12); color:#ffffff;
+  background:rgba(255,255,255,0.14); color:#ffffff;
   border-color:rgba(16,185,129,0.5); box-shadow:0 0 16px rgba(16,185,129,0.3);
+}
+
+/* 3D Splash Mobile Clean Layout */
+@media (max-width: 640px) {
+  .splash-top-bar{
+    top:max(12px, env(safe-area-inset-top, 12px));
+    right:max(14px, env(safe-area-inset-right, 14px));
+    gap:8px;
+  }
+  .btn-sound-splash{
+    width:32px; height:32px; font-size:13px;
+  }
+  .btn-skip-splash{
+    padding:6px 13px; font-size:10px; font-weight:700; letter-spacing:0.8px;
+  }
+  #splash .stage-3d{
+    padding:10px 14px;
+  }
+  #splash .gyro-wrapper{
+    width:180px; height:180px;
+  }
+  #splash .splash-flag{
+    height:72px;
+    filter:drop-shadow(0 10px 20px rgba(0,0,0,0.85)) drop-shadow(0 0 24px rgba(16,185,129,0.5));
+  }
+  #splash .holo-floor{
+    width:215px; height:215px;
+    transform:rotateX(76deg) translateZ(-50px);
+  }
+  #splash .ring-outer{
+    width:180px; height:180px;
+  }
+  #splash .ring-mid{
+    width:150px; height:150px;
+  }
+  #splash .ring-inner{
+    width:120px; height:120px;
+  }
+  #splash .brand-hud{
+    margin-top:10px;
+  }
+  #splash .splash-title{
+    font-size:25px; letter-spacing:-0.2px; line-height:1.15;
+  }
+  #splash .splash-sub{
+    font-size:8.5px; letter-spacing:2.2px; margin-top:4px;
+  }
+  #splash .telemetry-box{
+    margin-top:14px; width:224px; max-width:82vw; gap:5px;
+  }
+  #splash .status-row{
+    font-size:9px;
+  }
+  #splash .progress-track{
+    height:3.5px;
+  }
+  #splash .geo-stamp{
+    font-size:7.5px; letter-spacing:1px; margin-top:2px;
+  }
+}
+@media (max-height: 600px) {
+  #splash .gyro-wrapper{ width:130px; height:130px; }
+  #splash .splash-flag{ height:52px; }
+  #splash .ring-outer{ width:130px; height:130px; }
+  #splash .ring-mid{ width:110px; height:110px; }
+  #splash .ring-inner{ width:90px; height:90px; }
+  #splash .holo-floor{ width:150px; height:150px; transform:rotateX(76deg) translateZ(-35px); }
+  #splash .brand-hud{ margin-top:4px; }
+  #splash .telemetry-box{ margin-top:8px; }
 }
 
 /* Exit Warp Animation */
@@ -1499,7 +1571,7 @@ body::before {
    LOGIN SCREEN — Luxury
 ═══════════════════════════════════════════ */
 #login-screen{
-  position:fixed; inset:0; z-index:99999;
+  position:fixed; inset:0; z-index:99990;
   background:var(--bg-base); display:none; flex-direction:column;
   align-items:center; justify-content:center; padding:20px;
 }

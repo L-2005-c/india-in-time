@@ -284,29 +284,37 @@ export function initSplash3D(onComplete) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  let width = (canvas.width = window.innerWidth);
-  let height = (canvas.height = window.innerHeight);
+  let width = window.innerWidth;
+  let height = window.innerHeight;
 
   const onResize = () => {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
+  onResize();
   window.addEventListener('resize', onResize);
   cleanupFns.push(() => window.removeEventListener('resize', onResize));
 
-  // Generate 3D point cloud of cosmic waypoints
+  // Generate 3D point cloud of cosmic waypoints (lighter on mobile for clarity)
+  const isMobile = window.innerWidth <= 640;
   const points = [];
-  const NUM_POINTS = 85;
+  const NUM_POINTS = isMobile ? 38 : 85;
 
   for (let i = 0; i < NUM_POINTS; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = (Math.random() - 0.5) * Math.PI;
-    const radius = 250 + Math.random() * 190;
+    const radius = (isMobile ? 160 : 250) + Math.random() * (isMobile ? 100 : 190);
     points.push({
       x: radius * Math.cos(phi) * Math.cos(theta),
       y: radius * Math.sin(phi) * 0.72,
       z: radius * Math.cos(phi) * Math.sin(theta),
-      size: Math.random() * 2.2 + 0.8,
+      size: Math.random() * 2.0 + 0.7,
       color: i % 3 === 0 ? '#10b981' : (i % 3 === 1 ? '#f97316' : '#38bdf8'),
       pulse: Math.random() * Math.PI * 2,
     });
@@ -316,6 +324,10 @@ export function initSplash3D(onComplete) {
   let rotY = 0;
   let targetRotX = 0.15;
   let targetRotY = 0;
+  let targetStageRotX = 0;
+  let targetStageRotY = 0;
+  let currentStageRotX = 0;
+  let currentStageRotY = 0;
 
   // 3D Parallax on Desktop
   const onMouseMove = (e) => {
@@ -327,23 +339,22 @@ export function initSplash3D(onComplete) {
     const my = (e.clientY - cy) / cy;
     targetRotY = mx * 0.45;
     targetRotX = 0.15 - my * 0.3;
-
-    if (stage) {
-      stage.style.transform = `rotateY(${mx * 14}deg) rotateX(${-my * 12}deg)`;
-    }
+    targetStageRotY = mx * 10;
+    targetStageRotX = -my * 8;
   };
   window.addEventListener('mousemove', onMouseMove, { passive: true });
   cleanupFns.push(() => window.removeEventListener('mousemove', onMouseMove));
 
-  // 3D Parallax on Mobile Gyroscope
+  // 3D Parallax on Mobile Gyroscope - subtle, non-dizzy micro-tilt
   const onDeviceOrientation = (e) => {
     if (isDismissed || e.gamma === null || e.beta === null) return;
     ensureAudioStarted();
-    const tiltX = Math.min(Math.max(e.gamma / 28, -1), 1);
-    const tiltY = Math.min(Math.max((e.beta - 45) / 28, -1), 1);
-    if (stage) {
-      stage.style.transform = `rotateY(${tiltX * 16}deg) rotateX(${-tiltY * 14}deg)`;
-    }
+    const tiltX = Math.min(Math.max(e.gamma / 35, -1), 1);
+    const tiltY = Math.min(Math.max((e.beta - 45) / 35, -1), 1);
+    targetRotY = tiltX * 0.12;
+    targetRotX = 0.12 - tiltY * 0.08;
+    targetStageRotY = tiltX * 4;
+    targetStageRotX = -tiltY * 3;
   };
   window.addEventListener('deviceorientation', onDeviceOrientation, { passive: true });
   cleanupFns.push(() => window.removeEventListener('deviceorientation', onDeviceOrientation));
@@ -356,6 +367,13 @@ export function initSplash3D(onComplete) {
 
     rotX += (targetRotX - rotX) * 0.05;
     rotY += 0.003 + (targetRotY - rotY) * 0.05;
+
+    // Smooth lerp for stage tilt (60 FPS)
+    currentStageRotX += (targetStageRotX - currentStageRotX) * 0.08;
+    currentStageRotY += (targetStageRotY - currentStageRotY) * 0.08;
+    if (stage) {
+      stage.style.transform = `rotateY(${currentStageRotY.toFixed(2)}deg) rotateX(${currentStageRotX.toFixed(2)}deg)`;
+    }
 
     const cosX = Math.cos(rotX);
     const sinX = Math.sin(rotX);
@@ -482,9 +500,15 @@ export function initSplash3D(onComplete) {
       if (pNum) pNum.textContent = `${progress}%`;
     } else {
       clearInterval(progressInterval);
-      if (typeof onComplete === 'function') {
-        onComplete();
-      }
+      setTimeout(() => {
+        if (!isDismissed) {
+          if (typeof onComplete === 'function') {
+            onComplete();
+          } else {
+            dismissSplash();
+          }
+        }
+      }, 550);
     }
   }, 130);
 
@@ -504,6 +528,26 @@ export function dismissSplash() {
 
   setTimeout(() => {
     splash.style.display = 'none';
+
+    // Place 3D design before the sign-in option:
+    // Once splash finishes, reveal login screen smoothly if visitor is unauthenticated
+    const showLoginIfNeeded = () => {
+      const login = document.getElementById('login-screen');
+      if (login && !window.currentUser) {
+        login.style.display = 'flex';
+        login.style.opacity = '0';
+        requestAnimationFrame(() => {
+          login.style.transition = 'opacity 0.4s ease';
+          login.style.opacity = '1';
+        });
+      }
+    };
+
+    if (window.authCheckedPromise) {
+      Promise.race([window.authCheckedPromise, new Promise(r => setTimeout(r, 600))]).then(showLoginIfNeeded);
+    } else {
+      showLoginIfNeeded();
+    }
 
     // Stop animation loop and clear listeners
     if (animId) {

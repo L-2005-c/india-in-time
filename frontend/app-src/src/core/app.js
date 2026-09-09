@@ -134,6 +134,7 @@ let resolveAuthChecked = () => {};
 const authCheckedPromise = new Promise(resolve => {
   resolveAuthChecked = resolve;
 });
+window.authCheckedPromise = authCheckedPromise;
 
 // ── App State ─────────────────────────────────────────────────────────────────
 let currentCityName='India',currentCityId='india',LOCS=[];
@@ -3287,10 +3288,11 @@ Object.assign(window, { openCustomizeModal, closeCustomizeModal, selectAllCustom
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.onload=()=>{
-  initSplash3D();
+  initSplash3D(() => {
+    Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res, 2000))]).finally(()=>dismissSplash());
+  });
   applyTheme();
   try { installLeafletSafetyGuards(typeof L !== 'undefined' ? L : window.L); } catch(_e){}
-  Promise.all([Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4500))]), new Promise(res=>setTimeout(res,2200))]).then(()=>dismissSplash());
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
   try {
