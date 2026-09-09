@@ -49,8 +49,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-  <script type="module" crossorigin src="/assets/index-BGZvAJwG.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CXiHnxW-.css">
+  <script type="module" crossorigin src="/assets/index-LovxLWB3.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BKl7yhB4.css">
 </head>
 <body>
 <a href="#app" class="skip-link">Skip to content</a>
@@ -118,13 +118,48 @@
   </div>
 </div>
 
-<!-- SPLASH -->
+<!-- SPLASH 3D INTRO -->
 <div id="splash">
-  <img class="splash-flag" src="/logo-mark.png?v=20260910-logo" fetchpriority="high" alt="India In-Time logo" width="89" height="110" decoding="sync">
-  <h1 class="splash-title">India <span>In-Time</span></h1>
-  <p class="splash-sub">Smart Travel · Brighter Journeys</p>
-  <div class="splash-line"></div>
-  <div class="splash-dots"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>
+  <canvas id="splash-star-canvas"></canvas>
+
+  <div class="glow-orb glow-emerald"></div>
+  <div class="glow-orb glow-amber"></div>
+  <div class="glow-orb glow-purple"></div>
+
+  <button class="btn-skip-splash" data-action="dismissSplash" aria-label="Skip to application">ENTER APP ➔</button>
+
+  <div class="stage-3d" id="splash-stage-3d">
+    <div class="gyro-wrapper">
+      <div class="holo-floor">
+        <div class="holo-ripple"></div>
+      </div>
+
+      <div class="ring-3d ring-outer"></div>
+      <div class="ring-3d ring-mid"></div>
+      <div class="ring-3d ring-inner"></div>
+
+      <div class="logo-3d-card">
+        <div class="sheen-overlay"></div>
+        <img class="splash-flag" src="/logo-mark.png?v=20260910-logo" fetchpriority="high" alt="India In-Time logo" width="89" height="110" decoding="sync">
+      </div>
+    </div>
+
+    <div class="brand-hud">
+      <h1 class="splash-title">India <span>In-Time</span></h1>
+      <p class="splash-sub">SMART TRAVEL <span class="tagline-dot"></span> BRIGHTER JOURNEYS</p>
+
+      <div class="telemetry-box">
+        <div class="status-row">
+          <span class="status-text"><span class="status-dot"></span><span id="splash-status-lbl">INITIALIZING GEO-AI...</span></span>
+          <span class="status-percent" id="splash-status-num">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" id="splash-progress-bar"></div>
+        </div>
+        <div class="geo-stamp">GRID: 20.5937° N · 78.9629° E · EDGE v5.2</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="off-toast" role="status" aria-live="polite">📡 Offline — cached data active</div>

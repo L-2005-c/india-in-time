@@ -3,6 +3,7 @@ import { installLeafletSafetyGuards } from './mapGuards.js';
 import { openModal, closeModal } from '../a11y/modal.js';
 import { openTravelDnaModal } from '../modules/travelDna.js';
 import { createAuthSession } from '../modules/auth-session.js';
+import { initSplash3D, dismissSplash } from '../modules/splash3d.js';
 import { calculateStopBudget as _calculateStopBudget, calculateDayBudget as _calculateDayBudget, calculateTripBudget as _calculateTripBudget, renderBudgetBreakdownHTML as _renderBudgetBreakdownHTML } from '../modules/budget.js';
 import { getRouteStopsForDay as _getRouteStopsForDay, createBreakStop as _createBreakStop, estimateStopLoadMinutes as _estimateStopLoadMinutes } from '../modules/planner.js';
 import { getTransportOptions as _getTransportOptionsMod, getTrafficMultiplierForCity as _getTrafficMultiplierForCity, getSmartTravelTimeForCity as _getSmartTravelTimeForCity, getTrafficLevel as _modTrafficLevel, getCrowdLevel as _modCrowdLevel, getCrowdMultiplier as _modCrowdMultiplier, getSmartVisitTime as _modSmartVisitTime } from '../modules/transport.js';
@@ -1420,6 +1421,7 @@ function execPaletteCmd(btn) {
 }
 
 const STATIC_ACTIONS = {
+  dismissSplash,
   addNearby, aiSuggestAlternative, applyCustomPlaces, closeAiDrawer, closeCustomizeModal,
   closeNotifToast, compassTap, doSignOut, focusCitySelect, generatePlan, goBack, handleChat,
   installPWA, locateMe, openAiDrawer, openBudgetFromMenu, openCustomizeModal,
@@ -3287,13 +3289,14 @@ Object.assign(window, { openCustomizeModal, closeCustomizeModal, selectAllCustom
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.onload=()=>{
+  initSplash3D();
   applyTheme();
   try { installLeafletSafetyGuards(typeof L !== 'undefined' ? L : window.L); } catch(_e){}
-  // Wait for the real auth check (not a blind timer) before revealing
-// …
-  Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4000))])
-    .then(()=>new Promise(res=>setTimeout(res,500)))
-    .then(()=>{const s=document.getElementById('splash');s.style.opacity='0';setTimeout(()=>s.style.display='none',300);});
+  // Wait for auth check and ensure minimum presentation time for 3D intro
+  Promise.all([
+    Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4500))]),
+    new Promise(res=>setTimeout(res, 2200))
+  ]).then(() => dismissSplash());
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
   try {
