@@ -525,9 +525,13 @@ export function dismissSplash() {
   if (!splash) return;
 
   splash.classList.add('splash-warp-exit');
+  // Warm up map rendering behind the fading splash
+  window.safeInvalidateMapSize?.(false);
 
   setTimeout(() => {
     splash.style.display = 'none';
+    // Re-verify map geometry once splash overlay is fully removed
+    window.safeInvalidateMapSize?.(false);
 
     // Place 3D design before the sign-in option:
     // Once splash finishes, reveal login screen smoothly if visitor is unauthenticated
@@ -537,7 +541,7 @@ export function dismissSplash() {
         login.style.display = 'flex';
         login.style.opacity = '0';
         requestAnimationFrame(() => {
-          login.style.transition = 'opacity 0.4s ease';
+          login.style.transition = 'opacity 0.35s ease';
           login.style.opacity = '1';
         });
       }

@@ -149,6 +149,7 @@ function safeInvalidateMapSize(animate = false) {
     try { map.resize(); } catch (_e) { /* ignore */ }
   }
 }
+window.safeInvalidateMapSize = safeInvalidateMapSize;
 
 // …
 function isFiniteLatLon(lat, lon) {

@@ -85,7 +85,16 @@ export function createAuthSession({
   checkInAppBrowser();
 
   function continueAsGuest() {
-    document.getElementById('login-screen').style.display = 'none';
+    const login = document.getElementById('login-screen');
+    if (login) {
+      login.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
+      login.style.opacity = '0';
+      login.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        login.style.display = 'none';
+        window.safeInvalidateMapSize?.(false);
+      }, 280);
+    }
     if (typeof window.maybeShowOnboarding === 'function') window.maybeShowOnboarding();
     addMessage(`👋 Welcome to <strong>India In-Time</strong>! Pick a city and tap <strong>Generate Plan</strong> to start exploring!`);
   }
@@ -143,7 +152,17 @@ export function createAuthSession({
     if (user) {
       setUser(user);
       window.currentUser = user;
-      document.getElementById('login-screen').style.display = 'none';
+      const login = document.getElementById('login-screen');
+      if (login && login.style.display !== 'none') {
+        login.style.transition = 'opacity 0.28s ease';
+        login.style.opacity = '0';
+        setTimeout(() => {
+          login.style.display = 'none';
+          window.safeInvalidateMapSize?.(false);
+        }, 280);
+      } else if (login) {
+        login.style.display = 'none';
+      }
       if (typeof window.maybeShowOnboarding === 'function') window.maybeShowOnboarding();
       const avatar = document.getElementById('user-avatar');
       if (user.photoURL) {
