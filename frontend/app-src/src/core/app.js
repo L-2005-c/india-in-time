@@ -3273,14 +3273,12 @@ function selectAllCustomPlaces(state) {
 function applyCustomPlaces() {
   const checkboxes = document.querySelectorAll('.custom-place-cb:checked');
   window.customSelectedPlaces = Array.from(checkboxes).map(cb => cb.value);
-  
   if (window.customSelectedPlaces.length === 0) {
     addMsg('⚠️ You must select at least one place! Selecting all as fallback.');
     window.customSelectedPlaces = null;
   } else {
     addMsg(`✅ Saved ${window.customSelectedPlaces.length} customized places! Generating plan...`);
   }
-  
   closeCustomizeModal();
   generatePlan();
 }
@@ -3292,11 +3290,7 @@ window.onload=()=>{
   initSplash3D();
   applyTheme();
   try { installLeafletSafetyGuards(typeof L !== 'undefined' ? L : window.L); } catch(_e){}
-  // Wait for auth check and ensure minimum presentation time for 3D intro
-  Promise.all([
-    Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4500))]),
-    new Promise(res=>setTimeout(res, 2200))
-  ]).then(() => dismissSplash());
+  Promise.all([Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res,4500))]), new Promise(res=>setTimeout(res,2200))]).then(()=>dismissSplash());
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
   try {
