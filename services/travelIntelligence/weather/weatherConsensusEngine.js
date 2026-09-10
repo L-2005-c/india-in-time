@@ -72,6 +72,43 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
   const repA = reports[0];
   const repB = reports[1];
 
+  const isLiveA = repA.dataState === DATA_STATES.OBSERVED || repA.dataState === DATA_STATES.PREDICTED;
+  const isLiveB = repB.dataState === DATA_STATES.OBSERVED || repB.dataState === DATA_STATES.PREDICTED;
+
+  // Case: One provider is live NWP/observation and the other is only historical/climatological normal
+  if (isLiveA !== isLiveB) {
+    const liveRep = isLiveA ? repA : repB;
+    const histRep = isLiveA ? repB : repA;
+
+    const tempDelta = Math.abs(liveRep.metrics.temperatureC - histRep.metrics.temperatureC);
+    // If live temperature is within 5°C of seasonal normal, high plausibility
+    const tempPlausible = tempDelta <= 5.0;
+
+    return {
+      consensusState: tempPlausible ? WEATHER_CONSENSUS_STATES.MODERATE_AGREEMENT : WEATHER_CONSENSUS_STATES.SINGLE_PROVIDER,
+      dataState: liveRep.dataState,
+      confidence: tempPlausible ? CONFIDENCE_LEVELS.MEDIUM : CONFIDENCE_LEVELS.LOW,
+      temperatureC: liveRep.metrics.temperatureC,
+      apparentTempC: liveRep.metrics.apparentTempC,
+      precipitationProb: liveRep.metrics.precipitationProb,
+      precipitationMm: liveRep.metrics.precipitationMm,
+      condition: liveRep.metrics.condition,
+      humidityPercent: liveRep.metrics.humidityPercent,
+      windKph: liveRep.metrics.windKph,
+      providersConsidered: [liveRep.provider, histRep.provider],
+      divergence: {
+        tempDeltaC: Math.round(tempDelta * 10) / 10,
+        rainDeltaPercent: Math.abs((liveRep.metrics.precipitationProb ?? 0) - (histRep.metrics.precipitationProb ?? 0)),
+      },
+      advisories: [
+        `Primary live telemetry provided by ${liveRep.provider}; calibrated against ${histRep.provider} climatological baseline.`,
+      ],
+      disagreementNotice: null,
+      isAvailable: true,
+      hourly: liveRep.hourly || [],
+    };
+  }
+
   const tempA = repA.metrics.temperatureC;
   const tempB = repB.metrics.temperatureC;
   const rainA = repA.metrics.precipitationProb ?? 0;

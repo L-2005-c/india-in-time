@@ -185,6 +185,9 @@ function parseRequirements(raw = {}) {
     mustLeaveBy: endMin,
   };
 
+  const rawDna = raw.travelDna || raw.dnaProfile || raw.travelerDna || raw.dna || null;
+  const travelDna = rawDna && typeof rawDna === 'object' ? rawDna : null;
+
   const soft = {
     preferredCategories: [...new Set(preferred)],
     personas,
@@ -196,11 +199,13 @@ function parseRequirements(raw = {}) {
     relaxed: String(raw.tripMode || '').toLowerCase() === 'relaxed' || raw.relaxed === true,
     budget,
     safety: raw.safetyRequired === true,
+    travelDna,
   };
 
   return {
     hard,
     soft,
+    travelDna,
     originCoords: Array.isArray(raw.originCoords || raw.fromCoords) ? (raw.originCoords || raw.fromCoords) : null,
     weather: raw.weather || null,
     region: raw.region || null,

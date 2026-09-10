@@ -16,7 +16,7 @@ const { weatherCodeToCondition } = require('../../weatherEngine');
 
 const PROVIDER_NAME = 'OPEN_METEO';
 
-async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 6000 } = {}) {
+async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 9000 } = {}) {
   let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,relative_humidity_2m,wind_speed_10m,uv_index,cloud_cover,visibility,weather_code&forecast_days=2&timezone=Asia%2FKolkata`;
   if (Number.isFinite(Number(elevationM))) {
     url += `&elevation=${Math.round(Number(elevationM))}`;
@@ -41,8 +41,20 @@ async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 600
  * Fetches and normalizes weather from Open-Meteo.
  */
 async function getOpenMeteoWeather(lat, lon, options = {}) {
+  let raw = null;
   try {
-    const raw = await fetchFromOpenMeteo(lat, lon, options);
+    raw = await fetchFromOpenMeteo(lat, lon, options);
+  } catch (firstErr) {
+    appLogger.info(`[openMeteoAdapter] First attempt failed (${firstErr.message}), retrying...`);
+    try {
+      raw = await fetchFromOpenMeteo(lat, lon, { ...options, timeoutMs: 5000 });
+    } catch (secondErr) {
+      appLogger.warn(`[openMeteoAdapter] Provider fetch failed: ${secondErr.message}`);
+      return null;
+    }
+  }
+
+  try {
     const cw = raw?.current_weather;
     if (!cw) {
       throw new Error('Missing current_weather in Open-Meteo payload');
@@ -59,7 +71,17 @@ async function getOpenMeteoWeather(lat, lon, options = {}) {
     const firstCloud = Array.isArray(h.cloud_cover) ? h.cloud_cover[0] : 20;
     const firstUv = Array.isArray(h.uv_index) ? h.uv_index[0] : 3;
 
-    const hourly = Array.isArray(h.time) ? h.time.map((time, i) => ({
+    const timeKeys = Array.isArray(h.time)
+      ? h.time
+      : (Array.isArray(h.temperature_2m)
+          ? h.temperature_2m.map((_, i) => `+${i}h`)
+          : (Array.isArray(h.weathercode)
+              ? h.weathercode.map((_, i) => `+${i}h`)
+              : (Array.isArray(h.weather_code)
+                  ? h.weather_code.map((_, i) => `+${i}h`)
+                  : [])));
+
+    const hourly = timeKeys.map((time, i) => ({
       time,
       tempC: h.temperature_2m?.[i] != null ? Math.round(h.temperature_2m[i] * 10) / 10 : null,
       apparentTempC: h.apparent_temperature?.[i] != null ? Math.round(h.apparent_temperature[i] * 10) / 10 : null,
@@ -70,8 +92,8 @@ async function getOpenMeteoWeather(lat, lon, options = {}) {
       uvIndex: h.uv_index?.[i] ?? null,
       cloudCover: h.cloud_cover?.[i] ?? null,
       visibilityM: h.visibility?.[i] ?? null,
-      weathercode: h.weather_code?.[i] ?? null,
-    })) : [];
+      weathercode: h.weathercode?.[i] ?? h.weather_code?.[i] ?? null,
+    }));
 
     return normalizeWeatherRecord({
       provider: PROVIDER_NAME,

@@ -396,7 +396,38 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   const dnaProfile = requirements.travelDna || requirements.dnaProfile || requirements.soft.travelDna;
   const dnaMatch = computeDnaMatch(place, dnaProfile);
   if (dnaMatch && Number.isFinite(dnaMatch.score)) {
-    score += (dnaMatch.score - 50) * 0.28;
+    score += (dnaMatch.score - 50) * 0.45;
+  }
+
+  // Active evaluation of Traveler DNA operational tolerances (supports numeric 0-100 or categorical 'LOW'/'HIGH')
+  let rainTol = String(dnaProfile?.rainTolerance || '').toUpperCase();
+  if (Number.isFinite(Number(dnaProfile?.rainTolerance))) {
+    const rNum = Number(dnaProfile.rainTolerance);
+    rainTol = rNum <= 40 ? 'LOW' : (rNum >= 70 ? 'HIGH' : 'MEDIUM');
+  }
+
+  let walkTol = String(dnaProfile?.walkingTolerance || dnaProfile?.walkTolerance || '').toUpperCase();
+  if (Number.isFinite(Number(dnaProfile?.walkingTolerance || dnaProfile?.walkTolerance))) {
+    const wNum = Number(dnaProfile.walkingTolerance || dnaProfile.walkTolerance);
+    walkTol = wNum <= 40 ? 'SHORT' : (wNum >= 70 ? 'HIGH' : 'MODERATE');
+  }
+
+  let crowdTol = String(dnaProfile?.crowdTolerance || '').toUpperCase();
+  if (Number.isFinite(Number(dnaProfile?.crowdTolerance))) {
+    const cNum = Number(dnaProfile.crowdTolerance);
+    crowdTol = cNum <= 40 ? 'LOW' : (cNum >= 70 ? 'HIGH' : 'MEDIUM');
+  }
+
+  let heatTol = String(dnaProfile?.heatTolerance || '').toUpperCase();
+  if (Number.isFinite(Number(dnaProfile?.heatTolerance))) {
+    const hNum = Number(dnaProfile.heatTolerance);
+    heatTol = hNum <= 40 ? 'LOW' : (hNum >= 70 ? 'HIGH' : 'MEDIUM');
+  }
+
+  let ghatTol = String(dnaProfile?.ghatTolerance || '').toUpperCase();
+  if (Number.isFinite(Number(dnaProfile?.ghatTolerance))) {
+    const gNum = Number(dnaProfile.ghatTolerance);
+    ghatTol = gNum <= 40 ? 'LOW' : (gNum >= 70 ? 'HIGH' : 'MEDIUM');
   }
 
   if (state.stops.length && normalizeCat(state.stops[state.stops.length - 1].category) === cat && cat !== 'food') score -= 7;
@@ -438,17 +469,59 @@ function scoreTransition(place, arrivalMin, state, requirements, weather, nowBas
   const condition = String(intel.weather?.condition || '').toLowerCase();
   const tempC = Number(intel.weather?.tempC);
   const isMiddayHeat = arrivalMin >= 11 * 60 + 30 && arrivalMin <= 15 * 60 + 30;
+  const isRain = /rain|drizzle|shower|storm/.test(condition) || Number(weather?.rainProb || weather?.precipitationProb) >= 50;
 
-  if (outdoor && /heavy|storm|thunder|cyclone|flood/.test(condition)) return null;
-  if (outdoor && /rain|drizzle|shower/.test(condition)) score -= 40;
+  if (isRain) {
+    if (outdoor) {
+      if (rainTol === 'LOW') {
+        score -= 60; // Strong penalty for rain-sensitive travelers
+      } else if (rainTol === 'HIGH') {
+        score += 25; // Reward rain-loving / monsoon outdoor adventurers
+      } else {
+        score -= 35;
+      }
+    } else {
+      // Reward sheltered indoor / cultural / culinary refuges during rain
+      score += (rainTol === 'LOW' ? 40 : (rainTol === 'HIGH' ? 0 : 20));
+    }
+  }
+
+  if (walkTol === 'SHORT') {
+    const isStrenuousOrTrek = cat === 'trekking' || /trek|climb|caves|trail|hike|steep/i.test(placeNameLower);
+    if (isStrenuousOrTrek) {
+      score -= 50; // Strict penalty for strenuous walking
+    } else if (legDistanceKm <= 1.2) {
+      score += 15; // Reward short walks
+    }
+  }
+
+  if (crowdTol === 'LOW') {
+    if (['High', 'Very High'].includes(intel.crowdLevel)) {
+      score -= 35;
+    } else if (['Low', 'Very Low'].includes(intel.crowdLevel)) {
+      score += 25;
+    }
+  }
+
+  if (travel?.isGhatRoad && ghatTol === 'LOW') {
+    score -= 30; // Penalize motion-sickness-inducing ghat roads if low tolerance
+  }
+
+  if (outdoor && /heavy|storm|thunder|cyclone|flood/.test(condition)) {
+    if (rainTol === 'LOW') return null;
+    score -= 50;
+  }
+  if (outdoor && /rain|drizzle|shower/.test(condition)) score -= 30;
 
   if (Number.isFinite(tempC) && tempC >= 33) {
     if (isMiddayHeat) {
       if (outdoor) {
         if (tempC >= 38) return null; // Reject direct scorching sun outdoor exposures during extreme heat peak
         score -= tempC >= 37 ? 65 : 35; // Decisively penalize direct outdoor midday scorching sun
+        if (heatTol === 'LOW') score -= 30;
       } else {
         score += tempC >= 37 ? 35 : 20; // Strong reward for air-conditioned / covered indoor midday refuge
+        if (heatTol === 'LOW') score += 25;
       }
     } else if (outdoor && (arrivalMin <= 10 * 60 || arrivalMin >= 16 * 60)) {
       score += 16; // Pleasant morning/evening outdoor window
@@ -732,6 +805,35 @@ function planAdvancedItinerary(places, rawOptions = {}) {
   });
 
   const candidates = filterCandidates(tourismEligible, requirements);
+
+  // Contextual Alternative Substitution during Adverse Weather (Rain / Monsoon / Heat):
+  // If adverse weather is active, augment candidates with vetted regional indoor/sheltered havens
+  // to ensure plans remain viable, sheltered, and complete rather than collapsing.
+  const weatherCond = String(requirements.weather?.condition || '').toLowerCase();
+  const isRainyWeather = /rain|drizzle|shower|storm/.test(weatherCond) || Number(requirements.weather?.rainProb || requirements.weather?.precipitationProb) >= 50;
+  const userDna = requirements.travelDna || requirements.dnaProfile || requirements.soft?.travelDna;
+  const isRainTolerant = String(userDna?.rainTolerance || '').toUpperCase() === 'HIGH' ||
+    (Number.isFinite(Number(userDna?.rainTolerance)) && Number(userDna?.rainTolerance) >= 70);
+
+  if (isRainyWeather && !isRainTolerant) {
+    const originPoint = requirements.originCoords || (all[0] && all[0].coords) || null;
+    const { REGIONAL_ALTERNATIVE_HAVENS } = require('./decision/alternativeGenerator');
+    for (const haven of REGIONAL_ALTERNATIVE_HAVENS) {
+      if (candidates.some((c) => c.id === haven.id || String(c.name || '').toLowerCase() === String(haven.name || '').toLowerCase())) continue;
+      const hCoords = haven.coords || [haven.lat, haven.lon];
+      if (originPoint && originPoint.length >= 2 && hCoords && hCoords.length >= 2) {
+        const d = _distanceKm(originPoint, hCoords);
+        if (d <= 50) {
+          candidates.push({
+            ...haven,
+            coords: hCoords,
+            indoor_outdoor: haven.indoorOutdoor || 'indoor',
+            isAlternative: true,
+          });
+        }
+      }
+    }
+  }
   const climateStrategy = analyzeClimateStrategy(requirements.weather);
   const now = rawOptions.now instanceof Date ? rawOptions.now : new Date(rawOptions.now || Date.now());
   const startMin = requirements.hard.startMin;
@@ -798,7 +900,14 @@ function planAdvancedItinerary(places, rawOptions = {}) {
         // fill the itinerary with unrelated places while a requested category
         // remains uncovered, unless the candidate is itself a required meal.
         const preferred = requirements.soft.preferredCategories || [];
-        const missingPreferred = preferred.filter((cat) => !state.categories.has(cat));
+        const cond = String(requirements.weather?.condition || '').toLowerCase();
+        const rainActive = /rain|drizzle|shower|storm/.test(cond) || Number(requirements.weather?.rainProb || requirements.weather?.precipitationProb) >= 60;
+        const missingPreferred = preferred.filter((cat) => {
+          if (state.categories.has(cat)) return false;
+          // During active rain, do not deadlock the beam solver if the missing category is exposed outdoor
+          if (rainActive && OUTDOOR.has(cat)) return false;
+          return true;
+        });
         const placeCat = normalizeCat(place.cat || place.category);
         const mealNow = mealAt(state.cursor);
         const isRequiredMealCandidate = isFood(place) && mealRequirements(requirements).includes(mealNow);

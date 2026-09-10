@@ -93,7 +93,7 @@ router.get('/health', (_req, res) => {
 // ── 4. Journey State: Initialize or Update ───────────────────────────────────
 router.post('/trips/:id/state', async (req, res) => {
   const tripId = req.params.id;
-  const { plan, travelerId, initialLocation, startTimeMinutes, dna } = req.body || {};
+  const { plan, travelerId, initialLocation, startTimeMinutes, dna, travelerDna } = req.body || {};
 
   if (!plan || (!Array.isArray(plan.stops) && !Array.isArray(plan))) {
     return res.status(400).json({ error: 'Plan with stops is required to initialize journey state' });
@@ -110,7 +110,7 @@ router.post('/trips/:id/state', async (req, res) => {
 
     activeTripsState.set(tripId, {
       state,
-      travelerDna: sanitizeDnaProfile(dna),
+      travelerDna: sanitizeDnaProfile(travelerDna || dna),
     });
 
     // Commit Plan v1 to version audit trail

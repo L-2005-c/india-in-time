@@ -137,20 +137,24 @@ router.post('/optimize', async (req, res) => {
     const {
       weather, at, fromCoords, personas, tripMode, startMin, endMin, maxStops,
       bufferMin, beamWidth, region, preferredCategories, categories, excludedCategories,
+      travelDna, dnaProfile, travelerDna,
     } = body;
     const rawPlaces = body.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
     const now = at ? new Date(at) : new Date();
     if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
+    const personaList = Array.isArray(personas) ? personas : [];
+    const resolvedDna = travelDna || dnaProfile || travelerDna || deriveDnaFromPersonas(personaList, { tripMode });
     const shared = {
       now,
       weather: weather || null,
       originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
       fromCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
-      personas: Array.isArray(personas) ? personas : [],
+      personas: personaList,
       preferredCategories: Array.isArray(preferredCategories) ? preferredCategories : (Array.isArray(categories) ? categories : []),
       excludedCategories: Array.isArray(excludedCategories) ? excludedCategories : [],
       tripMode: tripMode || null,
+      travelDna: resolvedDna,
       startMin: Number.isFinite(startMin) ? startMin : undefined,
       endMin: Number.isFinite(endMin) ? endMin : undefined,
       maxStops: Number.isFinite(maxStops) ? maxStops : undefined,
@@ -172,11 +176,12 @@ router.post('/optimize', async (req, res) => {
 // ── Dynamic re-planning from current state ──────────────────────────────────
 router.post('/replan', async (req, res) => {
   try {
-    const { weather, at, fromCoords, tripMode, startMin, endMin, maxStops, bufferMin, region, preferredCategories, categories } = req.body || {};
+    const { weather, at, fromCoords, tripMode, startMin, endMin, maxStops, bufferMin, region, preferredCategories, categories, travelDna, personas } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
     const now = at ? new Date(at) : new Date();
     if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
+    const resolvedDna = travelDna || deriveDnaFromPersonas(Array.isArray(personas) ? personas : [], { tripMode });
     const result = planAdvancedItinerary(rawPlaces.slice(0, MAX_PLACES), {
       ...req.body,
       now,
@@ -184,6 +189,7 @@ router.post('/replan', async (req, res) => {
       originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
       preferredCategories: Array.isArray(preferredCategories) ? preferredCategories : (Array.isArray(categories) ? categories : []),
       tripMode: tripMode || null,
+      travelDna: resolvedDna,
       startMin: Number.isFinite(startMin) ? startMin : undefined,
       endMin: Number.isFinite(endMin) ? endMin : undefined,
       maxStops: Number.isFinite(maxStops) ? maxStops : undefined,

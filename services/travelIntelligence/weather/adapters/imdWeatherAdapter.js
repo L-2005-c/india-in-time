@@ -27,9 +27,17 @@ const IMD_PRIMARY_STATIONS = [
   { id: '43150', name: 'Visakhapatnam Airport', lat: 17.72, lon: 83.22, elevationM: 5, region: 'Coastal AP' },
   { id: '43145', name: 'Araku Valley Agro-Met', lat: 18.33, lon: 82.87, elevationM: 911, region: 'Eastern Ghats' },
   { id: '43146', name: 'Lambasingi High Altitude', lat: 17.82, lon: 82.52, elevationM: 1025, region: 'Eastern Ghats' },
+  { id: '43189', name: 'Vijayawada (Gannavaram)', lat: 16.52, lon: 80.80, elevationM: 25, region: 'Coastal AP Plains' },
+  { id: '43241', name: 'Tirupati Airport', lat: 13.63, lon: 79.55, elevationM: 107, region: 'Rayalaseema' },
+  { id: '43190', name: 'Amaravati / Guntur', lat: 16.30, lon: 80.45, elevationM: 30, region: 'Coastal AP' },
+  { id: '43152', name: 'Rajahmundry', lat: 17.00, lon: 81.78, elevationM: 46, region: 'Coastal AP' },
   { id: '43003', name: 'Hyderabad (Begumpet)', lat: 17.45, lon: 78.47, elevationM: 545, region: 'Telangana' },
   { id: '43285', name: 'Bengaluru (City)', lat: 12.97, lon: 77.59, elevationM: 920, region: 'South Interior Karnataka' },
+  { id: '43279', name: 'Chennai (Meenambakkam)', lat: 13.00, lon: 80.18, elevationM: 16, region: 'Coastal Tamil Nadu' },
   { id: '43057', name: 'Mumbai (Colaba)', lat: 18.90, lon: 72.82, elevationM: 11, region: 'Konkan' },
+  { id: '43351', name: 'Kochi (Naval Base)', lat: 9.93, lon: 76.27, elevationM: 3, region: 'Kerala Coast' },
+  { id: '42807', name: 'Kolkata (Alipore)', lat: 22.53, lon: 88.33, elevationM: 9, region: 'Gangetic West Bengal' },
+  { id: '42492', name: 'Varanasi (Babatpur)', lat: 25.45, lon: 82.85, elevationM: 81, region: 'Eastern UP' },
   { id: '42182', name: 'New Delhi (Safdarjung)', lat: 28.58, lon: 77.20, elevationM: 216, region: 'Northwest' },
   { id: '42348', name: 'Jaipur (Sanganer)', lat: 26.82, lon: 75.80, elevationM: 390, region: 'East Rajasthan' },
   { id: '43192', name: 'Goa (Panaji)', lat: 15.48, lon: 73.82, elevationM: 15, region: 'Konkan' },
@@ -53,20 +61,21 @@ function findNearestStation(lat, lon) {
 
 /**
  * Computes IMD climatological normal for coordinates when live feed is inaccessible.
- * Accurately models altitude lapse rates in Indian hill stations (-6.5°C per 1000m).
+ * Accurately models altitude lapse rates in Indian hill stations (-6.5°C per 1000m)
+ * strictly using the query location's elevation (never borrowing mountain elevations for plains).
  */
-function getImdClimatologicalNormal(lat, lon, nearestStation) {
+function getImdClimatologicalNormal(lat, lon, nearestStation, explicitElevationM = null) {
   const month = new Date().getMonth(); // 0-11
-  // Baseline seasonal temperature curve for Peninsular / Central India
+  // Baseline seasonal temperature curve for Peninsular / Central India plains (~100m baseline)
   let baseTemp = 28;
   let baseRainProb = 15;
   let condition = 'Partly Cloudy';
 
   // Monsoon season (June - September)
   if (month >= 5 && month <= 8) {
-    baseTemp = 27;
-    baseRainProb = 65;
-    condition = 'Monsoon Rain';
+    baseTemp = 28;
+    baseRainProb = 50;
+    condition = 'Monsoon Clouds / Showers';
   } else if (month >= 2 && month <= 4) {
     // Summer (March - May)
     baseTemp = 34;
@@ -74,18 +83,26 @@ function getImdClimatologicalNormal(lat, lon, nearestStation) {
     condition = 'Sunny / Warm';
   } else {
     // Winter (Nov - Feb)
-    baseTemp = 24;
+    baseTemp = 25;
     baseRainProb = 5;
     condition = 'Clear / Mild';
   }
 
-  // Altitude lapse rate correction for Indian Ghats and Hill Stations
-  const elevation = nearestStation?.elevationM || 100;
-  if (elevation > 500) {
-    const lapseDrop = ((elevation - 100) / 1000) * 6.5;
+  // Resolve target elevation: prefer caller's explicit elevation, then nearby station (<=40km)
+  let targetElevationM = 50; // default peninsular plain
+  if (explicitElevationM !== null && explicitElevationM !== undefined && Number.isFinite(Number(explicitElevationM))) {
+    targetElevationM = Math.max(0, Number(explicitElevationM));
+  } else if (nearestStation && nearestStation.distanceKm <= 40) {
+    targetElevationM = nearestStation.elevationM;
+  }
+
+  // Altitude lapse rate correction for Indian Ghats and Hill Stations (-6.5°C / 1000m)
+  if (targetElevationM > 500) {
+    const lapseDrop = ((targetElevationM - 100) / 1000) * 6.5;
     baseTemp = Math.round((baseTemp - lapseDrop) * 10) / 10;
-    if (month >= 5 && month <= 8) {
-      baseRainProb = Math.min(95, baseRainProb + 15); // Orographic rainfall enhancement
+    // Orographic hill rain enhancement applies only to high-altitude terrain
+    if (month >= 5 && month <= 8 && targetElevationM >= 800) {
+      baseRainProb = Math.min(90, baseRainProb + 25);
       condition = 'Orographic Hill Rain / Mist';
     }
   }
@@ -94,7 +111,7 @@ function getImdClimatologicalNormal(lat, lon, nearestStation) {
     temperatureC: baseTemp,
     precipitationProb: baseRainProb,
     condition,
-    elevationM: elevation,
+    elevationM: targetElevationM,
   };
 }
 
@@ -106,7 +123,7 @@ async function getImdWeather(lat, lon, options = {}) {
   const imdApiBase = process.env.IMD_API_BASE_URL || 'https://mausam.imd.gov.in/api';
   const apiKey = process.env.IMD_API_KEY;
 
-  if (apiKey && process.env.NODE_ENV !== 'test') {
+  if ((apiKey || process.env.IMD_LIVE_ENABLED === 'true') && process.env.NODE_ENV !== 'test') {
     try {
       const url = `${imdApiBase}/cityweather.php?id=${nearest.id}`;
       const res = await fetch(url, {
@@ -141,7 +158,7 @@ async function getImdWeather(lat, lon, options = {}) {
   }
 
   // Fallback to IMD Station Climatological Normals with altitude lapse rate
-  const normal = getImdClimatologicalNormal(lat, lon, nearest);
+  const normal = getImdClimatologicalNormal(lat, lon, nearest, options.elevationM);
 
   return normalizeWeatherRecord({
     provider: PROVIDER_NAME,
@@ -170,4 +187,5 @@ module.exports = {
   getImdWeather,
   findNearestStation,
   IMD_PRIMARY_STATIONS,
+  getImdClimatologicalNormal,
 };

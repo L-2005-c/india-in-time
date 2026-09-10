@@ -30,36 +30,23 @@ function bestTimeForCat(cat, weatherCode) {
   return 'Anytime during opening hours';
 }
 
-async function fetchWeatherHourly(lat, lon) {
-  const cacheKey = `${Number(lat).toFixed(2)},${Number(lon).toFixed(2)}`;
-  const cached = weatherCache.get(cacheKey);
-  if (cached && Array.isArray(cached.hourly) && cached.hourly.length) {
-    return {
-      currentTemp: cached.tempC ?? cached.temp ?? 28,
-      currentCode: cached.weathercode ?? 1,
-      hourlyTemps: cached.hourly.map(h => h.tempC),
-      hourlyCodes: cached.hourly.map(h => h.weathercode),
-      hourlyRainProb: cached.hourly.map(h => h.precipitationProbability),
-    };
-  }
+const { getConsensusWeather } = require('../services/travelIntelligence/weather/weatherProviderRegistry');
 
+async function fetchWeatherHourly(lat, lon) {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode,precipitation_probability&current_weather=true&forecast_days=1`;
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(6000), agent: keepAliveAgent });
-    if (upstream.ok) {
-      const data = await upstream.json();
-      const cw = data.current_weather || {};
-      const hourly = data.hourly || {};
+    const truth = await getConsensusWeather(Number(lat), Number(lon), { skipCache: true });
+    if (truth && truth.isAvailable) {
+      const h = Array.isArray(truth.hourly) ? truth.hourly : [];
       return {
-        currentTemp: Math.round(cw.temperature ?? 28),
-        currentCode: cw.weathercode ?? 1,
-        hourlyTemps: Array.isArray(hourly.temperature_2m) ? hourly.temperature_2m.map(t => Math.round(t)) : [],
-        hourlyCodes: Array.isArray(hourly.weathercode) ? hourly.weathercode : [],
-        hourlyRainProb: Array.isArray(hourly.precipitation_probability) ? hourly.precipitation_probability : [],
+        currentTemp: Math.round(truth.temperatureC),
+        currentCode: truth.weathercode ?? 1,
+        hourlyTemps: h.map(x => (x.tempC != null ? x.tempC : (x.temperature != null ? x.temperature : Math.round(truth.temperatureC)))),
+        hourlyCodes: h.map(x => (x.weathercode != null ? x.weathercode : (x.weather_code != null ? x.weather_code : 1))),
+        hourlyRainProb: h.map(x => (x.precipitationProbability != null ? x.precipitationProbability : (x.rain_prob != null ? x.rain_prob : 0))),
       };
     }
   } catch (err) {
-    appLogger.warn('[weather-alerts] Open-Meteo failed, using fallback:', err.message);
+    appLogger.warn('[weather-alerts] Consensus fetch failed, using fallback:', err.message);
   }
 
   const fallback = getDeterministicWeather(lat, lon);

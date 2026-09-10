@@ -1,7 +1,8 @@
 import { browserLogger } from '../utils/browser-logger.js';
 import { installLeafletSafetyGuards } from './mapGuards.js';
 import { openModal, closeModal } from '../a11y/modal.js';
-import { openTravelDnaModal } from '../modules/travelDna.js';
+import { openTravelDnaModal, getTravelDna } from '../modules/travelDna.js';
+import { initActiveTripControlCenter } from '../modules/tripControlCenter.js';
 import { createAuthSession } from '../modules/auth-session.js';
 import { initSplash3D, dismissSplash, toggleSplashSound } from '../modules/splash3d.js';
 import { calculateStopBudget as _calculateStopBudget, calculateDayBudget as _calculateDayBudget, calculateTripBudget as _calculateTripBudget, renderBudgetBreakdownHTML as _renderBudgetBreakdownHTML } from '../modules/budget.js';
@@ -31,24 +32,12 @@ import { shouldRetryWeather as _shouldRetryWeather, weatherRetryDelayMs as _weat
 import { CITIES, getHiddenGems, getTransportConfig, getLocalPlaces } from '../data/cities.js';
 import { normalizeFetchedPlaces as _normalizeFetchedPlaces, pickNearestCityId as _pickNearestCityId } from '../utils/city-load.js';
 import {
-  hvKm,
-  hasValidCoords,
-  withHiddenGems as _geoWithHiddenGems,
-  mergePlacePools as _geoMergePools,
-  sortNearestNeighbor as _geoSortNN,
-  routeDistanceKm as _geoRouteKm,
-  centroidOfStops as _geoCentroid,
-  clusterStopsByArea as _geoCluster,
-  orderStopsAreaWise as _geoOrderArea,
-  estimateTimeFitPenaltyKm as _geoTimeFit,
-  optimizeStopOrder as _geoOptimize,
-  bearingBetween as _geoBearing,
-  keepNearbyCluster as _geoKeepNearby,
-  famousPlaceScore as _geoFamous,
-  prioritizePlanStops as _geoPrioritize,
-  getRouteStopsForDay as _geoRouteStops,
-  estimateStopLoadMinutes as _geoLoadMins,
-  normalizeLatLon as _geoNormalizeLatLon,
+  hvKm, hasValidCoords, withHiddenGems as _geoWithHiddenGems, mergePlacePools as _geoMergePools,
+  sortNearestNeighbor as _geoSortNN, routeDistanceKm as _geoRouteKm, centroidOfStops as _geoCentroid,
+  clusterStopsByArea as _geoCluster, orderStopsAreaWise as _geoOrderArea, estimateTimeFitPenaltyKm as _geoTimeFit,
+  optimizeStopOrder as _geoOptimize, bearingBetween as _geoBearing, keepNearbyCluster as _geoKeepNearby,
+  famousPlaceScore as _geoFamous, prioritizePlanStops as _geoPrioritize, getRouteStopsForDay as _geoRouteStops,
+  estimateStopLoadMinutes as _geoLoadMins, normalizeLatLon as _geoNormalizeLatLon,
 } from '../utils/geo.js';
 import {
   dayPartForMinutes as _dayPartForMinutes,
@@ -170,7 +159,7 @@ function notifyGpsError(err) { _gpsCoord.notifyError(err); }
 function waitForFirstGpsFix(timeoutMs) {
   return _gpsCoord.waitForFirst(timeoutMs, { lat: cLat, lon: cLon });
 }
-let nsDist='--',nsEta='--',realTemp=28,realWeatherMain='Clear',wid=null,voiceOn=false;
+let nsDist='--',nsEta='--',realTemp=null,realWeatherMain=null,wid=null,voiceOn=false;
 // Tracks where/when the route line was last drawn from, so the live-tracking
 // polyline can be refreshed as the user moves (see initGPS()) instead of
 // staying frozen at the very first GPS fix of the trip.
@@ -1211,6 +1200,7 @@ async function generatePlan(){
           personas:_prefsSel,
           preferredCategories:_preferredCats,
           tripMode:window.selectedTripMode||null,
+          travelDna:getTravelDna(),
           startMin,
           endMin:startMin+maxT,
           maxStops:Math.min(8,Math.max(3,Math.ceil(maxT/40))), beamWidth:6,
@@ -1316,6 +1306,7 @@ async function generatePlan(){
     : '';
   addMsg(`✅ Built a <strong>${mdPlan.length}-day</strong> climate-aware plan with <strong>${actualStopCount} stops</strong>!<br><small style="color:var(--text-muted)">${mdPlan.length===nDays?'The route has been spread across your requested trip length.':'The available stops and opening windows could only support fewer full day plans this time.'}</small>${trimmedNote}`);
   updatePlannerShowcase();
+  initActiveTripControlCenter(document.getElementById('trip-control-center-slot'), mdPlan, getTravelDna());
   switchToView('plan-view',1);
   }finally{
     if(_genBtn){_genBtn.disabled=false;_genBtn.style.cursor='';_genBtn.innerHTML=_genBtnOrigHtml;}
@@ -2625,7 +2616,7 @@ function toggleLoadPanel() {
   list.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
 }
 
-function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));const l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-pass','btn-wa','btn-replay','btn-ls'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='inline-flex'; });const pb=document.getElementById('weather-pivot-bar');if(pb)pb.style.display='flex';renderTabs();switchDay(0);updatePlannerShowcase();switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(_e){addMsg('⚠️ Load failed.');}}
+function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));const l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-pass','btn-wa','btn-replay','btn-ls'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='inline-flex'; });const pb=document.getElementById('weather-pivot-bar');if(pb)pb.style.display='flex';renderTabs();switchDay(0);updatePlannerShowcase();initActiveTripControlCenter(document.getElementById('trip-control-center-slot'), mdPlan, getTravelDna());switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(_e){addMsg('⚠️ Load failed.');}}
 function shareIt(){ return _shareTripTextMod(mdPlan, currentCityName, { addMsg }); }
 function waShare(){
   const text = _genWhatsAppText(mdPlan, currentCityName, dayIdx);

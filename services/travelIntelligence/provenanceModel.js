@@ -16,6 +16,7 @@ const DATA_STATES = Object.freeze({
   PREDICTED: 'PREDICTED',
   LIVE: 'LIVE',
   OFFICIAL: 'OFFICIAL',
+  HISTORICAL: 'HISTORICAL',
   STALE: 'STALE',
 });
 

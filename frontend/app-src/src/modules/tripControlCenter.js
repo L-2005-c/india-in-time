@@ -147,3 +147,189 @@ export function renderTripControlCenter({
     </div>
   `;
 }
+
+/**
+ * Mounts and manages the interactive lifecycle of the Trip Control Center HUD.
+ * Connects directly to India In-Time v3.0 Journey State, Guardian, and Adaptation APIs.
+ */
+export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {}) {
+  if (!containerEl) return null;
+
+  let currentTripData = { ...tripData };
+
+  function render() {
+    containerEl.innerHTML = renderTripControlCenter(currentTripData);
+    bindEvents();
+  }
+
+  function bindEvents() {
+    const completeBtn = containerEl.querySelector('#btn-complete-active-stop');
+    if (completeBtn) {
+      completeBtn.onclick = async () => {
+        const stopId = completeBtn.getAttribute('data-stop-id');
+        const tripId = completeBtn.getAttribute('data-trip-id');
+        try {
+          completeBtn.disabled = true;
+          completeBtn.textContent = 'Updating...';
+          if (window.API?.advanceJourneyProgress) {
+            const res = await window.API.advanceJourneyProgress(tripId, 'COMPLETE', stopId);
+            if (res) {
+              currentTripData.activeStop = res.activeStop;
+              currentTripData.completedStops = currentTripData.completedStops || [];
+              const done = (currentTripData.upcomingStops || []).find(s => s.id === stopId) || { id: stopId, name: currentTripData.activeStop?.name || `Stop ${stopId}` };
+              if (!currentTripData.completedStops.some(s => s.id === stopId)) {
+                currentTripData.completedStops.push(done);
+              }
+              currentTripData.upcomingStops = (currentTripData.upcomingStops || []).filter(s => s.id !== stopId);
+              if (callbacks.onProgress) callbacks.onProgress(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to complete stop:', err);
+          completeBtn.disabled = false;
+          completeBtn.textContent = '✓ Mark Completed';
+        }
+      };
+    }
+
+    const skipBtn = containerEl.querySelector('#btn-skip-active-stop');
+    if (skipBtn) {
+      skipBtn.onclick = async () => {
+        const stopId = skipBtn.getAttribute('data-stop-id');
+        const tripId = skipBtn.getAttribute('data-trip-id');
+        try {
+          skipBtn.disabled = true;
+          skipBtn.textContent = 'Skipping...';
+          if (window.API?.advanceJourneyProgress) {
+            const res = await window.API.advanceJourneyProgress(tripId, 'SKIP', stopId);
+            if (res) {
+              currentTripData.activeStop = res.activeStop;
+              currentTripData.upcomingStops = (currentTripData.upcomingStops || []).filter(s => s.id !== stopId);
+              if (callbacks.onProgress) callbacks.onProgress(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to skip stop:', err);
+          skipBtn.disabled = false;
+          skipBtn.textContent = '⏭ Skip';
+        }
+      };
+    }
+
+    const replanBtn = containerEl.querySelector('#btn-trigger-replan');
+    if (replanBtn) {
+      replanBtn.onclick = async () => {
+        const tripId = replanBtn.getAttribute('data-trip-id');
+        try {
+          replanBtn.disabled = true;
+          replanBtn.textContent = 'Adapting Plan...';
+          if (window.API?.adaptTripPlan) {
+            const res = await window.API.adaptTripPlan(tripId, 'DISRUPTION_ADAPTATION');
+            if (res && res.newPlanVersion) {
+              currentTripData.planVersion = res.newPlanVersion;
+              currentTripData.tripHealth = 'ON_TRACK';
+              currentTripData.activeTriggers = [];
+              currentTripData.lastAdaptation = res;
+              if (Array.isArray(res.newStopsList)) {
+                currentTripData.completedStops = res.newStopsList.filter(s => s.status === 'COMPLETED');
+                currentTripData.upcomingStops = res.newStopsList.filter(s => s.status === 'PLANNED');
+                currentTripData.activeStop = res.newStopsList.find(s => s.status === 'PLANNED') || null;
+              }
+              if (callbacks.onPlanAdapted) callbacks.onPlanAdapted(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to adapt plan:', err);
+          replanBtn.disabled = false;
+          replanBtn.textContent = '⚡ Adapt Plan Now';
+        }
+      };
+    }
+
+    const simBtn = containerEl.querySelector('#btn-simulate-ghat-rain');
+    if (simBtn) {
+      simBtn.onclick = async () => {
+        const tripId = simBtn.getAttribute('data-trip-id');
+        try {
+          simBtn.disabled = true;
+          simBtn.textContent = 'Simulating...';
+          if (window.API?.simulateDisruptionEvent) {
+            const res = await window.API.simulateDisruptionEvent(tripId, { eventType: 'HEAVY_RAIN_GHAT' });
+            if (res && res.guardianEvaluation) {
+              currentTripData.tripHealth = res.guardianEvaluation.tripHealth || 'CRITICAL';
+              currentTripData.activeTriggers = (res.guardianEvaluation.activeTriggers || []).map(t => ({
+                type: t.trigger || 'DISRUPTION',
+                message: t.rationale || t.message || 'Severe weather and road risk detected',
+              }));
+              if (currentTripData.activeTriggers.length === 0 && res.guardianEvaluation.reasons) {
+                currentTripData.activeTriggers = res.guardianEvaluation.reasons.map(r => ({
+                  type: 'WEATHER_ROAD_RISK',
+                  message: r,
+                }));
+              }
+              if (callbacks.onSimulated) callbacks.onSimulated(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to simulate disruption:', err);
+          simBtn.disabled = false;
+          simBtn.textContent = '🌧️ Simulate Ghat Road Downpour';
+        }
+      };
+    }
+  }
+
+  render();
+
+  return {
+    update(newData) {
+      currentTripData = { ...currentTripData, ...newData };
+      render();
+    },
+    destroy() {
+      containerEl.innerHTML = '';
+    },
+  };
+}
+
+/**
+ * Initializes journey state on backend and mounts the Trip Control Center into containerEl.
+ */
+export async function initActiveTripControlCenter(containerEl, tripPlan, travelerDna = null) {
+  if (!containerEl || !Array.isArray(tripPlan) || !tripPlan.length || !window.API?.initJourneyState) return null;
+  containerEl.style.display = 'block';
+  const tripId = `trip_${Date.now()}`;
+  const flatStops = tripPlan.flat().filter(s => s && !s.isBreak).map((s, idx) => ({
+    id: String(s.id || `stop_${idx + 1}`),
+    name: s.name,
+    category: s.cat || s.category || 'scenic',
+    lat: Array.isArray(s.coords) ? s.coords[0] : (s.lat || 0),
+    lon: Array.isArray(s.coords) ? s.coords[1] : (s.lon || 0),
+    elevationM: s.elevationM || (s.coords?.[0] > 18 && s.coords?.[1] > 82 ? 900 : 50),
+    plannedDurationMinutes: s.vt || 45,
+    arriveAt: s.arriveAt || '09:00',
+    leaveAt: s.leaveAt || '10:00',
+    status: 'PLANNED',
+  }));
+
+  try {
+    const st = await window.API.initJourneyState(tripId, flatStops, travelerDna);
+    return mountTripControlCenter(containerEl, {
+      tripId,
+      planVersion: st?.activePlanVersion || 1,
+      tripHealth: st?.tripHealth || 'ON_TRACK',
+      activeStop: st?.activeStop || flatStops[0],
+      completedStops: [],
+      upcomingStops: st?.upcomingStops || flatStops.slice(1),
+    });
+  } catch (err) {
+    console.warn('[TripControlCenter] Init failed:', err);
+    return null;
+  }
+}
+
+

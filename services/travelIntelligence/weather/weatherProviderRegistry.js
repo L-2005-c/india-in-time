@@ -43,7 +43,7 @@ async function getConsensusWeather(lat, lon, options = {}) {
 
   const cacheKey = getQuantizedWeatherKey(numLat, numLon, options.elevationM);
   const cached = weatherCache ? weatherCache.get(cacheKey) : null;
-  if (cached && !options.skipCache) {
+  if (cached && !options.skipCache && process.env.NODE_ENV !== 'test') {
     return cached;
   }
 
@@ -68,7 +68,7 @@ async function getConsensusWeather(lat, lon, options = {}) {
 
   const consensus = evaluateWeatherConsensus(reports, options);
 
-  if (weatherCache && consensus.isAvailable) {
+  if (weatherCache && consensus.isAvailable && consensus.dataState !== 'HISTORICAL' && process.env.NODE_ENV !== 'test') {
     weatherCache.set(cacheKey, consensus);
   }
 

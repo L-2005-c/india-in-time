@@ -341,13 +341,27 @@
 
   // ── Health Check ────────────────────────────────────────────────────────────
 
-  async function healthCheck() {
-    return get('/api/health/ready');
+  // ── Travel Operating System & Intelligence (v3.0) ───────────────────────────
+  async function initJourneyState(tripId, plan = [], travelerDna = null) {
+    return post(`/api/intelligence/trips/${tripId}/state`, { tripId, plan, travelerDna });
+  }
+  async function advanceJourneyProgress(tripId, action, stopId) {
+    return post(`/api/intelligence/trips/${tripId}/state/progress`, { action, stopId });
+  }
+  async function fetchTripGuardianHealth(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/guardian`);
+  }
+  async function adaptTripPlan(tripId, triggerType = 'MANUAL_OPTIMIZATION', options = {}) {
+    return post(`/api/intelligence/trips/${tripId}/replan`, { triggerType, ...options });
+  }
+  async function simulateDisruptionEvent(tripId, event = {}) {
+    return post(`/api/intelligence/trips/${tripId}/simulate-event`, event);
   }
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
+    initJourneyState, advanceJourneyProgress, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

@@ -252,6 +252,20 @@ function getDeterministicWeather(lat, lon, now = new Date()) {
   };
 }
 
+function weatherCodeToCondition(code) {
+  if (code == null) return 'Clear';
+  const n = Number(code);
+  if (n <= 1) return 'Clear';
+  if (n <= 3) return 'Partly Cloudy';
+  if (n <= 48) return 'Fog / Overcast';
+  if (n <= 55) return 'Drizzle';
+  if (n <= 67) return 'Rain';
+  if (n <= 77) return 'Snow';
+  if (n <= 82) return 'Rain Showers';
+  if (n >= 95) return 'Thunderstorm';
+  return 'Rain';
+}
+
 module.exports = {
   computeWeatherIntelligence,
   computeHeatIndex,
@@ -260,4 +274,5 @@ module.exports = {
   getDeterministicWeather,
   weatherEmoji,
   weatherDesc,
+  weatherCodeToCondition,
 };

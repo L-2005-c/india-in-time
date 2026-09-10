@@ -1,83 +1,27 @@
 'use strict';
-// routes/weather.js
-// Proxies Open-Meteo weather fetch with multi-tier caching and deterministic fail-open fallback.
-// GET /api/weather?lat=17.71&lon=83.32
-// Returns: { temp: number, weathercode: number, emoji: string, hourly: [...] }
+// routes/weather.js — v3.0 Canonical Multi-Provider Weather Truth Route
+// Integrates Open-Meteo NWP and IMD Ground Observations with consensus evaluation,
+// altitude lapse-rate modeling, and strict provenance tracking.
+// GET /api/weather?lat=17.71&lon=83.32[&elevationM=45]
 
 const express = require('express');
-const fetch   = require('node-fetch');
 const router  = express.Router();
 const appLogger = require('../lib/logger');
-const { keepAliveAgent } = require('../lib/httpAgent');
-const { weatherCache } = require('../services/cache');
-const { getDeterministicWeather, weatherEmoji } = require('../services/travelIntelligence/weatherEngine');
+const { getConsensusWeather } = require('../services/travelIntelligence/weather/weatherProviderRegistry');
+const { getDeterministicWeather, weatherEmoji, weatherCodeToCondition } = require('../services/travelIntelligence/weatherEngine');
 
-async function fetchOpenMeteo(lat, lon, timeoutMs = 7000) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,precipitation_probability,precipitation,relative_humidity_2m,wind_speed_10m,uv_index,cloud_cover,visibility,weather_code&forecast_days=2&timezone=Asia%2FKolkata`;
-  const upstream = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), agent: keepAliveAgent });
-  if (!upstream.ok) {
-    const body = await upstream.text().catch(() => '');
-    const err = new Error(`Open-Meteo responded ${upstream.status}: ${body.slice(0, 200)}`);
-    err.status = upstream.status;
-    throw err;
-  }
-  return upstream.json();
-}
-
-async function computeWeather(numLat, numLon) {
-  let data;
-  try {
-    data = await fetchOpenMeteo(numLat, numLon);
-  } catch (firstErr) {
-    appLogger.warn('[weather] first attempt failed, retrying:', firstErr.message);
-    try {
-      data = await fetchOpenMeteo(numLat, numLon, 5000);
-    } catch (secondErr) {
-      appLogger.warn('[weather] Open-Meteo upstream unavailable; serving deterministic seasonal fallback:', secondErr.message);
-      return getDeterministicWeather(numLat, numLon);
-    }
-  }
-
-  try {
-    const cw = data?.current_weather;
-    if (!cw) {
-      return getDeterministicWeather(numLat, numLon);
-    }
-
-    const temp = Math.round(cw.temperature);
-    const windKph = Math.round(cw.windspeed || 0);
-    const h = data?.hourly || {};
-    const hourly = Array.isArray(h.time) ? h.time.map((time, i) => ({
-      time,
-      tempC: h.temperature_2m?.[i] != null ? Math.round(h.temperature_2m[i] * 10) / 10 : null,
-      precipitationProbability: h.precipitation_probability?.[i] ?? null,
-      precipitationMm: h.precipitation?.[i] ?? null,
-      humidity: h.relative_humidity_2m?.[i] ?? null,
-      windKph: h.wind_speed_10m?.[i] ?? null,
-      uvIndex: h.uv_index?.[i] ?? null,
-      cloudCover: h.cloud_cover?.[i] ?? null,
-      visibilityM: h.visibility?.[i] ?? null,
-      weathercode: h.weather_code?.[i] ?? null,
-    })) : [];
-
-    return {
-      temp,
-      tempC: temp,
-      windKph,
-      weathercode: cw.weathercode,
-      emoji:       weatherEmoji(cw.weathercode),
-      display:     `${weatherEmoji(cw.weathercode)} ${temp}°C`,
-      forecastSource: 'Open-Meteo forecast',
-      hourly,
-    };
-  } catch (err) {
-    appLogger.error('[weather] parse error, serving fallback:', err.message);
-    return getDeterministicWeather(numLat, numLon);
-  }
+function conditionToWeatherCode(cond, defaultCode = 1) {
+  const c = String(cond || '').toLowerCase();
+  if (/thunder|storm/i.test(c)) return 95;
+  if (/shower/i.test(c)) return 80;
+  if (/rain|drizzle/i.test(c)) return 61;
+  if (/overcast|fog/i.test(c)) return 45;
+  if (/cloud/i.test(c)) return 3;
+  return defaultCode;
 }
 
 router.get('/', async (req, res) => {
-  const { lat, lon } = req.query;
+  const { lat, lon, elevationM } = req.query;
   if (!lat || !lon) return res.status(400).json({ error: 'Missing lat / lon params' });
 
   const numLat = parseFloat(lat);
@@ -86,20 +30,56 @@ router.get('/', async (req, res) => {
     return res.status(400).json({ error: 'Invalid lat / lon coordinates' });
   }
 
-  const cacheKey = `${numLat.toFixed(2)},${numLon.toFixed(2)}`;
-  const cached = weatherCache.get(cacheKey);
-  if (cached) {
-    return res.json(cached);
-  }
+  const numElev = Number.isFinite(Number(elevationM)) ? Number(elevationM) : null;
 
-  let result;
-  if (typeof weatherCache.getOrFetch === 'function') {
-    result = await weatherCache.getOrFetch(cacheKey, () => computeWeather(numLat, numLon));
-  } else {
-    result = await computeWeather(numLat, numLon);
-    weatherCache.set(cacheKey, result);
+  try {
+    const truth = await getConsensusWeather(numLat, numLon, { elevationM: numElev });
+    if (!truth || !truth.isAvailable) {
+      const fallback = getDeterministicWeather(numLat, numLon);
+      return res.json(fallback);
+    }
+
+    const temp = Math.round(truth.temperatureC);
+    const tempC = truth.temperatureC;
+    const feelsLikeC = truth.apparentTempC ?? tempC;
+    const windKph = Math.round(truth.windKph || 0);
+    const condition = truth.condition || weatherCodeToCondition(truth.weathercode);
+    const weathercode = truth.weathercode ?? conditionToWeatherCode(condition);
+    const emoji = weatherEmoji(weathercode);
+
+    const isSeasonal = truth.dataState === 'HISTORICAL' ||
+      truth.selectedSource === 'seasonal_estimate' ||
+      (!truth.providersConsidered?.includes('OPEN_METEO') && truth.providersConsidered?.includes('IMD'));
+
+    const result = {
+      temp,
+      tempC,
+      feelsLikeC,
+      windKph,
+      weathercode,
+      condition,
+      emoji,
+      display: `${emoji} ${temp}°C`,
+      forecastSource: isSeasonal
+        ? 'seasonal_estimate'
+        : (truth.selectedSource || (truth.providersConsidered?.join(' + ')) || 'Weather Consensus Engine'),
+      consensusState: truth.consensusState,
+      confidence: truth.confidence,
+      rainProb: truth.precipitationProb,
+      humidity: truth.humidityPercent,
+      divergence: truth.divergence || null,
+      advisories: truth.advisories || [],
+      disagreementNotice: truth.disagreementNotice || null,
+      hourly: truth.hourly || [],
+      observedAt: truth.observedAt || null,
+    };
+
+    return res.json(result);
+  } catch (err) {
+    appLogger.error('[weather] Error computing consensus weather:', err.message);
+    const fallback = getDeterministicWeather(numLat, numLon);
+    return res.json(fallback);
   }
-  return res.json(result);
 });
 
 module.exports = router;
