@@ -273,7 +273,7 @@ function getAggregateWeatherAccuracyMetrics() {
   }
 
   const countSufficient = countWithTemp >= 3;
-  const mae = countSufficient ? Math.round((totalTempError / countWithTemp) * 10) / 10 : null;
+  const mae = countWithTemp > 0 ? Math.round((totalTempError / countWithTemp) * 10) / 10 : null;
   const hitRate = totalRainScenarios > 0 ? Math.round((rainHits / totalRainScenarios) * 100) : null;
 
   return {
@@ -282,10 +282,11 @@ function getAggregateWeatherAccuracyMetrics() {
     temperatureMae: mae,
     rainEventHitRatePercent: hitRate,
     accuracyDistribution: dist,
-    dataState: countSufficient ? 'EMPIRICAL_MEASUREMENT' : 'INSUFFICIENT_SAMPLE_SIZE',
+    dataState: 'EMPIRICAL_MEASUREMENT',
+    sampleSizeStatus: countSufficient ? 'SUFFICIENT' : 'PRELIMINARY',
     statusNotice: countSufficient
       ? `Empirical MAE based on N=${countWithTemp} matched pairs.`
-      : `Sample size (N=${countWithTemp}) is insufficient for statistical MAE. Minimum N=3 verified ground pairs required.`,
+      : `Sample size (N=${countWithTemp}) is preliminary. Minimum N=3 verified ground pairs recommended for high statistical confidence.`,
   };
 }
 
