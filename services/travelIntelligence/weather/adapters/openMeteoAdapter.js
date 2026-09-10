@@ -47,25 +47,38 @@ async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 900
 async function getOpenMeteoWeather(lat, lon, options = {}) {
   let raw = null;
   let lastError = null;
+  const startTime = Date.now();
+  const elevationSpecified = Number.isFinite(Number(options.elevationM));
+
   try {
     raw = await fetchFromOpenMeteo(lat, lon, options);
   } catch (firstErr) {
     lastError = firstErr;
-    appLogger.info(`[openMeteoAdapter] First attempt failed (${firstErr.message}), retrying...`);
-    try {
-      raw = await fetchFromOpenMeteo(lat, lon, { ...options, timeoutMs: 5000 });
-    } catch (secondErr) {
-      lastError = secondErr;
-      appLogger.warn(`[openMeteoAdapter] Provider fetch failed: ${secondErr.message}`);
-      return normalizeWeatherRecord({
-        provider: PROVIDER_NAME,
-        dataState: DATA_STATES.UNAVAILABLE,
-        confidence: CONFIDENCE_LEVELS.LOW,
-        latitude: lat,
-        longitude: lon,
-        rawWarnings: [`Open-Meteo fetch failed: ${secondErr.message}`],
-      });
+    // Bounded retry policy: fail fast on client auth/rate-limits (401, 403, 429)
+    const isRetryable = !firstErr.status || firstErr.status >= 500 || firstErr.name === 'TimeoutError' || /ECONNRESET|ETIMEDOUT/i.test(firstErr.message);
+    if (isRetryable) {
+      appLogger.info(`[openMeteoAdapter] First attempt transient failure (${firstErr.message}), retrying once with 5s timeout...`);
+      try {
+        raw = await fetchFromOpenMeteo(lat, lon, { ...options, timeoutMs: 5000 });
+      } catch (secondErr) {
+        lastError = secondErr;
+        appLogger.warn(`[openMeteoAdapter] Provider fetch retry failed: ${secondErr.message}`);
+      }
+    } else {
+      appLogger.warn(`[openMeteoAdapter] Provider returned non-retryable status ${firstErr.status}: ${firstErr.message}`);
     }
+  }
+
+  if (!raw) {
+    return normalizeWeatherRecord({
+      provider: PROVIDER_NAME,
+      dataState: DATA_STATES.UNAVAILABLE,
+      confidence: CONFIDENCE_LEVELS.LOW,
+      latitude: lat,
+      longitude: lon,
+      elevationM: elevationSpecified ? Number(options.elevationM) : null,
+      rawWarnings: [`Open-Meteo unavailable: ${lastError?.message || 'Upstream fetch failed'}`],
+    });
   }
 
   try {

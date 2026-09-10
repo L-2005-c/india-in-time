@@ -83,6 +83,31 @@ function evaluateTriggers({
     });
   }
 
+  // 3b. Weather Uncertainty & Telemetry Failure Trigger
+  const isWeatherUnavailable = weatherTelemetry.dataState === 'UNAVAILABLE' || weatherTelemetry.isAvailable === false;
+  const isWeatherEstimatedLowConfidence = (weatherTelemetry.isEstimated || weatherTelemetry.dataState === 'ESTIMATED') && weatherTelemetry.confidence === 'LOW';
+  const hasWeatherDisagreement = Boolean(weatherTelemetry.disagreementNotice);
+
+  if (isWeatherUnavailable) {
+    triggers.push({
+      type: TRIGGER_TYPES.WEATHER_DETERIORATION,
+      severity: TRIGGER_SEVERITY.WATCH,
+      message: 'Live meteorological telemetry is currently unavailable; plan with conservative outdoor buffers.',
+    });
+  } else if (hasWeatherDisagreement) {
+    triggers.push({
+      type: TRIGGER_TYPES.WEATHER_DETERIORATION,
+      severity: TRIGGER_SEVERITY.WATCH,
+      message: `Weather uncertainty detected: ${weatherTelemetry.disagreementNotice}`,
+    });
+  } else if (isWeatherEstimatedLowConfidence && upcomingStops.some(s => s.category === 'nature' || s.category === 'viewpoint' || s.category === 'beach')) {
+    triggers.push({
+      type: TRIGGER_TYPES.WEATHER_DETERIORATION,
+      severity: TRIGGER_SEVERITY.INFO,
+      message: 'Weather based on diurnal model estimate; monitor actual sky conditions before remote outdoor activities.',
+    });
+  }
+
   // 4. Stop-Specific Conditions (Weather, Opening Hours, Scenic)
   for (const stop of upcomingStops) {
     const isOutdoor = stop.category === 'nature' || stop.category === 'viewpoint' || stop.category === 'beach' || stop.category === 'cave';

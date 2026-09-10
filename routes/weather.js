@@ -66,9 +66,11 @@ router.get('/', async (req, res) => {
     const weathercode = truth.weathercode ?? conditionToWeatherCode(condition);
     const emoji = weatherEmoji(weathercode);
 
-    const isSeasonal = truth.dataState === 'HISTORICAL' ||
+    const isSeasonal = truth.dataState === 'HISTORICAL' || truth.dataState === 'ESTIMATED' ||
       truth.selectedSource === 'seasonal_estimate' ||
-      (!truth.providersConsidered?.includes('OPEN_METEO') && truth.providersConsidered?.includes('IMD'));
+      (!truth.providersConsidered?.includes('OPEN_METEO') && truth.providersConsidered?.includes('IMD') && truth.dataState !== 'OBSERVED');
+
+    const isEstimated = Boolean(truth.isEstimated ?? (truth.dataState === 'ESTIMATED' || truth.dataState === 'HISTORICAL' || isSeasonal));
 
     const result = {
       temp,
@@ -87,6 +89,10 @@ router.get('/', async (req, res) => {
       consensusState: truth.consensusState,
       confidence: truth.confidence,
       dataState: truth.dataState || (isSeasonal ? 'HISTORICAL' : 'PREDICTED'),
+      isEstimated,
+      userDisclosure: truth.userDisclosure || (isEstimated ? 'Live weather observation is unavailable. Showing a mathematical model estimate based on diurnal and historical patterns.' : null),
+      selectionReason: truth.selectionReason || (isEstimated ? 'FALLBACK_DIURNAL_ESTIMATE' : 'NWP_MODEL_AVAILABLE'),
+      elevationAudit: truth.elevationAudit || null,
       rainProb: truth.precipitationProb,
       humidity: truth.humidityPercent,
       station: truth.station || null,

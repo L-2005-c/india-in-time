@@ -118,9 +118,14 @@ function getImdClimatologicalNormal(lat, lon, nearestStation, explicitElevationM
   }
 
   // Altitude lapse rate correction for Indian Ghats and Hill Stations (-6.5°C / 1000m)
+  const unadjustedTemp = baseTemp;
+  let lapseDrop = 0;
+  let lapseCorrectionApplied = false;
+
   if (targetElevationM > 500) {
-    const lapseDrop = ((targetElevationM - 100) / 1000) * 6.5;
+    lapseDrop = Math.round((((targetElevationM - 100) / 1000) * 6.5) * 10) / 10;
     baseTemp = Math.round((baseTemp - lapseDrop) * 10) / 10;
+    lapseCorrectionApplied = true;
     // Orographic hill rain enhancement applies only to high-altitude terrain
     if (month >= 5 && month <= 8 && targetElevationM >= 800) {
       baseRainProb = Math.min(90, baseRainProb + 25);
@@ -134,6 +139,14 @@ function getImdClimatologicalNormal(lat, lon, nearestStation, explicitElevationM
     condition,
     elevationM: targetElevationM,
     istHour: Math.round(istHour * 10) / 10,
+    elevationAudit: {
+      rawProviderTemperature: unadjustedTemp,
+      providerElevation: 100,
+      targetElevation: targetElevationM,
+      correctionApplied: lapseCorrectionApplied,
+      correctionAmount: lapseDrop,
+      finalValue: baseTemp,
+    },
   };
 }
 
@@ -164,28 +177,32 @@ async function getImdWeather(lat, lon, options = {}) {
             longitude: lon,
             elevationM: nearest.elevationM,
             temperatureC: data.temperature,
-            humidityPercent: data.humidity,
-            windKph: data.wind_speed,
-            precipitationProb: data.rain_prob || (data.rainfall > 0 ? 90 : 20),
+            apparentTempC: data.feels_like || data.temperature,
+            humidityPercent: data.humidity || 70,
+            windKph: data.wind_speed || 10,
+            precipitationProb: data.rain_probability || 20,
             precipitationMm: data.rainfall || 0,
             condition: data.weather_condition || 'Clear',
             observedAt: new Date().toISOString(),
             rawWarnings: data.warnings || [],
           });
         }
+      } else {
+        appLogger.warn(`[imdAdapter] IMD live API responded HTTP ${res.status}: programmatic access restricted.`);
       }
     } catch (err) {
-      appLogger.info(`[imdAdapter] IMD live feed unreachable (${err.message}); falling back to IMD station climatological normals.`);
+      appLogger.info(`[imdAdapter] IMD live feed unreachable (${err.message}); falling back to diurnal model estimate.`);
     }
   }
 
   // Fallback to IMD Station Climatological Normals with altitude lapse rate & diurnal modeling
+  // Strictly labeled as ESTIMATED (never OBSERVED or LIVE)
   const normal = getImdClimatologicalNormal(lat, lon, nearest, options.elevationM, options.date || new Date());
 
   return normalizeWeatherRecord({
     provider: PROVIDER_NAME,
-    dataState: DATA_STATES.HISTORICAL,
-    confidence: nearest.distanceKm < 30 ? CONFIDENCE_LEVELS.MEDIUM : CONFIDENCE_LEVELS.LOW,
+    dataState: DATA_STATES.ESTIMATED,
+    confidence: CONFIDENCE_LEVELS.LOW,
     latitude: lat,
     longitude: lon,
     elevationM: normal.elevationM,
@@ -199,8 +216,9 @@ async function getImdWeather(lat, lon, options = {}) {
     observedAt: null,
     issuedAt: new Date().toISOString(),
     rawWarnings: [
-      `IMD Climatological Normal calibrated to station ${nearest.name} (${nearest.distanceKm}km away, ${nearest.elevationM}m elevation, diurnal IST ${normal.istHour}h)`,
+      `IMD station observation unavailable (access restricted); diurnal mathematical estimate calibrated to station ${nearest.name} (${nearest.distanceKm}km away, ${nearest.elevationM}m elevation, diurnal IST ${normal.istHour}h)`,
     ],
+    elevationAudit: normal.elevationAudit,
   });
 }
 

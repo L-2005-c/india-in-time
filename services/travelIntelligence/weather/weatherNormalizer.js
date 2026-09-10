@@ -35,6 +35,7 @@ function normalizeWeatherRecord({
   validUntil = null,
   hourly = [],
   rawWarnings = [],
+  elevationAudit = null,
 } = {}) {
   const isNum = v => v !== null && v !== undefined && Number.isFinite(Number(v));
 
@@ -85,6 +86,7 @@ function normalizeWeatherRecord({
     },
     hourly: Array.isArray(hourly) ? hourly : [],
     warnings: Array.isArray(rawWarnings) ? rawWarnings : [],
+    elevationAudit: elevationAudit || null,
     isAvailable: normTemp !== null,
   };
 }

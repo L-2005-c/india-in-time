@@ -21,7 +21,16 @@ const {
   DATA_STATES,
   CONFIDENCE_LEVELS,
   WEATHER_CONSENSUS_STATES,
+  SELECTION_REASONS,
 } = require('../services/travelIntelligence/provenanceModel');
+const {
+  evaluateTriggers,
+  TRIGGER_TYPES,
+  TRIGGER_SEVERITY,
+} = require('../services/travelIntelligence/guardian/triggerFramework');
+const {
+  computeWeatherIntelligence,
+} = require('../services/travelIntelligence/weatherEngine');
 
 function buildApp() {
   const app = express();
@@ -126,6 +135,59 @@ describe('Weather Truth & Provenance Engine Acceptance Tests', () => {
       expect(consensus.confidence).toBe(CONFIDENCE_LEVELS.LOW);
       expect(consensus.disagreementNotice).toBeDefined();
       expect(consensus.divergence.tempDeltaC).toBe(7.0);
+      expect(consensus.selectionReason).toBe(SELECTION_REASONS.DISAGREEMENT_PESSIMISTIC_BOUND);
+      expect(consensus.isEstimated).toBe(false);
+    });
+
+    test('when only estimated record is available, isEstimated is true and selectionReason is FALLBACK_DIURNAL_ESTIMATE', () => {
+      const rec = normalizeWeatherRecord({
+        provider: 'IMD',
+        dataState: DATA_STATES.ESTIMATED,
+        temperatureC: 26.5,
+      });
+
+      const consensus = evaluateWeatherConsensus([rec]);
+      expect(consensus.dataState).toBe(DATA_STATES.ESTIMATED);
+      expect(consensus.isEstimated).toBe(true);
+      expect(consensus.selectionReason).toBe(SELECTION_REASONS.FALLBACK_DIURNAL_ESTIMATE);
+      expect(consensus.confidence).toBe(CONFIDENCE_LEVELS.LOW);
+      expect(consensus.userDisclosure).toContain('Showing a mathematical model estimate');
+    });
+
+    test('when both providers are fallback/estimated, output is never promoted to OBSERVED or PREDICTED', () => {
+      const rec1 = normalizeWeatherRecord({
+        provider: 'IMD',
+        dataState: DATA_STATES.ESTIMATED,
+        temperatureC: 26.5,
+      });
+      const rec2 = normalizeWeatherRecord({
+        provider: 'OPEN_METEO_CACHE',
+        dataState: DATA_STATES.ESTIMATED,
+        temperatureC: 27.1,
+      });
+
+      const consensus = evaluateWeatherConsensus([rec1, rec2]);
+      expect(consensus.dataState).toBe(DATA_STATES.ESTIMATED);
+      expect(consensus.dataState).not.toBe(DATA_STATES.OBSERVED);
+      expect(consensus.dataState).not.toBe(DATA_STATES.PREDICTED);
+      expect(consensus.isEstimated).toBe(true);
+      expect(consensus.selectionReason).toBe(SELECTION_REASONS.FALLBACK_DIURNAL_ESTIMATE);
+    });
+
+    test('when live ground station observation is present, isEstimated is false and selectionReason is LIVE_OBSERVATION_MATCH', () => {
+      const liveObs = normalizeWeatherRecord({
+        provider: 'IMD',
+        dataState: DATA_STATES.OBSERVED,
+        confidence: CONFIDENCE_LEVELS.HIGH,
+        temperatureC: 26.8,
+        observedAt: new Date().toISOString(),
+      });
+
+      const consensus = evaluateWeatherConsensus([liveObs]);
+      expect(consensus.dataState).toBe(DATA_STATES.OBSERVED);
+      expect(consensus.isEstimated).toBe(false);
+      expect(consensus.selectionReason).toBe(SELECTION_REASONS.LIVE_OBSERVATION_MATCH);
+      expect(consensus.confidence).toBe(CONFIDENCE_LEVELS.HIGH);
     });
   });
 
@@ -141,7 +203,7 @@ describe('Weather Truth & Provenance Engine Acceptance Tests', () => {
       expect(typeof res.body.temperatures.rawTemperatureC).toBe('number');
       expect(typeof res.body.temperatures.displayTemperatureC).toBe('number');
       expect(res.body.timestamps.requestedAtIST).toBeDefined();
-    });
+    }, 15000);
   });
 
   describe('5. Production Route /api/weather Transparency', () => {
@@ -154,6 +216,52 @@ describe('Weather Truth & Provenance Engine Acceptance Tests', () => {
       expect(res.body.display).toContain('°C');
       expect(res.body.station).toBeDefined();
       expect(res.body.updatedAtIST).toBeDefined();
+      expect(typeof res.body.isEstimated).toBe('boolean');
+    }, 15000);
+  });
+
+  describe('6. Downstream Quality Gates & Guardian Trigger Verification', () => {
+    test('triggerFramework raises WATCH advisory when weather telemetry is unavailable', () => {
+      const triggers = evaluateTriggers({
+        upcomingStops: [{ id: 'stop-1', name: 'RK Beach', category: 'beach' }],
+        weatherTelemetry: { isAvailable: false, dataState: 'UNAVAILABLE' },
+      });
+
+      const weatherTrigger = triggers.find(t => t.type === TRIGGER_TYPES.WEATHER_DETERIORATION);
+      expect(weatherTrigger).toBeDefined();
+      expect(weatherTrigger.severity).toBe(TRIGGER_SEVERITY.WATCH);
+      expect(weatherTrigger.message).toContain('Live meteorological telemetry is currently unavailable');
+    });
+
+    test('triggerFramework raises WATCH advisory when providers disagree', () => {
+      const triggers = evaluateTriggers({
+        upcomingStops: [{ id: 'stop-1', name: 'Kailasagiri', category: 'viewpoint' }],
+        weatherTelemetry: {
+          isAvailable: true,
+          dataState: 'PREDICTED',
+          disagreementNotice: 'Rain/temperature outlook is uncertain due to provider divergence.',
+        },
+      });
+
+      const weatherTrigger = triggers.find(t => t.type === TRIGGER_TYPES.WEATHER_DETERIORATION);
+      expect(weatherTrigger).toBeDefined();
+      expect(weatherTrigger.severity).toBe(TRIGGER_SEVERITY.WATCH);
+      expect(weatherTrigger.message).toContain('Weather uncertainty detected');
+    });
+
+    test('weatherEngine adds model disclosure note and flags LOW confidence for estimated data', () => {
+      const intel = computeWeatherIntelligence({
+        tempC: 27,
+        condition: 'Clear',
+        isEstimated: true,
+        dataState: 'ESTIMATED',
+        confidence: 'LOW',
+      }, { cat: 'beach', indoor_outdoor: 'outdoor' });
+
+      expect(intel.confidenceBand).toBe('LOW');
+      expect(intel.confidence).toBe(40);
+      expect(intel.status).toBe('ESTIMATED');
+      expect(intel.activityNotes.some(n => /diurnal/i.test(n))).toBe(true);
     });
   });
 });

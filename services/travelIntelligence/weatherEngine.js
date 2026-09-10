@@ -112,16 +112,24 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
   if (isOutdoor && score >= 75) notes.push('Excellent for outdoor activity');
   if (isOutdoor && score < 40) notes.push('Poor for outdoor activity');
   if ((place.is_sunrise_spot || place.is_sunset_spot) && score >= 70) notes.push('Favourable for photography');
+  if (weather.disagreementNotice) {
+    warnings.push(`Forecast divergence: ${weather.disagreementNotice}`);
+  }
+  if (weather.isEstimated || weather.dataState === 'ESTIMATED') {
+    notes.push('Weather is an estimate based on diurnal & historical models; verify locally.');
+  }
+
   const evidenceSignals = (weather.tempC != null ? 1 : 0) + (weather.condition ? 1 : 0) + (weather.humidity != null ? 1 : 0) + (weather.windKph != null ? 1 : 0);
-  const confidenceBand = evidenceSignals >= 3 ? 'HIGH' : (evidenceSignals >= 1 ? 'MEDIUM' : 'LOW');
-  const confidenceScore = weather.tempC != null ? 75 : 50;
+  let confidenceBand = evidenceSignals >= 3 ? 'HIGH' : (evidenceSignals >= 1 ? 'MEDIUM' : 'LOW');
+  if (weather.confidence === 'LOW') confidenceBand = 'LOW';
+  const confidenceScore = weather.confidence === 'LOW' ? 40 : (weather.tempC != null ? 75 : 50);
 
   return {
     score,
     suitability,
-    status: (weather.isFallback || weather.isEstimated || weather.source === 'seasonal_estimate')
+    status: weather.dataState || ((weather.isFallback || weather.isEstimated || weather.source === 'seasonal_estimate')
       ? 'ESTIMATED'
-      : (weather.forecast ? 'PREDICTED' : (weather.isObserved ? 'OBSERVED' : 'ESTIMATED')),
+      : (weather.forecast ? 'PREDICTED' : (weather.isObserved ? 'OBSERVED' : 'ESTIMATED'))),
     activityNotes: notes,
     warnings,
     source: weather.source || (weather.forecast ? 'forecast' : (weather.isObserved ? 'observed' : 'seasonal_estimate')),
