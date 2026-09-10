@@ -119,10 +119,12 @@ function computeWeatherIntelligence(weather, place = {}, daypart = 'afternoon') 
   return {
     score,
     suitability,
-    status: weather.forecast ? 'PREDICTED' : 'OBSERVED',
+    status: (weather.isFallback || weather.isEstimated || weather.source === 'seasonal_estimate')
+      ? 'ESTIMATED'
+      : (weather.forecast ? 'PREDICTED' : (weather.isObserved ? 'OBSERVED' : 'ESTIMATED')),
     activityNotes: notes,
     warnings,
-    source: weather.forecast ? 'forecast' : 'observed',
+    source: weather.source || (weather.forecast ? 'forecast' : (weather.isObserved ? 'observed' : 'seasonal_estimate')),
     confidence: confidenceScore,
     confidenceBand,
     evidenceCount: evidenceSignals,

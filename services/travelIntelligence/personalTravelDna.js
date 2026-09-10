@@ -34,7 +34,13 @@ const DEFAULT_TRAVEL_DNA = Object.freeze({
   // Pace & Tolerances
   crowdTolerance: 50,
   walkingTolerance: 65,
+  heatTolerance: 50,
+  rainTolerance: 40,
+  ghatTolerance: 50,
+  budgetSensitivity: 50,
+  transportPreference: 'any',
   pacePreference: 'balanced',
+  observationHistory: [],
   enabled: true,
   sources: {
     photography: 'default',
@@ -50,6 +56,9 @@ const DEFAULT_TRAVEL_DNA = Object.freeze({
     nightlife: 'default',
     crowdTolerance: 'default',
     walkingTolerance: 'default',
+    heatTolerance: 'default',
+    rainTolerance: 'default',
+    ghatTolerance: 'default',
   },
   confidences: {
     photography: null,
@@ -65,6 +74,9 @@ const DEFAULT_TRAVEL_DNA = Object.freeze({
     nightlife: null,
     crowdTolerance: null,
     walkingTolerance: null,
+    heatTolerance: null,
+    rainTolerance: null,
+    ghatTolerance: null,
   },
   evidenceCounts: {
     photography: 0,
@@ -123,7 +135,13 @@ function sanitizeDnaProfile(input = {}) {
     nightlife: clamp(input.nightlife, 0, 100, DEFAULT_TRAVEL_DNA.nightlife),
     crowdTolerance: clamp(input.crowdTolerance, 0, 100, DEFAULT_TRAVEL_DNA.crowdTolerance),
     walkingTolerance: clamp(input.walkingTolerance, 0, 100, DEFAULT_TRAVEL_DNA.walkingTolerance),
+    heatTolerance: clamp(input.heatTolerance, 0, 100, DEFAULT_TRAVEL_DNA.heatTolerance),
+    rainTolerance: clamp(input.rainTolerance, 0, 100, DEFAULT_TRAVEL_DNA.rainTolerance),
+    ghatTolerance: clamp(input.ghatTolerance, 0, 100, DEFAULT_TRAVEL_DNA.ghatTolerance),
+    budgetSensitivity: clamp(input.budgetSensitivity, 0, 100, DEFAULT_TRAVEL_DNA.budgetSensitivity),
+    transportPreference: input.transportPreference || DEFAULT_TRAVEL_DNA.transportPreference,
     pacePreference: pace,
+    observationHistory: Array.isArray(input.observationHistory) ? input.observationHistory.slice(-50) : [],
     enabled: input.enabled !== false,
     sources: {
       photography: sources.photography || 'default',
@@ -139,6 +157,9 @@ function sanitizeDnaProfile(input = {}) {
       nightlife: sources.nightlife || 'default',
       crowdTolerance: sources.crowdTolerance || 'default',
       walkingTolerance: sources.walkingTolerance || 'default',
+      heatTolerance: sources.heatTolerance || 'default',
+      rainTolerance: sources.rainTolerance || 'default',
+      ghatTolerance: sources.ghatTolerance || 'default',
     },
     confidences: {
       photography: confidences.photography != null ? clamp(confidences.photography, 20, 100) : null,
@@ -154,6 +175,9 @@ function sanitizeDnaProfile(input = {}) {
       nightlife: confidences.nightlife != null ? clamp(confidences.nightlife, 20, 100) : null,
       crowdTolerance: confidences.crowdTolerance != null ? clamp(confidences.crowdTolerance, 20, 100) : null,
       walkingTolerance: confidences.walkingTolerance != null ? clamp(confidences.walkingTolerance, 20, 100) : null,
+      heatTolerance: confidences.heatTolerance != null ? clamp(confidences.heatTolerance, 20, 100) : null,
+      rainTolerance: confidences.rainTolerance != null ? clamp(confidences.rainTolerance, 20, 100) : null,
+      ghatTolerance: confidences.ghatTolerance != null ? clamp(confidences.ghatTolerance, 20, 100) : null,
     },
     evidenceCounts: {
       photography: Math.max(0, Number(evidenceCounts.photography) || 0),
@@ -169,6 +193,9 @@ function sanitizeDnaProfile(input = {}) {
       nightlife: Math.max(0, Number(evidenceCounts.nightlife) || 0),
       crowdTolerance: Math.max(0, Number(evidenceCounts.crowdTolerance) || 0),
       walkingTolerance: Math.max(0, Number(evidenceCounts.walkingTolerance) || 0),
+      heatTolerance: Math.max(0, Number(evidenceCounts.heatTolerance) || 0),
+      rainTolerance: Math.max(0, Number(evidenceCounts.rainTolerance) || 0),
+      ghatTolerance: Math.max(0, Number(evidenceCounts.ghatTolerance) || 0),
     },
     lastUpdated: input.lastUpdated || new Date().toISOString(),
   };
@@ -380,6 +407,38 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
   };
 }
 
+/**
+ * Records an explicit or inferred traveler observation with audit history.
+ */
+function recordTravelerObservation(currentProfile, observation = {}) {
+  const profile = { ...sanitizeDnaProfile(currentProfile) };
+  const history = Array.isArray(profile.observationHistory) ? [...profile.observationHistory] : [];
+
+  const obs = {
+    id: `obs_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    timestamp: observation.timestamp || new Date().toISOString(),
+    type: String(observation.type || 'INTERACTION'),
+    dimension: observation.dimension || null,
+    delta: Number.isFinite(Number(observation.delta)) ? Number(observation.delta) : 0,
+    context: observation.context || {},
+    confidence: observation.confidence || 'MEDIUM',
+  };
+
+  history.push(obs);
+  if (history.length > 50) history.shift();
+  profile.observationHistory = history;
+
+  if (obs.dimension && profile[obs.dimension] !== undefined && profile.sources[obs.dimension] !== 'explicit') {
+    profile[obs.dimension] = clamp(profile[obs.dimension] + obs.delta);
+    profile.sources[obs.dimension] = 'inferred';
+    profile.confidences[obs.dimension] = clamp((profile.confidences[obs.dimension] || 50) + 4, 20, 95);
+    profile.evidenceCounts[obs.dimension] = (profile.evidenceCounts[obs.dimension] || 0) + 1;
+  }
+
+  profile.lastUpdated = new Date().toISOString();
+  return profile;
+}
+
 module.exports = {
   SOURCE_TYPES,
   DEFAULT_TRAVEL_DNA,
@@ -387,5 +446,6 @@ module.exports = {
   deriveDnaFromPersonas,
   applyRecencyDecay,
   recordBehaviorInteraction,
+  recordTravelerObservation,
   computeDnaMatch,
 };

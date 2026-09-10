@@ -1,38 +1,76 @@
-# India In-Time 🇮🇳 ⏱️
+# India In-Time 🇮🇳 ⏱️ (v3.0)
 
-**Enterprise-Grade GeoAI & Temporal Travel Intelligence Platform**
+**India-Specific Travel Intelligence + Contextual Travel Decision Engine**  
+*The AI Travel Operating System for India*
 
-India In-Time is a full-stack, time-aware itinerary planning and navigation system for Indian cities. It combines deterministic astronomical solar calculations, real-time weather analytics, historical crowd modeling, multi-modal transport algorithms, and grounded Generative AI (Gemini) into a unified PWA and mobile-first experience.
+India In-Time is a contextual travel decision operating system for Indian journeys. While mapping platforms provide routes and AI models can generate static itineraries, India In-Time solves the real traveler dilemma:
+
+$$\textbf{“Given everything known right now, what is the best next travel decision for THIS traveler?”}$$
+
+It unifies astronomical solar timing, multi-provider weather truth (IMD official + global NWP models), 18-dimensional machine-learned crowd modeling, ghat road & highland hazard kinematics, and real-time journey adaptation into an explainable, trust-preserving travel operating system.
 
 ---
 
-## 🏛️ System Architecture
+## 🏛️ v3.0 Core Product Loop
+
+```
+    PLAN → TRAVEL → OBSERVE → UNDERSTAND → DETECT CHANGE → EVALUATE IMPACT
+                                                                 ↓
+    LEARN ← FEEDBACK ← TRAVELER ACTS ← EXPLAIN ← ADAPT ← DECIDE (Keep vs Adapt)
+```
+
+---
+
+## 🧠 Architectural Pillars of India In-Time v3.0
 
 ```mermaid
 graph TD
-    Client["Client (PWA / Mobile / Desktop Browser)"] -->|HTTPS / WSS| CDN["CDN / Reverse Proxy"]
-    CDN --> Express["Express.js Server (Node.js 20+)"]
+    DNA["Traveler DNA (Preferences, Heat/Rain Tolerances, Evidence Log)"] --> JS["Authoritative Journey State (Active Stop, Completed [IMMUTABLE], Pacing Lag)"]
+    JS --> CE["Context Engine & Data Trust Layer"]
     
-    subgraph "Core Backend Services"
-        Express --> Auth["Auth & Security (Firebase + Rate Limiters)"]
-        Express --> RoutingEngine["Temporal & Itinerary Optimizer (Beam Search)"]
-        Express --> WeatherEngine["Weather & Solar Engine (OpenWeather + Astronomy)"]
-        Express --> AIProxy["Grounded AI Service (Gemini 2.0 / 1.5 Pro)"]
-        Express --> PlacesService["POI Discovery & Deduplication"]
+    subgraph "Environmental Intelligence"
+        CE --> WTE["Weather Truth Engine (IMD Official + Open-Meteo Consensus)"]
+        CE --> RTE["Authoritative Routing (Live Traffic vs Road Estimates)"]
+        CE --> CRW["Crowd Model v3 (18-dim Online Logistic Regression)"]
+        CE --> SCN["Solar & Scenic Engine (Astronomical Golden Hour Curves)"]
     end
 
-    subgraph "Data & Persistence Layer"
-        RoutingEngine --> Redis[("Redis Cache (Cluster / TLS Memorystore)")]
-        RoutingEngine --> Postgres[("PostgreSQL Database (User Data & Stamps)")]
-        Express --> Fallback["In-Memory Resilient Fallbacks"]
-    end
+    CE --> TG["Travel Guardian (12 Event Triggers: Rain, Ghat Risk, Delay, Closure)"]
+    TG --> DE["Contextual Decision Engine"]
+    
+    DE -->|Plan Still Optimal| Keep["KEEP PLAN (Continue on Track)"]
+    DE -->|Disruption Detected| Alt["Alternative Generator (Sheltered Havens / Museums)"]
+    Alt --> Replan["Adaptation Pipeline (Re-times upcoming stops only)"]
+    Replan --> PV["Plan Versioning (Plan v1 -> Plan v2 Audit Trail)"]
+    PV --> HUD["Trip Control Center HUD (One-Click Traveler Action)"]
+    HUD --> FB["Feedback & Outcome Learning (Updates Traveler DNA)"]
 ```
 
-### Key Architectural Tenets
-1. **Deterministic Travel Grounding**: Astronomical sunrise/sunset curves, real-world distance metrics (Haversine/OSRM), weather thresholds, and opening hours are calculated by deterministic engines — never hallucinated by LLMs.
-2. **Resilience & Fail-Open**: Every external dependency (Redis, PostgreSQL, OpenWeather, Nominatim, Gemini) has automatic local fallback paths. If Redis or Postgres goes down, the app remains 100% operational with in-memory caching and local storage.
-3. **Strict Zero-Inline-Handler Policy**: The UI adheres to strict Content Security Policy (CSP) with CSP nonces, zero inline `onclick`/`onchange` handlers in production HTML, and delegated DOM listeners.
-4. **Architectural Guardrails**: Architectural limits (`scripts/architecture-check.js`) ratchet maximum file size (`app.js` ≤ 3600 lines, `server.js` ≤ 560 lines) to enforce ongoing modularization.
+### 1. Multi-Provider Weather Truth Engine
+- Integrates official **India Meteorological Department (IMD)** station feeds with high-resolution global numerical weather prediction models (Open-Meteo).
+- Models **altitude lapse rates** (-6.5°C / 1000m) for Indian hill stations and Eastern/Western Ghats (e.g., 910m Araku Valley vs coastal Visakhapatnam).
+- **Preserves Uncertainty**: When providers disagree on precipitation, the engine flags `WEATHER_DISAGREEMENT` and reduces confidence to `LOW` rather than fabricating false 50% averages.
+- **Accuracy Telemetry**: Continuously pairs forecast snapshots with subsequent ground observations to measure Mean Absolute Error (MAE) and rain detection calibration.
+
+### 2. Authoritative Central Journey State
+- Acts as the single source of truth for active trips (`tripId`, `activeStop`, `completedStops`, `upcomingStops`, `pacingLagMinutes`, `planVersion`).
+- **Strict Immutability Guarantee**: Completed activities are immutable and can never be rewritten, deleted, or re-timed during dynamic replanning.
+- **Pacing Lag Propagation**: Automatically shifts upcoming departure windows based on real-world transit delays without disrupting completed history.
+
+### 3. Real-Time Travel Guardian
+- Continuously evaluates journey health against 12 standardized event triggers:
+  `WEATHER_DETERIORATION`, `GHAT_ROAD_RISK`, `HEAT_SURGE`, `FOG_HAZARD`, `CROWD_SURGE`, `TRAFFIC_DELAY`, `TRAVELER_DELAY`, `OPENING_HOURS_CONFLICT`, `SCENIC_WINDOW_MISSED`, `DESTINATION_CLOSURE`, `HAZARD_CHANGE`, `EMERGENCY`.
+- Maps trip state to authoritative health bands: `ON_TRACK`, `WATCH`, `SUBOPTIMAL`, `REPLAN_RECOMMENDED`, `CRITICAL`.
+- Built-in anti-churn hysteresis prevents false plan replanning from trivial traffic variations.
+
+### 4. Contextual Decision Engine & Alternative Generator
+- When severe rain, heat, or road closures degrade an upcoming outdoor stop (e.g., viewpoints, waterfalls), the system does not simply drop it.
+- Dynamically discovers and substitutes **sheltered havens** (art museums, coffee roasteries, craft pavilions) aligned with Traveler DNA preferences.
+- Re-times remaining stops and generates an explainable diff: `WHAT CHANGED`, `WHY`, `WHAT WAS PRESERVED`.
+
+### 5. Plan Versioning & Audit Trail
+- Maintains an immutable audit history of plan mutations: Plan v1 $\rightarrow$ Plan v2 $\rightarrow$ Plan vN.
+- Logs trigger severity, changed stops, preserved stops, confidence score, and timestamp for every adaptation event.
 
 ---
 
@@ -43,26 +81,34 @@ india-in-time/
 ├── frontend/
 │   ├── app-src/                # Vite + ES Module Source Code
 │   │   ├── src/
-│   │   │   ├── core/           # Main controller (app.js, client-api.js, state)
-│   │   │   ├── modules/        # Extracted domain modules (budget, feedback, savedPlans, aiMedia, chat, transport)
+│   │   │   ├── core/           # Main controller (app.js ≤ 3500 lines)
+│   │   │   ├── modules/        # Domain modules (tripControlCenter, whatIfSimulatorUi, timeAwarePlanner)
 │   │   │   ├── a11y/           # Accessibility controllers (modal, keyboard navigation)
 │   │   │   └── utils/          # Geometry, sanitization, and helper utilities
 │   │   └── styles.css          # Curated responsive design tokens & CSS
 │   └── public/
 │       └── dist/               # Content-hashed production build output (HTML, JS, CSS)
 ├── services/
-│   ├── travelIntelligence/     # Beam search itinerary optimizer, temporal engine, scoring
-│   ├── ai/                     # Grounded Gemini AI prompt templates & provider abstraction
+│   ├── travelIntelligence/     # Core intelligence & operating system layer
+│   │   ├── weather/            # Multi-provider Weather Truth Engine (IMD + Open-Meteo)
+│   │   ├── journey/            # Authoritative Journey State & Plan Versioning Engines
+│   │   ├── guardian/           # Travel Guardian & 12-trigger framework
+│   │   ├── decision/           # Contextual Adaptation Pipeline & Alternative Generator
+│   │   ├── tourismPoi/         # Zero-Trust Canonical Place Resolver & Coordinate Integrity
+│   │   ├── advancedItineraryEngine.js # Beam-search itinerary optimizer
+│   │   └── personalTravelDna.js # 10-dim traveler preference vectors with recency decay
+│   ├── ml/                     # Online crowd prediction model (18-dim logistic regression v3)
 │   ├── cache.js                # Distributed Redis + in-memory LRU multi-tier cache
-│   ├── weatherEngine.js        # Deterministic weather scoring & temperature thresholds
 │   └── gemini.js               # Resilient LLM proxy with circuit breaker & retry backoff
-├── routes/                     # Express API endpoint controllers
+├── routes/
+│   ├── intelligence.js         # v3.0 Travel Operating System & Decision Intelligence APIs
+│   ├── weather.js              # Multi-provider weather proxy
+│   ├── trips.js                # Trip persistence & sharing
+│   └── time-intelligence.js    # Temporal visit windows & badge endpoints
 ├── middleware/                 # Rate limiting, security headers, SLO tracking, auth
 ├── db/                         # PostgreSQL connection pool, schema, migrations, queries
-├── data/                       # Curated city seed POIs and cultural metadata
-├── scripts/                    # Build, lint, architecture check, and load smoke test scripts
-├── docs/                       # Technical runbooks, SLO specifications, OpenAPI docs
-└── __tests__/                  # Comprehensive test suites (Unit, E2E, A11y, Hardening)
+├── scripts/                    # Build, lint, and architectural verification scripts
+└── __tests__/                  # 124 test suites, 1,250+ unit and end-to-end tests
 ```
 
 ---
@@ -72,7 +118,7 @@ india-in-time/
 ### Prerequisites
 - **Node.js**: v20.x or v22.x+
 - **npm**: v10.x+
-- *(Optional)* PostgreSQL & Redis (the app runs out-of-the-box in standalone mode without them)
+- *(Optional)* PostgreSQL & Redis (the system operates out-of-the-box in standalone mode with resilient local fallbacks)
 
 ### Installation
 ```bash
@@ -113,38 +159,32 @@ Access the application at `http://localhost:3001`.
 
 ---
 
-## 🧪 Comprehensive Verification & QA Suite
+## 🧪 Comprehensive Verification & Quality Gates
 
-All quality checks must exit 0 before deploying code:
+All quality checks must exit 0 cleanly:
 
 | Verification Target | Command | Description |
 | :--- | :--- | :--- |
-| **Unit & Integration Tests** | `npm test` | Runs 69 test suites (855+ assertions) across all travel engines, services, and routes |
-| **Playwright E2E & A11y** | `npm run test:e2e` | Runs headless Chromium journeys, WCAG 2 AA Axe checks, and responsive mobile viewports (375px & 320px) |
-| **Architecture Limits** | `node scripts/architecture-check.js` | Enforces line count limits (`app.js` ≤ 3600, `server.js` ≤ 560) |
-| **Inline Handler Guard** | `npm run check:inline-handlers` | AST/regex check guaranteeing zero inline `onclick`/`onload` HTML attributes |
-| **Bundle Size Budget** | `npm run check:bundle` | Validates frontend bundle remains under the 1.5 MB production performance budget |
-| **ESLint Static Analysis** | `npm run lint` | Ensures 0 errors and 0 warnings across frontend, backend, and test suites |
-| **Itinerary Load Smoke** | `node scripts/itinerary-load-smoke.js` | Benchmarks beam search optimizer under concurrency, reporting p50/p95/p99 latencies |
+| **Full Test Suite** | `npm test` | Runs **124 test suites (1,250+ assertions)** across all travel operating system engines, routers, and models |
+| **Architecture Guardrails** | `node scripts/architecture-check.js` | Enforces line-count ratchets (`app.js` ≤ 3500, `server.js` ≤ 560) and zero circular dependency cycles |
+| **End-to-End Simulation** | `npx jest __tests__/intelligence.operatingSystemE2E.test.js` | Simulates Visakhapatnam $\rightarrow$ Araku Valley rainy ghat journey adaptation |
+| **Frontend Production Build**| `npm run build:frontend` | Compiles Vite production bundle into content-hashed assets |
+| **Bundle Budget** | `node scripts/check-bundle-size.js` | Validates bundle remains under 1.5 MB (currently ~482 KB) |
+| **ESLint Analysis** | `npm run lint` | Ensures 0 syntax and style violations |
 
 ---
 
-## 🛡️ Security & Performance SLOs
+## 🛡️ Operational & Security Invariants
 
-- **CSP & Security Headers**: Strict HSTS, frame-options deny, script-src nonce injection, and complete XSS protection.
-- **Fail-Open Architecture**: Complete Redis or PostgreSQL outages trigger zero 500 responses on planning or read APIs.
-- **Latency SLOs**:
-  - POI Lookup & Scored Places: p95 < 80ms (cached), p95 < 250ms (uncached)
-  - Full Beam-Search Itinerary Planning: p95 < 500ms
-  - PWA Initial Paint: LCP < 1.8s, CLS < 0.05 on standard 4G mobile networks
+1. **Truth in Provenance**: All meteorological and routing telemetry carries strict data states: `OBSERVED`, `PREDICTED`, `ESTIMATED`, `HISTORICAL`, `STALE`, `UNAVAILABLE`, or `SIMULATED`. Simulated demo data is NEVER represented as live observation.
+2. **Deterministic Precedence**: Safety rules, opening hours, and solar calculations are deterministic. AI language models only explain decisions; they never invent coordinates, closures, or weather data.
+3. **CSP & Security**: Strict CSP nonces, HSTS, frame-deny, and zero inline event handlers guarantee XSS defense.
+4. **Resilience**: Redis or database connection failures fail open into memory caches without service disruption.
 
 ---
 
-## 📚 Technical Documentation
+## 📑 Technical Documentation
 
-- 📖 [Architecture Specification](docs/ARCHITECTURE.md)
 - ⏱️ [Service Level Objectives (SLO)](docs/SLO.md)
 - 🔴 [Redis Operations & Validation Runbook](docs/REDIS_RUNBOOK.md)
-- 📊 [Quality Status & Test Evidence](CURRENT_QUALITY_STATUS.md)
-- 🚀 [Production Hardening Checklist](PRODUCTION_STATUS.md)
 - 📑 [OpenAPI API Documentation](docs/openapi.yaml)

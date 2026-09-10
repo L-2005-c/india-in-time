@@ -68,11 +68,29 @@ describe('Personal Travel DNA Engine', () => {
   });
 
   test('respects privacy toggle and returns neutral scoring when disabled', () => {
-    const place = { name: 'Local Restaurant', cat: 'food' };
+    const place = { name: 'Sunset Point', cat: 'viewpoint', is_sunset_spot: true };
     const disabledDna = { enabled: false };
 
     const match = computeDnaMatch(place, disabledDna);
-    expect(match.reasons).toContain('Personalization disabled');
     expect(match.score).toBe(70);
+    expect(match.reasons[0]).toContain('Personalization disabled');
+  });
+
+  test('records structured observations and operational tolerances in observationHistory', () => {
+    const { recordTravelerObservation } = require('../services/travelIntelligence/personalTravelDna');
+    const profile = { photography: 60, heatTolerance: 40, rainTolerance: 30 };
+
+    const updated = recordTravelerObservation(profile, {
+      type: 'WEATHER_FEEDBACK',
+      dimension: 'heatTolerance',
+      delta: -5,
+      context: { temperatureC: 38, note: 'Found afternoon heat uncomfortable' },
+      confidence: 'HIGH',
+    });
+
+    expect(updated.heatTolerance).toBe(35);
+    expect(updated.observationHistory).toHaveLength(1);
+    expect(updated.observationHistory[0].context.note).toContain('uncomfortable');
+    expect(updated.evidenceCounts.heatTolerance).toBe(1);
   });
 });

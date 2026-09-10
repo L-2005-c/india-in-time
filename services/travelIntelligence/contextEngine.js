@@ -14,6 +14,7 @@
 const { sanitizeDnaProfile, computeDnaMatch } = require('./personalTravelDna');
 const { computeDestinationFingerprint } = require('./destinationFingerprints');
 const { distKm } = require('../../utils/geo');
+const { CANONICAL_ROAD_CIRCUITY_FACTOR } = require('./provenanceModel');
 
 const PROVENANCE_SOURCES = Object.freeze({
   LIVE_TRAFFIC: 'LIVE_TRAFFIC',
@@ -119,7 +120,7 @@ function createIntelligenceContext(opts = {}) {
       etaBreakdown: traffic?.etaBreakdown || (traffic?.travelMinutes != null ? `${traffic.travelMinutes}m (estimated)` : 'Traffic estimate unavailable'),
       trafficTransition: traffic?.trafficTransition || (traffic?.travelMinutes != null ? '🟢 Low Traffic' : '⚪ Traffic Unavailable'),
       trafficLevel: traffic?.trafficLevel || 'UNKNOWN',
-      roadDistanceKm: traffic?.distanceKm ?? (geodesicDistanceKm ? Math.round(geodesicDistanceKm * 1.3 * 10) / 10 : null),
+      roadDistanceKm: traffic?.distanceKm ?? (geodesicDistanceKm ? Math.round(geodesicDistanceKm * CANONICAL_ROAD_CIRCUITY_FACTOR * 10) / 10 : null),
       geodesicDistanceKm,
       source: traffic?.source === 'live' || traffic?.source === 'live_traffic'
         ? PROVENANCE_SOURCES.LIVE_TRAFFIC
@@ -172,7 +173,15 @@ function createIntelligenceContext(opts = {}) {
         crowd: crowd?.source || PROVENANCE_SOURCES.HISTORICAL_CROWD,
         solar: PROVENANCE_SOURCES.ASTRONOMICAL_SOLAR,
       },
-      confidence: 85,
+      confidence: (() => {
+        let signals = 0;
+        if (weather?.tempC != null) signals += 2;
+        if (traffic?.travelMinutes != null) signals += 2;
+        if (crowd?.level) signals += 2;
+        if (scenic?.score != null) signals += 1;
+        if (dna?.sources && dna.sources.length > 0) signals += 2;
+        return Math.min(95, Math.max(45, 55 + signals * 4));
+      })(),
       limitations: [
         'Transit times utilize traffic-calibrated corridor kinematics; real-world conditions may vary during unannounced road closures.',
       ],

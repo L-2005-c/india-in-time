@@ -5,19 +5,24 @@
  */
 
 export function calculateWhatIfDelta({ _currentPlan = null, timeShiftHours = 0, weatherMode = 'normal', _budgetTier = 'balanced' } = {}) {
-  let scenicScore = 88;
-  let trafficTimeMin = 42;
-  let crowdLevel = 65;
+  const baseScenic = Number(_currentPlan?.itineraryQualityScore ?? _currentPlan?.totalScore ?? 88);
+  const baseTraffic = Number(_currentPlan?.totalTravelMinutes ?? 42);
+  const baseCrowd = 65;
+
+  let scenicScore = baseScenic;
+  let trafficTimeMin = baseTraffic;
+  let crowdLevel = baseCrowd;
 
   // Time shift effects
-  if (timeShiftHours === 2 || timeShiftHours === '2') {
+  const shift = Number(timeShiftHours) || 0;
+  if (shift === 2) {
     scenicScore += 8; // Caught sunset
-    trafficTimeMin -= 10;
-    crowdLevel -= 15;
-  } else if (timeShiftHours === -1 || timeShiftHours === '-1') {
+    trafficTimeMin = Math.max(10, trafficTimeMin - 10);
+    crowdLevel = Math.max(10, crowdLevel - 15);
+  } else if (shift === -1) {
     scenicScore += 4;
-    trafficTimeMin -= 6;
-    crowdLevel -= 8;
+    trafficTimeMin = Math.max(10, trafficTimeMin - 6);
+    crowdLevel = Math.max(10, crowdLevel - 8);
   }
 
   // Weather pivot effects
@@ -25,14 +30,14 @@ export function calculateWhatIfDelta({ _currentPlan = null, timeShiftHours = 0, 
     scenicScore += 6; // Lush greenery & haveli indoor charm
     trafficTimeMin += 8; // Rain slow down
   } else if (weatherMode === 'heat') {
-    trafficTimeMin -= 5;
-    crowdLevel -= 12;
+    trafficTimeMin = Math.max(10, trafficTimeMin - 5);
+    crowdLevel = Math.max(10, crowdLevel - 12);
   }
 
   return {
-    scenicDelta: scenicScore - 88,
-    trafficDeltaMin: trafficTimeMin - 42,
-    crowdDelta: crowdLevel - 65,
+    scenicDelta: scenicScore - baseScenic,
+    trafficDeltaMin: trafficTimeMin - baseTraffic,
+    crowdDelta: crowdLevel - baseCrowd,
     projectedScenicScore: scenicScore,
     projectedTrafficMin: trafficTimeMin,
     projectedCrowdLevel: crowdLevel,

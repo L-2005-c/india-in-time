@@ -81,6 +81,7 @@ const feedbackRoutes     = require('./routes/feedback');
 const itineraryOptimizerRoutes = require('./routes/itinerary-optimizer');
 const routingRoutes            = require('./routes/routing');
 const { router: analyticsRoutes } = require('./routes/analytics');
+const intelligenceRoutes       = require('./routes/intelligence');
 
 const app  = express();
 const PORT = config.port;
@@ -176,6 +177,9 @@ app.use('/api/feedback', generalLimiter, feedbackRoutes);
 // Analytics
 app.use('/api/flags', flagsRoutes);
 app.use('/api/analytics', analyticsRoutes);
+
+// Travel Operating System & Decision Intelligence (v3.0)
+app.use('/api/intelligence', generalLimiter, intelligenceRoutes);
 
 // ── Health Checks ─────────────────────────────────────────────────────────
 const geminiService = require('./services/gemini');

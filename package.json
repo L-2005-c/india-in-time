@@ -1,7 +1,7 @@
 {
   "name": "india-in-time-backend",
-  "version": "2.2.0",
-  "description": "Production-ready adaptive GeoAI itinerary decision engine for India In Time",
+  "version": "3.0.0",
+  "description": "India-Specific Travel Intelligence + Contextual Travel Decision Engine (India In-Time v3.0)",
   "main": "server.js",
   "engines": {
     "node": "20.x || 22.x"
