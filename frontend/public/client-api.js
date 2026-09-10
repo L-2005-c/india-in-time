@@ -341,6 +341,10 @@
 
   // ── Health Check ────────────────────────────────────────────────────────────
 
+  async function healthCheck() {
+    return get('/api/health/ready');
+  }
+
   // ── Travel Operating System & Intelligence (v3.0) ───────────────────────────
   async function initJourneyState(tripId, plan = [], travelerDna = null) {
     return post(`/api/intelligence/trips/${tripId}/state`, { tripId, plan, travelerDna });
