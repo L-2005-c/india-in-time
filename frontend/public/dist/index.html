@@ -49,7 +49,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-  <script type="module" crossorigin src="/assets/index-BSHdkRjn.js"></script>
+  <script type="module" crossorigin src="/assets/index-BxrnXzJ1.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-CSrqjWxQ.css">
 </head>
 <body>
@@ -795,6 +795,56 @@
       <span class="pf-tip"><span>↑↓</span> to navigate</span>
       <span class="pf-tip"><span>↵</span> to select</span>
       <span class="pf-tip"><span>ESC</span> to close</span>
+    </div>
+  </div>
+</div>
+
+<!-- Weather Truth & Meteorological Provenance Modal (v3.0) -->
+<div id="weather-truth-modal" class="modal-overlay" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;">
+  <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="wx-truth-modal-title" tabindex="-1" style="background:var(--bg-layer1);border:1px solid var(--border-strong);border-radius:24px;width:100%;max-width:460px;max-height:85vh;display:flex;flex-direction:column;box-shadow:var(--shadow-card);overflow:hidden;padding:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">🌦️</span>
+        <h3 id="wx-truth-modal-title" style="font-family:'Playfair Display',serif;font-size:19px;margin:0;color:var(--text-primary);">Weather Intelligence Truth</h3>
+      </div>
+      <button id="weather-truth-close-btn" aria-label="Close" style="background:none;border:none;color:var(--text-primary);font-size:26px;line-height:1;cursor:pointer;padding:0;">&times;</button>
+    </div>
+    
+    <div style="display:flex;align-items:baseline;justify-content:space-between;background:rgba(255,255,255,0.03);padding:14px;border-radius:16px;border:1px solid rgba(255,255,255,0.06);margin-bottom:14px;">
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;color:var(--text-secondary);font-weight:700;letter-spacing:0.5px;">Display Temperature</div>
+        <div id="wx-truth-disp-temp" style="font-size:32px;font-weight:800;color:var(--text-primary);line-height:1.1;">--°C</div>
+        <div id="wx-truth-condition" style="font-size:13px;color:#38bdf8;margin-top:2px;">--</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;text-transform:uppercase;color:var(--text-secondary);font-weight:700;letter-spacing:0.5px;">Raw Value</div>
+        <div id="wx-truth-raw-temp" style="font-size:18px;font-weight:700;color:#94a3b8;">--°C</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span id="wx-truth-state-badge" style="display:inline-block;padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">PREDICTED</span>
+      <span id="wx-truth-conf-badge" style="display:inline-block;padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">MEDIUM CONFIDENCE</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr;gap:10px;font-size:12.5px;color:var(--text-secondary);margin-bottom:14px;">
+      <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);">
+        <strong style="color:var(--text-primary);">Provider Source:</strong> <span id="wx-truth-source">--</span>
+      </div>
+      <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);">
+        <strong style="color:var(--text-primary);">Nearest Ground Station:</strong> <span id="wx-truth-station">--</span>
+      </div>
+      <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);">
+        <strong style="color:var(--text-primary);">Last Updated:</strong> <span id="wx-truth-updated">--</span>
+      </div>
+    </div>
+
+    <div id="wx-truth-advisories" style="display:none;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);padding:10px 12px;border-radius:10px;font-size:12px;color:#fde047;margin-bottom:14px;">
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
+      <span style="font-size:11px;color:var(--text-muted);">Scientific Transparency Engine v3.0</span>
+      <a id="wx-truth-diag-link" target="_blank" rel="noopener" style="font-size:11.5px;color:#38bdf8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">View Diagnostic Telemetry ↗</a>
     </div>
   </div>
 </div>

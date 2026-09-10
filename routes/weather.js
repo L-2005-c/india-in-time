@@ -7,7 +7,7 @@
 const express = require('express');
 const router  = express.Router();
 const appLogger = require('../lib/logger');
-const { getConsensusWeather } = require('../services/travelIntelligence/weather/weatherProviderRegistry');
+const { getConsensusWeather, getWeatherDiagnostics } = require('../services/travelIntelligence/weather/weatherProviderRegistry');
 const { getDeterministicWeather, weatherEmoji, weatherCodeToCondition } = require('../services/travelIntelligence/weatherEngine');
 
 function conditionToWeatherCode(cond, defaultCode = 1) {
@@ -19,6 +19,25 @@ function conditionToWeatherCode(cond, defaultCode = 1) {
   if (/cloud/i.test(c)) return 3;
   return defaultCode;
 }
+
+// Development/admin diagnostic endpoint for real-world meteorological validation
+router.get('/debug', async (req, res) => {
+  const { lat, lon, elevationM } = req.query;
+  const numLat = parseFloat(lat || 17.6868);
+  const numLon = parseFloat(lon || 83.2185);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLon)) {
+    return res.status(400).json({ error: 'Invalid lat / lon coordinates' });
+  }
+
+  const numElev = Number.isFinite(Number(elevationM)) ? Number(elevationM) : null;
+  try {
+    const diag = await getWeatherDiagnostics(numLat, numLon, { elevationM: numElev, skipCache: true });
+    return res.json(diag);
+  } catch (err) {
+    appLogger.error('[weather/debug] Diagnostic check failed:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 router.get('/', async (req, res) => {
   const { lat, lon, elevationM } = req.query;
@@ -54,6 +73,8 @@ router.get('/', async (req, res) => {
     const result = {
       temp,
       tempC,
+      rawTemperatureC: tempC,
+      displayTemperatureC: temp,
       feelsLikeC,
       windKph,
       weathercode,
@@ -65,13 +86,16 @@ router.get('/', async (req, res) => {
         : (truth.selectedSource || (truth.providersConsidered?.join(' + ')) || 'Weather Consensus Engine'),
       consensusState: truth.consensusState,
       confidence: truth.confidence,
+      dataState: truth.dataState || (isSeasonal ? 'HISTORICAL' : 'PREDICTED'),
       rainProb: truth.precipitationProb,
       humidity: truth.humidityPercent,
+      station: truth.station || null,
       divergence: truth.divergence || null,
       advisories: truth.advisories || [],
       disagreementNotice: truth.disagreementNotice || null,
       hourly: truth.hourly || [],
       observedAt: truth.observedAt || null,
+      updatedAtIST: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
     };
 
     return res.json(result);

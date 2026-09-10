@@ -59,34 +59,55 @@ function findNearestStation(lat, lon) {
   return best;
 }
 
+function getIstHour(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const utcHours = d.getUTCHours() + d.getUTCMinutes() / 60;
+  return (utcHours + 5.5) % 24;
+}
+
 /**
  * Computes IMD climatological normal for coordinates when live feed is inaccessible.
- * Accurately models altitude lapse rates in Indian hill stations (-6.5°C per 1000m)
+ * Accurately models:
+ * 1. Diurnal solar cycle (nocturnal radiative cooling vs afternoon solar peak)
+ * 2. Altitude lapse rates in Indian hill stations (-6.5°C per 1000m)
  * strictly using the query location's elevation (never borrowing mountain elevations for plains).
  */
-function getImdClimatologicalNormal(lat, lon, nearestStation, explicitElevationM = null) {
-  const month = new Date().getMonth(); // 0-11
-  // Baseline seasonal temperature curve for Peninsular / Central India plains (~100m baseline)
-  let baseTemp = 28;
+function getImdClimatologicalNormal(lat, lon, nearestStation, explicitElevationM = null, targetDate = new Date()) {
+  const d = targetDate instanceof Date ? targetDate : new Date(targetDate);
+  const month = d.getMonth(); // 0-11
+  const istHour = getIstHour(d);
+
+  // Baseline seasonal daily mean temperature curve for Peninsular / Central India plains (~50m baseline)
+  let baseMeanTemp = 28.5;
   let baseRainProb = 15;
   let condition = 'Partly Cloudy';
+  let diurnalAmplitude = 2.5;
 
   // Monsoon season (June - September)
   if (month >= 5 && month <= 8) {
-    baseTemp = 28;
+    baseMeanTemp = 29.0;
     baseRainProb = 50;
     condition = 'Monsoon Clouds / Showers';
+    diurnalAmplitude = 2.5; // Cloud cover dampens diurnal temperature range
   } else if (month >= 2 && month <= 4) {
     // Summer (March - May)
-    baseTemp = 34;
+    baseMeanTemp = 33.5;
     baseRainProb = 10;
     condition = 'Sunny / Warm';
+    diurnalAmplitude = 4.5; // High solar insolation
   } else {
     // Winter (Nov - Feb)
-    baseTemp = 25;
+    baseMeanTemp = 25.0;
     baseRainProb = 5;
     condition = 'Clear / Mild';
+    diurnalAmplitude = 4.5; // Strong nocturnal radiative cooling
   }
+
+  // Diurnal sinusoidal model:
+  // Peaks at 14:30 IST (afternoon thermal lag); reaches daily minimum at 05:00 IST (pre-dawn)
+  const hourAngle = ((istHour - 14.5) * Math.PI) / 12;
+  const diurnalShift = Math.cos(hourAngle) * diurnalAmplitude;
+  let baseTemp = Math.round((baseMeanTemp + diurnalShift) * 10) / 10;
 
   // Resolve target elevation: prefer caller's explicit elevation, then nearby station (<=40km)
   let targetElevationM = 50; // default peninsular plain
@@ -112,6 +133,7 @@ function getImdClimatologicalNormal(lat, lon, nearestStation, explicitElevationM
     precipitationProb: baseRainProb,
     condition,
     elevationM: targetElevationM,
+    istHour: Math.round(istHour * 10) / 10,
   };
 }
 
@@ -157,8 +179,8 @@ async function getImdWeather(lat, lon, options = {}) {
     }
   }
 
-  // Fallback to IMD Station Climatological Normals with altitude lapse rate
-  const normal = getImdClimatologicalNormal(lat, lon, nearest, options.elevationM);
+  // Fallback to IMD Station Climatological Normals with altitude lapse rate & diurnal modeling
+  const normal = getImdClimatologicalNormal(lat, lon, nearest, options.elevationM, options.date || new Date());
 
   return normalizeWeatherRecord({
     provider: PROVIDER_NAME,
@@ -177,7 +199,7 @@ async function getImdWeather(lat, lon, options = {}) {
     observedAt: null,
     issuedAt: new Date().toISOString(),
     rawWarnings: [
-      `IMD Climatological Normal calibrated to station ${nearest.name} (${nearest.distanceKm}km away)`,
+      `IMD Climatological Normal calibrated to station ${nearest.name} (${nearest.distanceKm}km away, ${nearest.elevationM}m elevation, diurnal IST ${normal.istHour}h)`,
     ],
   });
 }
@@ -188,4 +210,5 @@ module.exports = {
   findNearestStation,
   IMD_PRIMARY_STATIONS,
   getImdClimatologicalNormal,
+  getIstHour,
 };

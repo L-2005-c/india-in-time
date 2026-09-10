@@ -25,6 +25,10 @@ async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 900
   const upstream = await fetch(url, {
     signal: AbortSignal.timeout(timeoutMs),
     agent: keepAliveAgent,
+    headers: {
+      'User-Agent': 'IndiaInTime/3.0 (weather-intelligence@indiaintime.app)',
+      'Accept': 'application/json',
+    },
   });
 
   if (!upstream.ok) {
@@ -42,15 +46,25 @@ async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 900
  */
 async function getOpenMeteoWeather(lat, lon, options = {}) {
   let raw = null;
+  let lastError = null;
   try {
     raw = await fetchFromOpenMeteo(lat, lon, options);
   } catch (firstErr) {
+    lastError = firstErr;
     appLogger.info(`[openMeteoAdapter] First attempt failed (${firstErr.message}), retrying...`);
     try {
       raw = await fetchFromOpenMeteo(lat, lon, { ...options, timeoutMs: 5000 });
     } catch (secondErr) {
+      lastError = secondErr;
       appLogger.warn(`[openMeteoAdapter] Provider fetch failed: ${secondErr.message}`);
-      return null;
+      return normalizeWeatherRecord({
+        provider: PROVIDER_NAME,
+        dataState: DATA_STATES.UNAVAILABLE,
+        confidence: CONFIDENCE_LEVELS.LOW,
+        latitude: lat,
+        longitude: lon,
+        rawWarnings: [`Open-Meteo fetch failed: ${secondErr.message}`],
+      });
     }
   }
 

@@ -10,23 +10,22 @@
 
 const appLogger = require('../../../lib/logger');
 const { getOpenMeteoWeather } = require('./adapters/openMeteoAdapter');
-const { getImdWeather } = require('./adapters/imdWeatherAdapter');
+const { getImdWeather, findNearestStation } = require('./adapters/imdWeatherAdapter');
 const { evaluateWeatherConsensus } = require('./weatherConsensusEngine');
 const { weatherCache } = require('../../cache');
 
 /**
- * Generates a stable spatial cache key accounting for 0.05° (~5km) grid quantization and elevation.
+ * Returns quantized spatial cache key (0.05° grid ≈ 5.5km).
  */
 function getQuantizedWeatherKey(lat, lon, elevationM = null) {
-  const qLat = (Math.round(lat * 20) / 20).toFixed(2);
-  const qLon = (Math.round(lon * 20) / 20).toFixed(2);
-  const elev = elevationM != null ? `_e${Math.round(elevationM / 100) * 100}` : '';
-  return `v3_weather_${qLat}_${qLon}${elev}`;
+  const qLat = Math.round(Number(lat) * 20) / 20;
+  const qLon = Math.round(Number(lon) * 20) / 20;
+  const elevKey = Number.isFinite(Number(elevationM)) ? `_e${Math.round(Number(elevationM))}` : '';
+  return `v3_weather_${qLat.toFixed(2)}_${qLon.toFixed(2)}${elevKey}`;
 }
 
 /**
- * Fetches multi-provider weather for target coordinates, evaluates consensus,
- * and caches the resulting Canonical Consensus Record.
+ * Primary multi-provider weather consensus aggregator.
  *
  * @param {number} lat
  * @param {number} lon
@@ -46,6 +45,8 @@ async function getConsensusWeather(lat, lon, options = {}) {
   if (cached && !options.skipCache && process.env.NODE_ENV !== 'test') {
     return cached;
   }
+
+  const nearestStation = findNearestStation(numLat, numLon);
 
   // Query both providers concurrently with bounded timeouts
   const [openMeteoRes, imdRes] = await Promise.allSettled([
@@ -67,6 +68,7 @@ async function getConsensusWeather(lat, lon, options = {}) {
   }
 
   const consensus = evaluateWeatherConsensus(reports, options);
+  consensus.station = nearestStation;
 
   if (weatherCache && consensus.isAvailable && consensus.dataState !== 'HISTORICAL' && process.env.NODE_ENV !== 'test') {
     weatherCache.set(cacheKey, consensus);
@@ -75,7 +77,81 @@ async function getConsensusWeather(lat, lon, options = {}) {
   return consensus;
 }
 
+/**
+ * Deep diagnostic inspection of meteorological providers, consensus, and classification.
+ */
+async function getWeatherDiagnostics(lat, lon, options = {}) {
+  const numLat = Number(lat);
+  const numLon = Number(lon);
+  const elevationM = Number.isFinite(Number(options.elevationM)) ? Number(options.elevationM) : null;
+  const nearestStation = findNearestStation(numLat, numLon);
+  const startTime = Date.now();
+
+  const [openMeteoRes, imdRes] = await Promise.allSettled([
+    getOpenMeteoWeather(numLat, numLon, { ...options, elevationM }),
+    getImdWeather(numLat, numLon, { ...options, elevationM }),
+  ]);
+
+  const reports = [];
+  if (openMeteoRes.status === 'fulfilled' && openMeteoRes.value?.isAvailable) {
+    reports.push(openMeteoRes.value);
+  }
+  if (imdRes.status === 'fulfilled' && imdRes.value?.isAvailable) {
+    reports.push(imdRes.value);
+  }
+
+  const consensus = evaluateWeatherConsensus(reports, options);
+  consensus.station = nearestStation;
+
+  const cacheKey = getQuantizedWeatherKey(numLat, numLon, elevationM);
+  const isCached = weatherCache ? Boolean(weatherCache.get(cacheKey)) : false;
+
+  let classification = 'HISTORICAL_ESTIMATE';
+  if (consensus.dataState === 'OBSERVED') {
+    classification = 'ACTUAL_OBSERVATION';
+  } else if (consensus.dataState === 'PREDICTED' || consensus.providersConsidered?.includes('OPEN_METEO')) {
+    classification = 'PROVIDER_FORECAST';
+  } else if (isCached) {
+    classification = 'CACHED_VALUE';
+  }
+
+  return {
+    requestedLocation: { latitude: numLat, longitude: numLon, explicitElevationM: elevationM },
+    resolvedStation: nearestStation,
+    classification,
+    temperatures: {
+      rawTemperatureC: consensus.temperatureC,
+      displayTemperatureC: consensus.temperatureC !== null ? Math.round(consensus.temperatureC) : null,
+      apparentTempC: consensus.apparentTempC,
+    },
+    timestamps: {
+      requestedAtIST: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      observedAt: consensus.observedAt || null,
+      forecastFor: consensus.forecastFor || null,
+      latencyMs: Date.now() - startTime,
+    },
+    providers: {
+      openMeteo: {
+        status: openMeteoRes.status,
+        record: openMeteoRes.value || null,
+        error: openMeteoRes.status === 'rejected' ? openMeteoRes.reason?.message : (openMeteoRes.value?.warnings || null),
+      },
+      imd: {
+        status: imdRes.status,
+        record: imdRes.value || null,
+        error: imdRes.status === 'rejected' ? imdRes.reason?.message : null,
+      },
+    },
+    consensus,
+    cache: {
+      key: cacheKey,
+      isCached,
+    },
+  };
+}
+
 module.exports = {
   getConsensusWeather,
   getQuantizedWeatherKey,
+  getWeatherDiagnostics,
 };

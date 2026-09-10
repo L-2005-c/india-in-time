@@ -3,6 +3,7 @@ import { installLeafletSafetyGuards } from './mapGuards.js';
 import { openModal, closeModal } from '../a11y/modal.js';
 import { openTravelDnaModal, getTravelDna } from '../modules/travelDna.js';
 import { initActiveTripControlCenter } from '../modules/tripControlCenter.js';
+import { initWeatherTruthUi, updateWeatherTruthData } from '../modules/weatherTruthUi.js';
 import { createAuthSession } from '../modules/auth-session.js';
 import { initSplash3D, dismissSplash, toggleSplashSound } from '../modules/splash3d.js';
 import { calculateStopBudget as _calculateStopBudget, calculateDayBudget as _calculateDayBudget, calculateTripBudget as _calculateTripBudget, renderBudgetBreakdownHTML as _renderBudgetBreakdownHTML } from '../modules/budget.js';
@@ -754,6 +755,7 @@ async function fetchWeatherUI(lat,lon,attempt=0){
     realWeatherMain=d.main || (d.weathercode>=51 ? 'Rain' : 'Clear');
     window.realWind = d.windKph || 0;
     document.getElementById('wx-display').textContent=d.display;
+    updateWeatherTruthData(d);
     updatePlannerShowcase();
     detectWeatherChangeAndReoptimize({ temp: realTemp, main: realWeatherMain, wind: window.realWind });
   }catch(e){
@@ -3447,6 +3449,7 @@ window.onload=()=>{
   syncSelectedTripMode();
   updateFollowButton();
   restoreNavCardCollapsed();
+  initWeatherTruthUi();
   // ── Auto-detect nearest city from GPS, fallback to Hyderabad ──────────────
   initGPS(); // start the live-location watch FIRST — detectAndLoadCity() below waits on its first fix
   (function detectAndLoadCity() {
