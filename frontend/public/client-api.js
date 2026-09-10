@@ -361,11 +361,21 @@
   async function simulateDisruptionEvent(tripId, event = {}) {
     return post(`/api/intelligence/trips/${tripId}/simulate-event`, event);
   }
+  async function getTripDecision(tripId, overrides = {}) {
+    return post(`/api/intelligence/trips/${tripId}/decide`, overrides);
+  }
+  async function recordDecisionOutcome(tripId, decisionId, outcome = 'ACCEPTED', notes = '') {
+    return post(`/api/intelligence/trips/${tripId}/decision/outcome`, { decisionId, outcome, notes });
+  }
+  async function fetchDecisionMetrics() {
+    return get('/api/intelligence/decisions/metrics');
+  }
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
     initJourneyState, advanceJourneyProgress, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
+    getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

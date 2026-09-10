@@ -31,6 +31,13 @@ const {
 } = require('../services/travelIntelligence/journey/journeyStateEngine');
 const { evaluateTripGuardian } = require('../services/travelIntelligence/guardian/travelGuardian');
 const { adaptJourneyPlan } = require('../services/travelIntelligence/decision/adaptationPipeline');
+const {
+  evaluateNextDecision,
+  recordDecisionOutcome,
+  getDecisionMetrics,
+  getTripDecisionHistory,
+  DECISION_STATES,
+} = require('../services/travelIntelligence/decision/adaptiveDecisionEngine');
 const { commitPlanVersion, getPlanVersionHistory } = require('../services/travelIntelligence/journey/planVersioning');
 const { sanitizeDnaProfile } = require('../services/travelIntelligence/personalTravelDna');
 
@@ -241,7 +248,100 @@ router.get('/trips/:id/guardian', async (req, res) => {
   }
 });
 
-// ── 8. Contextual Plan Adaptation (Replan) ───────────────────────────────────
+// ── 8. Adaptive Travel Decision Engine (v3.0) ────────────────────────────────
+// Evaluates: "Given everything known right now, what is the best next decision for THIS traveler?"
+router.post('/trips/:id/decide', async (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  try {
+    const journeyState = record ? record.state : req.body.journeyState;
+    const traveler = record ? record.travelerDna : (req.body.traveler || req.body.travelerDna);
+
+    if (!journeyState || !Array.isArray(journeyState.stops)) {
+      return res.status(400).json({ error: 'Valid journeyState or active tripId is required' });
+    }
+
+    const targetStop = journeyState.activeStop || (journeyState.stops.find(s => s.status === 'PLANNED') || journeyState.stops[0]);
+    let liveWeather = req.body.context?.weather || null;
+
+    if (!liveWeather && targetStop && Number.isFinite(targetStop.lat) && Number.isFinite(targetStop.lon)) {
+      liveWeather = await getConsensusWeather(targetStop.lat, targetStop.lon, {
+        elevationM: targetStop.elevationM,
+      });
+    }
+
+    const context = {
+      weather: liveWeather,
+      traffic: req.body.context?.traffic || {
+        trafficDelayMinutes: Math.max(0, journeyState.pacingLagMinutes || 0),
+        isGhatCorridor: targetStop?.elevationM > 600 || /araku|ghat/i.test(targetStop?.name || ''),
+      },
+      crowd: req.body.context?.crowd || { level: 'Moderate' },
+      ...req.body.context,
+    };
+
+    const decisionResult = evaluateNextDecision({
+      journeyState,
+      traveler,
+      context,
+      options: req.body.options || {},
+    });
+
+    res.json(decisionResult);
+  } catch (err) {
+    appLogger.error(`[intelligence/decide] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Stateless Decision Engine endpoint
+router.post('/decide', async (req, res) => {
+  try {
+    const { journeyState, traveler, context, options } = req.body || {};
+    if (!journeyState || !Array.isArray(journeyState.stops)) {
+      return res.status(400).json({ error: 'journeyState with stops array is required' });
+    }
+
+    const decisionResult = evaluateNextDecision({
+      journeyState,
+      traveler: traveler || {},
+      context: context || {},
+      options: options || {},
+    });
+
+    res.json(decisionResult);
+  } catch (err) {
+    appLogger.error(`[intelligence/decide/stateless] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Record user decision outcome (ACCEPTED, REJECTED, IGNORED, COMPLETED)
+router.post('/trips/:id/decision/outcome', (req, res) => {
+  const { decisionId, outcome, notes } = req.body || {};
+  if (!decisionId) {
+    return res.status(400).json({ error: 'decisionId is required' });
+  }
+
+  const result = recordDecisionOutcome(decisionId, outcome || 'ACCEPTED', notes);
+  res.json(result);
+});
+
+// Decision audit trail history for a trip
+router.get('/trips/:id/decision/history', (req, res) => {
+  const tripId = req.params.id;
+  const history = getTripDecisionHistory(tripId);
+  res.json({ tripId, decisionsCount: history.length, history });
+});
+
+// Operational metrics of the decision engine
+router.get('/decisions/metrics', (_req, res) => {
+  const metrics = getDecisionMetrics();
+  res.json(metrics);
+});
+
+// ── 9. Contextual Plan Adaptation (Replan) ───────────────────────────────────
 router.post('/trips/:id/replan', async (req, res) => {
   const tripId = req.params.id;
   const record = activeTripsState.get(tripId);
@@ -264,6 +364,26 @@ router.post('/trips/:id/replan', async (req, res) => {
       traffic: { isGhatCorridor: targetStop?.elevationM > 600 || /araku|ghat/i.test(targetStop?.name || '') },
       provenance: { confidence: weatherConsensus.confidence || 'MEDIUM' },
     };
+
+    // First consult the Decision Engine (Anti-churn check)
+    const decisionResult = evaluateNextDecision({
+      journeyState: record.state,
+      traveler: record.travelerDna,
+      context,
+      options: req.body.options || {},
+    });
+
+    // If decision is KEEP_PLAN and caller did not explicitly force replan, protect stability
+    if (decisionResult.decision === DECISION_STATES.KEEP_PLAN && !req.body.force) {
+      return res.json({
+        shouldAdapt: false,
+        decision: DECISION_STATES.KEEP_PLAN,
+        message: 'Current plan is healthy and stable; no adaptation required.',
+        activePlanVersion: record.state.activePlanVersion,
+        explanation: decisionResult.explanation,
+        decisionResult,
+      });
+    }
 
     const guardianEval = evaluateTripGuardian(record.state, context, record.travelerDna);
     const adaptation = adaptJourneyPlan(record.state, context, record.travelerDna, guardianEval);
@@ -290,7 +410,11 @@ router.post('/trips/:id/replan', async (req, res) => {
     record.state.tripHealth = TRIP_HEALTH_STATES.ON_TRACK;
     record.state.lastAdaptation = adaptation;
 
-    res.json(adaptation);
+    res.json({
+      ...adaptation,
+      decision: decisionResult.decision,
+      decisionExplanation: decisionResult.explanation,
+    });
   } catch (err) {
     appLogger.error(`[intelligence/replan] Error: ${err.message}`);
     res.status(500).json({ error: err.message });

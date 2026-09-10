@@ -240,3 +240,82 @@ export function renderPlanSkeleton(container) {
   container.innerHTML = html;
 }
 
+/**
+ * Renders the Adaptive Decision HUD for active trip intelligence.
+ * @param {HTMLElement} container
+ * @param {Object} decisionData - Structured decision from /api/intelligence/decide
+ * @param {Function} [onOutcome] - Callback when user accepts or rejects decision
+ */
+export function renderDecisionHud(container, decisionData, onOutcome) {
+  if (!container || !decisionData) return;
+  const state = decisionData.decision || 'KEEP_PLAN';
+  const nextAction = decisionData.nextAction || {};
+  const explanation = decisionData.explanation || {};
+  const confidence = decisionData.confidence || 'MEDIUM';
+  const planHealth = decisionData.planHealth || {};
+
+  let badgeColor = '#10b981'; // Green
+  let badgeIcon = '✓';
+  if (state === 'ALTERNATIVE_REQUIRED') {
+    badgeColor = '#ef4444'; // Red
+    badgeIcon = '⚠️';
+  } else if (state === 'ADAPT_PLAN' || state === 'WATCH') {
+    badgeColor = '#f59e0b'; // Amber
+    badgeIcon = '⚡';
+  } else if (state === 'INSUFFICIENT_DATA') {
+    badgeColor = '#64748b'; // Slate
+    badgeIcon = 'ℹ️';
+  }
+
+  const hudHtml = `
+    <div class="decision-hud-card" style="margin-bottom:16px;padding:16px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.12);border-radius:12px;backdrop-filter:blur(16px);color:#f8fafc;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:${badgeColor}22;border:1px solid ${badgeColor};border-radius:20px;font-size:12px;font-weight:700;color:${badgeColor};text-transform:uppercase;letter-spacing:0.5px;">
+            ${badgeIcon} ${state.replace('_', ' ')}
+          </span>
+          <span style="font-size:12px;color:#94a3b8;">Confidence: <strong style="color:#f8fafc;">${confidence}</strong></span>
+        </div>
+        <span style="font-size:11px;color:#64748b;font-family:'Space Mono',monospace;">v3.0 Decision Engine</span>
+      </div>
+
+      <div style="font-size:14px;font-weight:600;color:#f1f5f9;margin-bottom:6px;">
+        ${explanation.what || nextAction.actionType || 'Plan Active'}
+      </div>
+
+      <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;margin-bottom:12px;">
+        ${explanation.why || 'Itinerary is actively monitored against live weather, traffic, and your travel DNA.'}
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;font-size:11px;">
+        <span style="padding:2px 8px;background:rgba(255,255,255,0.06);border-radius:4px;color:#94a3b8;">Weather: <strong style="color:#e2e8f0;">${planHealth.weatherHealth || 'HEALTHY'}</strong></span>
+        <span style="padding:2px 8px;background:rgba(255,255,255,0.06);border-radius:4px;color:#94a3b8;">Route: <strong style="color:#e2e8f0;">${planHealth.routeHealth || 'CLEAR'}</strong></span>
+        <span style="padding:2px 8px;background:rgba(255,255,255,0.06);border-radius:4px;color:#94a3b8;">Pacing: <strong style="color:#e2e8f0;">${planHealth.scheduleHealth || 'ON_TRACK'}</strong></span>
+        <span style="padding:2px 8px;background:rgba(255,255,255,0.06);border-radius:4px;color:#94a3b8;">Crowd: <strong style="color:#e2e8f0;">${planHealth.crowdHealth || 'COMFORTABLE'}</strong></span>
+      </div>
+
+      ${state !== 'KEEP_PLAN' && state !== 'INSUFFICIENT_DATA' ? `
+        <div style="display:flex;gap:8px;">
+          <button id="btn-decision-accept" style="flex:1;padding:8px 12px;background:#3b82f6;color:#ffffff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.2s;">
+            Accept Adaptation
+          </button>
+          <button id="btn-decision-keep" style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;">
+            Keep Original
+          </button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  container.innerHTML = hudHtml;
+
+  const btnAccept = container.querySelector('#btn-decision-accept');
+  const btnKeep = container.querySelector('#btn-decision-keep');
+  if (btnAccept && onOutcome) {
+    btnAccept.addEventListener('click', () => onOutcome('ACCEPTED', decisionData));
+  }
+  if (btnKeep && onOutcome) {
+    btnKeep.addEventListener('click', () => onOutcome('REJECTED', decisionData));
+  }
+}
+

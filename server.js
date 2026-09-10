@@ -173,14 +173,11 @@ app.use('/api/travel-data', generalLimiter, travelDataRoutes);
 
 // Feedback (per-place ratings + overall app experience)
 app.use('/api/feedback', generalLimiter, feedbackRoutes);
-
 // Analytics
 app.use('/api/flags', flagsRoutes);
 app.use('/api/analytics', analyticsRoutes);
-
 // Travel Operating System & Decision Intelligence (v3.0)
 app.use('/api/intelligence', generalLimiter, intelligenceRoutes);
-
 // ── Health Checks ─────────────────────────────────────────────────────────
 const geminiService = require('./services/gemini');
 const { placesCache, geminiCache, weatherCache, geocodeCache } = require('./services/cache');
@@ -514,10 +511,8 @@ function startLongRunningServer() {
     process.exit(1);
   });
 }
-
 if (!isServerless) {
   startLongRunningServer();
 }
-
 module.exports = app;
 }
