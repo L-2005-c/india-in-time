@@ -37,7 +37,7 @@ export function closeWeatherTruthModal() {
 function _renderWeatherTruthModal(data) {
   const rawTemp = data.rawTemperatureC ?? data.tempC ?? data.temp;
   const dispTemp = data.displayTemperatureC ?? data.temp;
-  const state = (data.dataState || 'PREDICTED').toUpperCase();
+  const state = (data.classification || data.dataState || 'FORECAST').toUpperCase();
   const confidence = (data.confidence || 'MEDIUM').toUpperCase();
   const station = data.station || {};
   const lat = window._lastKnownLatLon?.[0] || 17.6868;

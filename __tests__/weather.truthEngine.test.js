@@ -31,6 +31,9 @@ const {
 const {
   computeWeatherIntelligence,
 } = require('../services/travelIntelligence/weatherEngine');
+const {
+  evaluateForecastObservationPair,
+} = require('../services/travelIntelligence/weather/weatherAccuracyTracker');
 
 function buildApp() {
   const app = express();
@@ -217,6 +220,12 @@ describe('Weather Truth & Provenance Engine Acceptance Tests', () => {
       expect(res.body.station).toBeDefined();
       expect(res.body.updatedAtIST).toBeDefined();
       expect(typeof res.body.isEstimated).toBe('boolean');
+      expect(res.body.classification).toBeDefined();
+      expect(['OBSERVATION', 'NOWCAST', 'FORECAST', 'ESTIMATE', 'HISTORICAL']).toContain(res.body.classification);
+      expect(typeof res.body.isObservation).toBe('boolean');
+      expect(typeof res.body.isForecast).toBe('boolean');
+      expect(res.body.temporalGrounding).toBeDefined();
+      expect(res.body.spatialGrounding).toBeDefined();
     }, 15000);
   });
 
@@ -262,6 +271,31 @@ describe('Weather Truth & Provenance Engine Acceptance Tests', () => {
       expect(intel.confidence).toBe(40);
       expect(intel.status).toBe('ESTIMATED');
       expect(intel.activityNotes.some(n => /diurnal/i.test(n))).toBe(true);
+    });
+  });
+
+  describe('7. Empirical Weather Accuracy & Temporal Matching', () => {
+    test('enforces temporal matching tolerance and rejects comparisons > 60 minutes apart', () => {
+      const result = evaluateForecastObservationPair({
+        forecast: { targetTime: '2026-09-11T03:35:00+05:30', tempC: 24.5, lat: 17.68, lon: 83.21 },
+        observation: { observedAt: '2026-09-10T23:30:00+05:30', tempC: 26.8, lat: 17.72, lon: 83.22 },
+        options: { maxTemporalDeltaMinutes: 60 },
+      });
+      expect(result.isValidComparison).toBe(false);
+      expect(result.validity).toBe('INVALID_TEMPORAL_MISMATCH');
+    });
+
+    test('validates matched forecast and computes true error at matching time', () => {
+      const result = evaluateForecastObservationPair({
+        forecast: { targetTime: '2026-09-10T23:00:00+05:30', tempC: 25.7, lat: 17.68, lon: 83.21 },
+        observation: { observedAt: '2026-09-10T23:30:00+05:30', tempC: 26.8, lat: 17.72, lon: 83.22 },
+        options: { maxTemporalDeltaMinutes: 60 },
+      });
+      expect(result.isValidComparison).toBe(true);
+      expect(result.validity).toBe('VALID_GROUND_TRUTH');
+      expect(result.errorMetrics.signedBiasC).toBe(-1.1);
+      expect(result.errorMetrics.absoluteErrorC).toBe(1.1);
+      expect(result.errorMetrics.accuracyClassification).toBe('EXACT');
     });
   });
 });

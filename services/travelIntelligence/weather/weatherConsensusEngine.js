@@ -13,7 +13,17 @@ const {
   CONFIDENCE_LEVELS,
   WEATHER_CONSENSUS_STATES,
   SELECTION_REASONS,
+  WEATHER_CLASSIFICATIONS,
 } = require('../provenanceModel');
+
+function toWeatherClassification(dataState) {
+  if (dataState === DATA_STATES.OBSERVED) return WEATHER_CLASSIFICATIONS.OBSERVATION;
+  if (dataState === DATA_STATES.NOWCAST) return WEATHER_CLASSIFICATIONS.NOWCAST;
+  if (dataState === DATA_STATES.PREDICTED || dataState === DATA_STATES.FORECAST) return WEATHER_CLASSIFICATIONS.FORECAST;
+  if (dataState === DATA_STATES.ESTIMATED) return WEATHER_CLASSIFICATIONS.ESTIMATE;
+  if (dataState === DATA_STATES.HISTORICAL) return WEATHER_CLASSIFICATIONS.HISTORICAL;
+  return WEATHER_CLASSIFICATIONS.UNAVAILABLE;
+}
 
 /**
  * Synthesizes multiple normalized provider reports into a Consensus Weather Record.
@@ -30,10 +40,13 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
     return {
       consensusState: WEATHER_CONSENSUS_STATES.UNAVAILABLE,
       dataState: DATA_STATES.UNAVAILABLE,
+      classification: WEATHER_CLASSIFICATIONS.UNAVAILABLE,
+      isObservation: false,
+      isForecast: false,
       confidence: CONFIDENCE_LEVELS.LOW,
       selectionReason: SELECTION_REASONS.TELEMETRY_UNAVAILABLE,
       isEstimated: false,
-      userDisclosure: 'Weather telemetry currently unavailable across meteorological providers.',
+      userDisclosure: 'Meteorological data currently unavailable across weather providers.',
       temperatureC: null,
       rawTemperatureC: null,
       displayTemperatureC: null,
@@ -45,7 +58,7 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
       windKph: null,
       providersConsidered: [],
       divergence: null,
-      advisories: ['Weather telemetry currently unavailable across meteorological providers.'],
+      advisories: ['Meteorological data currently unavailable across weather providers.'],
       disagreementNotice: null,
       isAvailable: false,
       hourly: [],
@@ -71,7 +84,7 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
     } else if (isForecast) {
       selectionReason = SELECTION_REASONS.NWP_MODEL_AVAILABLE;
       confidence = single.confidence === CONFIDENCE_LEVELS.HIGH ? CONFIDENCE_LEVELS.MEDIUM : CONFIDENCE_LEVELS.LOW;
-      userDisclosure = `Numerical weather prediction provided by ${single.provider}.`;
+      userDisclosure = `Numerical weather prediction (NWP) provided by ${single.provider}.`;
     } else if (isEstimated) {
       selectionReason = SELECTION_REASONS.FALLBACK_DIURNAL_ESTIMATE;
       confidence = CONFIDENCE_LEVELS.LOW;
@@ -83,9 +96,13 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
     }
 
     const tempC = single.metrics.temperatureC;
+    const finalDataState = single.dataState || (isEstimated || isHistorical ? DATA_STATES.ESTIMATED : DATA_STATES.PREDICTED);
     return {
       consensusState: WEATHER_CONSENSUS_STATES.SINGLE_PROVIDER,
-      dataState: single.dataState || (isEstimated || isHistorical ? DATA_STATES.ESTIMATED : DATA_STATES.PREDICTED),
+      dataState: finalDataState,
+      classification: toWeatherClassification(finalDataState),
+      isObservation: isObserved,
+      isForecast,
       confidence,
       selectionReason,
       isEstimated: Boolean(isEstimated || isHistorical),
@@ -101,7 +118,7 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
       windKph: single.metrics.windKph,
       providersConsidered: [single.provider],
       divergence: null,
-      advisories: [`Single provider telemetry (${single.provider}); consensus unverified.`],
+      advisories: [isObserved ? `Official ground observation (${single.provider}); single station telemetry.` : `Single provider forecast (${single.provider}); consensus unverified.`],
       disagreementNotice: null,
       isAvailable: true,
       hourly: single.hourly || [],
@@ -130,12 +147,15 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
     const selectionReason = isObserved ? SELECTION_REASONS.LIVE_OBSERVATION_MATCH : SELECTION_REASONS.NWP_MODEL_AVAILABLE;
     const userDisclosure = isObserved
       ? null
-      : `Primary live telemetry provided by ${liveRep.provider}; calibrated against ${histRep.provider} climatological baseline.`;
+      : `Numerical weather prediction (NWP) provided by ${liveRep.provider}; calibrated against ${histRep.provider} climatological baseline.`;
 
     const tempC = liveRep.metrics.temperatureC;
     return {
       consensusState: tempPlausible ? WEATHER_CONSENSUS_STATES.MODERATE_AGREEMENT : WEATHER_CONSENSUS_STATES.SINGLE_PROVIDER,
       dataState: liveRep.dataState,
+      classification: toWeatherClassification(liveRep.dataState),
+      isObservation: isObserved,
+      isForecast: !isObserved,
       confidence: isObserved
         ? (liveRep.confidence === CONFIDENCE_LEVELS.HIGH ? CONFIDENCE_LEVELS.HIGH : CONFIDENCE_LEVELS.MEDIUM)
         : (tempPlausible ? CONFIDENCE_LEVELS.MEDIUM : CONFIDENCE_LEVELS.LOW),
@@ -157,7 +177,9 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
         rainDeltaPercent: Math.abs((liveRep.metrics.precipitationProb ?? 0) - (histRep.metrics.precipitationProb ?? 0)),
       },
       advisories: [
-        `Primary live telemetry provided by ${liveRep.provider}; calibrated against ${histRep.provider} climatological baseline.`,
+        isObserved
+          ? `Official ground observation provided by ${liveRep.provider}; corroborated against ${histRep.provider} baseline.`
+          : `Numerical weather prediction (NWP) provided by ${liveRep.provider}; calibrated against ${histRep.provider} climatological baseline.`,
       ],
       disagreementNotice: null,
       isAvailable: true,
@@ -176,6 +198,9 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
     return {
       consensusState: WEATHER_CONSENSUS_STATES.FALLBACK_ESTIMATE,
       dataState: DATA_STATES.ESTIMATED,
+      classification: WEATHER_CLASSIFICATIONS.ESTIMATE,
+      isObservation: false,
+      isForecast: false,
       confidence: CONFIDENCE_LEVELS.LOW,
       selectionReason: SELECTION_REASONS.FALLBACK_DIURNAL_ESTIMATE,
       isEstimated: true,
@@ -194,7 +219,7 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
         tempDeltaC: Math.round(Math.abs(tempA - tempB) * 10) / 10,
         rainDeltaPercent: Math.abs((repA.metrics.precipitationProb ?? 0) - (repB.metrics.precipitationProb ?? 0)),
       },
-      advisories: ['Live weather telemetry unavailable; synthesized diurnal estimate.'],
+      advisories: ['Live observation and NWP forecast unavailable; mathematical diurnal estimate based on historical patterns.'],
       disagreementNotice: null,
       isAvailable: true,
       hourly: repA.hourly?.length ? repA.hourly : (repB.hourly || []),
@@ -233,6 +258,9 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
     return {
       consensusState: WEATHER_CONSENSUS_STATES.DISAGREEMENT,
       dataState: DATA_STATES.PREDICTED,
+      classification: WEATHER_CLASSIFICATIONS.FORECAST,
+      isObservation: false,
+      isForecast: true,
       confidence: CONFIDENCE_LEVELS.LOW,
       selectionReason: SELECTION_REASONS.DISAGREEMENT_PESSIMISTIC_BOUND,
       isEstimated: false,
@@ -270,11 +298,17 @@ function evaluateWeatherConsensus(providerReports = [], options = {}) {
   const blendedTemp = Math.round((tempA * weightA + tempB * weightB) * 10) / 10;
   const blendedRain = Math.round(rainA * weightA + rainB * weightB);
 
+  const finalDataState = (repA.dataState === DATA_STATES.OBSERVED || repB.dataState === DATA_STATES.OBSERVED)
+    ? DATA_STATES.OBSERVED
+    : DATA_STATES.PREDICTED;
+  const isObserved = finalDataState === DATA_STATES.OBSERVED;
+
   return {
     consensusState,
-    dataState: (repA.dataState === DATA_STATES.OBSERVED || repB.dataState === DATA_STATES.OBSERVED)
-      ? DATA_STATES.OBSERVED
-      : DATA_STATES.PREDICTED,
+    dataState: finalDataState,
+    classification: toWeatherClassification(finalDataState),
+    isObservation: isObserved,
+    isForecast: !isObserved,
     confidence: isStrongAgreement ? CONFIDENCE_LEVELS.HIGH : CONFIDENCE_LEVELS.MEDIUM,
     selectionReason: SELECTION_REASONS.MULTIPLE_PROVIDER_CONSENSUS,
     isEstimated: false,

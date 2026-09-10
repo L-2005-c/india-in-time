@@ -130,6 +130,21 @@ async function getWeatherDiagnostics(lat, lon, options = {}) {
       forecastFor: consensus.forecastFor || null,
       latencyMs: Date.now() - startTime,
     },
+    temporalGrounding: {
+      forecastIssuedAt: consensus.timestamps?.issuedAt || null,
+      forecastTargetTime: consensus.forecastFor || consensus.observedAt || new Date().toISOString(),
+      observationTime: consensus.observedAt || null,
+      timeDeltaMinutes: consensus.observedAt ? Math.round(Math.abs(Date.now() - new Date(consensus.observedAt).getTime()) / 60000) : null,
+      validity: consensus.dataState === 'OBSERVED' ? 'OBSERVATION_GROUND_TRUTH' : (consensus.isEstimated ? 'ESTIMATED_MODEL' : 'NWP_FORECAST'),
+    },
+    spatialGrounding: {
+      targetCoords: { lat: numLat, lon: numLon },
+      targetElevationM: elevationM ?? nearestStation?.elevationM ?? null,
+      stationCoords: nearestStation ? { lat: nearestStation.lat, lon: nearestStation.lon } : null,
+      stationElevationM: nearestStation?.elevationM ?? null,
+      distanceKm: nearestStation?.distanceKm ?? null,
+      elevationDeltaM: (elevationM != null && nearestStation?.elevationM != null) ? Math.round(elevationM - nearestStation.elevationM) : 0,
+    },
     providers: {
       openMeteo: {
         status: openMeteoRes.status,
