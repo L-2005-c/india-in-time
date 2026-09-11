@@ -6,6 +6,183 @@
  * one-click contextual plan adaptation, and controlled demo simulation.
  */
 
+const DEFAULT_CANDIDATES_BY_INTENT = {
+  GO_TO_HOTEL: [
+    {
+      id: 'hotel_novotel',
+      name: 'Novotel Visakhapatnam Varun Beach',
+      category: 'ACCOMMODATION',
+      distanceKm: 4.2,
+      durationMinutes: 12,
+      price: { base: 4600, taxes: 828, total: 5428 },
+      checkinStatus: 'Check-in Feasible (24h Front Desk)',
+      trustScore: 96,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 95,
+      explanation: 'Optimal luxury beach accommodation with seamless morning access to NH16 corridor.',
+    },
+    {
+      id: 'hotel_gateway',
+      name: 'The Gateway Hotel Beach Road',
+      category: 'ACCOMMODATION',
+      distanceKm: 3.8,
+      durationMinutes: 10,
+      price: { base: 3500, taxes: 630, total: 4130 },
+      checkinStatus: 'Check-in Feasible',
+      trustScore: 92,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 91,
+      explanation: 'Prime coastal location with trusted culinary options and fast highway transit.',
+    },
+    {
+      id: 'hotel_sheraton',
+      name: 'Four Points by Sheraton Visakhapatnam',
+      category: 'ACCOMMODATION',
+      distanceKm: 5.6,
+      durationMinutes: 16,
+      price: { base: 4000, taxes: 720, total: 4720 },
+      checkinStatus: 'Check-in Feasible',
+      trustScore: 90,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 88,
+      explanation: 'Central city hotel close to commercial and transit districts.',
+    },
+  ],
+  GO_TO_RESTAURANT: [
+    {
+      id: 'rest_sea_inn',
+      name: 'Sea Inn - Raju Gari Dhaba',
+      category: 'DINING',
+      distanceKm: 2.1,
+      durationMinutes: 7,
+      price: { base: 750, taxes: 38, total: 788 },
+      checkinStatus: 'OPEN (Closes 23:00)',
+      trustScore: 94,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 90,
+      explanation: 'Authentic Andhra seafood directly along the return corridor; negligible 0.3 km detour.',
+    },
+    {
+      id: 'rest_dharani',
+      name: 'Dharani Pure Veg Restaurant',
+      category: 'DINING',
+      distanceKm: 3.4,
+      durationMinutes: 11,
+      price: { base: 580, taxes: 29, total: 609 },
+      checkinStatus: 'OPEN (Closes 22:30)',
+      trustScore: 91,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 87,
+      explanation: 'Family-friendly pure vegetarian dining with high hygiene rating.',
+    },
+  ],
+  GO_TO_RAILWAY_STATION: [
+    {
+      id: 'hub_vskp_rail',
+      name: 'Visakhapatnam Junction Railway Station (VSKP)',
+      category: 'TRANSPORT_HUB',
+      distanceKm: 7.2,
+      durationMinutes: 20,
+      price: { base: 0, taxes: 0, total: 0 },
+      checkinStatus: 'SAFE_BUFFER (70 min margin vs 45m required)',
+      trustScore: 99,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 99,
+      explanation: 'Major railway junction on East Coast line; 70-minute buffer ensures comfortable boarding.',
+    },
+  ],
+  GO_TO_AIRPORT: [
+    {
+      id: 'hub_vtz_air',
+      name: 'Visakhapatnam International Airport (VTZ)',
+      category: 'TRANSPORT_HUB',
+      distanceKm: 14.5,
+      durationMinutes: 35,
+      price: { base: 0, taxes: 0, total: 0 },
+      checkinStatus: 'SAFE_BUFFER (145 min margin vs 120m required)',
+      trustScore: 99,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 99,
+      explanation: 'Commercial airport with 24h terminal access; ample buffer for security screening.',
+    },
+  ],
+  GO_TO_BUS_STATION: [
+    {
+      id: 'hub_rtc_bus',
+      name: 'Dwaraka Bus Station (RTC Complex)',
+      category: 'TRANSPORT_HUB',
+      distanceKm: 5.1,
+      durationMinutes: 14,
+      price: { base: 0, taxes: 0, total: 0 },
+      checkinStatus: 'SAFE_BUFFER (50 min margin vs 30m required)',
+      trustScore: 97,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 94,
+      explanation: 'Central bus terminal with direct intercity connections across Andhra Pradesh.',
+    },
+  ],
+  RETURN_HOME: [
+    {
+      id: 'dest_home',
+      name: 'Home Destination (Private Route)',
+      category: 'HOME',
+      distanceKm: 8.5,
+      durationMinutes: 22,
+      price: { base: 0, taxes: 0, total: 0 },
+      checkinStatus: 'Always Accessible',
+      trustScore: 100,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 100,
+      explanation: 'Return to primary residence. Exact coordinates remain private and unexposed in logs.',
+    },
+  ],
+  CONTINUE_TO_DESTINATION: [
+    {
+      id: 'dest_araku',
+      name: 'Araku Valley Hill Station',
+      category: 'TOURIST_DESTINATION',
+      distanceKm: 114.0,
+      durationMinutes: 195,
+      price: { base: 1200, taxes: 60, total: 1260 },
+      checkinStatus: 'Daylight Travel Recommended',
+      trustScore: 95,
+      safetyStatus: 'CAUTION: Night Ghat Section',
+      tomorrowUtilityScore: 98,
+      explanation: 'Next scenic circuit destination; overnight stay in valley recommended before ghat sunset.',
+    },
+  ],
+  CUSTOM_DESTINATION: [
+    {
+      id: 'dest_custom',
+      name: 'Custom Location / User Dropoff',
+      category: 'CUSTOM',
+      distanceKm: 6.0,
+      durationMinutes: 18,
+      price: { base: 0, taxes: 0, total: 0 },
+      checkinStatus: 'On-Demand Route',
+      trustScore: 90,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 90,
+      explanation: 'User-specified waypoint evaluated dynamically against traffic and road constraints.',
+    },
+  ],
+  END_JOURNEY: [
+    {
+      id: 'dest_end',
+      name: 'Conclude & Archive Journey',
+      category: 'END',
+      distanceKm: 0,
+      durationMinutes: 0,
+      price: { base: 0, taxes: 0, total: 0 },
+      checkinStatus: 'Completed',
+      trustScore: 100,
+      safetyStatus: 'CLEAR',
+      tomorrowUtilityScore: 100,
+      explanation: 'Formally finalize active itinerary and save trip summary to local records.',
+    },
+  ],
+};
+
 export function renderTripControlCenter({
   tripId = 'active_trip',
   planVersion = 1,
@@ -22,6 +199,13 @@ export function renderTripControlCenter({
   experienceOptimization = null,
   trustIntelligence = null,
   isEvidenceDrawerOpen = false,
+  isJourneyComplete = false,
+  currentLegIndex = 1,
+  journeyLegs = [],
+  selectedIntent = 'GO_TO_HOTEL',
+  nextLegCandidates = null,
+  selectedCandidate = null,
+  deadlineAlert = null,
 } = {}) {
   const healthBadges = {
     ON_TRACK: { icon: '🟢', label: 'Trip is On Track', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
@@ -111,12 +295,15 @@ export function renderTripControlCenter({
               <div style="font-size:16px; font-weight:700; color:#fff;">${activeStop.name}</div>
               <div style="font-size:12px; color:#94a3b8; margin-top:2px;">Category: ${activeStop.category} · Planned: ${activeStop.plannedDurationMinutes || 60}m</div>
             </div>
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button id="btn-complete-active-stop" data-stop-id="${activeStop.id}" data-trip-id="${tripId}" style="background:#10b981; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;">
                 ✓ Mark Completed
               </button>
               <button id="btn-skip-active-stop" data-stop-id="${activeStop.id}" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.1); color:#cbd5e1; border:none; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">
                 ⏭ Skip
+              </button>
+              <button id="btn-finish-journey-to-next" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #6366f1, #8b5cf6); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">
+                🏁 Finish & Plan Next Leg
               </button>
             </div>
           </div>
@@ -159,6 +346,209 @@ export function renderTripControlCenter({
           `}
         </div>
       </div>
+
+      <!-- Phase 6: Next Journey Intelligence (Return, Stay & Next Destination) -->
+      ${(() => {
+        const isComplete = isJourneyComplete || (upcomingStops.length === 0 && !activeStop);
+        const activeCandidates = (Array.isArray(nextLegCandidates) && nextLegCandidates.length > 0)
+          ? nextLegCandidates
+          : (DEFAULT_CANDIDATES_BY_INTENT[selectedIntent] || DEFAULT_CANDIDATES_BY_INTENT.GO_TO_HOTEL);
+        const topCandidate = selectedCandidate || activeCandidates[0];
+
+        return `
+          <div id="next-journey-panel" style="border-top:1px solid rgba(255,255,255,0.12); padding-top:16px; margin-bottom:18px;">
+            <!-- Status Banner -->
+            <div style="background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15)); border:1px solid rgba(168,85,247,0.35); border-radius:8px; padding:12px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:18px;">🚀</span>
+                  <h4 style="margin:0; font-size:14px; font-weight:800; color:#e0e7ff;">Next Journey Intelligence — Leg ${currentLegIndex} ${isComplete ? 'Complete' : 'In Progress'}</h4>
+                  <span style="background:rgba(16,185,129,0.2); color:#34d399; font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px; border:1px solid rgba(16,185,129,0.4);">
+                    ${isComplete ? 'NEXT_INTENT_REQUIRED' : 'PREVIEW_PLANNING'}
+                  </span>
+                </div>
+                <div style="font-size:11px; color:#cbd5e1; margin-top:4px;">
+                  Evaluates real-time constraints, check-in feasibility, corridor dining, transport deadlines, safety, and tomorrow's commitments.
+                </div>
+              </div>
+              <span style="font-size:11px; color:#a5b4fc; font-weight:700; background:rgba(99,102,241,0.2); padding:4px 10px; border-radius:6px;">
+                Leg ${currentLegIndex} History Locked 🔒
+              </span>
+            </div>
+
+            <!-- 8 Intent Selection Grid -->
+            <div style="margin-bottom:14px;">
+              <div style="font-size:11px; font-weight:700; color:#cbd5e1; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.04em;">
+                Select Traveler Intent:
+              </div>
+              <div class="next-journey-intent-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px;">
+                ${[
+                  { id: 'btn-intent-hotel', intent: 'GO_TO_HOTEL', icon: '🏨', label: 'Hotel / Stay' },
+                  { id: 'btn-intent-restaurant', intent: 'GO_TO_RESTAURANT', icon: '🍽️', label: 'Food / Dining' },
+                  { id: 'btn-intent-railway', intent: 'GO_TO_RAILWAY_STATION', icon: '🚆', label: 'Railway' },
+                  { id: 'btn-intent-airport', intent: 'GO_TO_AIRPORT', icon: '✈️', label: 'Airport' },
+                  { id: 'btn-intent-bus', intent: 'GO_TO_BUS_STATION', icon: '🚌', label: 'Bus Station' },
+                  { id: 'btn-intent-home', intent: 'RETURN_HOME', icon: '🏠', label: 'Return Home' },
+                  { id: 'btn-intent-continue', intent: 'CONTINUE_TO_DESTINATION', icon: '📍', label: 'Next Stop' },
+                  { id: 'btn-intent-custom', intent: 'CUSTOM_DESTINATION', icon: '✏️', label: 'Custom' },
+                  { id: 'btn-intent-end', intent: 'END_JOURNEY', icon: '🛑', label: 'End Trip' },
+                ].map(item => {
+                  const isSelected = selectedIntent === item.intent;
+                  return `
+                    <button
+                      id="${item.id}"
+                      class="btn-next-intent"
+                      data-next-intent="${item.intent}"
+                      data-trip-id="${tripId}"
+                      style="background:${isSelected ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.04)'}; border:1px solid ${isSelected ? '#38bdf8' : 'rgba(255,255,255,0.1)'}; color:${isSelected ? '#38bdf8' : '#e2e8f0'}; border-radius:6px; padding:8px 6px; font-size:11px; font-weight:${isSelected ? '700' : '500'}; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.15s ease;"
+                    >
+                      <span>${item.icon}</span>
+                      <span>${item.label}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Transport Deadline Risk Alert Banner (If Applicable) -->
+            ${deadlineAlert ? `
+              <div id="transport-deadline-banner" style="background:rgba(239, 68, 68, 0.15); border:1px solid #ef4444; border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:20px;">⚠️</span>
+                  <div>
+                    <div style="font-size:12px; font-weight:800; color:#fca5a5;">DEADLINE RISK: ${deadlineAlert.stationName || 'Transport Hub'}</div>
+                    <div style="font-size:11px; color:#fee2e2; margin-top:2px;">
+                      Scheduled Departure: <strong>${deadlineAlert.scheduledDeparture || '22:30'}</strong> · Available Buffer: <strong style="color:#ef4444;">${deadlineAlert.availableBufferMinutes}m</strong> (Required: ${deadlineAlert.requiredBufferMinutes}m). Immediate departure recommended!
+                    </div>
+                  </div>
+                </div>
+                <span style="background:#ef4444; color:#fff; font-size:10px; font-weight:800; padding:3px 8px; border-radius:4px;">URGENT</span>
+              </div>
+            ` : ''}
+
+            <!-- Best Next Leg Recommendation Card -->
+            ${topCandidate ? `
+              <div id="best-next-leg-card" style="background:rgba(30, 41, 59, 0.7); border:1px solid rgba(56, 189, 248, 0.3); border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                  <div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="font-size:12px; color:#38bdf8; font-weight:800; letter-spacing:0.04em;">BEST NEXT LEG RECOMMENDATION</span>
+                      <span style="background:rgba(56, 189, 248, 0.15); color:#38bdf8; font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; border:1px solid rgba(56, 189, 248, 0.3);">
+                        ${topCandidate.category}
+                      </span>
+                    </div>
+                    <h3 style="margin:6px 0 2px 0; font-size:16px; font-weight:700; color:#fff;">${topCandidate.name}</h3>
+                    <div style="font-size:12px; color:#94a3b8;">
+                      🚗 Travel Effort: <strong style="color:#f8fafc;">${topCandidate.distanceKm} km</strong> (~${topCandidate.durationMinutes} min)
+                    </div>
+                  </div>
+
+                  <!-- Itemized Cost & Taxes Decomposition -->
+                  <div style="text-align:right;">
+                    <div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Estimated Cost (Inc. GST)</div>
+                    <div style="font-size:18px; font-weight:800; color:#38bdf8;">₹${topCandidate.price?.total ?? 0}</div>
+                    <div style="font-size:10px; color:#64748b;">Base: ₹${topCandidate.price?.base ?? 0} + Tax: ₹${topCandidate.price?.taxes ?? 0}</div>
+                  </div>
+                </div>
+
+                <!-- Rationale & Explanation -->
+                <div style="margin-top:10px; font-size:12px; color:#cbd5e1; line-height:1.4; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:6px;">
+                  ${topCandidate.explanation}
+                </div>
+
+                <!-- Multidimensional Intelligence Badges -->
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
+                  <span style="font-size:11px; background:rgba(16, 185, 129, 0.15); color:#34d399; border:1px solid rgba(16, 185, 129, 0.3); padding:3px 8px; border-radius:4px;">
+                    🏨 ${topCandidate.checkinStatus}
+                  </span>
+                  <span style="font-size:11px; background:rgba(56, 189, 248, 0.15); color:#38bdf8; border:1px solid rgba(56, 189, 248, 0.3); padding:3px 8px; border-radius:4px;">
+                    🛡️ Trust Verified (${topCandidate.trustScore}/100)
+                  </span>
+                  <span style="font-size:11px; background:rgba(16, 185, 129, 0.15); color:#34d399; border:1px solid rgba(16, 185, 129, 0.3); padding:3px 8px; border-radius:4px;">
+                    🟢 Safety: ${topCandidate.safetyStatus}
+                  </span>
+                  <span style="font-size:11px; background:rgba(245, 158, 11, 0.15); color:#fbbf24; border:1px solid rgba(245, 158, 11, 0.3); padding:3px 8px; border-radius:4px;">
+                    🌅 Tomorrow Corridor Utility: +${topCandidate.tomorrowUtilityScore}/100
+                  </span>
+                </div>
+
+                <!-- Start Next Leg Action Button -->
+                <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+                  <button
+                    id="btn-start-next-leg"
+                    data-trip-id="${tripId}"
+                    data-candidate-id="${topCandidate.id}"
+                    style="background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(16,185,129,0.3); transition:all 0.2s;"
+                  >
+                    <span>🚀</span> Start Next Leg (Leg ${currentLegIndex + 1})
+                  </button>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Candidate Comparison Table (2-4 Options) -->
+            <div style="background:rgba(15, 23, 42, 0.5); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; margin-bottom:14px;">
+              <div style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:10px;">
+                Candidate Evaluation & Tradeoff Comparison (${activeCandidates.length} evaluated)
+              </div>
+              <div style="overflow-x:auto;">
+                <table id="next-leg-candidates-table" style="width:100%; border-collapse:collapse; font-size:11px; color:#cbd5e1; text-align:left;">
+                  <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#94a3b8;">
+                      <th style="padding:6px 8px;">Option / Destination</th>
+                      <th style="padding:6px 8px;">Travel Effort</th>
+                      <th style="padding:6px 8px;">Cost & GST</th>
+                      <th style="padding:6px 8px;">Window / Check-in</th>
+                      <th style="padding:6px 8px;">Tomorrow Fit</th>
+                      <th style="padding:6px 8px; text-align:right;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${activeCandidates.map(cand => {
+                      const isCandSelected = (selectedCandidate?.id === cand.id) || (!selectedCandidate && cand.id === activeCandidates[0]?.id);
+                      return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04); background:${isCandSelected ? 'rgba(56, 189, 248, 0.08)' : 'transparent'};">
+                          <td style="padding:8px; font-weight:${isCandSelected ? '700' : '500'}; color:${isCandSelected ? '#38bdf8' : '#f8fafc'};">
+                            ${cand.name}
+                            ${isCandSelected ? '<span style="color:#38bdf8; margin-left:4px; font-size:9px;">[Selected]</span>' : ''}
+                          </td>
+                          <td style="padding:8px;">${cand.distanceKm} km (${cand.durationMinutes}m)</td>
+                          <td style="padding:8px;">₹${cand.price?.total ?? 0}</td>
+                          <td style="padding:8px;">${cand.checkinStatus}</td>
+                          <td style="padding:8px;">${cand.tomorrowUtilityScore}/100</td>
+                          <td style="padding:8px; text-align:right;">
+                            <button
+                              class="btn-select-next-candidate"
+                              data-candidate-id="${cand.id}"
+                              data-trip-id="${tripId}"
+                              style="background:${isCandSelected ? '#38bdf8' : 'rgba(255,255,255,0.1)'}; color:${isCandSelected ? '#0f172a' : '#cbd5e1'}; border:none; border-radius:4px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer;"
+                            >
+                              ${isCandSelected ? '✓ Selected' : 'Select'}
+                            </button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Journey Leg Chain (Continuous Journey Chaining) -->
+            <div id="journey-leg-chain" style="background:rgba(0,0,0,0.25); border-radius:6px; padding:8px 12px; font-size:11px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-weight:700; color:#94a3b8;">Journey Sequence:</span>
+              ${(journeyLegs.length > 0 ? journeyLegs : [{ legIndex: 1, name: 'Visakhapatnam Tour', status: isComplete ? 'COMPLETED' : 'ACTIVE' }]).map((leg, idx) => `
+                <span style="display:inline-flex; align-items:center; gap:4px; background:${leg.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.15)'}; border:1px solid ${leg.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(56, 189, 248, 0.3)'}; color:${leg.status === 'COMPLETED' ? '#34d399' : '#38bdf8'}; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700;">
+                  ${leg.status === 'COMPLETED' ? '🔒' : '📍'} Leg ${leg.legIndex || (idx + 1)}: ${leg.name || 'Leg'} (${leg.status})
+                </span>
+                ${idx < (journeyLegs.length - 1) ? '<span style="color:#64748b;">➔</span>' : ''}
+              `).join('')}
+              <span style="color:#64748b;">➔</span>
+              <span style="color:#a5b4fc; font-style:italic;">Leg ${currentLegIndex + 1} (Planning...)</span>
+            </div>
+          </div>
+        `;
+      })()}
 
       <!-- Phase 4: Best Use of Your Time (Experience Value Optimization) -->
       <div id="experience-value-panel" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; margin-bottom:16px;">
@@ -512,6 +902,15 @@ export function renderTripControlCenter({
             <button id="btn-simulate-trust-route-conflict" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #ea580c, #c2410c); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
               <span>⚡</span> Route Conflict
             </button>
+            <button id="btn-simulate-next-deadline" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #ea580c, #c2410c); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>🚆</span> Train Deadline Risk
+            </button>
+            <button id="btn-simulate-next-disruption" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #dc2626, #991b1b); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>⚡</span> Next-Leg Disruption
+            </button>
+            <button id="btn-simulate-next-reset" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.12); color:#cbd5e1; border:1px solid rgba(255,255,255,0.2); border-radius:6px; padding:6px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>↺</span> Reset Next Leg
+            </button>
           </div>
         </div>
       </div>
@@ -552,7 +951,20 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
                 currentTripData.completedStops.push(done);
               }
               currentTripData.upcomingStops = (currentTripData.upcomingStops || []).filter(s => s.id !== stopId);
+              if (res.isCompleted || (currentTripData.upcomingStops.length === 0 && !res.activeStop)) {
+                currentTripData.isJourneyComplete = true;
+                currentTripData.selectedIntent = currentTripData.selectedIntent || 'GO_TO_HOTEL';
+              }
               if (callbacks.onProgress) callbacks.onProgress(res);
+            }
+          } else {
+            currentTripData.completedStops = currentTripData.completedStops || [];
+            if (currentTripData.activeStop) currentTripData.completedStops.push(currentTripData.activeStop);
+            currentTripData.activeStop = currentTripData.upcomingStops?.[0] || null;
+            currentTripData.upcomingStops = (currentTripData.upcomingStops || []).slice(1);
+            if (currentTripData.upcomingStops.length === 0 && !currentTripData.activeStop) {
+              currentTripData.isJourneyComplete = true;
+              currentTripData.selectedIntent = currentTripData.selectedIntent || 'GO_TO_HOTEL';
             }
           }
           render();
@@ -912,6 +1324,154 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
             whatToWatchOutFor: 'Do not follow GPS into submerged coastal highway section.',
           },
         };
+        render();
+      });
+    }
+
+    // Phase 6: Next Journey Intelligence Listeners
+    const finishToNextBtn = containerEl.querySelector('#btn-finish-journey-to-next');
+    if (finishToNextBtn) {
+      finishToNextBtn.addEventListener('click', () => {
+        currentTripData.isJourneyComplete = true;
+        if (currentTripData.activeStop) {
+          currentTripData.completedStops = currentTripData.completedStops || [];
+          if (!currentTripData.completedStops.some(s => s.id === currentTripData.activeStop.id)) {
+            currentTripData.completedStops.push(currentTripData.activeStop);
+          }
+          currentTripData.activeStop = null;
+        }
+        currentTripData.upcomingStops = [];
+        currentTripData.selectedIntent = currentTripData.selectedIntent || 'GO_TO_HOTEL';
+        render();
+      });
+    }
+
+    containerEl.querySelectorAll('.btn-next-intent').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const intent = btn.getAttribute('data-next-intent');
+        currentTripData.selectedIntent = intent;
+        currentTripData.selectedCandidate = null;
+        currentTripData.nextLegCandidates = DEFAULT_CANDIDATES_BY_INTENT[intent] || DEFAULT_CANDIDATES_BY_INTENT.GO_TO_HOTEL;
+
+        if (intent === 'END_JOURNEY') {
+          alert('Journey Concluded. All historical journey legs are archived.');
+          return;
+        }
+
+        const tripId = btn.getAttribute('data-trip-id');
+        if (typeof window !== 'undefined' && window.API?.submitNextLegIntent) {
+          try {
+            const res = await window.API.submitNextLegIntent(tripId, intent);
+            if (res && Array.isArray(res.candidates) && res.candidates.length > 0) {
+              currentTripData.nextLegCandidates = res.candidates;
+            }
+          } catch (_err) {
+            // fallback to preset candidates
+          }
+        }
+        render();
+      });
+    });
+
+    containerEl.querySelectorAll('.btn-select-next-candidate').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const candId = btn.getAttribute('data-candidate-id');
+        const activeList = currentTripData.nextLegCandidates || DEFAULT_CANDIDATES_BY_INTENT[currentTripData.selectedIntent] || [];
+        const found = activeList.find(c => c.id === candId);
+        if (found) {
+          currentTripData.selectedCandidate = found;
+          render();
+        }
+      });
+    });
+
+    const startNextLegBtn = containerEl.querySelector('#btn-start-next-leg');
+    if (startNextLegBtn) {
+      startNextLegBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const candId = startNextLegBtn.getAttribute('data-candidate-id');
+        const activeList = currentTripData.nextLegCandidates || DEFAULT_CANDIDATES_BY_INTENT[currentTripData.selectedIntent] || [];
+        const selected = currentTripData.selectedCandidate || activeList.find(c => c.id === candId) || activeList[0];
+
+        // Append completed historical leg
+        currentTripData.journeyLegs = currentTripData.journeyLegs || [];
+        currentTripData.journeyLegs.push({
+          legIndex: currentTripData.currentLegIndex || 1,
+          name: `Leg ${currentTripData.currentLegIndex || 1} Exploration`,
+          status: 'COMPLETED',
+        });
+
+        // Advance to Leg 2 (or next)
+        currentTripData.currentLegIndex = (currentTripData.currentLegIndex || 1) + 1;
+        currentTripData.isJourneyComplete = false;
+        currentTripData.planVersion = 1;
+        currentTripData.tripHealth = 'ON_TRACK';
+        currentTripData.activeStop = {
+          id: selected.id,
+          name: selected.name,
+          category: selected.category,
+          plannedDurationMinutes: 60,
+        };
+        currentTripData.upcomingStops = [];
+        currentTripData.deadlineAlert = null;
+        currentTripData.selectedCandidate = null;
+
+        const tripId = startNextLegBtn.getAttribute('data-trip-id');
+        if (typeof window !== 'undefined' && window.API?.decideNextLeg) {
+          try {
+            await window.API.decideNextLeg(tripId, 'ACCEPT', { candidateId: selected.id });
+          } catch (_err) {
+            // local advance fallback
+          }
+        }
+        render();
+      });
+    }
+
+    const simDeadlineBtn = containerEl.querySelector('#btn-simulate-next-deadline');
+    if (simDeadlineBtn) {
+      simDeadlineBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentTripData.isSimulationActive = true;
+        currentTripData.simulationScenario = 'Train Departure Tight Window (VSKP Junction)';
+        currentTripData.selectedIntent = 'GO_TO_RAILWAY_STATION';
+        currentTripData.deadlineAlert = {
+          stationName: 'Visakhapatnam Junction (VSKP)',
+          scheduledDeparture: '22:30',
+          requiredBufferMinutes: 45,
+          availableBufferMinutes: 12,
+          riskState: 'DEADLINE_RISK',
+          urgency: 'IMMEDIATE_DEPARTURE',
+        };
+        render();
+      });
+    }
+
+    const simDisruptionBtn = containerEl.querySelector('#btn-simulate-next-disruption');
+    if (simDisruptionBtn) {
+      simDisruptionBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentTripData.isSimulationActive = true;
+        currentTripData.simulationScenario = 'Highway Inundation on NH16 Corridor';
+        currentTripData.tripHealth = 'CRITICAL';
+        currentTripData.activeTriggers = [
+          { type: 'ROAD_FLOODING', message: 'Severe coastal flash flood on NH16 corridor. Next leg adaptation required.' },
+        ];
+        render();
+      });
+    }
+
+    const simResetBtn = containerEl.querySelector('#btn-simulate-next-reset');
+    if (simResetBtn) {
+      simResetBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentTripData.isSimulationActive = false;
+        currentTripData.simulationScenario = null;
+        currentTripData.deadlineAlert = null;
+        currentTripData.activeTriggers = [];
+        currentTripData.tripHealth = 'ON_TRACK';
         render();
       });
     }

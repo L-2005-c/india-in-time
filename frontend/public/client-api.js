@@ -411,6 +411,29 @@
     return get(`/api/intelligence/trips/${tripId}/safety/notifications`);
   }
 
+  // ── Phase 6: Next Journey Intelligence ───────────────────────────────────────
+  async function submitNextLegIntent(tripId, intentType, rawInput = '', options = {}) {
+    return post(`/api/intelligence/trips/${tripId}/next-leg/intent`, { intentType, rawInput, ...options });
+  }
+  async function fetchNextLegIntents(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/next-leg/intents`);
+  }
+  async function evaluateNextLeg(tripId, params = {}) {
+    return post(`/api/intelligence/trips/${tripId}/next-leg/evaluate`, params);
+  }
+  async function fetchNextLegOptions(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/next-leg/options`);
+  }
+  async function decideNextLeg(tripId, action = 'ACCEPT', options = {}) {
+    return post(`/api/intelligence/trips/${tripId}/next-leg/decide`, { action, ...options });
+  }
+  async function fetchJourneyLegs(journeyId) {
+    return get(`/api/intelligence/journeys/${journeyId}/legs`);
+  }
+  async function fetchCurrentLeg(journeyId) {
+    return get(`/api/intelligence/journeys/${journeyId}/current-leg`);
+  }
+
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
@@ -418,6 +441,7 @@
     getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
     evaluateTripDisruptions, simulateTripDisruption, fetchTripNotifications, recordNotificationAction, fetchDisruptionEvents,
     evaluateTripSafety, simulateTripSafety, fetchTripSafety, recordSafetyAction, fetchSafetyProviders, fetchSafetyMetrics, fetchSafetyNotifications,
+    submitNextLegIntent, fetchNextLegIntents, evaluateNextLeg, fetchNextLegOptions, decideNextLeg, fetchJourneyLegs, fetchCurrentLeg,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

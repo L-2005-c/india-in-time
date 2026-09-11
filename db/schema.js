@@ -472,6 +472,101 @@ const SCHEMA_SQL = `
     recorded_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_trust_outcomes_entity ON trust_outcomes(entity_id, recorded_at DESC);
+
+  -- Phase 6 Next Journey Intelligence (Return, Stay & Next-Destination)
+  CREATE TABLE IF NOT EXISTS journey_legs (
+    id                         VARCHAR(255) PRIMARY KEY,
+    journey_id                 VARCHAR(255) NOT NULL,
+    parent_leg_id              VARCHAR(255),
+    leg_number                 INTEGER NOT NULL DEFAULT 1,
+    origin_json                TEXT NOT NULL,
+    destination_json           TEXT NOT NULL,
+    destination_intent         VARCHAR(64) NOT NULL,
+    status                     VARCHAR(32) NOT NULL DEFAULT 'PLANNED',
+    plan_version               INTEGER NOT NULL DEFAULT 1,
+    traveler_profile_version   VARCHAR(64),
+    constraints_json           TEXT,
+    started_at                 TIMESTAMP,
+    completed_at               TIMESTAMP,
+    created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_journey_legs_journey ON journey_legs(journey_id, leg_number ASC);
+
+  CREATE TABLE IF NOT EXISTS journey_leg_destinations (
+    id                   VARCHAR(255) PRIMARY KEY,
+    leg_id               VARCHAR(255) NOT NULL,
+    entity_id            VARCHAR(255),
+    name                 VARCHAR(255) NOT NULL,
+    category             VARCHAR(64),
+    lat                  DOUBLE PRECISION,
+    lon                  DOUBLE PRECISION,
+    resolved_type        VARCHAR(64) NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_leg_dest_leg ON journey_leg_destinations(leg_id);
+
+  CREATE TABLE IF NOT EXISTS next_leg_intents (
+    id                         VARCHAR(255) PRIMARY KEY,
+    trip_id                    VARCHAR(255) NOT NULL,
+    journey_id                 VARCHAR(255),
+    intent_type                VARCHAR(64) NOT NULL,
+    raw_input                  TEXT,
+    selected_destination_json  TEXT,
+    captured_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_next_intents_trip ON next_leg_intents(trip_id, captured_at DESC);
+
+  CREATE TABLE IF NOT EXISTS next_leg_candidates (
+    id                   VARCHAR(255) PRIMARY KEY,
+    intent_id            VARCHAR(255) NOT NULL,
+    candidate_type       VARCHAR(64) NOT NULL,
+    name                 VARCHAR(255) NOT NULL,
+    place_id             VARCHAR(255),
+    score                DOUBLE PRECISION NOT NULL,
+    price_json           TEXT,
+    trust_state          VARCHAR(64),
+    eta_minutes          INTEGER,
+    distance_km          DOUBLE PRECISION,
+    evaluated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_next_cand_intent ON next_leg_candidates(intent_id, score DESC);
+
+  CREATE TABLE IF NOT EXISTS next_leg_evaluations (
+    id                           VARCHAR(255) PRIMARY KEY,
+    trip_id                      VARCHAR(255) NOT NULL,
+    journey_id                   VARCHAR(255),
+    decision_type                VARCHAR(64) NOT NULL DEFAULT 'NEXT_LEG_PLANNING',
+    recommended_destination_json TEXT NOT NULL,
+    explainability_json          TEXT NOT NULL,
+    is_simulated                 BOOLEAN DEFAULT FALSE,
+    evaluated_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_next_eval_trip ON next_leg_evaluations(trip_id, evaluated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS next_leg_decisions (
+    id                   VARCHAR(255) PRIMARY KEY,
+    evaluation_id        VARCHAR(255),
+    trip_id              VARCHAR(255) NOT NULL,
+    leg_id               VARCHAR(255),
+    action_taken         VARCHAR(64) NOT NULL,
+    selected_candidate_id VARCHAR(255),
+    decided_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_next_decisions_trip ON next_leg_decisions(trip_id, decided_at DESC);
+
+  CREATE TABLE IF NOT EXISTS next_leg_outcomes (
+    id                   VARCHAR(255) PRIMARY KEY,
+    decision_id          VARCHAR(255),
+    leg_id               VARCHAR(255) NOT NULL,
+    actual_arrival_minute INTEGER,
+    actual_cost          DOUBLE PRECISION,
+    satisfaction_rating  INTEGER,
+    notes                TEXT,
+    recorded_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_next_outcomes_leg ON next_leg_outcomes(leg_id, recorded_at DESC);
 `;
 
 module.exports = { SCHEMA_SQL };
+

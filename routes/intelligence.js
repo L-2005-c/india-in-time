@@ -68,6 +68,18 @@ const {
   trustObservability,
   TRUST_STATES,
 } = require('../services/travelIntelligence/trust');
+const {
+  transitionLegStatus,
+  getOrCreateJourneyChain,
+  appendNextLeg,
+  getJourneyLegHistory,
+  getCurrentLeg,
+  resolveDestinationIntent,
+  DESTINATION_INTENTS,
+  evaluateNextLegDecision,
+  recordNextJourneyMetric,
+  getNextJourneyMetrics,
+} = require('../services/travelIntelligence/nextJourney');
 
 // Active journey state registry (survives requests; syncs with DB if connected)
 const activeTripsState = new Map();
@@ -221,6 +233,24 @@ router.post('/trips/:id/state/progress', (req, res) => {
       reason,
     });
 
+    const isTripFinished = updatedState.upcomingStops.length === 0 && !updatedState.activeStop;
+    if (isTripFinished) {
+      updatedState.isCompleted = true;
+      updatedState.nextIntentRequired = true;
+      try {
+        const chain = getOrCreateJourneyChain(tripId, {
+          city: record.state.city || 'Active Trip',
+          stops: updatedState.stops,
+          status: 'COMPLETED',
+        });
+        if (chain.legs[0] && chain.legs[0].status !== 'COMPLETED') {
+          chain.legs[0] = transitionLegStatus(chain.legs[0], 'COMPLETED');
+        }
+      } catch (_chainErr) {
+        // chain initialization fallback
+      }
+    }
+
     record.state = updatedState;
     activeTripsState.set(tripId, record);
 
@@ -232,6 +262,8 @@ router.post('/trips/:id/state/progress', (req, res) => {
       activeStop: updatedState.activeStop,
       completedStopsCount: updatedState.completedStops.length,
       upcomingStopsCount: updatedState.upcomingStops.length,
+      isCompleted: Boolean(isTripFinished),
+      nextIntentRequired: Boolean(isTripFinished),
     });
   } catch (err) {
     appLogger.warn(`[intelligence/progress] Warning: ${err.message}`);
@@ -1483,4 +1515,360 @@ router.get('/trust/metrics', (_req, res) => {
   }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// PHASE 6: NEXT JOURNEY INTELLIGENCE (Return, Stay & Next-Destination)
+// ═════════════════════════════════════════════════════════════════════════════
+
+const activeNextIntents = new Map();
+const activeNextEvaluations = new Map();
+
+/**
+ * 1. POST /trips/:id/next-leg/intent
+ * Captures traveler next destination intent.
+ */
+router.post('/trips/:id/next-leg/intent', async (req, res) => {
+  try {
+    const tripId = req.params.id;
+    const { intentType, rawInput, userProfile, isSimulated } = req.body || {};
+
+    if (!intentType) {
+      return res.status(400).json({ error: 'intentType is required' });
+    }
+
+    recordNextJourneyMetric('next_leg_intent_count', isSimulated);
+    const intentKey = String(intentType).toLowerCase();
+    if (intentKey.includes('home')) recordNextJourneyMetric('home_selection', isSimulated);
+    else if (intentKey.includes('hotel') || intentKey.includes('stay')) recordNextJourneyMetric('hotel_selection', isSimulated);
+    else if (intentKey.includes('restaurant') || intentKey.includes('food')) recordNextJourneyMetric('restaurant_selection', isSimulated);
+    else if (intentKey.includes('airport')) recordNextJourneyMetric('airport_selection', isSimulated);
+    else if (intentKey.includes('rail') || intentKey.includes('train')) recordNextJourneyMetric('rail_selection', isSimulated);
+    else if (intentKey.includes('bus')) recordNextJourneyMetric('bus_selection', isSimulated);
+    else recordNextJourneyMetric('custom_destination_selection', isSimulated);
+
+    const record = activeTripsState.get(tripId);
+    const currentLocation = record?.state?.currentLocation || null;
+
+    const resolution = await resolveDestinationIntent({
+      intentType,
+      rawInput,
+      currentLocation,
+      userProfile,
+      tripContext: { city: record?.state?.city, activeHotel: record?.state?.activeHotel },
+    });
+
+    const storedIntent = {
+      tripId,
+      intentType,
+      rawInput,
+      resolution,
+      capturedAt: new Date().toISOString(),
+      isSimulated: Boolean(isSimulated),
+    };
+
+    activeNextIntents.set(tripId, storedIntent);
+
+    res.json(storedIntent);
+  } catch (err) {
+    appLogger.error(`[intelligence/next-leg/intent] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 2. GET /trips/:id/next-leg/intents
+ * Lists supported next destination intents.
+ */
+router.get('/trips/:id/next-leg/intents', (_req, res) => {
+  res.json({
+    intents: Object.keys(DESTINATION_INTENTS),
+    categories: [
+      { id: DESTINATION_INTENTS.RETURN_HOME, icon: '🏠', label: 'Home' },
+      { id: DESTINATION_INTENTS.GO_TO_HOTEL, icon: '🏨', label: 'Hotel / Stay' },
+      { id: DESTINATION_INTENTS.GO_TO_RESTAURANT, icon: '🍽️', label: 'Food & Dining' },
+      { id: DESTINATION_INTENTS.GO_TO_AIRPORT, icon: '✈️', label: 'Airport' },
+      { id: DESTINATION_INTENTS.GO_TO_RAILWAY_STATION, icon: '🚆', label: 'Railway Station' },
+      { id: DESTINATION_INTENTS.GO_TO_BUS_STATION, icon: '🚌', label: 'Bus Station' },
+      { id: DESTINATION_INTENTS.CONTINUE_TO_DESTINATION, icon: '📍', label: 'Another Destination' },
+      { id: DESTINATION_INTENTS.CUSTOM_DESTINATION, icon: '✏️', label: 'Custom Location' },
+      { id: DESTINATION_INTENTS.END_JOURNEY, icon: '🛑', label: 'End Journey' },
+    ],
+  });
+});
+
+/**
+ * 3. POST /trips/:id/next-leg/evaluate
+ * Master next-leg evaluation returning ranked candidates and explainability contract.
+ */
+router.post('/trips/:id/next-leg/evaluate', async (req, res) => {
+  try {
+    const tripId = req.params.id;
+    const {
+      intentType = DESTINATION_INTENTS.GO_TO_HOTEL,
+      rawInput = '',
+      currentMinute = 1140,
+      nextDayPlans = null,
+      userProfile = {},
+      activeSafetyAlerts = [],
+      isSimulated = false,
+    } = req.body || {};
+
+    recordNextJourneyMetric('next_leg_evaluation_count', isSimulated);
+
+    const record = activeTripsState.get(tripId);
+    const currentLocation = req.body.currentLocation || record?.state?.currentLocation || null;
+
+    const evaluation = await evaluateNextLegDecision({
+      tripId,
+      currentLocation,
+      intentType,
+      rawInput,
+      currentMinute,
+      nextDayPlans,
+      userProfile,
+      tripContext: {
+        city: record?.state?.city,
+        activeHotel: record?.state?.activeHotel,
+        weather: record?.state?.weather || {},
+      },
+      activeSafetyAlerts,
+      isSimulated,
+    });
+
+    activeNextEvaluations.set(tripId, evaluation);
+
+    res.json(evaluation);
+  } catch (err) {
+    appLogger.error(`[intelligence/next-leg/evaluate] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 4. GET /trips/:id/next-leg/options
+ * Returns evaluated options for active trip next-leg.
+ */
+router.get('/trips/:id/next-leg/options', (req, res) => {
+  const tripId = req.params.id;
+  const evaluation = activeNextEvaluations.get(tripId);
+
+  if (!evaluation) {
+    return res.status(404).json({ error: `No active next-leg evaluation found for trip '${tripId}'` });
+  }
+
+  res.json({
+    tripId,
+    decision: evaluation.decision,
+    recommendedDestination: evaluation.recommendedDestination,
+    candidates: evaluation.candidates,
+    overnightAssessment: evaluation.overnightAssessment,
+    explanation: evaluation.explanation,
+  });
+});
+
+/**
+ * 5. POST /trips/:id/next-leg/decide
+ * Traveler decides on next leg: ACCEPT, DECLINE, or END_JOURNEY.
+ * Immutability invariant: Completed Leg 1 remains permanently untouched!
+ */
+router.post('/trips/:id/next-leg/decide', async (req, res) => {
+  try {
+    const tripId = req.params.id;
+    const { action = 'ACCEPT', candidateId, destination, intentType, isSimulated } = req.body || {};
+
+    recordNextJourneyMetric('next_leg_decision_count', isSimulated);
+
+    if (action === 'END_JOURNEY') {
+      return res.json({
+        tripId,
+        action: 'END_JOURNEY',
+        message: 'Traveler concluded journey.',
+        concludedAt: new Date().toISOString(),
+      });
+    }
+
+    if (action !== 'ACCEPT') {
+      return res.json({
+        tripId,
+        action,
+        message: `Action '${action}' recorded.`,
+      });
+    }
+
+    // Get or initialize journey chain
+    const chain = getOrCreateJourneyChain(tripId);
+
+    // If Leg 1 exists and is not completed, transition it to COMPLETED
+    if (chain.legs.length > 0 && chain.legs[0].status !== 'COMPLETED') {
+      chain.legs[0] = transitionLegStatus(chain.legs[0], 'COMPLETED');
+    }
+
+    // Target destination
+    const evalData = activeNextEvaluations.get(tripId);
+    const chosenCandidate = (evalData?.candidates || []).find(c => c.id === candidateId) ||
+      evalData?.recommendedDestination ||
+      (destination ? { name: destination.name, ...destination } : { name: 'Next Destination' });
+
+    // Append new Leg (Leg 2, Leg 3, etc.)
+    const nextLeg = appendNextLeg(tripId, {
+      destination: {
+        id: chosenCandidate.id || `dest_${Date.now()}`,
+        name: chosenCandidate.name,
+        lat: chosenCandidate.lat,
+        lon: chosenCandidate.lon,
+        city: chosenCandidate.city,
+      },
+      destinationIntent: intentType || evalData?.intentType || 'CONTINUE_TO_DESTINATION',
+      status: 'ACTIVE',
+      plan: {
+        stops: [
+          {
+            id: chosenCandidate.id || `stop_${Date.now()}`,
+            name: chosenCandidate.name,
+            lat: chosenCandidate.lat,
+            lon: chosenCandidate.lon,
+            plannedDurationMinutes: 60,
+            status: 'PLANNED',
+          },
+        ],
+      },
+      stops: [
+        {
+          id: chosenCandidate.id || `stop_${Date.now()}`,
+          name: chosenCandidate.name,
+          lat: chosenCandidate.lat,
+          lon: chosenCandidate.lon,
+          plannedDurationMinutes: 60,
+          status: 'ACTIVE',
+        },
+      ],
+    });
+
+    recordNextJourneyMetric('next_leg_creation_count', isSimulated);
+
+    // Update active trip state with new leg plan
+    const record = activeTripsState.get(tripId) || { state: {} };
+    record.state.activeLegId = nextLeg.legId;
+    record.state.activePlanVersion = 1;
+    record.state.activeStop = nextLeg.stops[0];
+    record.state.upcomingStops = [];
+    record.state.isCompleted = false;
+    record.state.nextIntentRequired = false;
+    activeTripsState.set(tripId, record);
+
+    // Commit Plan v1 for new leg
+    await commitPlanVersion({
+      tripId,
+      versionNumber: 1,
+      triggerType: 'NEXT_LEG_STARTED',
+      triggerReason: `Started Leg ${nextLeg.legNumber} to ${nextLeg.destination.name}`,
+      plan: nextLeg.plan,
+      confidence: 'HIGH',
+      dbPool: getDbPool(),
+    });
+
+    res.json({
+      message: `Next journey leg started (${nextLeg.destination.name})`,
+      tripId,
+      leg: nextLeg,
+      planVersion: 1,
+      priorLegsCount: chain.legs.length - 1,
+      immutabilityAudit: 'Prior completed legs remain strictly immutable.',
+    });
+  } catch (err) {
+    appLogger.error(`[intelligence/next-leg/decide] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 6. GET /journeys/:id/legs
+ * Retrieves all ordered legs in a journey chain with immutable history.
+ */
+router.get('/journeys/:id/legs', (req, res) => {
+  try {
+    const journeyId = req.params.id;
+    const legs = getJourneyLegHistory(journeyId);
+    res.json({ journeyId, count: legs.length, legs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 7. GET /journeys/:id/current-leg
+ * Retrieves currently active or latest leg in a journey chain.
+ */
+router.get('/journeys/:id/current-leg', (req, res) => {
+  try {
+    const journeyId = req.params.id;
+    const current = getCurrentLeg(journeyId);
+    if (!current) {
+      return res.status(404).json({ error: `No active leg found for journey '${journeyId}'` });
+    }
+    res.json({ journeyId, currentLeg: current });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 8. POST /journeys/:id/legs
+ * Appends a new leg to a journey chain.
+ */
+router.post('/journeys/:id/legs', (req, res) => {
+  try {
+    const journeyId = req.params.id;
+    const nextLegOptions = req.body || {};
+    const newLeg = appendNextLeg(journeyId, nextLegOptions);
+    res.status(201).json({ journeyId, leg: newLeg });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * 9. POST /journeys/:id/legs/:legId/complete
+ * Completes a journey leg and transitions it to immutable COMPLETED status.
+ */
+router.post('/journeys/:id/legs/:legId/complete', (req, res) => {
+  try {
+    const { id: journeyId, legId } = req.params;
+    const chain = getOrCreateJourneyChain(journeyId);
+    const target = chain.legs.find(l => l.legId === legId);
+
+    if (!target) {
+      return res.status(404).json({ error: `Leg '${legId}' not found in journey '${journeyId}'` });
+    }
+
+    const completedLeg = transitionLegStatus(target, 'COMPLETED');
+    const idx = chain.legs.findIndex(l => l.legId === legId);
+    chain.legs[idx] = completedLeg;
+
+    recordNextJourneyMetric('next_leg_completion_count');
+
+    res.json({
+      message: `Leg '${legId}' completed and permanently sealed.`,
+      journeyId,
+      completedLeg,
+      nextIntentRequired: true,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * 10. GET /next-journey/metrics
+ * Telemetry counters separating LIVE from SIMULATED metrics.
+ */
+router.get('/next-journey/metrics', (_req, res) => {
+  try {
+    const metrics = getNextJourneyMetrics();
+    res.json(metrics);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+
