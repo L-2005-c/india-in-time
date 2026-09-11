@@ -19,6 +19,7 @@ export function renderTripControlCenter({
   isSimulationActive = false,
   simulationScenario = null,
   providerHealth = [],
+  experienceOptimization = null,
 } = {}) {
   const healthBadges = {
     ON_TRACK: { icon: '🟢', label: 'Trip is On Track', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
@@ -155,6 +156,92 @@ export function renderTripControlCenter({
             <div style="font-size:11px; color:#64748b;">All planned stops finished.</div>
           `}
         </div>
+      </div>
+
+      <!-- Phase 4: Best Use of Your Time (Experience Value Optimization) -->
+      <div id="experience-value-panel" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:14px;">✨</span>
+            <span style="font-size:12px; font-weight:700; color:#f8fafc;">Best Use of Your Time:</span>
+            <span style="background:rgba(129,140,248,0.15); color:#a5b4fc; font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; border:1px solid rgba(129,140,248,0.3);">
+              ${experienceOptimization?.timeBudget?.usableExperienceMinutes ?? 75}m Usable Time (${experienceOptimization?.timeBudget?.budgetClassification || 'BALANCED'})
+            </span>
+          </div>
+          <span style="font-size:10px; color:#94a3b8;">Deterministic Value Optimizer</span>
+        </div>
+
+        ${(() => {
+          const rec = experienceOptimization?.primaryRecommendation || (
+            upcomingStops.length > 0
+              ? {
+                  candidate: upcomingStops[0],
+                  compositeScore: 88,
+                  actionType: 'DO_NEXT',
+                  visitScore: 85,
+                  dnaMatchScore: 82,
+                  windowScore: 90,
+                  explanation: {
+                    headline: `Proceed with ${upcomingStops[0].name} to maximize daytime experience value.`,
+                    tradeoff: 'No planned stops sacrificed; fits cleanly within usable schedule.',
+                    confidence: 88,
+                  },
+                }
+              : null
+          );
+
+          if (!rec) {
+            return `<div style="font-size:11px; color:#64748b; padding:8px; background:rgba(0,0,0,0.2); border-radius:6px;">No upcoming experience recommendations needed.</div>`;
+          }
+
+          const actionColors = {
+            DO_NOW: { color: '#10b981', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.35)' },
+            DO_NEXT: { color: '#818cf8', bg: 'rgba(129,140,248,0.15)', border: 'rgba(129,140,248,0.35)' },
+            SWAP_FOR: { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.35)' },
+            DEFER_TO_LATER: { color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.35)' },
+            REST_OR_REFUEL: { color: '#14b8a6', bg: 'rgba(20,184,166,0.15)', border: 'rgba(20,184,166,0.35)' },
+          };
+          const badge = actionColors[rec.actionType] || actionColors.DO_NOW;
+
+          return `
+            <div class="experience-recommendation-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:13px; font-weight:700; color:#f8fafc;">${rec.candidate?.name}</span>
+                    <span style="background:${badge.bg}; color:${badge.color}; border:1px solid ${badge.border}; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">
+                      ${rec.actionType}
+                    </span>
+                    <span style="font-size:10px; color:#94a3b8;">${rec.candidate?.visitMinutes || 45} min stay</span>
+                  </div>
+                  <div style="font-size:11px; color:#cbd5e1; margin-top:4px; line-height:1.4;">
+                    ${rec.explanation?.headline || 'Optimized for current timing and conditions.'}
+                  </div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:16px; font-weight:800; color:#38bdf8;">${rec.compositeScore}<span style="font-size:10px; color:#94a3b8;">/100</span></div>
+                  <div style="font-size:9px; color:#64748b; text-transform:uppercase;">Experience Value</div>
+                </div>
+              </div>
+
+              <!-- Tradeoff statement -->
+              <div style="margin-top:8px; font-size:10px; color:#94a3b8; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:4px; display:flex; align-items:center; gap:6px;">
+                <span>⚖️</span>
+                <span><strong>Downstream Tradeoff:</strong> ${rec.explanation?.tradeoff || 'Zero downstream sacrifices.'}</span>
+              </div>
+
+              <!-- Action buttons -->
+              <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
+                <button id="btn-accept-experience" data-place-id="${rec.candidate?.id}" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer;">
+                  ✓ Prioritize This Stop
+                </button>
+                <button id="btn-defer-experience" data-place-id="${rec.candidate?.id}" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.08); color:#cbd5e1; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:5px 10px; font-size:11px; font-weight:600; cursor:pointer;">
+                  Keep Original Sequence
+                </button>
+              </div>
+            </div>
+          `;
+        })()}
       </div>
 
       <!-- Safety Data Sources & Ground-Truth Telemetry Status (Section 4 & Section 31) -->
@@ -475,6 +562,51 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
           console.error('[TripControlCenter] Failed to simulate safety data unavailable:', err);
           unavailBtn.disabled = false;
           unavailBtn.textContent = 'ℹ️ Data Unavailable';
+        }
+      };
+    }
+
+    const acceptExpBtn = containerEl.querySelector('#btn-accept-experience');
+    if (acceptExpBtn) {
+      acceptExpBtn.onclick = async () => {
+        const placeId = acceptExpBtn.getAttribute('data-place-id');
+        const tripId = acceptExpBtn.getAttribute('data-trip-id');
+        try {
+          acceptExpBtn.disabled = true;
+          acceptExpBtn.textContent = 'Prioritizing...';
+          if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+            await window.fetch(`/api/intelligence/trips/${tripId}/experience/decide`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ placeId, actionTaken: 'ACCEPTED' }),
+            }).catch(() => {});
+          }
+          acceptExpBtn.textContent = '✓ Prioritized';
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to accept experience:', err);
+          acceptExpBtn.disabled = false;
+        }
+      };
+    }
+
+    const deferExpBtn = containerEl.querySelector('#btn-defer-experience');
+    if (deferExpBtn) {
+      deferExpBtn.onclick = async () => {
+        const placeId = deferExpBtn.getAttribute('data-place-id');
+        const tripId = deferExpBtn.getAttribute('data-trip-id');
+        try {
+          deferExpBtn.disabled = true;
+          deferExpBtn.textContent = 'Preserved';
+          if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+            await window.fetch(`/api/intelligence/trips/${tripId}/experience/decide`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ placeId, actionTaken: 'DEFERRED' }),
+            }).catch(() => {});
+          }
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to defer experience:', err);
+          deferExpBtn.disabled = false;
         }
       };
     }

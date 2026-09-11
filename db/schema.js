@@ -344,6 +344,48 @@ const SCHEMA_SQL = `
     decided_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_safety_decisions_trip ON safety_decisions(trip_id, decided_at DESC);
+
+  -- Phase 4 Experience Value Intelligence
+  CREATE TABLE IF NOT EXISTS experience_evaluations (
+    id                   VARCHAR(255) PRIMARY KEY,
+    trip_id              VARCHAR(255) NOT NULL,
+    current_minute       INTEGER NOT NULL,
+    usable_time_minutes  INTEGER NOT NULL,
+    budget_state         VARCHAR(32) NOT NULL,
+    top_recommendation   VARCHAR(255),
+    payload_json         TEXT NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_exp_eval_trip ON experience_evaluations(trip_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS experience_recommendations (
+    id                   VARCHAR(255) PRIMARY KEY,
+    evaluation_id        VARCHAR(255) NOT NULL,
+    trip_id              VARCHAR(255) NOT NULL,
+    place_id             VARCHAR(255) NOT NULL,
+    place_name           VARCHAR(255) NOT NULL,
+    composite_score      INTEGER NOT NULL,
+    action_type          VARCHAR(64) NOT NULL,
+    provenance           VARCHAR(64) NOT NULL,
+    opportunity_cost     VARCHAR(32) DEFAULT 'NONE',
+    explanation_json     TEXT NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_exp_rec_trip ON experience_recommendations(trip_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS experience_outcomes (
+    id                   VARCHAR(255) PRIMARY KEY,
+    trip_id              VARCHAR(255) NOT NULL,
+    traveler_id          VARCHAR(255),
+    recommendation_id    VARCHAR(255),
+    place_id             VARCHAR(255) NOT NULL,
+    action_taken         VARCHAR(32) NOT NULL,
+    actual_dwell_minutes INTEGER,
+    traveler_rating      INTEGER,
+    feedback_text        TEXT,
+    recorded_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_exp_outcomes_trip ON experience_outcomes(trip_id, recorded_at DESC);
 `;
 
 module.exports = { SCHEMA_SQL };

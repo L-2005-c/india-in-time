@@ -33,6 +33,8 @@ const {
 
 const {
   dispatchDisruptionNotification,
+  dispatchSafetyNotification,
+  dispatchExperienceNotification,
   getTripNotifications,
   resetNotificationEngine,
   NOTIFICATION_SEVERITIES,
@@ -144,6 +146,8 @@ module.exports = {
   evaluateJourneyImpact,
   JOURNEY_IMPACT_STATES,
   dispatchDisruptionNotification,
+  dispatchSafetyNotification,
+  dispatchExperienceNotification,
   getTripNotifications,
   resetNotificationEngine,
   NOTIFICATION_SEVERITIES,

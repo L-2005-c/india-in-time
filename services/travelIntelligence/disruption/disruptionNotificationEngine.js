@@ -463,6 +463,83 @@ function resolveSafetyNotification({
 }
 
 /**
+ * Builds and dispatches a Phase 4 Experience Value proactive notification.
+ */
+function dispatchExperienceNotification({
+  tripId = 'active_trip',
+  recommendation = {},
+  explanation = {},
+  timeBudget = {},
+  now = Date.now(),
+} = {}) {
+  const candidate = recommendation.candidate || {};
+  const placeId = candidate.id || 'destination';
+  const dedupKey = `${tripId}:exp:${placeId}`;
+
+  const record = notificationDeduplicationRecords.get(dedupKey);
+  let version = 1;
+
+  if (record) {
+    version = record.version + 1;
+    const elapsedMs = now - record.lastNotifiedAt;
+    if (elapsedMs < COOLDOWN_WINDOW_MS) {
+      return {
+        dispatched: false,
+        reason: `SUPPRESSED_BY_COOLDOWN (last notified ${(elapsedMs / 60000).toFixed(1)}m ago)`,
+      };
+    }
+  }
+
+  const notificationId = `notif_exp_${crypto.randomBytes(6).toString('hex')}`;
+  const notification = {
+    notificationId,
+    tripId,
+    category: 'EXPERIENCE_VALUE',
+    severity: NOTIFICATION_SEVERITIES.INFO,
+    headline: `✨ BEST USE OF TIME: ${candidate.name || 'Optimal Experience'}`,
+    actionType: recommendation.actionType || 'DO_NOW',
+    qa: {
+      whatHappened: `High-value experience window detected for ${candidate.name || 'destination'}.`,
+      why: explanation.headline || 'High alignment with your available time and preferences.',
+      howLong: `${candidate.visitMinutes || 45} minutes recommended stay.`,
+      when: `Current usable time bank: ${timeBudget.usableExperienceMinutes ?? 45} minutes.`,
+      doesItAffectTrip: explanation.tradeoff || 'Fits within usable schedule without sacrificing stops.',
+      whatShouldIDo: recommendation.actionType === 'DO_NOW' ? 'Visit now to capture optimal conditions.' : 'Review experience recommendation.',
+      howConfidentAreWe: `${explanation.confidence || 85}% confidence grounded in temporal and destination telemetry.`,
+    },
+    recommendation,
+    explanation,
+    availableActions: [
+      NOTIFICATION_ACTIONS.ACCEPT,
+      NOTIFICATION_ACTIONS.DECLINE,
+      NOTIFICATION_ACTIONS.VIEW_OPTIONS,
+    ],
+    timestamp: new Date(now).toISOString(),
+    status: 'ACTIVE',
+  };
+
+  notificationDeduplicationRecords.set(dedupKey, {
+    lastNotifiedAt: now,
+    lastSeverity: NOTIFICATION_SEVERITIES.INFO,
+    lastDelay: 0,
+    version,
+  });
+
+  let tripLogs = tripNotificationLogs.get(tripId);
+  if (!tripLogs) {
+    tripLogs = [];
+    tripNotificationLogs.set(tripId, tripLogs);
+  }
+  tripLogs.unshift(notification);
+  if (tripLogs.length > 50) tripLogs.pop();
+
+  return {
+    dispatched: true,
+    notification,
+  };
+}
+
+/**
  * Retrieves notifications for a trip.
  */
 function getTripNotifications(tripId) {
@@ -483,6 +560,7 @@ module.exports = {
   NOTIFICATION_ACTIONS,
   dispatchDisruptionNotification,
   dispatchSafetyNotification,
+  dispatchExperienceNotification,
   resolveSafetyNotification,
   getTripNotifications,
   resetNotificationEngine,

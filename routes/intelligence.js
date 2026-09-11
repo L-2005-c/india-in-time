@@ -52,6 +52,16 @@ const {
   simulateSafetyEvent,
   resolveSafetyCondition,
 } = require('../services/travelIntelligence/safety');
+const {
+  evaluatePlaceExperienceWindow,
+  evaluateOpportunityCost,
+  evaluateExperienceValue,
+  generateExperienceExplanation,
+  recordExperienceOutcome,
+  getTripExperienceOutcomes,
+  computeExperienceAccuracyMetrics,
+} = require('../services/travelIntelligence/experience');
+const { dispatchExperienceNotification } = require('../services/travelIntelligence/disruption');
 
 // Active journey state registry (survives requests; syncs with DB if connected)
 const activeTripsState = new Map();
@@ -60,6 +70,8 @@ const activeTripDisruptions = new Map();
 // Active trip safety evaluations registry
 const activeTripSafety = new Map();
 const tripSafetyHistory = new Map();
+// Active trip experience evaluations registry
+const activeTripExperience = new Map();
 
 function getDbPool() {
   try {
@@ -885,6 +897,291 @@ router.get('/trips/:id/safety/notifications', (req, res) => {
     tripId,
     notificationsCount: safetyNotifications.length,
     notifications: safetyNotifications,
+  });
+});
+
+// ── 19. Phase 4: Experience Value Intelligence Endpoints ─────────────────────
+
+/**
+ * Evaluates candidate experiences and computes optimized recommendations.
+ */
+router.post(['/experience/evaluate', '/trips/:id/experience/evaluate'], async (req, res) => {
+  try {
+    const tripId = req.params.id || req.body.tripId || 'default_trip';
+    let journeyState = req.body.journeyState || activeTripsState.get(tripId);
+    if (!journeyState && req.body.stops) {
+      journeyState = createJourneyState({ tripId, plan: { stops: req.body.stops } });
+    }
+    if (!journeyState) {
+      journeyState = createJourneyState({ tripId, plan: [] });
+    }
+
+    const travelerDna = req.body.travelerDna || {};
+    const cityName = req.body.cityName || req.body.city || 'visakhapatnam';
+    const currentMinute = req.body.currentMinute != null ? Number(req.body.currentMinute) : journeyState.currentMinute;
+    const candidatePool = req.body.candidatePool || req.body.candidates || [];
+    const weather = req.body.weather || null;
+    const traffic = req.body.traffic || null;
+    const activeHazards = req.body.activeHazards || journeyState.activeHazards || [];
+
+    const previousResult = activeTripExperience.get(tripId);
+    const previousRecs = previousResult ? previousResult.recommendations : null;
+
+    const evalResult = evaluateExperienceValue({
+      journeyState,
+      travelerDna,
+      weather,
+      traffic,
+      activeHazards,
+      candidatePool,
+      cityName,
+      currentMinute,
+      previousRecommendations: previousRecs,
+    });
+
+    // Enrich recommendations with explanation
+    evalResult.recommendations = evalResult.recommendations.map(rec => {
+      const explanation = generateExperienceExplanation(rec, {
+        timeBudget: evalResult.timeBudget,
+        weather,
+        dna: travelerDna,
+      });
+      return {
+        ...rec,
+        explanation,
+      };
+    });
+
+    if (evalResult.primaryRecommendation) {
+      evalResult.primaryRecommendation.explanation = generateExperienceExplanation(
+        evalResult.primaryRecommendation,
+        { timeBudget: evalResult.timeBudget, weather, dna: travelerDna }
+      );
+
+      // Dispatch proactive notification if high value
+      if (evalResult.primaryRecommendation.compositeScore >= 70) {
+        dispatchExperienceNotification({
+          tripId,
+          recommendation: evalResult.primaryRecommendation,
+          explanation: evalResult.primaryRecommendation.explanation,
+          timeBudget: evalResult.timeBudget,
+        });
+      }
+    }
+
+    activeTripExperience.set(tripId, evalResult);
+
+    const pool = getDbPool();
+    if (pool) {
+      pool.query(
+        `INSERT INTO experience_evaluations (id, trip_id, current_minute, usable_time_minutes, budget_state, top_recommendation, payload_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO UPDATE SET payload_json = $7`,
+        [
+          `eval_${tripId}_${Date.now()}`,
+          tripId,
+          currentMinute || 540,
+          evalResult.timeBudget.usableExperienceMinutes,
+          evalResult.timeBudget.budgetClassification,
+          evalResult.primaryRecommendation?.candidate?.name || null,
+          JSON.stringify(evalResult),
+        ]
+      ).catch(err => appLogger.warn('Failed to persist experience evaluation to DB', { error: err.message }));
+    }
+
+    res.json({
+      success: true,
+      evaluation: evalResult,
+    });
+  } catch (err) {
+    appLogger.error('Error evaluating experience value', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Retrieves active experience recommendations for a trip.
+ */
+router.get(['/experience/recommendations', '/trips/:id/experience/recommendations'], (req, res) => {
+  const tripId = req.params.id || req.query.tripId || 'default_trip';
+  const cached = activeTripExperience.get(tripId);
+  if (cached) {
+    return res.json({
+      tripId,
+      timeBudget: cached.timeBudget,
+      primaryRecommendation: cached.primaryRecommendation,
+      recommendations: cached.recommendations,
+      sequencePlan: cached.sequencePlan,
+      divergenceAnalysis: cached.divergenceAnalysis,
+      evaluatedAt: cached.evaluatedAt,
+    });
+  }
+
+  const state = activeTripsState.get(tripId);
+  if (!state) {
+    return res.json({
+      tripId,
+      recommendations: [],
+      message: 'No active experience evaluation for trip',
+    });
+  }
+
+  const evalResult = evaluateExperienceValue({ journeyState: state });
+  activeTripExperience.set(tripId, evalResult);
+  res.json({
+    tripId,
+    timeBudget: evalResult.timeBudget,
+    primaryRecommendation: evalResult.primaryRecommendation,
+    recommendations: evalResult.recommendations,
+    sequencePlan: evalResult.sequencePlan,
+    divergenceAnalysis: evalResult.divergenceAnalysis,
+    evaluatedAt: evalResult.evaluatedAt,
+  });
+});
+
+/**
+ * Traveler records an experience decision (ACCEPT, REJECT, DEFER, MODIFY).
+ */
+router.post(['/experience/decide', '/trips/:id/experience/decide'], async (req, res) => {
+  try {
+    const tripId = req.params.id || req.body.tripId || 'default_trip';
+    const { recommendationId, placeId, placeCategory, actionTaken, actualDwellMinutes, travelerRating, feedbackText, travelerDna } = req.body;
+
+    if (!placeId) {
+      return res.status(400).json({ error: 'placeId is required' });
+    }
+
+    const outcome = recordExperienceOutcome({
+      tripId,
+      recommendationId,
+      placeId,
+      placeCategory,
+      actionTaken: actionTaken || 'ACCEPTED',
+      actualDwellMinutes,
+      travelerRating,
+      feedbackText,
+      travelerDna: travelerDna || {},
+    });
+
+    const pool = getDbPool();
+    if (pool) {
+      pool.query(
+        `INSERT INTO experience_outcomes (id, trip_id, recommendation_id, place_id, action_taken, actual_dwell_minutes, traveler_rating, feedback_text)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          outcome.outcome.id,
+          tripId,
+          recommendationId || null,
+          placeId,
+          actionTaken || 'ACCEPTED',
+          actualDwellMinutes || null,
+          travelerRating || null,
+          feedbackText || null,
+        ]
+      ).catch(err => appLogger.warn('Failed to insert experience outcome to DB', { error: err.message }));
+    }
+
+    res.json(outcome);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * Computes downstream opportunity cost for a specific candidate place.
+ */
+router.get(['/experience/opportunity-cost', '/trips/:id/experience/opportunity-cost'], (req, res) => {
+  const tripId = req.params.id || req.query.tripId || 'default_trip';
+  const journeyState = activeTripsState.get(tripId) || null;
+
+  const candidate = {
+    id: req.query.placeId || 'candidate_poi',
+    name: req.query.name || 'Candidate Stop',
+    lat: Number(req.query.lat) || 17.6868,
+    lon: Number(req.query.lon) || 83.2185,
+    visitMinutes: Number(req.query.visitMinutes) || 45,
+    cat: req.query.cat || 'scenic',
+  };
+
+  const oppCost = evaluateOpportunityCost({
+    candidate,
+    journeyState: journeyState || { currentMinute: Number(req.query.currentMinute) || 540, stops: [] },
+  });
+
+  res.json({
+    tripId,
+    candidateId: candidate.id,
+    opportunityCost: oppCost,
+  });
+});
+
+/**
+ * Temporal experience windows evaluation for a place across time.
+ */
+router.get(['/experience/windows', '/trips/:id/experience/windows'], (req, res) => {
+  const place = {
+    id: req.query.placeId || 'poi',
+    name: req.query.name || 'Attraction',
+    lat: Number(req.query.lat) || 17.6868,
+    lon: Number(req.query.lon) || 83.2185,
+    cat: req.query.cat || 'scenic',
+    ot: req.query.ot || null,
+    ct: req.query.ct || null,
+    visitMinutes: Number(req.query.visitMinutes) || 60,
+    is_sunset_spot: req.query.is_sunset_spot === 'true',
+    is_sunrise_spot: req.query.is_sunrise_spot === 'true',
+  };
+
+  const currentMinute = req.query.currentMinute != null ? Number(req.query.currentMinute) : 600;
+  const windowEval = evaluatePlaceExperienceWindow(place, {
+    currentMinute,
+  });
+
+  res.json(windowEval);
+});
+
+/**
+ * Post-visit feedback and rating.
+ */
+router.post(['/experience/feedback', '/trips/:id/experience/feedback'], async (req, res) => {
+  try {
+    const tripId = req.params.id || req.body.tripId || 'default_trip';
+    const { placeId, placeCategory, travelerRating, actualDwellMinutes, feedbackText, travelerDna } = req.body;
+
+    if (!placeId) {
+      return res.status(400).json({ error: 'placeId is required' });
+    }
+
+    const outcome = recordExperienceOutcome({
+      tripId,
+      placeId,
+      placeCategory,
+      actionTaken: 'ACCEPTED',
+      travelerRating,
+      actualDwellMinutes,
+      feedbackText,
+      travelerDna: travelerDna || {},
+    });
+
+    res.json(outcome);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * Trip experience outcomes and accuracy metrics.
+ */
+router.get(['/experience/outcomes', '/trips/:id/experience/outcomes'], (req, res) => {
+  const tripId = req.params.id || req.query.tripId || 'default_trip';
+  const outcomes = getTripExperienceOutcomes(tripId);
+  const metrics = computeExperienceAccuracyMetrics(tripId);
+
+  res.json({
+    tripId,
+    outcomesCount: outcomes.length,
+    outcomes,
+    metrics,
   });
 });
 
