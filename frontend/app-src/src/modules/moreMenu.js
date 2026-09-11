@@ -248,6 +248,7 @@ export function renderMoreMenu({
   utilsCard.appendChild(utilsHead);
 
   const tools = [
+    { name: 'Alerts Center', icon: '⚠️', desc: 'Weather, traffic, and safety alerts', action: 'alerts' },
     { name: 'Budget Splitter', icon: '💸', desc: 'Manage shared group expenses', action: 'budget' },
     { name: 'Travel Passport', icon: '🛂', desc: 'View collected cultural stamps', action: 'passport' },
     { name: 'Offline Pass', icon: '📱', desc: 'Export offline emergency pass', action: 'offlinePass' },

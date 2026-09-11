@@ -4,8 +4,8 @@
  * India In-Time v3.0 — Phase 7 Mobile Shell & Responsive Navigation
  *
  * Features:
- * - 5-Tab Navigation Architecture: MAP, JOURNEY, PLAN, ALERTS, MORE
- * - Unread Alert Count Badge
+ * - 5-Tab Navigation Architecture: MAP, JOURNEY, PLAN, AI ASSISTANT, MORE
+ * - Unread Alert Count Badge in More tab
  * - Dynamic slot attachment ensuring HUD is visible in both Journey and Plan views
  * - Seamless integration with existing view switching (switchToView)
  * - Accessible keyboard navigation & touch targets (min 44x44)
@@ -15,6 +15,15 @@ import { renderAlertsCenter } from './alertsCenter.js';
 import { renderMoreMenu } from './moreMenu.js';
 
 let activeTabIdx = 0;
+
+function resolveMobileTabIdx(viewId, idx) {
+  if (viewId === 'chat-view') return 3;
+  if (viewId === 'more-view' || viewId === 'tools-view' || viewId === 'alerts-view') return 4;
+  if (typeof idx === 'number') return idx;
+  if (viewId === 'journey-view') return 1;
+  if (viewId === 'plan-view') return 2;
+  return 0;
+}
 
 /**
  * Initializes the mobile shell, wiring the 5-tab navigation and mounting dedicated views.
@@ -71,10 +80,11 @@ export function initMobileShell() {
   // Enhance existing switchToView to work with new tabs
   const originalSwitch = window.switchToView;
   window.switchToView = function (viewId, idx, skipRender) {
-    switchMobileTab(viewId, idx ?? 0);
+    const tabIdx = resolveMobileTabIdx(viewId, idx);
     if (typeof originalSwitch === 'function' && (viewId === 'map-view' || viewId === 'plan-view' || viewId === 'chat-view' || viewId === 'tools-view')) {
       try { originalSwitch(viewId, idx, skipRender); } catch {}
     }
+    switchMobileTab(viewId, tabIdx);
   };
 
   refreshAlertsView();
@@ -89,8 +99,8 @@ function renderBottomNav(navEl) {
     { id: 'map-view', label: 'Map', icon: '🗺️' },
     { id: 'journey-view', label: 'Journey', icon: '🧭' },
     { id: 'plan-view', label: 'Plan', icon: '📋' },
-    { id: 'alerts-view', label: 'Alerts', icon: '⚠️', hasBadge: true },
-    { id: 'more-view', label: 'More', icon: '☰' },
+    { id: 'chat-view', label: 'AI Assistant', icon: '🤖' },
+    { id: 'more-view', label: 'More', icon: '☰', hasBadge: true },
   ];
 
   navEl.innerHTML = '';
@@ -433,7 +443,10 @@ export function refreshMoreView() {
       refreshMoreView();
     },
     onOpenTool: (tool) => {
-      if (tool === 'budget' && typeof window.renderBudget === 'function') {
+      if (tool === 'alerts') {
+        refreshAlertsView();
+        switchMobileTab('alerts-view', 4);
+      } else if (tool === 'budget' && typeof window.renderBudget === 'function') {
         switchMobileTab('tools-view', 4);
         window.renderBudget();
       } else if (tool === 'passport' && typeof window.renderPassport === 'function') {
