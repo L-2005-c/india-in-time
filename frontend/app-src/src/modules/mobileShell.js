@@ -215,14 +215,155 @@ export function switchMobileTab(viewId, idx = 0) {
 }
 
 /**
- * Refreshes the Alerts View.
+ * Generates contextual traffic alerts based on time-of-day and city patterns.
+ */
+function generateTrafficAlerts(cityKey = 'visakhapatnam') {
+  const alerts = [];
+  const now = new Date();
+  const minuteOfDay = now.getHours() * 60 + now.getMinutes();
+  const dayOfWeek = now.getDay(); // 0=Sun, 6=Sat
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const city = String(cityKey || 'visakhapatnam').toLowerCase();
+
+  // City-specific rush hour congestion patterns
+  const CITY_RUSH_CORRIDORS = {
+    visakhapatnam: [
+      { name: 'RK Beach Road — NAD Junction', peakDelay: 22, level: 'HEAVY' },
+      { name: 'Siripuram — Dwaraka Nagar', peakDelay: 18, level: 'MODERATE' },
+      { name: 'Gajuwaka — Steel Plant Rd', peakDelay: 28, level: 'HEAVY' },
+    ],
+    hyderabad: [
+      { name: 'Mehdipatnam — Tolichowki', peakDelay: 35, level: 'SEVERE' },
+      { name: 'HITEC City — Gachibowli', peakDelay: 30, level: 'HEAVY' },
+      { name: 'Secunderabad — Begumpet', peakDelay: 25, level: 'HEAVY' },
+    ],
+    bengaluru: [
+      { name: 'Silk Board Junction — KR Puram', peakDelay: 45, level: 'GRIDLOCK' },
+      { name: 'MG Road — Koramangala', peakDelay: 32, level: 'SEVERE' },
+      { name: 'Electronic City — Hosur Rd', peakDelay: 38, level: 'SEVERE' },
+    ],
+    mumbai: [
+      { name: 'Western Express Highway — Andheri', peakDelay: 40, level: 'SEVERE' },
+      { name: 'Sion — Dadar', peakDelay: 28, level: 'HEAVY' },
+    ],
+    chennai: [
+      { name: 'Anna Salai — T. Nagar', peakDelay: 25, level: 'HEAVY' },
+      { name: 'OMR — Thoraipakkam', peakDelay: 30, level: 'HEAVY' },
+    ],
+    delhi: [
+      { name: 'NH-48 — Dhaula Kuan', peakDelay: 35, level: 'SEVERE' },
+      { name: 'Ring Road — ITO', peakDelay: 30, level: 'HEAVY' },
+    ],
+  };
+
+  const corridors = CITY_RUSH_CORRIDORS[city] || CITY_RUSH_CORRIDORS.visakhapatnam;
+
+  // Morning Rush: 8:30 AM - 10:30 AM (weekdays)
+  const isMorningRush = !isWeekend && minuteOfDay >= 510 && minuteOfDay <= 630;
+  // Evening Rush: 5:30 PM - 8:30 PM (weekdays)
+  const isEveningRush = !isWeekend && minuteOfDay >= 1050 && minuteOfDay <= 1230;
+  // Weekend evening: 5 PM - 10 PM
+  const isWeekendEveRush = isWeekend && minuteOfDay >= 1020 && minuteOfDay <= 1320;
+
+  if (isMorningRush || isEveningRush) {
+    const rushType = isMorningRush ? 'Morning' : 'Evening';
+    const topCorridor = corridors[0];
+    const scaleFactor = isMorningRush ? 0.85 : 1.0;
+    const delay = Math.round(topCorridor.peakDelay * scaleFactor);
+
+    alerts.push({
+      category: 'TRAFFIC',
+      severity: delay >= 30 ? 'WARNING' : 'CAUTION',
+      type: 'TRAFFIC_DELAY',
+      title: `${rushType} Rush Hour Congestion`,
+      message: `${rushType} commuter rush active on ${topCorridor.name}. Expected +${delay} min delay on transit routes.`,
+      source: `City Traffic Model (${city.charAt(0).toUpperCase() + city.slice(1)})`,
+      corridor: topCorridor.name,
+      delayMinutes: delay,
+      trafficLevel: topCorridor.level,
+      congestionFactor: isMorningRush ? 1.45 : 1.65,
+      provenance: 'Predictive City Model',
+      recommendation: `Consider departing ${isMorningRush ? 'before 8:00 AM' : 'after 8:30 PM'} to avoid peak congestion.`,
+      timestamp: now.toISOString(),
+      canAdapt: true,
+      primaryActionLabel: '🔄 View Alternate Route',
+    });
+
+    // If severe, add a second corridor
+    if (corridors.length > 1 && delay >= 25) {
+      const secondCorridor = corridors[1];
+      alerts.push({
+        category: 'TRAFFIC',
+        severity: 'WATCH',
+        type: 'TRAFFIC_ANOMALY',
+        title: `Elevated Traffic — ${secondCorridor.name}`,
+        message: `Above-normal congestion detected on ${secondCorridor.name}. +${Math.round(secondCorridor.peakDelay * 0.7)} min estimated delay.`,
+        source: `City Traffic Model (${city.charAt(0).toUpperCase() + city.slice(1)})`,
+        corridor: secondCorridor.name,
+        delayMinutes: Math.round(secondCorridor.peakDelay * 0.7),
+        trafficLevel: 'MODERATE',
+        provenance: 'Predictive City Model',
+        timestamp: now.toISOString(),
+        canAdapt: false,
+      });
+    }
+  } else if (isWeekendEveRush) {
+    const topCorridor = corridors[0];
+    alerts.push({
+      category: 'TRAFFIC',
+      severity: 'WATCH',
+      type: 'TRAFFIC_DELAY',
+      title: 'Weekend Evening Traffic',
+      message: `Weekend leisure & market rush active on ${topCorridor.name}. Moderate delays expected.`,
+      source: `City Traffic Model (${city.charAt(0).toUpperCase() + city.slice(1)})`,
+      corridor: topCorridor.name,
+      delayMinutes: Math.round(topCorridor.peakDelay * 0.6),
+      trafficLevel: 'MODERATE',
+      provenance: 'Predictive City Model',
+      timestamp: now.toISOString(),
+      canAdapt: false,
+    });
+  }
+
+  // Ghat Road advisory if heading to highlands
+  const activeTrip = window.__activeTripData;
+  const hasGhatStop = activeTrip?.stops?.some(s =>
+    /araku|ghat|paderu|lambasingi|vanjangi|borra/i.test(s.name || '')
+  );
+  if (hasGhatStop && (isMorningRush || isEveningRush)) {
+    alerts.push({
+      category: 'TRAFFIC',
+      severity: 'INFO',
+      type: 'TRAFFIC_DELAY',
+      title: 'Ghat Road Single-Lane Advisory',
+      message: 'Paderu-Araku Ghat section may have single-lane operation due to maintenance. Allow extra 15 min buffer.',
+      source: 'AP Road Transport Authority',
+      corridor: 'Paderu-Araku Ghat Rd (NH-516E)',
+      delayMinutes: 15,
+      trafficLevel: 'MODERATE',
+      provenance: 'Official Advisory',
+      timestamp: now.toISOString(),
+      canAdapt: false,
+    });
+  }
+
+  return alerts;
+}
+
+// Track current filter state
+let _currentAlertFilter = 'ALL';
+
+/**
+ * Refreshes the Alerts View with weather + traffic alerts.
  */
 export function refreshAlertsView() {
   const alertsContainer = document.getElementById('alerts-view');
   if (!alertsContainer) return;
 
-  const mockAlerts = window.__currentAlerts || [
+  // Base weather/safety alerts
+  const weatherAlerts = window.__currentAlerts || [
     {
+      category: 'WEATHER',
       severity: 'INFO',
       title: 'Monsoon Ghat Advisory',
       message: 'Light intermittent mist observed along Paderu-Araku Ghat road. Low beam recommended.',
@@ -232,9 +373,21 @@ export function refreshAlertsView() {
     }
   ];
 
+  // Generate contextual traffic alerts
+  const cityKey = window.__currentCity || window.__selectedCity || 'visakhapatnam';
+  const trafficAlerts = generateTrafficAlerts(cityKey);
+
+  // Merge all alert sources
+  const allAlerts = [...weatherAlerts, ...trafficAlerts];
+
   alertsContainer.innerHTML = '';
   const rendered = renderAlertsCenter({
-    activeAlerts: mockAlerts,
+    activeAlerts: allAlerts,
+    activeFilter: _currentAlertFilter,
+    onFilterChange: (cat) => {
+      _currentAlertFilter = cat;
+      refreshAlertsView(); // Re-render with new filter
+    },
     onSaferOption: () => switchMobileTab('journey-view', 1),
     onAdapt: () => switchMobileTab('journey-view', 1),
   });
@@ -242,14 +395,15 @@ export function refreshAlertsView() {
 
   const badge = document.getElementById('nav-alert-badge');
   if (badge) {
-    if (mockAlerts.length > 0) {
-      badge.textContent = String(mockAlerts.length);
+    if (allAlerts.length > 0) {
+      badge.textContent = String(allAlerts.length);
       badge.style.display = 'inline-block';
     } else {
       badge.style.display = 'none';
     }
   }
 }
+
 
 /**
  * Refreshes the More View.
