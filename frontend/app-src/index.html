@@ -645,24 +645,44 @@
       </div>
     </div>
 
+    <!-- ═══ JOURNEY VIEW (Primary Traveler Experience HUD) ═══ -->
+    <div id="journey-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
+    </div>
+
+    <!-- ═══ ALERTS VIEW (Dedicated Alerts Center) ═══ -->
+    <div id="alerts-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
+    </div>
+
+    <!-- ═══ MORE VIEW (Developer Simulation & Secondary Tools) ═══ -->
+    <div id="more-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
+    </div>
+
   </div>
 
-  <!-- BOTTOM NAV -->
+  <!-- BOTTOM NAV (5 Core Traveler Tabs) -->
   <nav id="bottom-nav" role="navigation" aria-label="Main navigation">
-    <div class="nav-item active" role="button" tabindex="0" data-action="switchToView" data-view="map-view" data-idx="0">
+    <div class="nav-item active" role="button" tabindex="0" data-action="switchToView" data-view="map-view" data-idx="0" aria-current="page">
       <span class="nav-ico" aria-hidden="true">🗺️</span><span class="nav-lbl">Map</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="plan-view" data-idx="1">
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="journey-view" data-idx="1">
+      <span class="nav-ico" aria-hidden="true">🧭</span><span class="nav-lbl">Journey</span>
+    </div>
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="plan-view" data-idx="2">
       <span class="nav-ico" aria-hidden="true">📋</span><span class="nav-lbl">Plan</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="chat-view" data-idx="2">
-      <span class="nav-ico" aria-hidden="true">💬</span><span class="nav-lbl">Chat</span>
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="alerts-view" data-idx="3">
+      <span class="nav-ico" aria-hidden="true">⚠️</span><span class="nav-lbl">Alerts</span>
+      <span id="nav-alert-badge" class="nav-badge-count" style="display:none">0</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="tools-view" data-idx="3">
-      <span class="nav-ico" aria-hidden="true">🧰</span><span class="nav-lbl">Tools</span>
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="more-view" data-idx="4">
+      <span class="nav-ico" aria-hidden="true">☰</span><span class="nav-lbl">More</span>
     </div>
   </nav>
+
+  <!-- Reusable Bottom Sheet Slot -->
+  <div id="iit-bottom-sheet-root"></div>
 </div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- DOMPurify: sanitizes the small HTML fragments the chat/toast UI builds

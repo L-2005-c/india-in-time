@@ -26,4 +26,9 @@ export * as whatIfSimulatorUi from './whatIfSimulatorUi.js';
 export * as tripHealthScore from './tripHealthScore.js';
 export * as mapHud from './mapHud.js';
 export * as aiDrawer from './aiDrawer.js';
+export * as tripControlCenter from './tripControlCenter.js';
+export * as bottomSheet from './bottomSheet.js';
+export * as alertsCenter from './alertsCenter.js';
+export * as moreMenu from './moreMenu.js';
+export * as mobileShell from './mobileShell.js';
 
