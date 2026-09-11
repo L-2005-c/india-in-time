@@ -2619,6 +2619,7 @@ function toggleLoadPanel() {
 }
 
 function loadPlan(sd){try{const d=JSON.parse(decodeURIComponent(sd));const l=JSON.parse(d.data);mdPlan=(l.length&&Array.isArray(l[0]))?l:[l];mdPlan=mdPlan.map(day=>Array.isArray(day)?day.map(s=>({...s,coords:normalizeLatLon(s.coords)})):day);document.getElementById('s-time').value=d.st||'09:00';if(d.tm)setTripMinutes(d.tm);if(d.et)document.getElementById('e-time').value=d.et;syncPlannerTimeFields(d.et?'end':'duration');document.getElementById('phase2-section').style.display='block';document.getElementById('aitools-section').style.display='block';renderAiToolsGrid();['btn-save','btn-share','btn-pass','btn-wa','btn-replay','btn-ls'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='inline-flex'; });const pb=document.getElementById('weather-pivot-bar');if(pb)pb.style.display='flex';renderTabs();switchDay(0);updatePlannerShowcase();initActiveTripControlCenter(document.getElementById('trip-control-center-slot'), mdPlan, getTravelDna());switchToView('map-view',0);addMsg('📂 Loaded! Tap Start to navigate.');}catch(_e){addMsg('⚠️ Load failed.');}}
+window.loadPlan = loadPlan; window.initActiveTripControlCenter = initActiveTripControlCenter;
 function shareIt(){ return _shareTripTextMod(mdPlan, currentCityName, { addMsg }); }
 function waShare(){
   const text = _genWhatsAppText(mdPlan, currentCityName, dayIdx);

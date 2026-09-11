@@ -61,7 +61,13 @@ const {
   getTripExperienceOutcomes,
   computeExperienceAccuracyMetrics,
 } = require('../services/travelIntelligence/experience');
-const { dispatchExperienceNotification } = require('../services/travelIntelligence/disruption');
+const { dispatchExperienceNotification, dispatchTrustNotification } = require('../services/travelIntelligence/disruption');
+const {
+  touristTrustEngine,
+  trustOutcomeTracker,
+  trustObservability,
+  TRUST_STATES,
+} = require('../services/travelIntelligence/trust');
 
 // Active journey state registry (survives requests; syncs with DB if connected)
 const activeTripsState = new Map();
@@ -1247,6 +1253,234 @@ router.get(['/experience/outcomes', '/trips/:id/experience/outcomes'], (req, res
     outcomes,
     metrics,
   });
+});
+
+// ============================================================================
+// PHASE 5: TOURIST TRUST INTELLIGENCE API ENDPOINTS
+// ============================================================================
+
+/**
+ * 1. POST /trust/evaluate
+ * Master multi-dimensional trust evaluation for any travel object.
+ */
+router.post(['/trust/evaluate', '/trips/:id/trust/evaluate'], async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const tripId = req.params.id || req.body.tripId || 'active_trip';
+    const { target, context = {}, isSimulated = false } = req.body;
+
+    if (!target) {
+      return res.status(400).json({ error: 'target object is required for trust evaluation' });
+    }
+
+    const evaluation = await touristTrustEngine.evaluateTrust(target, context);
+    const latencyMs = Date.now() - startTime;
+
+    // Record telemetry
+    trustObservability.recordEvaluation({
+      isSimulated: Boolean(isSimulated),
+      objectType: evaluation.objectType,
+      trustState: evaluation.overallTrustState,
+      hasRouteConflict: evaluation.overallTrustState === 'CONFLICTED' && evaluation.subEvaluations?.route?.trustState === 'ROUTE_CONFLICT',
+      safetyOverride: Boolean(evaluation.safetyOverrideActive),
+      registryVerifications: evaluation.subEvaluations?.provider?.verifications || [],
+      latencyMs,
+    });
+
+    // Proactive Trust Notification if high discrepancy or conflicted
+    if (evaluation.overallTrustState === TRUST_STATES.CONFLICTED || evaluation.overallTrustState === TRUST_STATES.HIGH_RISK) {
+      dispatchTrustNotification({
+        tripId,
+        entityId: target.id || 'target_entity',
+        entityName: target.name || 'Travel Target',
+        trustEvaluation: evaluation,
+        severity: evaluation.overallTrustState === TRUST_STATES.CONFLICTED ? 'WARNING' : 'WATCH',
+      });
+    }
+
+    res.json(evaluation);
+  } catch (err) {
+    appLogger.error(`[Trust API] Error evaluating trust: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 2. GET /trust/entity/:id
+ * Detailed trust profile for an entity (Place or Provider).
+ */
+router.get('/trust/entity/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, city, type = 'PLACE' } = req.query;
+
+    const evaluation = await touristTrustEngine.evaluateTrust({
+      id,
+      name: name || id,
+      type,
+      city,
+    });
+
+    res.json(evaluation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 3. GET /trust/evidence/:id
+ * Claim-level evidence graph with sources, freshness, and provenance.
+ */
+router.get('/trust/evidence/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const claims = touristTrustEngine.evidenceGraph.getClaimsForEntity(id);
+    const graphSummary = touristTrustEngine.evidenceGraph.getGraphSummary();
+
+    res.json({
+      entityId: id,
+      claimsCount: claims.length,
+      claims,
+      graphSummary,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 4. GET & POST /trust/price/:id /trust/price/evaluate
+ * Decomposes price into 11 components, transparency tier, surge vs anomaly.
+ */
+router.all(['/trust/price/:id', '/trust/price/evaluate'], (req, res) => {
+  try {
+    const quote = req.method === 'POST' ? req.body.quote || req.body : req.query;
+    const benchmark = req.method === 'POST' ? req.body.benchmark || {} : {};
+
+    const priceEval = touristTrustEngine.priceEngine.evaluatePrice(quote, benchmark);
+    res.json(priceEval);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 5. GET & POST /trust/provider/:id /trust/provider/evaluate
+ * Evaluates provider legitimacy across official registries, associations, and operational signals.
+ */
+router.all(['/trust/provider/:id', '/trust/provider/evaluate'], async (req, res) => {
+  try {
+    const provider = req.method === 'POST'
+      ? req.body.provider || req.body
+      : { id: req.params.id, ...req.query };
+
+    const providerEval = await touristTrustEngine.providerEngine.evaluateProvider(provider);
+    res.json(providerEval);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 6. GET & POST /trust/route/:id /trust/route/evaluate
+ * Evaluates route feasibility and detects map vs official closure contradictions.
+ */
+router.all(['/trust/route/:id', '/trust/route/evaluate'], (req, res) => {
+  try {
+    const routeData = req.method === 'POST'
+      ? req.body.routeData || req.body
+      : { routeId: req.params.id, ...req.query };
+
+    const routeEval = touristTrustEngine.routeEngine.evaluateRoute(routeData);
+    res.json(routeEval);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 7. POST /trust/report
+ * Traveler problem report (pricing mismatch, closed facility, misleading listing).
+ */
+router.post('/trust/report', (req, res) => {
+  try {
+    const { evaluationId, entityId, travelerId, outcomeType, notes, evidenceDetails } = req.body;
+
+    if (!entityId || !outcomeType) {
+      return res.status(400).json({ error: 'entityId and outcomeType are required' });
+    }
+
+    const outcome = trustOutcomeTracker.recordOutcome({
+      evaluationId,
+      entityId,
+      travelerId,
+      outcomeType,
+      notes,
+      evidenceDetails,
+    });
+
+    res.json(outcome);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * 8. POST /trust/action
+ * Records traveler action taken on trust advisories.
+ */
+router.post('/trust/action', (req, res) => {
+  try {
+    const { tripId = 'active_trip', entityId, action, notes } = req.body;
+
+    if (!action) {
+      return res.status(400).json({ error: 'action is required' });
+    }
+
+    res.json({
+      recorded: true,
+      tripId,
+      entityId,
+      action,
+      timestamp: new Date().toISOString(),
+      notes: notes || '',
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * 9. GET /trust/history
+ * Dispute, outcome, and evaluation history for an entity or trip.
+ */
+router.get('/trust/history', (req, res) => {
+  try {
+    const { entityId, limit = 50 } = req.query;
+
+    if (entityId) {
+      const stats = trustOutcomeTracker.getEntityStats(entityId);
+      return res.json({ entityId, stats });
+    }
+
+    const recent = trustOutcomeTracker.getRecentOutcomes(Number(limit));
+    res.json({ count: recent.length, outcomes: recent });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 10. GET /trust/metrics
+ * Observability telemetry separating LIVE from SIMULATED metrics.
+ */
+router.get('/trust/metrics', (_req, res) => {
+  try {
+    const metrics = trustObservability.getMetrics();
+    res.json(metrics);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

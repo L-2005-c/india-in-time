@@ -67,6 +67,7 @@ function evaluateExperienceValue({
   dayEndMinute = 1320,
   referenceDate = new Date(),
   previousRecommendations = null,
+  trustEvaluations = null,
 } = {}) {
   const currentMin = currentMinute != null
     ? Number(currentMinute)
@@ -156,13 +157,28 @@ function evaluateExperienceValue({
     if (timeBudget.pacingLagMinutes > 30) fatiguePenalty += 5;
     if (currentMin >= 720 && currentMin <= 900 && cand.indoorOutdoor === 'outdoor') fatiguePenalty += 10;
 
+    // Phase 5 Trust Assessment
+    const candTrust = cand.trustEvaluation || (trustEvaluations && (trustEvaluations[cand.id] || trustEvaluations[cand.name]));
+    let trustPenalty = 0;
+    let trustBoost = 0;
+
+    if (candTrust) {
+      if (candTrust.overallTrustState === 'HIGH_RISK') {
+        continue; // Invariant: Safety & High Risk entities are dropped
+      } else if (candTrust.overallTrustState === 'CONFLICTED') {
+        trustPenalty = 30; // Heavy penalty for conflicted credentials / route conflicts
+      } else if (candTrust.overallTrustState === 'TRUSTED') {
+        trustBoost = 5;
+      }
+    }
+
     // Composite Experience Value Formula
-    // Weights: Visit Quality (35%), DNA Alignment (30%), Temporal Window (35%) - OppCost Penalty - Fatigue Penalty
+    // Weights: Visit Quality (35%), DNA Alignment (30%), Temporal Window (35%) - OppCost Penalty - Fatigue Penalty - Trust Penalty + Trust Boost
     const rawComposite = (
       visitScoreResult.visitScore * 0.35 +
       dnaMatch.score * 0.30 +
       windowEval.temporalScore * 0.35
-    ) - oppCost.penaltyScore - fatiguePenalty;
+    ) - oppCost.penaltyScore - fatiguePenalty - trustPenalty + trustBoost;
 
     const baseComposite = (cand.rawCandidate?.compositeScore ?? cand.rawCandidate?.rawScore) != null
       ? Number(cand.rawCandidate.compositeScore ?? cand.rawCandidate.rawScore)
@@ -176,6 +192,7 @@ function evaluateExperienceValue({
       windowSuitability: windowEval.temporalScore >= 75 ? 'OPTIMAL' : (windowEval.temporalScore >= 50 ? 'FAVORABLE' : 'CONSTRAINED'),
       weatherSuitability: weather?.isRaining ? (cand.indoorOutdoor === 'indoor' ? 'SHELTERED' : 'EXPOSED') : 'SUITABLE',
       safety: 'CLEAR',
+      trustState: candTrust ? (candTrust.overallTrustState || 'SUPPORTED') : 'SUPPORTED',
       opportunityCost: oppCost.opportunityCostLevel === 'LOW' ? 'LOW' : (oppCost.opportunityCostLevel === 'MODERATE' ? 'MODERATE' : 'SACRIFICE DETECTED'),
       valueIndex: compositeScore,
       valueBadge: compositeScore >= 85 ? 'HIGH VALUE' : (compositeScore >= 70 ? 'STRONG FIT' : (compositeScore >= 50 ? 'MODERATE' : 'LOW PRIORITY')),
@@ -214,6 +231,9 @@ function evaluateExperienceValue({
       windowScore: windowEval.temporalScore,
       opportunityCostPenalty: oppCost.penaltyScore,
       fatiguePenalty,
+      trustPenalty,
+      trustBoost,
+      trustEvaluation: candTrust || null,
       factorLevels,
       explanation,
       windowEval,

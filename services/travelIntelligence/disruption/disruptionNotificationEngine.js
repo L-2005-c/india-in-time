@@ -540,6 +540,93 @@ function dispatchExperienceNotification({
 }
 
 /**
+ * Builds and dispatches a Phase 5 Tourist Trust proactive notification.
+ * Trust notifications NEVER use CRITICAL (only Phase 3 Safety can emit CRITICAL).
+ */
+function dispatchTrustNotification({
+  tripId = 'active_trip',
+  entityId = 'entity',
+  entityName = 'Place/Provider',
+  trustEvaluation = {},
+  severity = NOTIFICATION_SEVERITIES.INFO,
+  now = Date.now(),
+} = {}) {
+  // Cap severity to WARNING - Trust NEVER emits CRITICAL
+  const cappedSeverity = severity === NOTIFICATION_SEVERITIES.CRITICAL
+    ? NOTIFICATION_SEVERITIES.WARNING
+    : (NOTIFICATION_SEVERITIES[severity] || NOTIFICATION_SEVERITIES.INFO);
+
+  const dedupKey = `${tripId}:trust:${entityId}`;
+  const record = notificationDeduplicationRecords.get(dedupKey);
+  let version = 1;
+
+  if (record) {
+    version = record.version + 1;
+    const elapsedMs = now - record.lastNotifiedAt;
+    if (elapsedMs < COOLDOWN_WINDOW_MS && cappedSeverity === record.lastSeverity) {
+      return {
+        dispatched: false,
+        reason: `SUPPRESSED_BY_COOLDOWN (last notified ${(elapsedMs / 60000).toFixed(1)}m ago)`,
+      };
+    }
+  }
+
+  const notificationId = `notif_trust_${crypto.randomBytes(6).toString('hex')}`;
+  const explain = trustEvaluation.explainability || {};
+  const whatToWatch = (explain.whatToWatchOutFor && explain.whatToWatchOutFor[0]) || 'Operational conditions verified.';
+
+  const notification = {
+    notificationId,
+    tripId,
+    category: 'TRUST',
+    severity: cappedSeverity,
+    headline: `🛡️ TRUST ADVISORY: ${entityName} [${trustEvaluation.overallTrustState || 'VERIFIED'}]`,
+    entityId,
+    entityName,
+    trustState: trustEvaluation.overallTrustState || 'SUPPORTED',
+    qa: {
+      whatHappened: trustEvaluation.summary || `Trust evaluation completed for ${entityName}.`,
+      why: (explain.why && explain.why[0]) || 'Multi-source factual signals analyzed.',
+      howLong: 'Valid during active itinerary window.',
+      when: 'Current trip segment.',
+      doesItAffectTrip: cappedSeverity === NOTIFICATION_SEVERITIES.WARNING
+        ? 'May cause unexpected fees, delays, or service discrepancy.'
+        : 'Information verified for confident travel.',
+      whatShouldIDo: whatToWatch,
+      howConfidentAreWe: `${Math.round((trustEvaluation.confidence || 0.8) * 100)}% confidence grounded in evidence graph.`,
+    },
+    trustEvaluation,
+    availableActions: [
+      NOTIFICATION_ACTIONS.VIEW_OPTIONS,
+      NOTIFICATION_ACTIONS.VIEW_ALTERNATIVE,
+      NOTIFICATION_ACTIONS.DISMISS,
+    ],
+    timestamp: new Date(now).toISOString(),
+    status: 'ACTIVE',
+  };
+
+  notificationDeduplicationRecords.set(dedupKey, {
+    lastNotifiedAt: now,
+    lastSeverity: cappedSeverity,
+    lastDelay: 0,
+    version,
+  });
+
+  let tripLogs = tripNotificationLogs.get(tripId);
+  if (!tripLogs) {
+    tripLogs = [];
+    tripNotificationLogs.set(tripId, tripLogs);
+  }
+  tripLogs.unshift(notification);
+  if (tripLogs.length > 50) tripLogs.pop();
+
+  return {
+    dispatched: true,
+    notification,
+  };
+}
+
+/**
  * Retrieves notifications for a trip.
  */
 function getTripNotifications(tripId) {
@@ -561,6 +648,7 @@ module.exports = {
   dispatchDisruptionNotification,
   dispatchSafetyNotification,
   dispatchExperienceNotification,
+  dispatchTrustNotification,
   resolveSafetyNotification,
   getTripNotifications,
   resetNotificationEngine,

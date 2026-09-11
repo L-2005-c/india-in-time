@@ -386,6 +386,92 @@ const SCHEMA_SQL = `
     recorded_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_exp_outcomes_trip ON experience_outcomes(trip_id, recorded_at DESC);
+
+  -- Phase 5 Tourist Trust Intelligence
+  CREATE TABLE IF NOT EXISTS trust_entities (
+    id                   VARCHAR(255) PRIMARY KEY,
+    entity_type          VARCHAR(64) NOT NULL,
+    canonical_name       VARCHAR(255) NOT NULL,
+    city                 VARCHAR(100),
+    lat                  DOUBLE PRECISION,
+    lon                  DOUBLE PRECISION,
+    overall_trust_state  VARCHAR(64) DEFAULT 'UNVERIFIED',
+    confidence           DOUBLE PRECISION DEFAULT 0.5,
+    metadata_json        TEXT,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_entities_type_city ON trust_entities(entity_type, city);
+
+  CREATE TABLE IF NOT EXISTS trust_claims (
+    id                   VARCHAR(255) PRIMARY KEY,
+    entity_id            VARCHAR(255) NOT NULL,
+    claim_type           VARCHAR(64) NOT NULL,
+    claim_value          TEXT NOT NULL,
+    status               VARCHAR(32) DEFAULT 'PLAUSIBLE',
+    confidence           DOUBLE PRECISION DEFAULT 0.5,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_claims_entity ON trust_claims(entity_id);
+
+  CREATE TABLE IF NOT EXISTS trust_evidence (
+    id                   VARCHAR(255) PRIMARY KEY,
+    claim_id             VARCHAR(255) NOT NULL,
+    source_class         VARCHAR(64) NOT NULL,
+    source_name          VARCHAR(255) NOT NULL,
+    provenance_json      TEXT NOT NULL,
+    freshness_state      VARCHAR(32) DEFAULT 'CURRENT',
+    captured_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_evidence_claim ON trust_evidence(claim_id);
+
+  CREATE TABLE IF NOT EXISTS trust_verifications (
+    id                   VARCHAR(255) PRIMARY KEY,
+    entity_id            VARCHAR(255) NOT NULL,
+    registry             VARCHAR(64) NOT NULL,
+    registration_id      VARCHAR(255) NOT NULL,
+    status               VARCHAR(64) NOT NULL,
+    phrasing             TEXT NOT NULL,
+    verified_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_verif_entity ON trust_verifications(entity_id);
+
+  CREATE TABLE IF NOT EXISTS trust_price_observations (
+    id                   VARCHAR(255) PRIMARY KEY,
+    entity_id            VARCHAR(255) NOT NULL,
+    base_price           DOUBLE PRECISION,
+    taxes                DOUBLE PRECISION DEFAULT 0,
+    fees                 DOUBLE PRECISION DEFAULT 0,
+    total                DOUBLE PRECISION NOT NULL,
+    transparency_tier    VARCHAR(32) NOT NULL,
+    is_surge             BOOLEAN DEFAULT FALSE,
+    observed_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_price_entity ON trust_price_observations(entity_id, observed_at DESC);
+
+  CREATE TABLE IF NOT EXISTS trust_evaluations (
+    id                   VARCHAR(255) PRIMARY KEY,
+    target_id            VARCHAR(255) NOT NULL,
+    target_type          VARCHAR(64) NOT NULL,
+    trust_state          VARCHAR(64) NOT NULL,
+    confidence           DOUBLE PRECISION NOT NULL,
+    summary              TEXT NOT NULL,
+    explainability_json  TEXT NOT NULL,
+    is_simulated         BOOLEAN DEFAULT FALSE,
+    evaluated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_eval_target ON trust_evaluations(target_id, evaluated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS trust_outcomes (
+    id                   VARCHAR(255) PRIMARY KEY,
+    evaluation_id        VARCHAR(255),
+    entity_id            VARCHAR(255) NOT NULL,
+    traveler_id          VARCHAR(255),
+    outcome_type         VARCHAR(64) NOT NULL,
+    notes                TEXT,
+    recorded_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_trust_outcomes_entity ON trust_outcomes(entity_id, recorded_at DESC);
 `;
 
 module.exports = { SCHEMA_SQL };
