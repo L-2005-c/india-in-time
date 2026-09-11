@@ -20,6 +20,7 @@ const { computeTimeBudget } = require('./timeBudgetEngine');
 const { evaluatePlaceExperienceWindow } = require('./experienceWindowEngine');
 const { generateCandidates } = require('./candidateGenerator');
 const { evaluateOpportunityCost } = require('./opportunityCostEngine');
+const { generateExperienceExplanation } = require('./experienceExplanationEngine');
 const { computeVisitScore, computeTimeScore, openingToScore, trafficToScore } = require('../scoringEngine');
 const { computeDnaMatch, sanitizeDnaProfile } = require('../personalTravelDna');
 const { calculateSolarTimes } = require('../astronomyTime');
@@ -54,13 +55,16 @@ const ACTION_TYPES = Object.freeze({
 function evaluateExperienceValue({
   journeyState = {},
   travelerDna = {},
+  timeBudget: overrideTimeBudget = null,
   weather = null,
   traffic = null,
   safetyDecision = null,
   activeHazards = [],
   candidatePool = [],
+  customPoolOnly = false,
   cityName = 'visakhapatnam',
   currentMinute = null,
+  dayEndMinute = 1320,
   referenceDate = new Date(),
   previousRecommendations = null,
 } = {}) {
@@ -71,10 +75,11 @@ function evaluateExperienceValue({
   const dna = sanitizeDnaProfile(travelerDna);
 
   // 1. Time Budget
-  const timeBudget = computeTimeBudget({
+  const timeBudget = overrideTimeBudget || computeTimeBudget({
     journeyState,
     travelerDna: dna,
     currentMinute: currentMin,
+    dayEndMinute,
   });
 
   // Current location & solar times
@@ -89,6 +94,7 @@ function evaluateExperienceValue({
     cityName,
     currentLocation: currentLoc,
     customPool: candidatePool,
+    customPoolOnly,
     activeHazards,
   });
 
@@ -158,7 +164,22 @@ function evaluateExperienceValue({
       windowEval.temporalScore * 0.35
     ) - oppCost.penaltyScore - fatiguePenalty;
 
-    const compositeScore = Math.max(5, Math.min(100, Math.round(rawComposite)));
+    const baseComposite = (cand.rawCandidate?.compositeScore ?? cand.rawCandidate?.rawScore) != null
+      ? Number(cand.rawCandidate.compositeScore ?? cand.rawCandidate.rawScore)
+      : Math.max(5, Math.min(100, Math.round(rawComposite)));
+    const compositeScore = baseComposite;
+
+    // Factor Levels (Structured UI & Explainability schema)
+    const factorLevels = {
+      travelerFit: dnaMatch.score >= 80 ? 'HIGH' : (dnaMatch.score >= 55 ? 'MEDIUM' : 'LOW'),
+      timeEfficiency: cand.visitMinutes <= 60 ? 'HIGH' : (cand.visitMinutes <= 100 ? 'MODERATE' : 'DEMANDING'),
+      windowSuitability: windowEval.temporalScore >= 75 ? 'OPTIMAL' : (windowEval.temporalScore >= 50 ? 'FAVORABLE' : 'CONSTRAINED'),
+      weatherSuitability: weather?.isRaining ? (cand.indoorOutdoor === 'indoor' ? 'SHELTERED' : 'EXPOSED') : 'SUITABLE',
+      safety: 'CLEAR',
+      opportunityCost: oppCost.opportunityCostLevel === 'LOW' ? 'LOW' : (oppCost.opportunityCostLevel === 'MODERATE' ? 'MODERATE' : 'SACRIFICE DETECTED'),
+      valueIndex: compositeScore,
+      valueBadge: compositeScore >= 85 ? 'HIGH VALUE' : (compositeScore >= 70 ? 'STRONG FIT' : (compositeScore >= 50 ? 'MODERATE' : 'LOW PRIORITY')),
+    };
 
     // Determine Action Type
     let actionType = ACTION_TYPES.DO_NOW;
@@ -172,23 +193,45 @@ function evaluateExperienceValue({
       actionType = ACTION_TYPES.DO_NEXT;
     }
 
+    const explanation = generateExperienceExplanation({
+      candidate: cand,
+      compositeScore,
+      visitScore: visitScoreResult.visitScore,
+      dnaMatchScore: dnaMatch.score,
+      windowScore: windowEval.temporalScore,
+      opportunityCost: oppCost,
+      windowEval,
+      provenance: cand.provenance,
+    }, { weather, timeBudget });
+
     evaluatedCandidates.push({
       candidate: cand,
       compositeScore,
+      totalJourneyValue: compositeScore,
       actionType,
       visitScore: visitScoreResult.visitScore,
       dnaMatchScore: dnaMatch.score,
       windowScore: windowEval.temporalScore,
       opportunityCostPenalty: oppCost.penaltyScore,
       fatiguePenalty,
+      factorLevels,
+      explanation,
       windowEval,
       opportunityCost: oppCost,
       provenance: cand.provenance,
     });
   }
 
-  // Rank candidates descending by compositeScore
-  evaluatedCandidates.sort((a, b) => b.compositeScore - a.compositeScore);
+  // 4. Bounded Multi-Stop Lookahead Chain Optimization (Total Journey Value vs Single Stop)
+  computeMultiStopChains(evaluatedCandidates, timeBudget);
+
+  // Rank candidates descending by totalJourneyValue (primary), then individual compositeScore (secondary)
+  evaluatedCandidates.sort((a, b) => {
+    if (b.totalJourneyValue !== a.totalJourneyValue) {
+      return b.totalJourneyValue - a.totalJourneyValue;
+    }
+    return b.compositeScore - a.compositeScore;
+  });
 
   // Anti-Churn / Recommendation Stability
   if (previousRecommendations && previousRecommendations.length > 0 && evaluatedCandidates.length > 0) {
@@ -198,12 +241,16 @@ function evaluateExperienceValue({
     // If new top is different from previous top, but score delta is under 5 points
     if (prevTop.candidate?.id !== newTop.candidate?.id) {
       const prevInNew = evaluatedCandidates.find(e => e.candidate.id === prevTop.candidate?.id);
-      if (prevInNew && (newTop.compositeScore - prevInNew.compositeScore) < 5) {
-        // Retain previous top to avoid jitter unless an active hazard triggered the change
-        const hasHazardEvent = activeHazards.some(h => h.targetPlaceId === prevTop.candidate.id);
-        if (!hasHazardEvent) {
-          evaluatedCandidates.splice(evaluatedCandidates.indexOf(prevInNew), 1);
-          evaluatedCandidates.unshift(prevInNew);
+      if (prevInNew) {
+        const prevVal = prevInNew.totalJourneyValue ?? prevInNew.compositeScore;
+        const newVal = newTop.totalJourneyValue ?? newTop.compositeScore;
+        if ((newVal - prevVal) < 5) {
+          // Retain previous top to avoid jitter unless an active hazard triggered the change
+          const hasHazardEvent = activeHazards.some(h => h.targetPlaceId === prevTop.candidate.id);
+          if (!hasHazardEvent) {
+            evaluatedCandidates.splice(evaluatedCandidates.indexOf(prevInNew), 1);
+            evaluatedCandidates.unshift(prevInNew);
+          }
         }
       }
     }
@@ -227,6 +274,88 @@ function evaluateExperienceValue({
     sequencePlan,
     divergenceAnalysis: computeDivergenceAnalysis(journeyState, topRecommendations),
   };
+}
+
+/**
+ * Estimates transit duration between two candidate coordinates in minutes.
+ */
+function estimateTransitMinutes(locA, locB) {
+  if (!locA || !locB) return 0;
+  const latA = Number(locA.lat);
+  const lonA = Number(locA.lon);
+  const latB = Number(locB.lat);
+  const lonB = Number(locB.lon);
+  if (!Number.isFinite(latA) || !Number.isFinite(lonA) || !Number.isFinite(latB) || !Number.isFinite(lonB)) {
+    return 0;
+  }
+  const d = distKm(latA, lonA, latB, lonB);
+  if (d <= 0.2) return 0;
+  // Assume ~25 km/h urban transit
+  return Math.max(5, Math.min(60, Math.ceil((d / 25) * 60)));
+}
+
+/**
+ * Bounded multi-stop lookahead sequence evaluation.
+ * Evaluates feasible 1 to 3 stop chains within the remaining usable time budget.
+ * Maximizes Total Cumulative Journey Value across the entire feasible chain.
+ */
+function computeMultiStopChains(evaluatedCandidates, timeBudget) {
+  const usableMinutes = Number(timeBudget?.usableExperienceMinutes ?? timeBudget?.usableTimeMinutes ?? 120);
+
+  for (const item of evaluatedCandidates) {
+    const candA = item.candidate;
+    const durA = Number(candA.visitMinutes || 60);
+
+    let bestChainValue = item.compositeScore;
+    let bestChainPlan = [candA.id];
+    let bestChainDuration = durA;
+    let bestChainNames = [candA.name];
+
+    if (durA <= usableMinutes) {
+      // Look for 2nd stop
+      for (const itemB of evaluatedCandidates) {
+        if (itemB.candidate.id === candA.id) continue;
+        const candB = itemB.candidate;
+        const durB = Number(candB.visitMinutes || 60);
+        const transitAB = estimateTransitMinutes(candA, candB);
+        const totalAB = durA + transitAB + durB;
+
+        if (totalAB <= usableMinutes) {
+          const valAB = item.compositeScore + itemB.compositeScore;
+          if (valAB > bestChainValue) {
+            bestChainValue = valAB;
+            bestChainPlan = [candA.id, candB.id];
+            bestChainDuration = totalAB;
+            bestChainNames = [candA.name, candB.name];
+          }
+
+          // Look for 3rd stop (depth 3 bounded lookahead)
+          for (const itemC of evaluatedCandidates) {
+            if (itemC.candidate.id === candA.id || itemC.candidate.id === candB.id) continue;
+            const candC = itemC.candidate;
+            const durC = Number(candC.visitMinutes || 60);
+            const transitBC = estimateTransitMinutes(candB, candC);
+            const totalABC = totalAB + transitBC + durC;
+
+            if (totalABC <= usableMinutes) {
+              const valABC = valAB + itemC.compositeScore;
+              if (valABC > bestChainValue) {
+                bestChainValue = valABC;
+                bestChainPlan = [candA.id, candB.id, candC.id];
+                bestChainDuration = totalABC;
+                bestChainNames = [candA.name, candB.name, candC.name];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    item.totalJourneyValue = bestChainValue;
+    item.chainPlan = bestChainPlan;
+    item.chainNames = bestChainNames;
+    item.chainDurationMinutes = bestChainDuration;
+  }
 }
 
 /**

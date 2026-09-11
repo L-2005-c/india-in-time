@@ -203,6 +203,16 @@ export function renderTripControlCenter({
           };
           const badge = actionColors[rec.actionType] || actionColors.DO_NOW;
 
+          const valueBadge = rec.factorLevels?.valueBadge || (rec.compositeScore >= 85 ? 'HIGH VALUE' : (rec.compositeScore >= 70 ? 'STRONG FIT' : 'BALANCED FIT'));
+          const valueBadgeColors = {
+            'HIGH VALUE': { color: '#10b981', bg: 'rgba(16,185,129,0.2)', border: 'rgba(16,185,129,0.4)' },
+            'STRONG FIT': { color: '#38bdf8', bg: 'rgba(56,189,248,0.2)', border: 'rgba(56,189,248,0.4)' },
+            'BALANCED FIT': { color: '#818cf8', bg: 'rgba(129,140,248,0.2)', border: 'rgba(129,140,248,0.4)' },
+            'MODERATE': { color: '#f59e0b', bg: 'rgba(245,158,11,0.2)', border: 'rgba(245,158,11,0.4)' },
+            'LOW PRIORITY': { color: '#94a3b8', bg: 'rgba(148,163,184,0.2)', border: 'rgba(148,163,184,0.4)' },
+          };
+          const vBadge = valueBadgeColors[valueBadge] || valueBadgeColors['STRONG FIT'];
+
           return `
             <div class="experience-recommendation-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; margin-bottom:8px;">
               <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -219,15 +229,39 @@ export function renderTripControlCenter({
                   </div>
                 </div>
                 <div style="text-align:right;">
-                  <div style="font-size:16px; font-weight:800; color:#38bdf8;">${rec.compositeScore}<span style="font-size:10px; color:#94a3b8;">/100</span></div>
-                  <div style="font-size:9px; color:#64748b; text-transform:uppercase;">Experience Value</div>
+                  <span style="background:${vBadge.bg}; color:${vBadge.color}; border:1px solid ${vBadge.border}; font-size:11px; font-weight:800; padding:3px 8px; border-radius:6px; display:inline-block;">
+                    ${valueBadge}
+                  </span>
+                  <div style="font-size:10px; color:#94a3b8; margin-top:3px;">Value Index: <strong style="color:#38bdf8;">${rec.compositeScore}</strong>/100</div>
                 </div>
               </div>
 
+              <!-- Factor Dimension Tags (Sections 10, 41, 42, 43, 44) -->
+              <div class="experience-factor-pills" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                <span style="font-size:10px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25); padding:2px 7px; border-radius:4px;">
+                  🎯 Traveler Fit: <strong>${rec.factorLevels?.travelerFit || 'HIGH'}</strong>
+                </span>
+                <span style="font-size:10px; background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25); padding:2px 7px; border-radius:4px;">
+                  ⏱️ Efficiency: <strong>${rec.factorLevels?.timeEfficiency || 'HIGH'}</strong>
+                </span>
+                <span style="font-size:10px; background:rgba(245,158,11,0.12); color:#fbbf24; border:1px solid rgba(245,158,11,0.25); padding:2px 7px; border-radius:4px;">
+                  🌅 Window: <strong>${rec.factorLevels?.windowSuitability || 'OPTIMAL'}</strong>
+                </span>
+                <span style="font-size:10px; background:rgba(99,102,241,0.12); color:#a5b4fc; border:1px solid rgba(99,102,241,0.25); padding:2px 7px; border-radius:4px;">
+                  🌦️ Weather: <strong>${rec.factorLevels?.weatherSuitability || 'SUITABLE'}</strong>
+                </span>
+                <span style="font-size:10px; background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25); padding:2px 7px; border-radius:4px;">
+                  🛡️ Safety: <strong>${rec.factorLevels?.safety || 'CLEAR'}</strong>
+                </span>
+                <span style="font-size:10px; background:${rec.factorLevels?.opportunityCost === 'SACRIFICE DETECTED' ? 'rgba(239,68,68,0.15)' : 'rgba(148,163,184,0.12)'}; color:${rec.factorLevels?.opportunityCost === 'SACRIFICE DETECTED' ? '#f87171' : '#cbd5e1'}; border:1px solid ${rec.factorLevels?.opportunityCost === 'SACRIFICE DETECTED' ? 'rgba(239,68,68,0.3)' : 'rgba(148,163,184,0.25)'}; padding:2px 7px; border-radius:4px;">
+                  ⚖️ Opp Cost: <strong>${rec.factorLevels?.opportunityCost || 'LOW'}</strong>
+                </span>
+              </div>
+
               <!-- Tradeoff statement -->
-              <div style="margin-top:8px; font-size:10px; color:#94a3b8; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:4px; display:flex; align-items:center; gap:6px;">
+              <div style="margin-top:8px; font-size:11px; color:#cbd5e1; background:rgba(0,0,0,0.25); padding:6px 10px; border-radius:4px; display:flex; align-items:flex-start; gap:6px; border-left:3px solid #38bdf8;">
                 <span>⚖️</span>
-                <span><strong>Downstream Tradeoff:</strong> ${rec.explanation?.tradeoff || 'Zero downstream sacrifices.'}</span>
+                <span><strong>Downstream Tradeoff:</strong> ${rec.explanation?.tradeoff ? (rec.explanation.tradeoff.toLowerCase().includes('sacrifice') || rec.explanation.tradeoff.toLowerCase().includes('miss') ? rec.explanation.tradeoff : `If you choose this, schedule accommodates next planned stops cleanly (${rec.explanation.tradeoff})`) : 'Zero downstream sacrifices; fits cleanly within usable time.'}</span>
               </div>
 
               <!-- Action buttons -->
@@ -575,13 +609,26 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
           acceptExpBtn.disabled = true;
           acceptExpBtn.textContent = 'Prioritizing...';
           if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
-            await window.fetch(`/api/intelligence/trips/${tripId}/experience/decide`, {
+            const resp = await window.fetch(`/api/intelligence/trips/${tripId}/experience/decide`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ placeId, actionTaken: 'ACCEPTED' }),
-            }).catch(() => {});
+            }).catch(() => null);
+
+            if (resp && resp.ok) {
+              const resData = await resp.json();
+              if (resData && (resData.newPlanVersion || resData.activePlanVersion)) {
+                currentTripData.planVersion = resData.newPlanVersion || resData.activePlanVersion;
+                if (Array.isArray(resData.resequencedStops)) {
+                  currentTripData.upcomingStops = resData.resequencedStops.filter(s => s.status === 'PLANNED');
+                  currentTripData.completedStops = resData.resequencedStops.filter(s => s.status === 'COMPLETED' || s.status === 'SKIPPED');
+                  currentTripData.activeStop = resData.activeStop || resData.resequencedStops.find(s => s.status === 'PLANNED') || null;
+                }
+              }
+            }
           }
           acceptExpBtn.textContent = '✓ Prioritized';
+          render();
         } catch (err) {
           console.error('[TripControlCenter] Failed to accept experience:', err);
           acceptExpBtn.disabled = false;

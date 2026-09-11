@@ -155,6 +155,118 @@ function evaluatePlaceExperienceWindow(place = {}, {
     }
   }
 
+  // 5. Structured Windows Array (Standardized temporal schema)
+  const windows = [];
+
+  // Opening hours window
+  if (hasOt || hasCt) {
+    const openStr = place.ot || '06:00';
+    const closeStr = place.ct || '20:00';
+    const openM = t2m(openStr, 360);
+    const closeM = t2m(closeStr, 1200);
+    let openStatus = 'AVAILABLE';
+    if (nowMin >= closeM) openStatus = 'MISSED';
+    else if (closingRisk) openStatus = 'AT_RISK';
+    else if (nowMin < openM) openStatus = 'AVAILABLE';
+
+    windows.push({
+      windowType: 'OPENING_WINDOW',
+      startsAt: openStr,
+      endsAt: closeStr,
+      source: 'operating_hours',
+      confidence: (hasOt && hasCt) ? 0.95 : 0.6,
+      status: openStatus,
+      description: `Official operating hours: ${openStr} - ${closeStr}`,
+    });
+
+    if (closingRisk) {
+      windows.push({
+        windowType: 'CLOSING_WINDOW',
+        startsAt: m2t(Math.max(0, closeM - 45)),
+        endsAt: closeStr,
+        source: 'operating_hours',
+        confidence: 0.9,
+        status: 'AT_RISK',
+        description: `Final 45 minutes before closing at ${closeStr}`,
+      });
+    }
+  } else {
+    windows.push({
+      windowType: 'OPENING_WINDOW',
+      startsAt: null,
+      endsAt: null,
+      source: 'operating_hours',
+      confidence: 0.5,
+      status: 'UNKNOWN',
+      description: 'Hours not formally registered; assumed flexible',
+    });
+  }
+
+  // Sunrise window
+  windows.push({
+    windowType: 'SUNRISE',
+    startsAt: m2t(Math.max(0, sunriseMin - 30)),
+    endsAt: m2t(sunriseMin + 30),
+    source: 'astronomy',
+    confidence: 0.99,
+    status: (nowMin > sunriseMin + 30) ? 'MISSED' : (nowMin >= sunriseMin - 30 ? 'AVAILABLE' : 'AVAILABLE'),
+    description: `Morning solar sunrise event at ${m2t(sunriseMin)}`,
+  });
+
+  // Morning golden hour
+  windows.push({
+    windowType: 'GOLDEN_HOUR',
+    startsAt: m2t(morningGoldenStart),
+    endsAt: m2t(morningGoldenEnd),
+    source: 'astronomy',
+    confidence: 0.98,
+    status: (nowMin > morningGoldenEnd) ? 'MISSED' : (overlapsMorningGolden ? 'AVAILABLE' : 'AVAILABLE'),
+    description: `Morning photographic golden hour lighting: ${m2t(morningGoldenStart)} - ${m2t(morningGoldenEnd)}`,
+  });
+
+  // Midday heat window
+  windows.push({
+    windowType: 'MIDDAY_HEAT_REST',
+    startsAt: '12:00',
+    endsAt: '15:00',
+    source: 'climatology',
+    confidence: 0.9,
+    status: isPeakHeat ? 'AVAILABLE' : (nowMin > 900 ? 'MISSED' : 'AVAILABLE'),
+    description: 'High solar insolation window (recommend shaded or indoor activity)',
+  });
+
+  // Sunset & Evening golden hour
+  windows.push({
+    windowType: 'GOLDEN_HOUR',
+    startsAt: m2t(eveningGoldenStart),
+    endsAt: m2t(eveningGoldenEnd),
+    source: 'astronomy',
+    confidence: 0.98,
+    status: (nowMin > eveningGoldenEnd) ? 'MISSED' : (overlapsEveningGolden ? 'AVAILABLE' : 'AVAILABLE'),
+    description: `Evening photographic golden hour lighting: ${m2t(eveningGoldenStart)} - ${m2t(eveningGoldenEnd)}`,
+  });
+
+  windows.push({
+    windowType: 'SUNSET',
+    startsAt: m2t(Math.max(0, sunsetMin - 30)),
+    endsAt: m2t(sunsetMin + 15),
+    source: 'astronomy',
+    confidence: 0.99,
+    status: (nowMin > sunsetMin + 15) ? 'MISSED' : (nowMin >= sunsetMin - 30 ? 'AVAILABLE' : 'AVAILABLE'),
+    description: `Evening solar sunset event at ${m2t(sunsetMin)}`,
+  });
+
+  // Night window
+  windows.push({
+    windowType: 'NIGHT',
+    startsAt: m2t(sunsetMin + 30),
+    endsAt: m2t(Math.min(1439, sunriseMin + 1410)),
+    source: 'astronomy',
+    confidence: 0.99,
+    status: isNightNow ? 'AVAILABLE' : (nowMin < sunsetMin + 30 ? 'AVAILABLE' : 'MISSED'),
+    description: 'Nocturnal cycle: darkness limits outdoor visibility without lighting',
+  });
+
   const finalScore = Math.max(0, Math.min(100, Math.round(temporalScore)));
 
   // Viability classification
@@ -177,6 +289,7 @@ function evaluatePlaceExperienceWindow(place = {}, {
     windowViability,
     isGoldenHour,
     isNightNow,
+    windows,
     openingDetails: {
       status: openingStatus,
       label: isWithinOpeningHours ? (closingRisk ? 'Closing soon' : 'Open now') : (openingStatus === 'UNKNOWN' ? 'Hours unknown' : 'Currently Closed'),

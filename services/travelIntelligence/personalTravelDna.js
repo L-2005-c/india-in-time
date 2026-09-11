@@ -389,7 +389,7 @@ function computeDnaMatch(place = {}, dnaProfile = null) {
   }
 
   // 4. Heritage & Culture Alignment
-  const isCulture = cat === 'temple' || cat === 'museum' || cat === 'monument' || cat === 'fort' || cat === 'heritage';
+  const isCulture = cat === 'culture' || cat === 'temple' || cat === 'museum' || cat === 'monument' || cat === 'fort' || cat === 'heritage';
   if (isCulture) {
     const boost = (Math.max(dna.culture, dna.heritage) - 50) * 0.4;
     score += boost;

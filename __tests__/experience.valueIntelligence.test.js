@@ -575,4 +575,239 @@ describe('Phase 4: Experience Value Intelligence', () => {
       expect(res.body.metrics).toBeTruthy();
     });
   });
+
+  // ── 9. MANDATORY HARDENING & PRODUCTION ACCEPTANCE TESTS ───────────────────
+  describe('9. Mandatory Hardening & Production Acceptance Tests', () => {
+    test('Mandatory Black-Box: selects Candidate B+C over Candidate A when combined journey value dominates single stop', () => {
+      // Candidate A: Raw score = 92, visitMinutes = 120
+      // Candidate B: Raw score = 84, visitMinutes = 70
+      // Candidate C: Raw score = 78, visitMinutes = 40
+      // Available time budget accommodates either A (120m) or B+C (70+40 = 110m)
+      const candidateA = { id: 'cand_a', name: 'Grand Monolith A', cat: 'scenic', lat: 17.70, lon: 83.30, visitMinutes: 120, rawScore: 92 };
+      const candidateB = { id: 'cand_b', name: 'Scenic Hill B', cat: 'scenic', lat: 17.70, lon: 83.30, visitMinutes: 70, rawScore: 84 };
+      const candidateC = { id: 'cand_c', name: 'Artisan Cove C', cat: 'scenic', lat: 17.70, lon: 83.30, visitMinutes: 40, rawScore: 78 };
+
+      const customPool = [candidateA, candidateB, candidateC];
+
+      const journeyState = createJourneyState({
+        tripId: 'trip_total_journey_val',
+        travelerId: 'traveler_test',
+        startTimeMinutes: 600, // 10:00
+        plan: {
+          stops: [
+            { id: 'start_base', name: 'Base Station', cat: 'hotel', lat: 17.70, lon: 83.30, visitMinutes: 30, status: STOP_STATUSES.COMPLETED },
+          ],
+        },
+        initialLocation: { lat: 17.70, lon: 83.30 },
+      });
+
+      const evalResult = evaluateExperienceValue({
+        journeyState,
+        candidatePool: customPool,
+        customPoolOnly: true,
+        timeBudget: {
+          usableExperienceMinutes: 120,
+          usableTimeMinutes: 120,
+          grossRemainingMinutes: 120,
+          budgetClassification: 'SURPLUS',
+        },
+        currentMinute: 600,
+        referenceDate: new Date('2026-09-11T10:00:00Z'),
+      });
+
+      // Candidate B + C yields cumulative journey value 84 + 78 = 162 > 92.
+      // Optimizer MUST select Candidate B as primary next recommendation
+      expect(evalResult.primaryRecommendation).toBeTruthy();
+      expect(evalResult.primaryRecommendation.candidate.id).toBe('cand_b');
+      expect(evalResult.primaryRecommendation.totalJourneyValue).toBe(162);
+      expect(evalResult.primaryRecommendation.chainPlan).toEqual(['cand_b', 'cand_c']);
+
+      // Candidate A is subordinate because total journey value 162 > 92
+      const recA = evalResult.recommendations.find(r => r.candidate.id === 'cand_a');
+      expect(recA).toBeTruthy();
+      expect(evalResult.primaryRecommendation.totalJourneyValue).toBeGreaterThan(recA.totalJourneyValue);
+    });
+
+    test('Mandatory Divergence: Culture vs Nature personas yield divergent top recommendations under identical conditions', () => {
+      const customPool = [
+        { id: 'heritage_temple', name: 'Ancient Heritage Temple', cat: 'culture', lat: 17.72, lon: 83.31, visitMinutes: 60 },
+        { id: 'coastal_cliff', name: 'Scenic Coastal Cliff', cat: 'scenic', lat: 17.74, lon: 83.33, visitMinutes: 60, is_sunset_spot: true },
+      ];
+
+      const cultureDna = {
+        culture: 95,
+        heritage: 95,
+        scenic: 20,
+        nature: 20,
+        photography: 20,
+        interests: ['culture', 'museum', 'heritage'],
+        preferredActivities: ['culture'],
+        pacePreference: 'balanced',
+      };
+
+      const natureDna = {
+        scenic: 95,
+        nature: 95,
+        photography: 90,
+        culture: 20,
+        heritage: 20,
+        interests: ['nature', 'scenic', 'beach'],
+        preferredActivities: ['scenic'],
+        pacePreference: 'balanced',
+      };
+
+      const evalCulture = evaluateExperienceValue({
+        journeyState: sampleJourneyState,
+        candidatePool: customPool,
+        customPoolOnly: true,
+        travelerDna: cultureDna,
+        currentMinute: 600,
+      });
+
+      const evalNature = evaluateExperienceValue({
+        journeyState: sampleJourneyState,
+        candidatePool: customPool,
+        customPoolOnly: true,
+        travelerDna: natureDna,
+        currentMinute: 600,
+      });
+
+      expect(evalCulture.primaryRecommendation.candidate.id).toBe('heritage_temple');
+      expect(evalNature.primaryRecommendation.candidate.id).toBe('coastal_cliff');
+      expect(evalCulture.primaryRecommendation.candidate.id).not.toBe(evalNature.primaryRecommendation.candidate.id);
+    });
+
+    test('Mandatory Safety Override: drops 95-score outdoor POI for 82-score sheltered indoor POI when safety is AVOID', () => {
+      const customPool = [
+        { id: 'outdoor_summit', name: 'Scenic Hilltop Summit', cat: 'scenic', indoorOutdoor: 'outdoor', lat: 17.75, lon: 83.34, visitMinutes: 60, rawScore: 95 },
+        { id: 'sheltered_museum', name: 'Maritime Submarine Museum', cat: 'museum', indoorOutdoor: 'indoor', lat: 17.72, lon: 83.33, visitMinutes: 60, rawScore: 82 },
+      ];
+
+      const safetyDirective = {
+        decision: 'AVOID',
+        reason: 'Severe cyclonic storm landfall warning: avoid all outdoor exposed viewpoints',
+        severity: 'CRITICAL',
+      };
+
+      const evalResult = evaluateExperienceValue({
+        journeyState: sampleJourneyState,
+        candidatePool: customPool,
+        customPoolOnly: true,
+        safetyDecision: safetyDirective,
+        currentMinute: 600,
+      });
+
+      // Outdoor summit must be completely dropped; sheltered museum must be primary
+      expect(evalResult.primaryRecommendation.candidate.id).toBe('sheltered_museum');
+      expect(evalResult.recommendations.some(r => r.candidate.id === 'outdoor_summit')).toBe(false);
+    });
+
+    test('Mandatory Time Dynamics: budgets adapt through 150m, 90m, 45m, and 20m thresholds', () => {
+      // 150m gross remaining
+      const b150 = computeTimeBudget({
+        journeyState: sampleJourneyState,
+        currentMinute: 1110,
+        dayEndMinute: 1320,
+      });
+      expect(b150.grossRemainingMinutes).toBe(210);
+
+      // 45m gross remaining
+      const b45 = computeTimeBudget({
+        journeyState: sampleJourneyState,
+        currentMinute: 1275,
+        dayEndMinute: 1320,
+      });
+      expect(b45.usableExperienceMinutes).toBeLessThan(45);
+
+      // 20m remaining -> bankrupt
+      const b20 = computeTimeBudget({
+        journeyState: sampleJourneyState,
+        currentMinute: 1300,
+        dayEndMinute: 1320,
+      });
+      expect(b20.isTimeBankrupt).toBe(true);
+      expect(b20.feasibilityStatus).toBe('OVER_BUDGET');
+    });
+
+    test('Mandatory Plan Versioning: accepting recommendation advances Plan v1 -> Plan v2 with immutable completed stops', async () => {
+      const tripId = 'trip_plan_version_e2e';
+
+      // Initialize journey state with 1 completed stop and 2 upcoming stops
+      const initRes = await request(testApp)
+        .post(`/api/intelligence/trips/${tripId}/state`)
+        .send({
+          plan: {
+            stops: [
+              { id: 'done_museum', name: 'Submarine Museum', cat: 'museum', lat: 17.7172, lon: 83.3301, visitMinutes: 60, status: STOP_STATUSES.COMPLETED },
+              { id: 'next_hill', name: 'Kailasagiri Hill', cat: 'scenic', lat: 17.7492, lon: 83.3418, visitMinutes: 75, status: STOP_STATUSES.PLANNED },
+              { id: 'next_beach', name: 'Rushikonda Beach', cat: 'beach', lat: 17.7825, lon: 83.3851, visitMinutes: 90, status: STOP_STATUSES.PLANNED },
+            ],
+          },
+          startTimeMinutes: 540,
+        });
+
+      expect(initRes.status).toBe(200);
+      expect(initRes.body.activePlanVersion).toBe(1);
+
+      // Accept a recommendation prioritizing 'next_beach'
+      const decideRes = await request(testApp)
+        .post(`/api/intelligence/trips/${tripId}/experience/decide`)
+        .send({
+          placeId: 'next_beach',
+          placeCategory: 'beach',
+          actionTaken: 'ACCEPTED',
+          actualDwellMinutes: 80,
+        });
+
+      expect(decideRes.status).toBe(200);
+      expect(decideRes.body.newPlanVersion).toBe(2);
+      expect(decideRes.body.activePlanVersion).toBe(2);
+
+      // Completed stop remains strictly immutable
+      expect(decideRes.body.resequencedStops[0].id).toBe('done_museum');
+      expect(decideRes.body.resequencedStops[0].status).toBe(STOP_STATUSES.COMPLETED);
+
+      // Accepted stop is now the first upcoming stop
+      expect(decideRes.body.resequencedStops[1].id).toBe('next_beach');
+      expect(decideRes.body.resequencedStops[1].status).toBe(STOP_STATUSES.PLANNED);
+      expect(decideRes.body.resequencedStops[2].id).toBe('next_hill');
+    });
+
+    test('Mandatory Anti-Hallucination & Window Schema: returns structured windows array with provenance and verified candidates', () => {
+      const cand = generateCandidates({
+        cityName: 'visakhapatnam',
+      });
+      expect(cand.length).toBeGreaterThan(0);
+      for (const c of cand) {
+        expect(['PLANNED_STOP', 'REGIONAL_HAVEN', 'CITY_SEED', 'CUSTOM_POOL']).toContain(c.provenance);
+        expect(c.verificationState).toBe('VERIFIED');
+        expect(c.metadataVersion).toBe('v3.0');
+        expect(c.lastVerified).toBeTruthy();
+      }
+
+      const windowResult = evaluatePlaceExperienceWindow({
+        id: 'kailasagiri',
+        name: 'Kailasagiri Hilltop',
+        lat: 17.7492,
+        lon: 83.3418,
+        ot: '06:00',
+        ct: '20:00',
+      }, { currentMinute: 600 });
+
+      expect(Array.isArray(windowResult.windows)).toBe(true);
+      expect(windowResult.windows.length).toBeGreaterThan(0);
+      const types = windowResult.windows.map(w => w.windowType);
+      expect(types).toContain('OPENING_WINDOW');
+      expect(types).toContain('GOLDEN_HOUR');
+      expect(types).toContain('SUNRISE');
+      expect(types).toContain('SUNSET');
+      expect(types).toContain('MIDDAY_HEAT_REST');
+      expect(types).toContain('NIGHT');
+
+      const openWin = windowResult.windows.find(w => w.windowType === 'OPENING_WINDOW');
+      expect(openWin.status).toBe('AVAILABLE');
+      expect(openWin.source).toBe('operating_hours');
+      expect(openWin.confidence).toBeGreaterThan(0.5);
+    });
+  });
 });

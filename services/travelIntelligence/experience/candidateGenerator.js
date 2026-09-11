@@ -57,13 +57,20 @@ function normalizeCandidate(raw, provenance = 'UNKNOWN', originLoc = null) {
     distanceKm = Math.round(distKm(originLoc.lat, originLoc.lon, lat, lon) * 10) / 10;
   }
 
+  const isAuthoritative = ['PLANNED_STOP', 'REGIONAL_HAVEN', 'CITY_SEED'].includes(provenance);
+  const verificationState = raw.verificationState || (isAuthoritative ? 'VERIFIED' : 'UNVERIFIED');
+  const metadataVersion = raw.metadataVersion || 'v3.0';
+  const lastVerified = raw.lastVerified || '2026-09-11T00:00:00.000Z';
+  const estimatedDuration = Math.max(15, visitMinutes || 60);
+
   return {
     id,
     name,
     cat: String(cat).toLowerCase(),
     lat,
     lon,
-    visitMinutes: Math.max(15, visitMinutes || 60),
+    visitMinutes: estimatedDuration,
+    estimatedDuration,
     ot,
     ct,
     indoorOutdoor,
@@ -73,6 +80,9 @@ function normalizeCandidate(raw, provenance = 'UNKNOWN', originLoc = null) {
     status: raw.status || null,
     is_sunset_spot: !!(raw.is_sunset_spot || raw.isSunsetSpot),
     is_sunrise_spot: !!(raw.is_sunrise_spot || raw.isSunriseSpot),
+    verificationState,
+    metadataVersion,
+    lastVerified,
     rawCandidate: raw,
   };
 }
@@ -94,6 +104,7 @@ function generateCandidates({
   cityName = 'visakhapatnam',
   currentLocation = null,
   customPool = [],
+  customPoolOnly = false,
   maxRadiusKm = 45,
   activeHazards = [],
 } = {}) {
@@ -103,6 +114,29 @@ function generateCandidates({
 
   const candidates = [];
   const seenIds = new Set();
+
+  // If caller specifically requested customPoolOnly
+  if (customPoolOnly && Array.isArray(customPool) && customPool.length > 0) {
+    for (const item of customPool) {
+      const c = normalizeCandidate(item, 'CUSTOM_POOL', originLoc);
+      if (c && !seenIds.has(c.id)) {
+        seenIds.add(c.id);
+        candidates.push(c);
+      }
+    }
+    return candidates.filter(cand => {
+      for (const hazard of activeHazards) {
+        if (hazard.status === 'ACTIVE' && hazard.severity === 'CRITICAL') {
+          if (hazard.targetPlaceId && hazard.targetPlaceId === cand.id) return false;
+          if (hazard.lat && hazard.lon && cand.lat && cand.lon) {
+            const d = distKm(hazard.lat, hazard.lon, cand.lat, cand.lon);
+            if (d <= (hazard.radiusKm || 5)) return false;
+          }
+        }
+      }
+      return true;
+    });
+  }
 
   // 1. Upcoming Planned Stops from Journey State (Highest Priority)
   const stops = Array.isArray(journeyState?.stops) ? journeyState.stops : [];

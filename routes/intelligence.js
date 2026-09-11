@@ -1081,7 +1081,71 @@ router.post(['/experience/decide', '/trips/:id/experience/decide'], async (req, 
       ).catch(err => appLogger.warn('Failed to insert experience outcome to DB', { error: err.message }));
     }
 
-    res.json(outcome);
+    let planUpdate = null;
+    if ((actionTaken || 'ACCEPTED') === 'ACCEPTED' && activeTripsState.has(tripId)) {
+      const record = activeTripsState.get(tripId);
+      const state = record?.state || record;
+      if (state && Array.isArray(state.stops)) {
+        // Completed and skipped stops remain strictly immutable
+        const completedStops = state.stops.filter(s => s.status === 'COMPLETED' || s.status === 'SKIPPED');
+        const uncompletedStops = state.stops.filter(s => s.status !== 'COMPLETED' && s.status !== 'SKIPPED');
+
+        // Resequence upcoming stops: prioritize accepted place
+        let reorderedUpcoming = [];
+        const existingIdx = uncompletedStops.findIndex(s => s.id === placeId);
+        if (existingIdx >= 0) {
+          const target = { ...uncompletedStops[existingIdx], status: 'PLANNED' };
+          const others = uncompletedStops.filter((_, idx) => idx !== existingIdx);
+          reorderedUpcoming = [target, ...others];
+        } else {
+          // New candidate stop added to plan
+          const newStop = {
+            id: placeId,
+            name: req.body.placeName || (placeId.charAt(0).toUpperCase() + placeId.slice(1).replace(/_/g, ' ')),
+            cat: placeCategory || 'attraction',
+            status: 'PLANNED',
+            visitMinutes: Number(actualDwellMinutes || 60),
+            lat: Number(req.body.lat || 17.6868),
+            lon: Number(req.body.lon || 83.2185),
+          };
+          reorderedUpcoming = [newStop, ...uncompletedStops];
+        }
+
+        const newStopsList = [...completedStops, ...reorderedUpcoming];
+        const newPlanVersion = (state.activePlanVersion || 1) + 1;
+
+        await commitPlanVersion({
+          tripId,
+          versionNumber: newPlanVersion,
+          triggerType: 'EXPERIENCE_PRIORITIZATION',
+          triggerReason: `Traveler prioritized recommended experience '${placeId}'`,
+          plan: newStopsList,
+          changedStops: [{ stopId: placeId, action: 'PRIORITIZE' }],
+          preservedStops: completedStops.map(s => s.id),
+          confidence: 'HIGH',
+          dbPool: pool,
+        });
+
+        state.activePlanVersion = newPlanVersion;
+        state.stops = newStopsList;
+        state.completedStops = completedStops;
+        state.upcomingStops = reorderedUpcoming.filter(s => s.status === 'PLANNED');
+        state.activeStop = reorderedUpcoming.find(s => s.status === 'PLANNED') || null;
+
+        planUpdate = {
+          newPlanVersion,
+          activePlanVersion: newPlanVersion,
+          resequencedStops: newStopsList,
+          preservedStops: completedStops.map(s => s.id),
+          activeStop: state.activeStop,
+        };
+      }
+    }
+
+    res.json({
+      ...outcome,
+      ...(planUpdate || {}),
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
