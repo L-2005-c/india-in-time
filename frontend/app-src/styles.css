@@ -3893,6 +3893,27 @@ body::after{
   color: #38bdf8 !important;
 }
 
+/* ── Leaflet Attribution — WCAG AA contrast fix ─────────────────────── */
+.leaflet-control-attribution {
+  background: rgba(10, 15, 29, 0.88) !important;
+  color: #e2e8f0 !important;
+  font-size: 10px !important;
+  border-radius: 8px 0 0 0 !important;
+  padding: 3px 8px !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.leaflet-control-attribution a {
+  color: #93c5fd !important;     /* blue-300 — 7.1:1 on dark bg */
+  text-decoration: underline !important;
+}
+
+.leaflet-control-attribution a:hover {
+  color: #bfdbfe !important;     /* blue-200 — 9.2:1 on dark bg */
+}
+
 .map-hud-pill {
   display: inline-flex;
   align-items: center;
