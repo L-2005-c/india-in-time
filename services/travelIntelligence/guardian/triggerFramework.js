@@ -20,6 +20,15 @@ const TRIGGER_TYPES = Object.freeze({
   DESTINATION_CLOSURE: 'DESTINATION_CLOSURE',
   HAZARD_CHANGE: 'HAZARD_CHANGE',
   EMERGENCY: 'EMERGENCY',
+  // Phase 2 Disruption Triggers
+  TRAFFIC_ANOMALY: 'TRAFFIC_ANOMALY',
+  MAJOR_TRAFFIC_DISRUPTION: 'MAJOR_TRAFFIC_DISRUPTION',
+  PLANNED_EVENT_RISK: 'PLANNED_EVENT_RISK',
+  ROAD_CLOSURE: 'ROAD_CLOSURE',
+  INCIDENT_REPORTED: 'INCIDENT_REPORTED',
+  EVENT_CORRIDOR_OVERLAP: 'EVENT_CORRIDOR_OVERLAP',
+  TRAFFIC_RECOVERY: 'TRAFFIC_RECOVERY',
+  DISRUPTION_RESOLVED: 'DISRUPTION_RESOLVED',
 });
 
 const TRIGGER_SEVERITY = Object.freeze({
@@ -64,6 +73,67 @@ function evaluateTriggers({
       severity: trafficDelay >= 45 ? TRIGGER_SEVERITY.CRITICAL : TRIGGER_SEVERITY.SUBOPTIMAL,
       message: `Severe traffic congestion adding ${trafficDelay} minutes to transit.`,
       corridor: trafficTelemetry.corridorName || 'Transit Corridor',
+    });
+  }
+
+  // 2b. Phase 2 Disruption Intelligence Triggers
+  const disruption = trafficTelemetry.disruption || trafficTelemetry.disruptionTelemetry || null;
+  const isRoadClosure = trafficTelemetry.isRoadBlocked || disruption?.eventType === 'ROAD_CLOSURE' || disruption?.eventType === 'EMERGENCY';
+  if (isRoadClosure) {
+    triggers.push({
+      type: TRIGGER_TYPES.ROAD_CLOSURE,
+      severity: TRIGGER_SEVERITY.CRITICAL,
+      message: `Route blockage / confirmed road closure along ${trafficTelemetry.corridorName || disruption?.corridor || 'corridor'}.`,
+      corridor: trafficTelemetry.corridorName || disruption?.corridor || 'Transit Corridor',
+      evidence: disruption?.evidence || ['Verified road closure or zero speed corridor'],
+    });
+  } else if (disruption && (disruption.severity === 'SEVERE' || disruption.eventType === 'MAJOR_DISRUPTION' || trafficDelay >= 50)) {
+    triggers.push({
+      type: TRIGGER_TYPES.MAJOR_TRAFFIC_DISRUPTION,
+      severity: TRIGGER_SEVERITY.CRITICAL,
+      message: `Major traffic collapse adding +${disruption.estimatedDelay || trafficDelay} minutes to transit. Cause: ${disruption.isCauseVerified ? disruption.eventType : 'Currently unverified'}.`,
+      corridor: disruption.corridor || trafficTelemetry.corridorName || 'Transit Corridor',
+      disruptionConfidence: disruption.disruptionConfidence || 'HIGH',
+      causeConfidence: disruption.causeConfidence || 'LOW',
+    });
+  } else if (disruption && (disruption.severity === 'WARNING' || disruption.eventType === 'TRAFFIC_ANOMALY')) {
+    triggers.push({
+      type: TRIGGER_TYPES.TRAFFIC_ANOMALY,
+      severity: TRIGGER_SEVERITY.SUBOPTIMAL,
+      message: `Abnormal traffic surge detected along ${disruption.corridor || 'route'} (+${disruption.estimatedDelay || trafficDelay}m).`,
+      corridor: disruption.corridor || trafficTelemetry.corridorName || 'Transit Corridor',
+    });
+  }
+
+  // Planned Event Corridor Overlap & Risk
+  const plannedEvent = trafficTelemetry.plannedEvent || disruption?.event || null;
+  if (plannedEvent || disruption?.eventType === 'PLANNED_EVENT_RISK' || disruption?.correlationType === 'UPCOMING_EVENT_RISK') {
+    const evtName = plannedEvent?.name || disruption?.evidence?.[0] || 'Scheduled public gathering';
+    triggers.push({
+      type: TRIGGER_TYPES.PLANNED_EVENT_RISK,
+      severity: TRIGGER_SEVERITY.WATCH,
+      message: `Upcoming event corridor overlap: ${evtName}. Expected impact +${plannedEvent?.expectedDelayMinutes || 45}m.`,
+      corridor: trafficTelemetry.corridorName || disruption?.corridor || 'Event Corridor',
+    });
+  }
+
+  // Incident reported
+  if (trafficTelemetry.incidentReport && trafficTelemetry.incidentReport.verified) {
+    triggers.push({
+      type: TRIGGER_TYPES.INCIDENT_REPORTED,
+      severity: TRIGGER_SEVERITY.SUBOPTIMAL,
+      message: `Official traffic police advisory: ${trafficTelemetry.incidentReport.description || trafficTelemetry.incidentReport.type}.`,
+      corridor: trafficTelemetry.corridorName || 'Corridor',
+    });
+  }
+
+  // Traffic recovery
+  if (trafficTelemetry.isRecovering || disruption?.recoveryTrend === 'IMPROVING') {
+    triggers.push({
+      type: TRIGGER_TYPES.TRAFFIC_RECOVERY,
+      severity: TRIGGER_SEVERITY.INFO,
+      message: 'Traffic flow is recovering back toward normal corridor baseline.',
+      corridor: trafficTelemetry.corridorName || 'Corridor',
     });
   }
 

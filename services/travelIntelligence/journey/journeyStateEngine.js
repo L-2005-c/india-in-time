@@ -55,7 +55,7 @@ function createJourneyState({
       plannedArrivalMinute: s.arrivalMinute ?? (startTimeMinutes + idx * 90),
       plannedDurationMinutes: s.visitMinutes || s.visit_minutes || 60,
       plannedDepartureMinute: s.departureMinute ?? (startTimeMinutes + idx * 90 + 60),
-      status: idx === 0 ? STOP_STATUSES.ACTIVE : STOP_STATUSES.PLANNED,
+      status: s.status || (idx === 0 ? STOP_STATUSES.ACTIVE : STOP_STATUSES.PLANNED),
       openingHours: s.openingHours || (s.open_time && s.close_time ? { open: s.open_time, close: s.close_time } : null),
       actualArrivalMinute: idx === 0 ? startTimeMinutes : null,
       actualDepartureMinute: null,
@@ -64,8 +64,11 @@ function createJourneyState({
     };
   });
 
-  const activeStop = stops.find(s => s.status === STOP_STATUSES.ACTIVE) || stops[0] || null;
+  const completedStops = stops.filter(s => s.status === STOP_STATUSES.COMPLETED);
+  const activeStop = stops.find(s => s.status === STOP_STATUSES.ACTIVE) ||
+    stops.find(s => s.status === STOP_STATUSES.PLANNED) || null;
   const upcomingStops = stops.filter(s => s.status === STOP_STATUSES.PLANNED);
+  const skippedStops = stops.filter(s => s.status === STOP_STATUSES.SKIPPED);
 
   return {
     tripId: String(tripId),
@@ -76,10 +79,10 @@ function createJourneyState({
     currentLocation: initialLocation || (activeStop ? { lat: activeStop.lat, lon: activeStop.lon } : null),
     pacingLagMinutes: 0,
     stops,
-    completedStops: [],
+    completedStops,
     activeStop,
     upcomingStops,
-    skippedStops: [],
+    skippedStops,
     activeHazards: [],
     lastAdaptation: null,
     createdAt: new Date().toISOString(),

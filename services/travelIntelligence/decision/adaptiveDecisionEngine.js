@@ -32,6 +32,10 @@ const DECISION_STATES = Object.freeze({
   INSUFFICIENT_DATA: 'INSUFFICIENT_DATA',
   WATCH: 'WATCH',
   DEFER: 'DEFER',
+  WAIT: 'WAIT',
+  REROUTE: 'REROUTE',
+  REORDER: 'REORDER',
+  REPLACE_STOP: 'REPLACE_STOP',
 });
 
 // ── Plan Health Dimension States (Section 8) ─────────────────────────────────
@@ -111,6 +115,10 @@ const decisionMetrics = {
   alternativeRequiredCount: 0,
   insufficientDataCount: 0,
   watchCount: 0,
+  waitCount: 0,
+  rerouteCount: 0,
+  reorderCount: 0,
+  replaceStopCount: 0,
   acceptedCount: 0,
   rejectedCount: 0,
   ignoredCount: 0,
@@ -129,7 +137,14 @@ function validateDataTrust(context = {}) {
 
   const hasWeatherInfo = weather.tempC != null || weather.temperatureC != null || weather.precipitationProb != null || weather.condition != null;
   const weatherDataState = weather.dataState || (weather.isEstimated ? 'ESTIMATED' : (hasWeatherInfo ? 'PREDICTED' : 'UNAVAILABLE'));
-  const trafficDataState = traffic.dataState || (traffic.source === 'live' ? 'LIVE' : (traffic.trafficDelayMinutes != null ? 'ESTIMATED' : 'UNAVAILABLE'));
+  const hasTrafficSignal = traffic.source === 'live' ||
+    traffic.trafficDelayMinutes != null ||
+    traffic.delayMinutes != null ||
+    traffic.isRoadBlocked != null ||
+    traffic.disruption != null ||
+    traffic.anomalyState != null ||
+    context.disruption != null;
+  const trafficDataState = traffic.dataState || (traffic.source === 'live' ? 'LIVE' : (hasTrafficSignal ? 'ESTIMATED' : 'UNAVAILABLE'));
   const crowdDataState = crowd.dataState || (crowd.level ? 'HISTORICAL' : 'UNAVAILABLE');
 
   const dataStates = {
@@ -479,16 +494,81 @@ function evaluateNextDecision({
       });
     }
   } else {
-    // Check for Pacing Lag / Traffic Delay (Anti-churn check: minor traffic <= 10m does NOT adapt)
-    const trafficDelay = Number(context.traffic?.trafficDelayMinutes || 0);
-    const isMeaningfulDelay = lag >= DECISION_THRESHOLDS.MIN_USER_LAG_TO_ADAPT_MINUTES ||
-      trafficDelay >= DECISION_THRESHOLDS.MIN_TRAFFIC_DELAY_TO_ADAPT_MINUTES;
+    // Check for Disruption / Pacing Lag / Traffic Delay (Anti-churn check: minor traffic <= 10m does NOT adapt)
+    const trafficDelay = Number(context.traffic?.trafficDelayMinutes || context.traffic?.delayMinutes || 0);
+    const disruption = context.traffic?.disruption || context.disruption || null;
+    const isRoadClosure = context.traffic?.isRoadBlocked || disruption?.eventType === 'ROAD_CLOSURE' || disruption?.eventType === 'EMERGENCY';
 
-    if (isMeaningfulDelay) {
-      decision = DECISION_STATES.ADAPT_PLAN;
-      nextActionType = 'RETIME_REMAINING';
-      if (trafficDelay >= DECISION_THRESHOLDS.MIN_TRAFFIC_DELAY_TO_ADAPT_MINUTES) reasonCodes.push('TRAFFIC_DELAY');
-      if (lag >= DECISION_THRESHOLDS.MIN_USER_LAG_TO_ADAPT_MINUTES) reasonCodes.push('TRAVELER_DELAY');
+    const isMeaningfulDelay = lag >= DECISION_THRESHOLDS.MIN_USER_LAG_TO_ADAPT_MINUTES ||
+      trafficDelay >= DECISION_THRESHOLDS.MIN_TRAFFIC_DELAY_TO_ADAPT_MINUTES ||
+      disruption?.isDisruption === true;
+
+    if (isRoadClosure) {
+      decision = DECISION_STATES.ALTERNATIVE_REQUIRED;
+      nextActionType = 'SUBSTITUTE_STOP';
+      reasonCodes.push('ROAD_CLOSURE', 'CRITICAL_ROUTE_BLOCKED');
+      const candidatePool = options.candidatePool || REGIONAL_ALTERNATIVE_HAVENS;
+      const bestAlt = findAlternativeStop(activeStop || { lat: 18.33, lon: 82.87, name: 'Current Location' }, {
+        reason: 'ROAD_CLOSURE',
+        travelerDna,
+        currentMinute,
+        candidatePool,
+      });
+      if (bestAlt) {
+        selectedAlternative = bestAlt;
+        candidateAlternatives.push({
+          id: bestAlt.id,
+          name: bestAlt.name,
+          category: bestAlt.cat,
+          score: bestAlt.substituteScore,
+          distanceKm: bestAlt.distanceFromOriginalKm,
+          reason: 'Bypass blocked corridor with verified open stop',
+        });
+      }
+    } else if (isMeaningfulDelay) {
+      const alternateRoute = options.alternateRoute || context.traffic?.alternateRoute || null;
+      const canReorder = options.canReorder || context.traffic?.canReorder || false;
+      const hasStrictDeadline = Boolean(travelerDna.hardDeadlineMinute || travelerDna.isDeadlineStrict);
+      const isFlexible = Boolean(travelerDna.isFlexible || travelerDna.pacingPreference === 'slow');
+
+      // 1. Evaluate Reroute vs Wait
+      if (alternateRoute && alternateRoute.isViable !== false) {
+        const altDelay = Number(alternateRoute.trafficDelayMinutes ?? alternateRoute.delayMinutes ?? 0);
+        const timeSaved = trafficDelay - altDelay;
+        const isHazardousTerrain = Boolean(alternateRoute.isGhat || alternateRoute.isRoughTerrain);
+
+        if (timeSaved >= 18 && !isHazardousTerrain && alternateRoute.isBlocked !== true) {
+          decision = DECISION_STATES.REROUTE;
+          nextActionType = 'REROUTE_CORRIDOR';
+          reasonCodes.push('REROUTE_RECOMMENDED', 'MATERIAL_TIME_SAVINGS');
+        } else if (timeSaved <= 10 || isHazardousTerrain || isFlexible) {
+          decision = DECISION_STATES.WAIT;
+          nextActionType = 'WAIT_OUT_CONGESTION';
+          reasonCodes.push('WAIT_PREFERRED_OVER_ROUGH_DETOUR', 'TEMPORARY_CONGESTION_EXPECTED_TO_CLEAR');
+        } else {
+          decision = DECISION_STATES.ADAPT_PLAN;
+          nextActionType = 'RETIME_REMAINING';
+          reasonCodes.push('TRAFFIC_DELAY');
+        }
+      } else if (canReorder && upcomingStops.length >= 2) {
+        decision = DECISION_STATES.REORDER;
+        nextActionType = 'REORDER_NEXT_STOPS';
+        reasonCodes.push('AVOID_PEAK_CORRIDOR_CONGESTION', 'REORDER_STOPS');
+      } else if (hasStrictDeadline && trafficDelay >= 35) {
+        // Traveler with hard deadline cannot afford delay -> require alternative or drop stop
+        decision = DECISION_STATES.ALTERNATIVE_REQUIRED;
+        nextActionType = 'DROP_OR_SWAP_STOP';
+        reasonCodes.push('HARD_DEADLINE_BREACH_PREVENTION', 'TRAFFIC_DELAY');
+      } else if (isFlexible && trafficDelay <= 45) {
+        decision = DECISION_STATES.WAIT;
+        nextActionType = 'WAIT_OUT_CONGESTION';
+        reasonCodes.push('FLEXIBLE_PACING_WAIT_SUITABLE');
+      } else {
+        decision = DECISION_STATES.ADAPT_PLAN;
+        nextActionType = 'RETIME_REMAINING';
+        if (trafficDelay >= DECISION_THRESHOLDS.MIN_TRAFFIC_DELAY_TO_ADAPT_MINUTES) reasonCodes.push('TRAFFIC_DELAY');
+        if (lag >= DECISION_THRESHOLDS.MIN_USER_LAG_TO_ADAPT_MINUTES) reasonCodes.push('TRAVELER_DELAY');
+      }
     } else if (planHealth.overall === 'ATTENTION_REQUIRED' && !options.forceReplan) {
       decision = DECISION_STATES.WATCH;
       nextActionType = 'CONTINUE_PLANNED_STOP';
@@ -506,7 +586,9 @@ function evaluateNextDecision({
     finalConfidence = trust.overallConfidence === CONFIDENCE_LEVELS.HIGH ? CONFIDENCE_LEVELS.HIGH : CONFIDENCE_LEVELS.MEDIUM;
   }
 
-  // 8. Compose Deterministic Structured Explanation (Section 23)
+  const disruptionTelemetry = context.traffic?.disruption || context.disruption || null;
+
+  // 8. Compose Deterministic Structured Explanation (Section 23 & 36)
   const explanation = composeExplanation({
     decision,
     activeStop,
@@ -517,6 +599,7 @@ function evaluateNextDecision({
     completedStops,
     travelerDna,
     context,
+    disruptionTelemetry,
   });
 
   // 9. Update telemetry counters
@@ -525,6 +608,10 @@ function evaluateNextDecision({
   else if (decision === DECISION_STATES.ADAPT_PLAN) decisionMetrics.adaptPlanCount++;
   else if (decision === DECISION_STATES.ALTERNATIVE_REQUIRED) decisionMetrics.alternativeRequiredCount++;
   else if (decision === DECISION_STATES.WATCH) decisionMetrics.watchCount++;
+  else if (decision === DECISION_STATES.WAIT) decisionMetrics.waitCount++;
+  else if (decision === DECISION_STATES.REROUTE) decisionMetrics.rerouteCount++;
+  else if (decision === DECISION_STATES.REORDER) decisionMetrics.reorderCount++;
+  else if (decision === DECISION_STATES.REPLACE_STOP) decisionMetrics.replaceStopCount++;
 
   const auditRecord = recordDecisionAudit({
     tripId: journeyState.tripId,
@@ -576,6 +663,7 @@ function composeExplanation({
   completedStops,
   _travelerDna,
   context,
+  disruptionTelemetry,
 }) {
   const completedCount = completedStops.length;
   const stopName = activeStop?.name || 'Upcoming stop';
@@ -583,10 +671,22 @@ function composeExplanation({
   let what = `Continue with your planned stop: ${stopName}.`;
   let why = 'Your current plan is healthy, on track, and well aligned with live conditions.';
   let evidence = 'Environmental and transit conditions are within comfortable thresholds.';
+  let whatWeKnow = 'Live environmental and transit telemetry are verified.';
+  let whatWeDontKnow = 'None';
+  let howItAffectsTrip = 'No schedule compression or hazard detected.';
+  let whatWeRecommend = `Proceed to ${stopName} as planned.`;
+
+  const disruption = disruptionTelemetry || context.traffic?.disruption || null;
+  const isCauseVerified = disruption?.isCauseVerified === true;
+  const disruptionConfidence = disruption?.disruptionConfidence || (confidence === 'HIGH' ? 'HIGH' : 'MEDIUM');
+  const causeConfidence = disruption?.causeConfidence || (isCauseVerified ? 'HIGH' : 'LOW');
 
   if (decision === DECISION_STATES.ALTERNATIVE_REQUIRED && selectedAlternative) {
     what = `Substitute "${stopName}" with "${selectedAlternative.name}".`;
-    if (reasonCodes.includes('WEATHER_DETERIORATION') || reasonCodes.includes('TRAVELER_RAIN_SENSITIVITY')) {
+    if (reasonCodes.includes('ROAD_CLOSURE')) {
+      why = `A verified road closure prevents transit to "${stopName}". Switching to "${selectedAlternative.name}" bypasses the blockage safely.`;
+      evidence = `Route blockage or closure confirmed by official advisory or zero-speed corridor sensors.`;
+    } else if (reasonCodes.includes('WEATHER_DETERIORATION') || reasonCodes.includes('TRAVELER_RAIN_SENSITIVITY')) {
       why = `Heavy precipitation or orographic fog is impacting "${stopName}". Given your preference for sheltered exploration, switching ensures an optimal experience.`;
       evidence = `Precipitation probability is ${context.weather?.precipitationProb || 80}% at ${stopName}. "${selectedAlternative.name}" is fully sheltered and open.`;
     } else if (reasonCodes.includes('OPENING_HOURS_CONFLICT')) {
@@ -596,28 +696,70 @@ function composeExplanation({
       why = `Contextual conditions make "${stopName}" suboptimal. "${selectedAlternative.name}" offers superior experiential value.`;
       evidence = `Experience score for ${selectedAlternative.name} is higher under current conditions.`;
     }
+    whatWeRecommend = `Switch destination to ${selectedAlternative.name}.`;
+    howItAffectsTrip = `Preserves itinerary feasibility while bypassing ${stopName}.`;
+  } else if (decision === DECISION_STATES.REROUTE) {
+    what = `Reroute around transit corridor to save travel time.`;
+    why = `The primary route has deteriorated severely (+${disruption?.estimatedDelay || context.traffic?.trafficDelayMinutes || 30}m). A faster, validated alternate bypass is available.`;
+    evidence = `Verified bypass corridor saves travel time without navigating severe bottlenecks.`;
+    whatWeRecommend = 'Take the recommended bypass corridor.';
+    howItAffectsTrip = 'Restores schedule buffer for remaining stops.';
+  } else if (decision === DECISION_STATES.WAIT) {
+    what = `Wait out peak corridor congestion before departing for "${stopName}".`;
+    why = `Alternative routes present rough terrain or negligible time savings; waiting 15–20 minutes is more comfortable and reliable.`;
+    evidence = `Current corridor delay is expected to dissipate faster than navigating narrow detours.`;
+    whatWeRecommend = 'Relax at current location for 15–20 minutes, then re-check.';
+    howItAffectsTrip = 'Pacing shifted slightly without adding navigation fatigue.';
+  } else if (decision === DECISION_STATES.REORDER) {
+    what = `Reorder upcoming stops to avoid peak corridor congestion.`;
+    why = `Swapping stop sequence allows you to visit an unimpacted nearby attraction while the congested corridor clears.`;
+    evidence = `Next stop is in the congestion bottleneck, but subsequent stop is readily accessible.`;
+    whatWeRecommend = 'Visit the nearby destination first, then return to this stop.';
+    howItAffectsTrip = 'Avoids sitting in traffic while keeping all planned stops.';
   } else if (decision === DECISION_STATES.ADAPT_PLAN) {
     what = `Adjust arrival times for remaining stops to accommodate travel pacing.`;
     why = `Accumulated transit or activity lag requires shifting the schedule forward without dropping any stops.`;
     evidence = `Current pacing lag is ${planHealth.scheduleHealth === SCHEDULE_HEALTH.SEVERE_LAG ? 'significant (>45m)' : 'moderate (15-40m)'}.`;
+    whatWeRecommend = 'Follow adjusted timetable.';
+    howItAffectsTrip = 'Future arrival estimates adjusted forward.';
   } else if (decision === DECISION_STATES.WATCH) {
     what = `Maintain plan for "${stopName}", but observe conditions closely.`;
-    why = `Conditions are borderline or clouds are forming, but remain within acceptable operational bounds.`;
+    why = `Conditions are borderline or traffic is building, but remain within acceptable operational bounds.`;
     evidence = `Weather and crowd indicators require monitoring before committing to a plan change.`;
+    whatWeRecommend = 'Continue towards destination; monitor updates.';
+    howItAffectsTrip = 'No immediate change to plan.';
+  }
+
+  if (disruption) {
+    whatWeKnow = `Route delay is +${disruption.estimatedDelay || 0}m. ${isCauseVerified ? `Cause verified: ${disruption.eventType}` : 'Cause is currently unverified.'}`;
+    whatWeDontKnow = isCauseVerified ? 'Exact clearance timestamp' : 'Exact root cause behind sudden traffic collapse';
   }
 
   const whatChanged = selectedAlternative
     ? `Replaced 1 stop ("${stopName}" → "${selectedAlternative.name}").`
-    : (decision === DECISION_STATES.ADAPT_PLAN ? 'Re-timed future stop arrival estimates.' : 'No stops changed.');
+    : (decision === DECISION_STATES.REROUTE
+        ? 'Rerouted to bypass corridor.'
+        : (decision === DECISION_STATES.REORDER
+            ? 'Reordered stop sequence.'
+            : (decision === DECISION_STATES.WAIT
+                ? 'Added 15-minute wait buffer.'
+                : (decision === DECISION_STATES.ADAPT_PLAN ? 'Re-timed future stop arrival estimates.' : 'No stops changed.'))));
 
+  const completedNames = completedStops.map(s => s.name).join(', ');
   const whatRemains = completedCount > 0
-    ? `All ${completedCount} completed stop(s) are strictly preserved and immutable.`
+    ? `All ${completedCount} completed stop(s) (${completedNames}) are strictly preserved and immutable.`
     : 'All planned stops remain on your active itinerary.';
 
   return {
     what,
     why,
     evidence,
+    whatWeKnow,
+    whatWeDontKnow,
+    howItAffectsTrip,
+    whatWeRecommend,
+    disruptionConfidence,
+    causeConfidence,
     confidence: `${confidence} (${confidence === 'HIGH' ? 'Strong verified telemetry' : 'Model prediction / moderate uncertainty'})`,
     whatChanged,
     whatRemains,

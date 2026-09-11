@@ -371,11 +371,29 @@
     return get('/api/intelligence/decisions/metrics');
   }
 
+  // ── Phase 2: Traffic Disruption & Travel Guardian Notifications ─────────────
+  async function evaluateTripDisruptions(tripId, params = {}) {
+    return post(`/api/intelligence/trips/${tripId}/disruptions/evaluate`, params);
+  }
+  async function simulateTripDisruption(tripId, scenario = {}) {
+    return post(`/api/intelligence/trips/${tripId}/disruptions/simulate`, scenario);
+  }
+  async function fetchTripNotifications(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/notifications`);
+  }
+  async function recordNotificationAction(tripId, notificationId, action, notes = '') {
+    return post(`/api/intelligence/trips/${tripId}/notifications/action`, { notificationId, action, notes });
+  }
+  async function fetchDisruptionEvents(params = {}) {
+    return get('/api/intelligence/disruptions/events', params);
+  }
+
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
     initJourneyState, advanceJourneyProgress, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
     getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
+    evaluateTripDisruptions, simulateTripDisruption, fetchTripNotifications, recordNotificationAction, fetchDisruptionEvents,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

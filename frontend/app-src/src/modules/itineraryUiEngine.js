@@ -256,28 +256,57 @@ export function renderDecisionHud(container, decisionData, onOutcome) {
 
   let badgeColor = '#10b981'; // Green
   let badgeIcon = '✓';
-  if (state === 'ALTERNATIVE_REQUIRED') {
+  if (state === 'ALTERNATIVE_REQUIRED' || state === 'REPLACE_STOP') {
     badgeColor = '#ef4444'; // Red
     badgeIcon = '⚠️';
-  } else if (state === 'ADAPT_PLAN' || state === 'WATCH') {
+  } else if (state === 'ADAPT_PLAN' || state === 'WATCH' || state === 'WAIT' || state === 'REROUTE' || state === 'REORDER') {
     badgeColor = '#f59e0b'; // Amber
-    badgeIcon = '⚡';
+    badgeIcon = state === 'WAIT' ? '⏳' : (state === 'REROUTE' ? '🔀' : (state === 'REORDER' ? '🔃' : '⚡'));
   } else if (state === 'INSUFFICIENT_DATA') {
     badgeColor = '#64748b'; // Slate
     badgeIcon = 'ℹ️';
   }
+
+  // Phase 2: Disruption Banner if disruption telemetry or delay exists
+  const hasDisruption = Boolean(explanation.whatWeKnow && explanation.whatWeKnow !== 'None');
+  const disruptionConfidence = explanation.disruptionConfidence || confidence;
+  const causeConfidence = explanation.causeConfidence || 'LOW';
+
+  const disruptionBannerHtml = hasDisruption ? `
+    <div style="background:rgba(239, 68, 68, 0.12); border-left:4px solid #ef4444; border-radius:6px; padding:10px 12px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-weight:700; font-size:12px; color:#fca5a5; display:flex; align-items:center; gap:5px;">
+          <span>⚠️</span> ROUTE DISRUPTION ACTIVE
+        </span>
+        <div style="display:flex; gap:6px; font-size:10px;">
+          <span style="padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:#cbd5e1;">Disruption: <strong>${disruptionConfidence}</strong></span>
+          <span style="padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:#cbd5e1;">Cause: <strong>${causeConfidence}</strong></span>
+        </div>
+      </div>
+      <div style="font-size:12px; color:#f8fafc; line-height:1.4;">${explanation.whatWeKnow}</div>
+      ${explanation.howItAffectsTrip ? `<div style="font-size:11px; color:#fca5a5; margin-top:3px;">Impact: ${explanation.howItAffectsTrip}</div>` : ''}
+    </div>
+  ` : '';
+
+  let actionButtonLabel = 'Accept Adaptation';
+  if (state === 'WAIT') actionButtonLabel = '⏳ Wait & Recheck (15m)';
+  else if (state === 'REROUTE') actionButtonLabel = '🔀 Take Bypass Route';
+  else if (state === 'REORDER') actionButtonLabel = '🔃 Reorder Stops';
+  else if (state === 'ALTERNATIVE_REQUIRED' || state === 'REPLACE_STOP') actionButtonLabel = '⚡ Explore & Swap Stop';
 
   const hudHtml = `
     <div class="decision-hud-card" style="margin-bottom:16px;padding:16px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.12);border-radius:12px;backdrop-filter:blur(16px);color:#f8fafc;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:${badgeColor}22;border:1px solid ${badgeColor};border-radius:20px;font-size:12px;font-weight:700;color:${badgeColor};text-transform:uppercase;letter-spacing:0.5px;">
-            ${badgeIcon} ${state.replace('_', ' ')}
+            ${badgeIcon} ${state.replace(/_/g, ' ')}
           </span>
           <span style="font-size:12px;color:#94a3b8;">Confidence: <strong style="color:#f8fafc;">${confidence}</strong></span>
         </div>
-        <span style="font-size:11px;color:#64748b;font-family:'Space Mono',monospace;">v3.0 Decision Engine</span>
+        <span style="font-size:11px;color:#64748b;font-family:'Space Mono',monospace;">v3.0 Disruption Engine</span>
       </div>
+
+      ${disruptionBannerHtml}
 
       <div style="font-size:14px;font-weight:600;color:#f1f5f9;margin-bottom:6px;">
         ${explanation.what || nextAction.actionType || 'Plan Active'}
@@ -297,7 +326,7 @@ export function renderDecisionHud(container, decisionData, onOutcome) {
       ${state !== 'KEEP_PLAN' && state !== 'INSUFFICIENT_DATA' ? `
         <div style="display:flex;gap:8px;">
           <button id="btn-decision-accept" style="flex:1;padding:8px 12px;background:#3b82f6;color:#ffffff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.2s;">
-            Accept Adaptation
+            ${actionButtonLabel}
           </button>
           <button id="btn-decision-keep" style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;">
             Keep Original

@@ -40,9 +40,17 @@ const {
 } = require('../services/travelIntelligence/decision/adaptiveDecisionEngine');
 const { commitPlanVersion, getPlanVersionHistory } = require('../services/travelIntelligence/journey/planVersioning');
 const { sanitizeDnaProfile } = require('../services/travelIntelligence/personalTravelDna');
+const {
+  evaluateTripDisruptions,
+  getTripNotifications,
+  queryPlannedEvents,
+  CANONICAL_PLANNED_EVENTS,
+} = require('../services/travelIntelligence/disruption');
 
 // Active journey state registry (survives requests; syncs with DB if connected)
 const activeTripsState = new Map();
+// Active trip disruptions registry
+const activeTripDisruptions = new Map();
 
 function getDbPool() {
   try {
@@ -470,6 +478,175 @@ router.post('/trips/:id/simulate-event', (req, res) => {
     dataState: 'SIMULATED',
     eventType,
     guardianEvaluation: guardian,
+  });
+});
+
+// ── 11. Phase 2: Disruption Intelligence & Journey Impact ────────────────────
+router.post('/trips/:id/disruptions/evaluate', async (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  const journeyState = record ? record.state : req.body.journeyState;
+  const travelerDna = record ? record.travelerDna : (req.body.travelerDna || {});
+
+  if (!journeyState || !Array.isArray(journeyState.stops)) {
+    return res.status(400).json({ error: 'Valid journeyState or active trip is required' });
+  }
+
+  const {
+    currentTravelMinutes = 45,
+    freeFlowMinutes = null,
+    corridorName = 'Transit Corridor',
+    coords = null,
+    incidentReport = null,
+    customEvents = null,
+    minuteOfDay = null,
+    isSimulation = false,
+  } = req.body || {};
+
+  try {
+    const result = evaluateTripDisruptions({
+      tripId,
+      journeyState,
+      travelerDna,
+      currentTravelMinutes,
+      freeFlowMinutes,
+      corridorName,
+      coords,
+      incidentReport,
+      customEvents,
+      minuteOfDay,
+      isSimulation,
+    });
+
+    // Store active disruption for this trip
+    if (result.disruption) {
+      let tripDisruptions = activeTripDisruptions.get(tripId) || [];
+      tripDisruptions = [result.disruption, ...tripDisruptions.filter(d => d.disruptionId !== result.disruption.disruptionId)].slice(0, 10);
+      activeTripDisruptions.set(tripId, tripDisruptions);
+    }
+
+    res.json(result);
+  } catch (err) {
+    appLogger.error(`[intelligence/disruptions/evaluate] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fetch active disruptions for trip
+router.get('/trips/:id/disruptions', (req, res) => {
+  const tripId = req.params.id;
+  const disruptions = activeTripDisruptions.get(tripId) || [];
+  res.json({
+    tripId,
+    disruptionsCount: disruptions.length,
+    disruptions,
+  });
+});
+
+// ── 12. Phase 2: Controlled Disruption Simulation Hook ───────────────────────
+router.post('/trips/:id/disruptions/simulate', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  const {
+    simulationScenario = 'CRICKET_MATCH_CONGESTION',
+    corridorName = 'NH16 Stadium Corridor',
+    currentTravelMinutes = 75,
+    freeFlowMinutes = 25,
+  } = req.body || {};
+
+  const journeyState = record ? record.state : req.body.journeyState;
+  const travelerDna = record ? record.travelerDna : (req.body.travelerDna || {});
+
+  if (!journeyState || !Array.isArray(journeyState.stops)) {
+    return res.status(400).json({ error: 'Valid journeyState or active trip is required' });
+  }
+
+  // Simulated disruption payload strictly marked SIMULATED
+  const result = evaluateTripDisruptions({
+    tripId,
+    journeyState,
+    travelerDna,
+    currentTravelMinutes,
+    freeFlowMinutes,
+    corridorName,
+    coords: [17.7972, 83.3533], // ACA-VDCA Stadium
+    minuteOfDay: req.body.minuteOfDay || (17 * 60 + 30),
+    isSimulation: true,
+  });
+
+  if (result.disruption) {
+    let tripDisruptions = activeTripDisruptions.get(tripId) || [];
+    tripDisruptions = [result.disruption, ...tripDisruptions.filter(d => d.disruptionId !== result.disruption.disruptionId)].slice(0, 10);
+    activeTripDisruptions.set(tripId, tripDisruptions);
+  }
+
+  res.json({
+    simulationNotice: 'Controlled Demonstration: Live Reality Mutation Simulated',
+    dataState: 'SIMULATED',
+    scenario: simulationScenario,
+    disruptionEvaluation: result,
+  });
+});
+
+// ── 13. Phase 2: Proactive Travel Guardian Notifications ─────────────────────
+router.get('/trips/:id/notifications', (req, res) => {
+  const tripId = req.params.id;
+  const notifications = getTripNotifications(tripId);
+  res.json({
+    tripId,
+    notificationsCount: notifications.length,
+    notifications,
+  });
+});
+
+// Record traveler action on notification
+router.post('/trips/:id/notifications/action', (req, res) => {
+  const tripId = req.params.id;
+  const { notificationId, action, notes } = req.body || {};
+  if (!notificationId || !action) {
+    return res.status(400).json({ error: 'notificationId and action are required' });
+  }
+
+  const notifications = getTripNotifications(tripId);
+  const target = notifications.find(n => n.notificationId === notificationId);
+  if (target) {
+    target.userAction = action;
+    target.actionRecordedAt = new Date().toISOString();
+    target.actionNotes = notes || null;
+    target.status = 'ACTIONED';
+  }
+
+  res.json({
+    message: `Notification action '${action}' recorded.`,
+    notificationId,
+    action,
+  });
+});
+
+// ── 14. Phase 2: Planned Events Query & Operational Metrics ──────────────────
+router.get('/disruptions/events', (req, res) => {
+  const { lat, lon, corridorName, minuteOfDay } = req.query;
+  const coords = (lat && lon) ? [Number(lat), Number(lon)] : null;
+  const events = queryPlannedEvents({
+    coords,
+    corridorName,
+    targetMinute: minuteOfDay ? Number(minuteOfDay) : null,
+  });
+
+  res.json({
+    eventsCount: events.length,
+    canonicalCatalogCount: CANONICAL_PLANNED_EVENTS.length,
+    events,
+  });
+});
+
+router.get('/disruptions/metrics', (_req, res) => {
+  res.json({
+    activeDisruptedTrips: activeTripDisruptions.size,
+    totalPlannedEvents: CANONICAL_PLANNED_EVENTS.length,
+    timestamp: new Date().toISOString(),
   });
 });
 

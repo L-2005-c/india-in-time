@@ -136,13 +136,18 @@ export function renderTripControlCenter({
       </div>
 
       <!-- Killer Demo Simulation Controls -->
-      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; display:flex; justify-content:space-between; align-items:center;">
+      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div style="font-size:11px; color:#94a3b8;">
-          <span style="font-weight:700; color:#cbd5e1;">Demo Reality Simulator:</span> Introduce controlled mountain weather shift
+          <span style="font-weight:700; color:#cbd5e1;">Demo Reality Simulator:</span> Controlled disruption injection (SIMULATED)
         </div>
-        <button id="btn-simulate-ghat-rain" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
-          <span>🌧️</span> Simulate Ghat Road Downpour
-        </button>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-simulate-cricket-traffic" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #0284c7, #0369a1); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+            <span>🏏</span> Simulate Stadium Traffic (+50m)
+          </button>
+          <button id="btn-simulate-ghat-rain" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+            <span>🌧️</span> Simulate Ghat Downpour
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -277,7 +282,42 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         } catch (err) {
           console.error('[TripControlCenter] Failed to simulate disruption:', err);
           simBtn.disabled = false;
-          simBtn.textContent = '🌧️ Simulate Ghat Road Downpour';
+          simBtn.textContent = '🌧️ Simulate Ghat Downpour';
+        }
+      };
+    }
+
+    const cricketSimBtn = containerEl.querySelector('#btn-simulate-cricket-traffic');
+    if (cricketSimBtn) {
+      cricketSimBtn.onclick = async () => {
+        const tripId = cricketSimBtn.getAttribute('data-trip-id');
+        try {
+          cricketSimBtn.disabled = true;
+          cricketSimBtn.textContent = 'Simulating...';
+          if (window.API?.simulateTripDisruption) {
+            const res = await window.API.simulateTripDisruption(tripId, {
+              simulationScenario: 'CRICKET_MATCH_CONGESTION',
+              corridorName: 'NH16 Stadium Corridor',
+              currentTravelMinutes: 75,
+              freeFlowMinutes: 25,
+            });
+            if (res && res.disruptionEvaluation) {
+              const evalRes = res.disruptionEvaluation;
+              currentTripData.tripHealth = evalRes.disruption?.severity === 'CRITICAL' ? 'CRITICAL' : 'SUBOPTIMAL';
+              currentTripData.activeTriggers = [
+                {
+                  type: evalRes.disruption?.eventType || 'CRICKET_MATCH',
+                  message: `Stadium congestion (+${evalRes.disruption?.estimatedDelay || 50}m). Disruption: ${evalRes.disruption?.disruptionConfidence || 'HIGH'}, Cause: ${evalRes.disruption?.causeConfidence || 'HIGH'}.`,
+                },
+              ];
+              if (callbacks.onSimulated) callbacks.onSimulated(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to simulate cricket traffic:', err);
+          cricketSimBtn.disabled = false;
+          cricketSimBtn.textContent = '🏏 Simulate Stadium Traffic (+50m)';
         }
       };
     }

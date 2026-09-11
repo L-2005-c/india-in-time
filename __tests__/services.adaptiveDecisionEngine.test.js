@@ -435,7 +435,7 @@ describe('India In-Time v3.0 — Adaptive Travel Decision Engine', () => {
     test('POST /api/intelligence/trips/:id/decision/outcome logs user feedback', async () => {
       const decideRes = await request(app)
         .post(`/api/intelligence/trips/${testTripId}/decide`)
-        .send({});
+        .send({ context: { weather: { temperatureC: 26, condition: 'Clear' } } });
       const decisionId = decideRes.body.audit?.decisionId;
 
       const outcomeRes = await request(app)
