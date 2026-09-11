@@ -306,6 +306,44 @@ const SCHEMA_SQL = `
     created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_safety_notif_trip ON safety_notifications(trip_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS safety_source_snapshots (
+    id                   SERIAL PRIMARY KEY,
+    provider             VARCHAR(64) NOT NULL,
+    endpoint             TEXT NOT NULL,
+    http_status          INTEGER,
+    etag                 VARCHAR(255),
+    last_modified        VARCHAR(255),
+    payload_hash         VARCHAR(128) NOT NULL,
+    record_count         INTEGER DEFAULT 0,
+    parse_status         VARCHAR(32) DEFAULT 'SUCCESS',
+    retrieved_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_safety_snapshots_provider ON safety_source_snapshots(provider, retrieved_at DESC);
+
+  CREATE TABLE IF NOT EXISTS safety_provider_health (
+    id                   SERIAL PRIMARY KEY,
+    provider             VARCHAR(64) NOT NULL,
+    connection_status    VARCHAR(32) NOT NULL,
+    latency_ms           INTEGER DEFAULT 0,
+    failure_count        INTEGER DEFAULT 0,
+    freshness            VARCHAR(32) DEFAULT 'FRESH',
+    last_successful_fetch TIMESTAMP,
+    last_provider_ts     VARCHAR(255),
+    recorded_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_safety_health_provider ON safety_provider_health(provider, recorded_at DESC);
+
+  CREATE TABLE IF NOT EXISTS safety_decisions (
+    id                   SERIAL PRIMARY KEY,
+    trip_id              VARCHAR(255) NOT NULL,
+    plan_version         INTEGER DEFAULT 1,
+    decision_state       VARCHAR(64) NOT NULL,
+    primary_driver       TEXT,
+    traveler_action      VARCHAR(32) DEFAULT 'PENDING',
+    decided_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_safety_decisions_trip ON safety_decisions(trip_id, decided_at DESC);
 `;
 
 module.exports = { SCHEMA_SQL };

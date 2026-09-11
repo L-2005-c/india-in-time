@@ -624,7 +624,7 @@ describe('India In-Time v3.0 — Phase 3: Safety & Risk Intelligence', () => {
     const providersAfter = getSafetyProviders();
 
     expect(providersBefore.length).toBe(providersAfter.length);
-    expect(providersAfter.find(p => p.id === 'NDMA_SACHET').status).toBe('CONFIGURED_BUT_NOT_CONNECTED');
+    expect(providersAfter.find(p => p.id === 'NDMA_SACHET').status).toBe(providersBefore.find(p => p.id === 'NDMA_SACHET').status);
   });
 
   // TEST 22 — Traveler accepts recommendation => plan adaptation

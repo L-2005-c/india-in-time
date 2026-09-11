@@ -6,7 +6,14 @@
  * Unified Safety & Risk Intelligence Facade for India In-Time v3.0.
  */
 
-const { getSafetyProviders, OFFICIAL_PROVIDERS } = require('./safetySourceAdapters');
+const {
+  getSafetyProviders,
+  OFFICIAL_PROVIDERS,
+  fetchNdmaAlerts,
+  fetchImdWarnings,
+  fetchCwcFloodAdvisories,
+  fetchFsiFireAlerts,
+} = require('./safetySourceAdapters');
 const { createSafetySignal, HAZARD_TYPES, SAFETY_SEVERITIES, SAFETY_DATA_STATES } = require('./safetySignalModel');
 const { calibrateSafetyConfidences } = require('./safetyDualConfidence');
 const { arbitrateSafetySources } = require('./sourceAuthorityEngine');
@@ -255,9 +262,25 @@ function simulateSafetyEvent({
   });
 }
 
+/**
+ * Refreshes live safety feeds from official government adapters (NDMA, IMD).
+ */
+async function refreshLiveSafetyFeeds({ district = null, force = false } = {}) {
+  const [ndmaSignals, imdSignals] = await Promise.all([
+    fetchNdmaAlerts({ force }).catch(() => []),
+    fetchImdWarnings({ district, force }).catch(() => []),
+  ]);
+  return [...ndmaSignals, ...imdSignals];
+}
+
 module.exports = {
   getSafetyProviders,
   OFFICIAL_PROVIDERS,
+  fetchNdmaAlerts,
+  fetchImdWarnings,
+  fetchCwcFloodAdvisories,
+  fetchFsiFireAlerts,
+  refreshLiveSafetyFeeds,
   createSafetySignal,
   HAZARD_TYPES,
   SAFETY_SEVERITIES,

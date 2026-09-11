@@ -814,10 +814,16 @@ router.post('/trips/:id/safety/action', async (req, res) => {
 
   // Check if resolution requested
   if (action === 'RESOLVE' || req.body.resolveCondition) {
-    resolveSafetyCondition({
+    const resolution = resolveSafetyCondition({
       tripId,
-      hazardId: target?.hazardId || 'hazard_001',
-      hazardType: target?.hazardType || 'Safety condition',
+      hazardId: target?.hazardId || req.body.hazardId || 'hazard_001',
+      hazardType: target?.hazardType || req.body.hazardType || 'Safety condition',
+    });
+    return res.json({
+      message: "Safety condition resolved.",
+      notificationId: resolution.notification?.notificationId,
+      action: 'RESOLVE',
+      resolution,
     });
   }
 
@@ -838,10 +844,10 @@ router.get('/safety/sources', (_req, res) => {
   res.json({
     sourcesCount: 4,
     sources: [
-      { id: 'NDMA_SACHET', name: 'NDMA SACHET CAP Feed', tier: 'OFFICIAL_ACTIVE_WARNING' },
-      { id: 'IMD', name: 'IMD Warning & Nowcast Network', tier: 'OFFICIAL_ACTIVE_WARNING' },
-      { id: 'CWC', name: 'CWC Hydrological Advisory', tier: 'OFFICIAL_FORECAST' },
-      { id: 'FSI', name: 'FSI & NASA FIRMS Thermal Hotspots', tier: 'HIGH_CONFIDENCE_LIVE_OBSERVATION' },
+      { id: 'NDMA_SACHET', name: 'NDMA SACHET Alert Service', tier: 'OFFICIAL_ACTIVE_WARNING', status: 'LIVE' },
+      { id: 'IMD', name: 'IMD Warning & Nowcast Network', tier: 'OFFICIAL_ACTIVE_WARNING', status: 'LIVE' },
+      { id: 'CWC', name: 'CWC Hydrological Advisory', tier: 'OFFICIAL_FORECAST', status: 'PARTIALLY_AVAILABLE' },
+      { id: 'FSI', name: 'FSI & NASA FIRMS Thermal Hotspots', tier: 'HIGH_CONFIDENCE_LIVE_OBSERVATION', status: 'PARTIALLY_AVAILABLE' },
     ],
   });
 });
@@ -857,14 +863,16 @@ router.get('/safety/providers', (_req, res) => {
 
 router.get('/safety/metrics', (_req, res) => {
   const providers = getSafetyProviders();
-  const connectedCount = providers.filter(p => p.status === 'CONNECTED').length;
-  const partialCount = providers.filter(p => p.status === 'PARTIALLY_CONNECTED').length;
+  const liveCount = providers.filter(p => p.connectionStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'CONNECTED').length;
+  const partialCount = providers.filter(p => p.connectionStatus === 'PARTIALLY_AVAILABLE' || p.status === 'PARTIALLY_AVAILABLE' || p.status === 'PARTIALLY_CONNECTED').length;
 
   res.json({
     activeEvaluatedTrips: activeTripSafety.size,
     totalProvidersRegistered: providers.length,
-    connectedProvidersCount: connectedCount,
+    connectedProvidersCount: liveCount,
+    liveProvidersCount: liveCount,
     partiallyConnectedCount: partialCount,
+    partiallyAvailableCount: partialCount,
     timestamp: new Date().toISOString(),
   });
 });

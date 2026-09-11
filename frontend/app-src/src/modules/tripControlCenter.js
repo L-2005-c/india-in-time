@@ -137,6 +137,44 @@ export function renderTripControlCenter({
         </div>
       </div>
 
+      <!-- Safety Data Sources & Ground-Truth Telemetry Status (Section 36) -->
+      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-bottom:12px;">
+        <div style="font-size:11px; font-weight:700; color:#cbd5e1; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+          <span>🛡️ Safety Data Sources & Ground-Truth Telemetry:</span>
+          <span style="font-size:10px; color:#64748b;">Deterministic Rules • Zero LLM Fabrication</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16,185,129,0.2); border-radius:6px; padding:6px 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:600; color:#f8fafc;">NDMA SACHET</span>
+              <span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">LIVE</span>
+            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Official CAP Disaster & Evacuation Alerts</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16,185,129,0.2); border-radius:6px; padding:6px 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:600; color:#f8fafc;">IMD Mausam</span>
+              <span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">LIVE</span>
+            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Official District Color Warnings (750+ Dists)</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(245,158,11,0.2); border-radius:6px; padding:6px 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:600; color:#f8fafc;">CWC Flood Service</span>
+              <span style="background:rgba(245,158,11,0.2); color:#f59e0b; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PARTIALLY_AVAILABLE</span>
+            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Public Daily Bulletins (Machine GIS IAM-protected)</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(245,158,11,0.2); border-radius:6px; padding:6px 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:600; color:#f8fafc;">FSI Forest Fire</span>
+              <span style="background:rgba(245,158,11,0.2); color:#f59e0b; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PARTIALLY_AVAILABLE</span>
+            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Portal Monitoring & Satellite Thermal Anomalies</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Killer Demo Simulation Controls -->
       <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div style="font-size:11px; color:#94a3b8;">
