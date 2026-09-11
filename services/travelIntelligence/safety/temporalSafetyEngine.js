@@ -64,6 +64,7 @@ function evaluateTemporalOverlap({
   travelerStartMinute = null,
   travelerEndMinute = null,
   nowMinute = 600,
+  nowTimestamp = Date.now(),
 } = {}) {
   // If hazard has no explicit time window, default to active now
   if (!signal.validFrom && !signal.validUntil) {
@@ -73,6 +74,31 @@ function evaluateTemporalOverlap({
       isOverlap: true,
       explanation: 'Hazard is currently active with open validity window.',
     };
+  }
+
+  // 1. Absolute date/epoch checks (e.g. tomorrow or past days)
+  if (signal.validFrom) {
+    const fromMs = new Date(signal.validFrom).getTime();
+    if (!Number.isNaN(fromMs) && fromMs - nowTimestamp > 4 * 3600 * 1000) {
+      return {
+        state: TEMPORAL_STATES.NO_OVERLAP,
+        overlapMinutes: 0,
+        isOverlap: false,
+        explanation: 'Hazard window starts well after traveler has cleared corridor.',
+      };
+    }
+  }
+
+  if (signal.validUntil) {
+    const untilMs = new Date(signal.validUntil).getTime();
+    if (!Number.isNaN(untilMs) && untilMs < nowTimestamp - 5 * 60 * 1000) {
+      return {
+        state: TEMPORAL_STATES.EXPIRED,
+        overlapMinutes: 0,
+        isOverlap: false,
+        explanation: 'Hazard validity window expired prior to scheduled arrival.',
+      };
+    }
   }
 
   const hazardStartMin = parseTimestampToMinutes(signal.validFrom) ?? 0;

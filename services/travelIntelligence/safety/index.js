@@ -101,6 +101,7 @@ function evaluateJourneySafety({
     travelerStartMinute: currentMinute,
     travelerEndMinute: currentMinute + 180,
     nowMinute: currentMinute,
+    nowTimestamp: now,
   });
 
   // 5. Personalized Exposure & Hard Safety Constraints
