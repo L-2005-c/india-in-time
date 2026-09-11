@@ -129,7 +129,7 @@ function recommendTransitMode(distanceKm, opts = {}) {
       modeIcon: '🚙',
       estimatedFare: cabFare,
       fareStr: `₹${cabFare}`,
-      rationale: 'Experienced mountain ghat driver recommended for high-altitude hairpin curves',
+      rationale: 'India In-Time recommends a lower-risk transport option based on route complexity and traveler tolerance.',
     };
   }
 
@@ -238,7 +238,7 @@ function estimateTravel(opts = {}) {
   const roadNetworkFactor = isGhat ? (rules.ghatRoadTransit?.windingFactor || 1.68) : ROAD_NETWORK_FACTOR;
   const baseSpeedKmPerMin = isGhat ? (rules.ghatRoadTransit?.speedKmPerMin || 0.22) : 0.32;
   const isNightGhat = isGhat && (departMin >= (rules.ghatRoadTransit?.nightFogThresholdMin || 1080) || departMin <= (rules.ghatRoadTransit?.dawnFogThresholdMin || 330));
-  const ghatNightAdvisory = isNightGhat ? 'Night mountain pass: severe fog and unlit hairpin switchbacks. Drive under 30 km/h.' : null;
+  const ghatNightAdvisory = isNightGhat ? 'Night mountain pass: severe fog and unlit hairpin switchbacks. Reduce speed and reassess visibility and road conditions.' : null;
 
   const isMorningRush = departMin >= 8 * 60 + 30 && departMin <= 10 * 60 + 30;
   const isEveningRush = departMin >= 17 * 60 + 30 && departMin <= 20 * 60 + 30;

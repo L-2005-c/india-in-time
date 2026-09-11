@@ -176,7 +176,45 @@ function evaluateSafetyDecision({
   };
 }
 
+const MACRO_DECISION_STATES = Object.freeze({
+  KEEP_PLAN: 'KEEP_PLAN',
+  ADAPT_PLAN: 'ADAPT_PLAN',
+  ALTERNATIVE_REQUIRED: 'ALTERNATIVE_REQUIRED',
+});
+
+/**
+ * Deterministically maps Phase 3 Safety Decisions to Phase 1 Macro Decisions.
+ *
+ * Invariants:
+ * - CONTINUE / WATCH / CAUTION => KEEP_PLAN
+ * - DELAY / WAIT / REORDER => ADAPT_PLAN
+ * - REROUTE / REPLACE_STOP / AVOID / EMERGENCY => ALTERNATIVE_REQUIRED
+ * - INSUFFICIENT_DATA => KEEP_PLAN with unverified advisory
+ */
+function mapSafetyToMacroDecision(safetyDecision) {
+  switch (safetyDecision) {
+    case SAFETY_DECISION_STATES.CONTINUE:
+    case SAFETY_DECISION_STATES.WATCH:
+    case SAFETY_DECISION_STATES.CAUTION:
+      return MACRO_DECISION_STATES.KEEP_PLAN;
+    case SAFETY_DECISION_STATES.DELAY:
+    case SAFETY_DECISION_STATES.WAIT:
+    case SAFETY_DECISION_STATES.REORDER:
+      return MACRO_DECISION_STATES.ADAPT_PLAN;
+    case SAFETY_DECISION_STATES.REROUTE:
+    case SAFETY_DECISION_STATES.REPLACE_STOP:
+    case SAFETY_DECISION_STATES.AVOID:
+    case SAFETY_DECISION_STATES.EMERGENCY:
+      return MACRO_DECISION_STATES.ALTERNATIVE_REQUIRED;
+    case SAFETY_DECISION_STATES.INSUFFICIENT_DATA:
+    default:
+      return MACRO_DECISION_STATES.KEEP_PLAN;
+  }
+}
+
 module.exports = {
   SAFETY_DECISION_STATES,
+  MACRO_DECISION_STATES,
   evaluateSafetyDecision,
+  mapSafetyToMacroDecision,
 };

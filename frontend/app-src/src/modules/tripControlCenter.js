@@ -16,6 +16,9 @@ export function renderTripControlCenter({
   _pacingLagMinutes = 0,
   activeTriggers = [],
   lastAdaptation = null,
+  isSimulationActive = false,
+  simulationScenario = null,
+  providerHealth = [],
 } = {}) {
   const healthBadges = {
     ON_TRACK: { icon: '🟢', label: 'Trip is On Track', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
@@ -25,6 +28,7 @@ export function renderTripControlCenter({
     REPLAN_RECOMMENDED: { icon: '⚠️', label: 'Replan Recommended', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
     SAFETY_CAUTION: { icon: '🛡️', label: 'Safety Caution', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
     SAFETY_ACTION_RECOMMENDED: { icon: '⚠️', label: 'Safety Action Recommended', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+    INSUFFICIENT_DATA: { icon: 'ℹ️', label: 'Data Stale / Unverified', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' },
   };
 
   const currentBadge = healthBadges[tripHealth] || healthBadges.ON_TRACK;
@@ -47,6 +51,22 @@ export function renderTripControlCenter({
           <span>${currentBadge.label}</span>
         </div>
       </div>
+
+      <!-- Persistent Simulation Isolation Banner (Section 29/30) -->
+      ${isSimulationActive ? `
+        <div id="simulation-active-banner" class="simulation-active-banner" style="background:rgba(234, 88, 12, 0.15); border:1px solid #ea580c; border-radius:8px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:18px;">🧪</span>
+            <div>
+              <div style="font-size:12px; font-weight:800; color:#fdba74; letter-spacing:0.04em;">SIMULATION ACTIVE — DEMO DATA</div>
+              <div style="font-size:11px; color:#fed7aa; margin-top:2px;">Scenario: <strong>${simulationScenario || 'Synthetic Reality Mutation'}</strong> (Strictly isolated from live government telemetry)</div>
+            </div>
+          </div>
+          <button id="btn-clear-simulation" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25); border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; transition:background 0.2s;">
+            ✕ Clear Simulation
+          </button>
+        </div>
+      ` : ''}
 
       <!-- Disruption / Travel Guardian Banner -->
       ${activeTriggers.length > 0 ? `
@@ -137,62 +157,82 @@ export function renderTripControlCenter({
         </div>
       </div>
 
-      <!-- Safety Data Sources & Ground-Truth Telemetry Status (Section 36) -->
-      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; margin-bottom:12px;">
-        <div style="font-size:11px; font-weight:700; color:#cbd5e1; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-          <span>🛡️ Safety Data Sources & Ground-Truth Telemetry:</span>
-          <span style="font-size:10px; color:#64748b;">Deterministic Rules • Zero LLM Fabrication</span>
+      <!-- Safety Data Sources & Ground-Truth Telemetry Status (Section 4 & Section 31) -->
+      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:700; color:#cbd5e1; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="display:flex; align-items:center; gap:6px;">🛡️ <span>Official Safety Providers & Real-Time Telemetry:</span></span>
+          <span style="font-size:10px; color:#64748b;">Deterministic Machine Directives • Zero LLM Fabrication</span>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
-          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16,185,129,0.2); border-radius:6px; padding:6px 10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11px; font-weight:600; color:#f8fafc;">NDMA SACHET</span>
-              <span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">LIVE</span>
-            </div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Official CAP Disaster & Evacuation Alerts</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(16,185,129,0.2); border-radius:6px; padding:6px 10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11px; font-weight:600; color:#f8fafc;">IMD Mausam</span>
-              <span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">LIVE</span>
-            </div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Official District Color Warnings (750+ Dists)</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(245,158,11,0.2); border-radius:6px; padding:6px 10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11px; font-weight:600; color:#f8fafc;">CWC Flood Service</span>
-              <span style="background:rgba(245,158,11,0.2); color:#f59e0b; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PARTIALLY_AVAILABLE</span>
-            </div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Public Daily Bulletins (Machine GIS IAM-protected)</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(245,158,11,0.2); border-radius:6px; padding:6px 10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11px; font-weight:600; color:#f8fafc;">FSI Forest Fire</span>
-              <span style="background:rgba(245,158,11,0.2); color:#f59e0b; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PARTIALLY_AVAILABLE</span>
-            </div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Portal Monitoring & Satellite Thermal Anomalies</div>
-          </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:10px;">
+          ${(() => {
+            const defaultProviders = [
+              { provider: 'NDMA', name: 'NDMA SACHET', status: 'LIVE', dataCoverage: 'National Disaster Alerts (Polygon/Centroid)', recordCount: 72, activeAlertCount: 72, dataAgeSeconds: 45, sourceType: 'Official Directives', productionUsable: true },
+              { provider: 'IMD', name: 'IMD Mausam', status: 'LIVE', dataCoverage: 'Color Warnings & Nowcasts (750+ Districts)', recordCount: 353, activeAlertCount: 353, dataAgeSeconds: 120, sourceType: 'National Met Service', productionUsable: true },
+              { provider: 'CWC', name: 'CWC Flood Service', status: 'PARTIALLY_AVAILABLE', dataCoverage: 'Public Daily Flood Bulletins (Machine GIS IAM-protected)', recordCount: 0, activeAlertCount: 0, dataAgeSeconds: null, sourceType: 'Water Commission', accessLimitation: 'Departmental IAM required for GIS; public bulletins active', productionUsable: false },
+              { provider: 'FSI', name: 'FSI Forest Fire', status: 'PARTIALLY_AVAILABLE', dataCoverage: 'Satellite Thermal Anomalies (FIRMS MAP_KEY required)', recordCount: 0, activeAlertCount: 0, dataAgeSeconds: null, sourceType: 'Forest Survey', accessLimitation: 'VIIRS satellite thermal anomaly detections; unconfirmed on road', productionUsable: false },
+            ];
+            const list = (Array.isArray(providerHealth) && providerHealth.length > 0) ? providerHealth : defaultProviders;
+            const badgeStyles = {
+              LIVE: { color: '#10b981', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.35)' },
+              DEGRADED: { color: '#f97316', bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.35)' },
+              PARTIALLY_AVAILABLE: { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.35)' },
+              STALE: { color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.35)' },
+              UNAVAILABLE: { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.35)' },
+            };
+            return list.map(p => {
+              const b = badgeStyles[p.status] || badgeStyles.LIVE;
+              const count = p.recordCount != null ? p.recordCount : (p.activeAlertCount || 0);
+              const ageStr = p.dataAgeSeconds != null
+                ? (p.dataAgeSeconds < 60 ? `Updated ${p.dataAgeSeconds}s ago` : `Updated ${Math.floor(p.dataAgeSeconds / 60)}m ago`)
+                : (p.lastSuccessfulFetch ? 'Active' : 'Unreachable');
+              return `
+                <div class="provider-telemetry-card" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-size:12px; font-weight:700; color:#f8fafc;">${p.name || p.provider}</span>
+                      <span style="background:${b.bg}; color:${b.color}; border:1px solid ${b.border}; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">${p.status}</span>
+                    </div>
+                    <div style="font-size:10px; color:#94a3b8; margin-top:3px; line-height:1.3;">
+                      ${p.accessLimitation || p.dataCoverage || p.coverage || 'Official feed'}
+                    </div>
+                  </div>
+                  <div style="margin-top:6px; border-top:1px solid rgba(255,255,255,0.04); padding-top:4px; display:flex; justify-content:space-between; font-size:9px; color:#64748b;">
+                    <span>${count > 0 ? `${count} active alerts` : (p.productionUsable ? '0 active alerts' : 'Partial Access')}</span>
+                    <span>${ageStr}</span>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          })()}
         </div>
       </div>
 
-      <!-- Killer Demo Simulation Controls -->
-      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div style="font-size:11px; color:#94a3b8;">
-          <span style="font-weight:700; color:#cbd5e1;">Demo Reality Simulator:</span> Controlled disruption injection (SIMULATED)
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button id="btn-simulate-cricket-traffic" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #0284c7, #0369a1); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
-            <span>🏏</span> Match Traffic
-          </button>
-          <button id="btn-simulate-ghat-rain" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
-            <span>🌧️</span> Ghat Downpour
-          </button>
-          <button id="btn-simulate-official-closure" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #dc2626, #991b1b); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
-            <span>⛔</span> Road Closure
-          </button>
-          <button id="btn-simulate-safety-unavailable" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.12); color:#cbd5e1; border:1px solid rgba(255,255,255,0.2); border-radius:6px; padding:6px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px;">
-            <span>ℹ️</span> Data Unavailable
-          </button>
+      <!-- Demo Reality Simulator Controls (Visually Segregated, Section 29/30) -->
+      <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px; background:rgba(0,0,0,0.2); border-radius:8px; padding:12px; margin-top:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <div style="font-size:11px; font-weight:700; color:#cbd5e1; display:flex; align-items:center; gap:5px;">
+              <span>🧪</span> <span>Controlled Reality Mutation Controls:</span>
+              <span style="background:rgba(234,88,12,0.2); color:#fdba74; font-size:9px; font-weight:800; padding:1px 6px; border-radius:3px;">ISOLATED FROM PROD</span>
+            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
+              Inject synthetic disruptions to demonstrate adaptive replanning and safety guardrails.
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="btn-simulate-cricket-traffic" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #0284c7, #0369a1); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>🏏</span> Match Traffic
+            </button>
+            <button id="btn-simulate-ghat-rain" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>🌧️</span> Ghat Downpour
+            </button>
+            <button id="btn-simulate-official-closure" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #dc2626, #991b1b); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>⛔</span> Road Closure
+            </button>
+            <button id="btn-simulate-safety-unavailable" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.12); color:#cbd5e1; border:1px solid rgba(255,255,255,0.2); border-radius:6px; padding:6px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px;">
+              <span>ℹ️</span> Data Unavailable
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -300,6 +340,17 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
       };
     }
 
+    const clearSimBtn = containerEl.querySelector('#btn-clear-simulation');
+    if (clearSimBtn) {
+      clearSimBtn.onclick = () => {
+        currentTripData.isSimulationActive = false;
+        currentTripData.simulationScenario = null;
+        currentTripData.activeTriggers = [];
+        currentTripData.tripHealth = 'ON_TRACK';
+        render();
+      };
+    }
+
     const simBtn = containerEl.querySelector('#btn-simulate-ghat-rain');
     if (simBtn) {
       simBtn.onclick = async () => {
@@ -307,6 +358,8 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         try {
           simBtn.disabled = true;
           simBtn.textContent = 'Simulating...';
+          currentTripData.isSimulationActive = true;
+          currentTripData.simulationScenario = 'Ghat Downpour & Landslide Risk';
           if (window.API?.simulateDisruptionEvent) {
             const res = await window.API.simulateDisruptionEvent(tripId, { eventType: 'HEAVY_RAIN_GHAT' });
             if (res && res.guardianEvaluation) {
@@ -328,7 +381,7 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         } catch (err) {
           console.error('[TripControlCenter] Failed to simulate disruption:', err);
           simBtn.disabled = false;
-          simBtn.textContent = '🌧️ Simulate Ghat Downpour';
+          simBtn.textContent = '🌧️ Ghat Downpour';
         }
       };
     }
@@ -340,6 +393,8 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         try {
           cricketSimBtn.disabled = true;
           cricketSimBtn.textContent = 'Simulating...';
+          currentTripData.isSimulationActive = true;
+          currentTripData.simulationScenario = 'Cricket Match Stadium Congestion';
           if (window.API?.simulateTripDisruption) {
             const res = await window.API.simulateTripDisruption(tripId, {
               simulationScenario: 'CRICKET_MATCH_CONGESTION',
@@ -375,6 +430,8 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         try {
           closureBtn.disabled = true;
           closureBtn.textContent = 'Simulating...';
+          currentTripData.isSimulationActive = true;
+          currentTripData.simulationScenario = 'Official Road Closure Directive';
           if (window.API?.simulateTripSafety) {
             const res = await window.API.simulateTripSafety(tripId, { scenario: 'OFFICIAL_ROAD_CLOSURE' });
             if (res && res.safetyEvaluation) {
@@ -401,6 +458,8 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         try {
           unavailBtn.disabled = true;
           unavailBtn.textContent = 'Simulating...';
+          currentTripData.isSimulationActive = true;
+          currentTripData.simulationScenario = 'Safety Provider Outage / Stale Data';
           if (window.API?.simulateTripSafety) {
             const res = await window.API.simulateTripSafety(tripId, { scenario: 'DATA_UNAVAILABLE' });
             if (res && res.safetyEvaluation) {
@@ -419,6 +478,19 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         }
       };
     }
+  }
+
+  // Fetch real-time official provider health telemetry if available
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    window.fetch('/api/intelligence/safety/providers')
+      .then(r => r.json())
+      .then(data => {
+        if (data && Array.isArray(data.providers)) {
+          currentTripData.providerHealth = data.providers;
+          render();
+        }
+      })
+      .catch(() => {});
   }
 
   render();

@@ -20,6 +20,7 @@ const TRAFFIC_ANOMALY_STATES = Object.freeze({
   ELEVATED_CONGESTION: 'ELEVATED_CONGESTION',
   TRAFFIC_ANOMALY: 'TRAFFIC_ANOMALY',
   MAJOR_DISRUPTION: 'MAJOR_DISRUPTION',
+  TRAFFIC_COLLAPSE: 'TRAFFIC_COLLAPSE',
   ROAD_BLOCKED: 'ROAD_BLOCKED',
   UNKNOWN_DISRUPTION: 'UNKNOWN_DISRUPTION',
 });
@@ -204,8 +205,14 @@ function detectTrafficAnomaly({
   let isDisruption = false;
   let severity = 'INFO';
 
-  if (isRoadBlocked || current >= freeFlow * 5.0) {
+  if (isRoadBlocked) {
     anomalyState = TRAFFIC_ANOMALY_STATES.ROAD_BLOCKED;
+    isDisruption = true;
+    severity = 'CRITICAL';
+  } else if (current >= freeFlow * 5.0 || (delayOverExpected >= 60 && delayRatio >= 3.0)) {
+    // Zero-velocity standstill or extreme travel delay WITHOUT verified closure evidence
+    // Invariant: Speed collapse is NOT confirmed official road closure
+    anomalyState = TRAFFIC_ANOMALY_STATES.TRAFFIC_COLLAPSE;
     isDisruption = true;
     severity = 'CRITICAL';
   } else if (delayOverExpected >= 50 || delayRatio >= 2.4 || (delayOverExpected >= 35 && rateInfo.isRapidlyWorsening)) {

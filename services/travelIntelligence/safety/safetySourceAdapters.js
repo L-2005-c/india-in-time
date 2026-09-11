@@ -21,6 +21,7 @@ const { createSafetySignal, HAZARD_TYPES, SAFETY_SEVERITIES, SAFETY_DATA_STATES,
 
 const PROVIDER_STATUS = Object.freeze({
   LIVE: 'LIVE',
+  DEGRADED: 'DEGRADED',
   PARTIALLY_AVAILABLE: 'PARTIALLY_AVAILABLE',
   STALE: 'STALE',
   UNAVAILABLE: 'UNAVAILABLE',
@@ -104,12 +105,15 @@ const providerHealthRecords = new Map([
     lastSuccessfulPayloadHash: null,
     freshness: 'FRESH',
     failureCount: 0,
+    lastFailure: null,
+    lastFailureError: null,
     latencyMs: 0,
     authenticationStatus: 'OPEN_PUBLIC',
     dataCoverage: 'ALL_INDIA_DISASTER_ALERTS',
     productionUsable: true,
     endpoint: OFFICIAL_PROVIDERS.NDMA_SACHET.endpoint,
     activeAlertCount: 0,
+    recordCount: 0,
     lastEtag: null,
   }],
   ['IMD', {
@@ -121,12 +125,15 @@ const providerHealthRecords = new Map([
     lastSuccessfulPayloadHash: null,
     freshness: 'FRESH',
     failureCount: 0,
+    lastFailure: null,
+    lastFailureError: null,
     latencyMs: 0,
     authenticationStatus: 'OPEN_PUBLIC',
     dataCoverage: 'ALL_INDIA_750_DISTRICTS',
     productionUsable: true,
     endpoint: OFFICIAL_PROVIDERS.IMD.endpoint,
     activeAlertCount: 0,
+    recordCount: 0,
     lastEtag: null,
   }],
   ['CWC', {
@@ -138,12 +145,15 @@ const providerHealthRecords = new Map([
     lastSuccessfulPayloadHash: null,
     freshness: 'FRESH',
     failureCount: 0,
+    lastFailure: null,
+    lastFailureError: null,
     latencyMs: 0,
     authenticationStatus: 'PARTIAL_PUBLIC_ACCESS',
     dataCoverage: 'MAJOR_RIVER_BASINS_PUBLIC_BULLETINS',
     productionUsable: false, // Machine GIS requires departmental IAM token
     endpoint: OFFICIAL_PROVIDERS.CWC.endpoint,
     activeAlertCount: 0,
+    recordCount: 0,
     accessLimitation: 'CWC machine GIS interface requires departmental IAM token; public access limited to published daily bulletins',
   }],
   ['FSI', {
@@ -155,12 +165,15 @@ const providerHealthRecords = new Map([
     lastSuccessfulPayloadHash: null,
     freshness: 'FRESH',
     failureCount: 0,
+    lastFailure: null,
+    lastFailureError: null,
     latencyMs: 0,
     authenticationStatus: 'PARTIAL_PUBLIC_ACCESS',
     dataCoverage: 'SATELLITE_THERMAL_ANOMALIES',
     productionUsable: false, // Satellite direct stream requires registered MAP_KEY
     endpoint: OFFICIAL_PROVIDERS.FSI.endpoint,
     activeAlertCount: 0,
+    recordCount: 0,
     accessLimitation: 'NASA FIRMS VIIRS satellite ingestion requires user MAP_KEY; detections classified strictly as FIRE_ANOMALY',
   }],
 ]);
@@ -408,9 +421,11 @@ async function fetchNdmaAlerts({ force = false, etag = null } = {}) {
     health.lastEtag = newEtag;
 
     return signals;
-  } catch (_err) {
+  } catch (err) {
     health.failureCount += 1;
     health.latencyMs = Date.now() - startTime;
+    health.lastFailure = new Date().toISOString();
+    health.lastFailureError = err.message;
     if (adapterCache.ndma.alerts.length > 0) {
       health.connectionStatus = PROVIDER_STATUS.STALE;
       health.freshness = 'STALE';
@@ -518,9 +533,11 @@ async function fetchImdWarnings({ district = null, _force = false } = {}) {
     }
 
     return signals;
-  } catch (_err) {
+  } catch (err) {
     health.failureCount += 1;
     health.latencyMs = Date.now() - startTime;
+    health.lastFailure = new Date().toISOString();
+    health.lastFailureError = err.message;
     if (adapterCache.imd.warnings.length > 0) {
       health.connectionStatus = PROVIDER_STATUS.STALE;
       health.freshness = 'STALE';
@@ -559,6 +576,8 @@ async function fetchCwcFloodAdvisories() {
     };
   } catch (err) {
     health.failureCount += 1;
+    health.lastFailure = new Date().toISOString();
+    health.lastFailureError = err.message;
     health.connectionStatus = PROVIDER_STATUS.UNAVAILABLE;
     health.freshness = 'UNAVAILABLE';
     return {
@@ -572,8 +591,8 @@ async function fetchCwcFloodAdvisories() {
 }
 
 /**
- * Ingestion Adapter for FSI & NASA FIRMS Thermal Hotspots.
- * Explicitly distinguishes raw satellite thermal anomalies from confirmed roadway fires.
+ * Ingestion Adapter for FSI Forest Fire / NASA FIRMS Hotspots.
+ * Explicitly distinguishes satellite thermal anomaly detections from confirmed road fires.
  */
 async function fetchFsiFireAlerts() {
   const health = providerHealthRecords.get('FSI');
@@ -597,6 +616,8 @@ async function fetchFsiFireAlerts() {
     };
   } catch (err) {
     health.failureCount += 1;
+    health.lastFailure = new Date().toISOString();
+    health.lastFailureError = err.message;
     health.connectionStatus = PROVIDER_STATUS.UNAVAILABLE;
     health.freshness = 'UNAVAILABLE';
     return {
@@ -610,34 +631,67 @@ async function fetchFsiFireAlerts() {
 }
 
 /**
- * Returns complete provider health records matrix conforming to Section 3.
+ * Returns complete provider health records matrix conforming to Section 3 and Section 4.
  */
 function getSafetyProviders() {
+  const now = Date.now();
   return Array.from(providerHealthRecords.values()).map(h => {
     const id = h.provider === 'NDMA' ? 'NDMA_SACHET' : h.provider;
     const official = OFFICIAL_PROVIDERS[id] || {};
+    const policyTtl = official.freshnessPolicySeconds || 3600;
+
+    const dataAgeSeconds = h.lastSuccessfulFetch
+      ? Math.max(0, Math.floor((now - new Date(h.lastSuccessfulFetch).getTime()) / 1000))
+      : null;
+
+    let computedStatus = h.connectionStatus;
+    if (h.provider === 'CWC' || h.provider === 'FSI') {
+      computedStatus = h.connectionStatus === PROVIDER_STATUS.UNAVAILABLE
+        ? PROVIDER_STATUS.UNAVAILABLE
+        : PROVIDER_STATUS.PARTIALLY_AVAILABLE;
+    } else if (h.lastSuccessfulFetch) {
+      if (dataAgeSeconds != null && dataAgeSeconds > policyTtl) {
+        computedStatus = PROVIDER_STATUS.STALE;
+      } else if (h.failureCount > 0) {
+        computedStatus = PROVIDER_STATUS.DEGRADED;
+      } else {
+        computedStatus = PROVIDER_STATUS.LIVE;
+      }
+    } else if (h.failureCount > 0) {
+      computedStatus = PROVIDER_STATUS.UNAVAILABLE;
+    }
+
+    const freshness = (dataAgeSeconds != null && dataAgeSeconds > policyTtl)
+      ? 'STALE'
+      : (h.lastSuccessfulFetch ? 'FRESH' : h.freshness);
+
     return {
       id,
       provider: h.provider,
       name: h.name,
-      status: h.connectionStatus,
-      connectionStatus: h.connectionStatus,
+      status: computedStatus,
+      connectionStatus: computedStatus,
       sourceType: official.sourceType,
       accessMethod: official.accessMethod,
-      freshnessPolicySeconds: official.freshnessPolicySeconds,
+      freshnessPolicySeconds: policyTtl,
       geographicResolution: official.geographicResolution,
       productionRequirement: official.productionRequirement,
       lastSuccessfulFetch: h.lastSuccessfulFetch,
       lastProviderTimestamp: h.lastProviderTimestamp,
       lastSuccessfulPayloadHash: h.lastSuccessfulPayloadHash,
-      freshness: h.freshness,
-      failureCount: h.failureCount,
-      latencyMs: h.latencyMs,
+      dataAgeSeconds,
+      recordCount: h.activeAlertCount || 0,
+      activeAlertCount: h.activeAlertCount || 0,
+      freshness,
+      failureCount: h.failureCount || 0,
+      lastFailure: h.lastFailure || null,
+      lastFailureError: h.lastFailureError || null,
+      latencyMs: h.latencyMs || 0,
       authenticationStatus: h.authenticationStatus,
+      coverage: h.dataCoverage,
       dataCoverage: h.dataCoverage,
       productionUsable: h.productionUsable,
       endpoint: h.endpoint,
-      activeAlertCount: h.activeAlertCount,
       accessLimitation: h.accessLimitation || null,
     };
   });

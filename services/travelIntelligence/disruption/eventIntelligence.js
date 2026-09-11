@@ -31,6 +31,20 @@ const EVENT_TYPES = Object.freeze({
   ROAD_CLOSURE: 'ROAD_CLOSURE',
 });
 
+const SOURCE_CLASSIFICATIONS = Object.freeze({
+  OFFICIAL_SCHEDULE: 'OFFICIAL_SCHEDULE',
+  VERIFIED_EVENT: 'VERIFIED_EVENT',
+  STATIC_KNOWLEDGE: 'STATIC_KNOWLEDGE',
+  SIMULATED: 'SIMULATED',
+});
+
+const EVENT_STATES = Object.freeze({
+  EVENT_SCHEDULED: 'EVENT_SCHEDULED',
+  TRAFFIC_IMPACT_OBSERVED: 'TRAFFIC_IMPACT_OBSERVED',
+  EVENT_CAUSED_TRAFFIC: 'EVENT_CAUSED_TRAFFIC',
+  PLANNED_VIP_EVENT: 'PLANNED_VIP_EVENT',
+});
+
 // Canonical Indian Regional and Metro Events Catalog
 const CANONICAL_PLANNED_EVENTS = [
   {
@@ -48,8 +62,16 @@ const CANONICAL_PLANNED_EVENTS = [
     endTime: '22:30',
     source: 'OFFICIAL_STADIUM_SCHEDULE',
     sourceType: 'BCCI / ACA Official Calendar',
+    sourceClassification: SOURCE_CLASSIFICATIONS.OFFICIAL_SCHEDULE,
+    eventScheduleState: EVENT_STATES.EVENT_SCHEDULED,
     confidence: 'HIGH',
     expectedDelayMinutes: 55,
+    estimatedImpact: {
+      delayMinutesRange: [45, 65],
+      basis: 'HISTORICAL_STADIUM_PRIOR',
+      modelVersion: 'event-prior-v1',
+      heuristic: true,
+    },
     expectedImpact: 'HEAVY_CORRIDOR_CONGESTION',
   },
   {
@@ -67,8 +89,16 @@ const CANONICAL_PLANNED_EVENTS = [
     endTime: '23:59',
     source: 'DEVASTHANAM_OFFICIAL_CALENDAR',
     sourceType: 'Endowments Department / City Police Advisory',
+    sourceClassification: SOURCE_CLASSIFICATIONS.OFFICIAL_SCHEDULE,
+    eventScheduleState: EVENT_STATES.EVENT_SCHEDULED,
     confidence: 'HIGH',
     expectedDelayMinutes: 45,
+    estimatedImpact: {
+      delayMinutesRange: [30, 50],
+      basis: 'FESTIVAL_CALENDAR_PRIOR',
+      modelVersion: 'event-prior-v1',
+      heuristic: true,
+    },
     expectedImpact: 'FOOT_PROCESSION_ROAD_DIVERSION',
   },
   {
@@ -86,8 +116,16 @@ const CANONICAL_PLANNED_EVENTS = [
     endTime: '23:30',
     source: 'TTD_OFFICIAL_CALENDAR',
     sourceType: 'Tirumala Tirupati Devasthanams Advisory',
+    sourceClassification: SOURCE_CLASSIFICATIONS.OFFICIAL_SCHEDULE,
+    eventScheduleState: EVENT_STATES.EVENT_SCHEDULED,
     confidence: 'HIGH',
     expectedDelayMinutes: 70,
+    estimatedImpact: {
+      delayMinutesRange: [40, 70],
+      basis: 'DEVASTHANAM_CALENDAR_PRIOR',
+      modelVersion: 'event-prior-v1',
+      heuristic: true,
+    },
     expectedImpact: 'PILGRIM_SURGE_GHAT_CONGESTION',
   },
   {
@@ -105,8 +143,16 @@ const CANONICAL_PLANNED_EVENTS = [
     endTime: '23:30',
     source: 'MUMBAI_TRAFFIC_POLICE',
     sourceType: 'Official Police Circular',
+    sourceClassification: SOURCE_CLASSIFICATIONS.OFFICIAL_SCHEDULE,
+    eventScheduleState: EVENT_STATES.EVENT_SCHEDULED,
     confidence: 'HIGH',
     expectedDelayMinutes: 60,
+    estimatedImpact: {
+      delayMinutesRange: [45, 65],
+      basis: 'HISTORICAL_STADIUM_PRIOR',
+      modelVersion: 'event-prior-v1',
+      heuristic: true,
+    },
     expectedImpact: 'SOUTH_MUMBAI_ARTERIAL_DIVERSION',
   },
   {
@@ -124,9 +170,17 @@ const CANONICAL_PLANNED_EVENTS = [
     endTime: '12:00',
     source: 'DELHI_TRAFFIC_POLICE',
     sourceType: 'Special Traffic Notification',
+    sourceClassification: SOURCE_CLASSIFICATIONS.OFFICIAL_SCHEDULE,
+    eventScheduleState: EVENT_STATES.PLANNED_VIP_EVENT,
     confidence: 'HIGH',
     expectedDelayMinutes: 50,
-    expectedImpact: 'CONTROLLED_VEHICULAR_RESTRICTION',
+    estimatedImpact: {
+      delayMinutesRange: [30, 50],
+      basis: 'VIP_CONVOY_PROTOCOL_PRIOR',
+      modelVersion: 'event-prior-v1',
+      heuristic: true,
+    },
+    expectedImpact: 'POTENTIAL_DISRUPTION',
   },
 ];
 
@@ -252,6 +306,8 @@ function correlateEventWithTraffic({
       hasCorrelatedEvent: false,
       event: null,
       correlationType: 'NO_EVENT_FOUND',
+      trafficObservedState: trafficAnomaly.isDisruption ? EVENT_STATES.TRAFFIC_IMPACT_OBSERVED : 'NO_ANOMALY_OBSERVED',
+      causalState: 'NO_EVENT_FOUND',
       causeConfidence: 'LOW',
     };
   }
@@ -264,10 +320,12 @@ function correlateEventWithTraffic({
       hasCorrelatedEvent: true,
       event: primaryEvent,
       correlationType: 'CONFIRMED_EVENT_CONGESTION',
+      trafficObservedState: EVENT_STATES.TRAFFIC_IMPACT_OBSERVED,
+      causalState: EVENT_STATES.EVENT_CAUSED_TRAFFIC,
       causeConfidence: 'HIGH',
       disruptionConfidence: 'HIGH',
       dataState: 'LIVE_OBSERVED_DISRUPTION',
-      explanation: `Live severe congestion aligns with ${primaryEvent.name} at ${primaryEvent.location?.name || 'event venue'}.`,
+      explanation: `Observed corridor delay matches scheduled ${primaryEvent.name} at ${primaryEvent.location?.name || 'event venue'}.`,
     };
   }
 
@@ -276,26 +334,32 @@ function correlateEventWithTraffic({
       hasCorrelatedEvent: true,
       event: primaryEvent,
       correlationType: 'UPCOMING_EVENT_RISK',
+      trafficObservedState: 'NO_ANOMALY_OBSERVED',
+      causalState: EVENT_STATES.EVENT_SCHEDULED,
       causeConfidence: 'HIGH',
       disruptionConfidence: 'MEDIUM',
       dataState: 'PLANNED_EVENT',
-      explanation: `Upcoming ${primaryEvent.name} scheduled for ${primaryEvent.startTime} will affect planned corridor traversal.`,
+      explanation: `Upcoming ${primaryEvent.name} scheduled for ${primaryEvent.startTime} will affect planned corridor traversal; corridor currently flows without confirmed disruption.`,
     };
   }
 
   return {
     hasCorrelatedEvent: true,
     event: primaryEvent,
-    correlationType: 'POSSIBLE_EVENT_IMPACT',
+    correlationType: 'PLANNED_EVENT_ADVISORY',
+    trafficObservedState: 'NO_ANOMALY_OBSERVED',
+    causalState: EVENT_STATES.EVENT_SCHEDULED,
     causeConfidence: 'MEDIUM',
     disruptionConfidence: 'LOW',
-    dataState: 'INFERRED_DISRUPTION',
-    explanation: `${primaryEvent.name} is active in the area, though live corridor telemetry does not yet reflect full bottleneck.`,
+    dataState: 'PLANNED_EVENT',
+    explanation: `${primaryEvent.name} is active in area catalog, though live corridor telemetry does not reflect bottleneck.`,
   };
 }
 
 module.exports = {
   EVENT_TYPES,
+  SOURCE_CLASSIFICATIONS,
+  EVENT_STATES,
   CANONICAL_PLANNED_EVENTS,
   queryPlannedEvents,
   correlateEventWithTraffic,
