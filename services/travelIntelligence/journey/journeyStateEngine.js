@@ -23,6 +23,8 @@ const TRIP_HEALTH_STATES = Object.freeze({
   ON_TRACK: 'ON_TRACK',
   WATCH: 'WATCH',
   SUBOPTIMAL: 'SUBOPTIMAL',
+  SAFETY_CAUTION: 'SAFETY_CAUTION',
+  SAFETY_ACTION_RECOMMENDED: 'SAFETY_ACTION_RECOMMENDED',
   REPLAN_RECOMMENDED: 'REPLAN_RECOMMENDED',
   CRITICAL: 'CRITICAL',
   INSUFFICIENT_DATA: 'INSUFFICIENT_DATA',
@@ -94,14 +96,24 @@ function createJourneyState({
  * Advances progress of a stop (START, COMPLETE, or SKIP).
  * IMMUTABILITY GUARANTEE: Completed stops cannot be reverted or altered.
  */
-function advanceJourneyProgress(journeyState, {
-  stopId,
-  action = 'COMPLETE',
-  currentMinute = null,
-  actualVisitMinutes = null,
-  currentLocation = null,
-  reason = null,
-} = {}) {
+function advanceJourneyProgress(journeyStateOrOptions, options = {}) {
+  let journeyState = journeyStateOrOptions;
+  let opts = options;
+
+  if (journeyStateOrOptions && journeyStateOrOptions.journeyState) {
+    journeyState = journeyStateOrOptions.journeyState;
+    opts = journeyStateOrOptions;
+  }
+
+  const {
+    stopId,
+    action = 'COMPLETE',
+    currentMinute = null,
+    actualVisitMinutes = null,
+    currentLocation = null,
+    reason = null,
+  } = opts;
+
   if (!journeyState || !Array.isArray(journeyState.stops)) {
     throw new Error('Invalid journeyState provided');
   }

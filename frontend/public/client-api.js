@@ -388,12 +388,36 @@
     return get('/api/intelligence/disruptions/events', params);
   }
 
+  // ── Phase 3: Safety & Risk Decision Intelligence ─────────────────────────────
+  async function evaluateTripSafety(tripId, params = {}) {
+    return post(`/api/intelligence/trips/${tripId}/safety/evaluate`, params);
+  }
+  async function simulateTripSafety(tripId, scenario = {}) {
+    return post(`/api/intelligence/trips/${tripId}/safety/simulate`, scenario);
+  }
+  async function fetchTripSafety(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/safety`);
+  }
+  async function recordSafetyAction(tripId, notificationId, action, notes = '') {
+    return post(`/api/intelligence/trips/${tripId}/safety/action`, { notificationId, action, notes });
+  }
+  async function fetchSafetyProviders() {
+    return get('/api/intelligence/safety/providers');
+  }
+  async function fetchSafetyMetrics() {
+    return get('/api/intelligence/safety/metrics');
+  }
+  async function fetchSafetyNotifications(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/safety/notifications`);
+  }
+
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
     initJourneyState, advanceJourneyProgress, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
     getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
     evaluateTripDisruptions, simulateTripDisruption, fetchTripNotifications, recordNotificationAction, fetchDisruptionEvents,
+    evaluateTripSafety, simulateTripSafety, fetchTripSafety, recordSafetyAction, fetchSafetyProviders, fetchSafetyMetrics, fetchSafetyNotifications,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,
     aiBudgetAnalysis, aiAlternative, aiCaption, aiTranslate,

@@ -270,6 +270,42 @@ const SCHEMA_SQL = `
     recorded_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_weather_acc_snapshot ON weather_accuracy_records(snapshot_id);
+
+  -- Phase 3 Safety & Risk Intelligence
+  CREATE TABLE IF NOT EXISTS safety_signals (
+    id                   VARCHAR(255) PRIMARY KEY,
+    provider             VARCHAR(64) NOT NULL,
+    hazard_type          VARCHAR(64) NOT NULL,
+    severity             VARCHAR(32) NOT NULL,
+    data_state           VARCHAR(32) NOT NULL,
+    confidence           VARCHAR(32) NOT NULL,
+    payload_json         TEXT NOT NULL,
+    is_stale             BOOLEAN DEFAULT false,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS safety_evaluations (
+    id                   SERIAL PRIMARY KEY,
+    trip_id              VARCHAR(255) NOT NULL,
+    safety_status        VARCHAR(64) NOT NULL,
+    decision             VARCHAR(64) NOT NULL,
+    confidence           VARCHAR(32),
+    evaluation_json      TEXT NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_safety_eval_trip ON safety_evaluations(trip_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS safety_notifications (
+    id                   VARCHAR(255) PRIMARY KEY,
+    trip_id              VARCHAR(255) NOT NULL,
+    hazard_type          VARCHAR(64) NOT NULL,
+    severity             VARCHAR(32) NOT NULL,
+    lifecycle_state      VARCHAR(32) NOT NULL,
+    user_action          VARCHAR(32) DEFAULT 'PENDING',
+    payload_json         TEXT NOT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_safety_notif_trip ON safety_notifications(trip_id, created_at DESC);
 `;
 
 module.exports = { SCHEMA_SQL };

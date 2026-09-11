@@ -46,11 +46,20 @@ const {
   queryPlannedEvents,
   CANONICAL_PLANNED_EVENTS,
 } = require('../services/travelIntelligence/disruption');
+const {
+  getSafetyProviders,
+  evaluateJourneySafety,
+  simulateSafetyEvent,
+  resolveSafetyCondition,
+} = require('../services/travelIntelligence/safety');
 
 // Active journey state registry (survives requests; syncs with DB if connected)
 const activeTripsState = new Map();
 // Active trip disruptions registry
 const activeTripDisruptions = new Map();
+// Active trip safety evaluations registry
+const activeTripSafety = new Map();
+const tripSafetyHistory = new Map();
 
 function getDbPool() {
   try {
@@ -647,6 +656,227 @@ router.get('/disruptions/metrics', (_req, res) => {
     activeDisruptedTrips: activeTripDisruptions.size,
     totalPlannedEvents: CANONICAL_PLANNED_EVENTS.length,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// ── 15. Phase 3: Safety & Risk Decision Intelligence ─────────────────────────
+router.post('/trips/:id/safety/evaluate', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  const journeyState = record ? record.state : req.body.journeyState;
+  const travelerDna = record ? record.travelerDna : (req.body.travelerDna || {});
+
+  if (!journeyState || !Array.isArray(journeyState.stops)) {
+    return res.status(400).json({ error: 'Valid journeyState or active trip is required' });
+  }
+
+  const { signals = [], customSignal = null, minuteOfDay = null } = req.body || {};
+
+  try {
+    const evaluation = evaluateJourneySafety({
+      tripId,
+      journeyState,
+      travelerDna,
+      signals,
+      customSignal,
+      now: minuteOfDay ? Date.now() : Date.now(),
+    });
+
+    activeTripSafety.set(tripId, evaluation);
+
+    // Append to audit history
+    let history = tripSafetyHistory.get(tripId) || [];
+    history = [evaluation, ...history].slice(0, 20);
+    tripSafetyHistory.set(tripId, history);
+
+    res.json(evaluation);
+  } catch (err) {
+    appLogger.error(`[intelligence/safety/evaluate] Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/trips/:id/safety', (req, res) => {
+  const tripId = req.params.id;
+  const evaluation = activeTripSafety.get(tripId);
+  if (!evaluation) {
+    return res.json({
+      tripId,
+      safetyStatus: 'SAFE_TO_CONTINUE',
+      activeSignalsCount: 0,
+      signals: [],
+      message: 'No safety alerts or evaluated risks for this trip.',
+    });
+  }
+  res.json({ tripId, ...evaluation });
+});
+
+router.get('/trips/:id/safety/signals', (req, res) => {
+  const tripId = req.params.id;
+  const evaluation = activeTripSafety.get(tripId);
+  const signals = evaluation?.primarySignal ? [evaluation.primarySignal] : [];
+  res.json({
+    tripId,
+    signalsCount: signals.length,
+    signals,
+  });
+});
+
+router.get('/trips/:id/safety/history', (req, res) => {
+  const tripId = req.params.id;
+  const history = tripSafetyHistory.get(tripId) || [];
+  res.json({
+    tripId,
+    historyCount: history.length,
+    history,
+  });
+});
+
+// ── 16. Phase 3: Controlled Safety Event Simulation ──────────────────────────
+router.post('/trips/:id/safety/simulate', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  const journeyState = record ? record.state : req.body.journeyState;
+  const travelerDna = record ? record.travelerDna : (req.body.travelerDna || {});
+
+  if (!journeyState || !Array.isArray(journeyState.stops)) {
+    return res.status(400).json({ error: 'Valid journeyState or active trip is required' });
+  }
+
+  const { scenario = 'HEAVY_RAIN_GHAT_LANDSLIDE' } = req.body || {};
+
+  const evaluation = simulateSafetyEvent({
+    tripId,
+    journeyState,
+    travelerDna,
+    scenario,
+  });
+
+  activeTripSafety.set(tripId, evaluation);
+
+  let history = tripSafetyHistory.get(tripId) || [];
+  history = [evaluation, ...history].slice(0, 20);
+  tripSafetyHistory.set(tripId, history);
+
+  res.json({
+    simulationNotice: 'Controlled Demonstration: Safety Reality Mutation Simulated',
+    dataState: 'SIMULATED',
+    scenario,
+    safetyEvaluation: evaluation,
+  });
+});
+
+// ── 17. Phase 3: Traveler Action on Safety Notification ───────────────────────
+router.post('/trips/:id/safety/action', async (req, res) => {
+  const tripId = req.params.id;
+  const { notificationId, action, notes, adaptIfAccepted = true } = req.body || {};
+
+  if (!action) {
+    return res.status(400).json({ error: 'action is required' });
+  }
+
+  const record = activeTripsState.get(tripId);
+  const notifications = getTripNotifications(tripId);
+  const target = notifications.find(n => n.notificationId === notificationId);
+
+  if (target) {
+    target.userAction = action;
+    target.actionRecordedAt = new Date().toISOString();
+    target.actionNotes = notes || null;
+    target.status = 'ACTIONED';
+  }
+
+  let adaptationResult = null;
+  // If user accepts safety recommendation and active trip state exists, execute adaptation
+  if (action === 'ACCEPT' && adaptIfAccepted && record?.state) {
+    try {
+      const evaluation = activeTripSafety.get(tripId);
+      const triggerReason = evaluation?.explanation?.primaryDriver || 'Accepted safer alternative route';
+      adaptationResult = await adaptJourneyPlan({
+        journeyState: record.state,
+        travelerDna: record.travelerDna || {},
+        context: { safety: evaluation || {} },
+        triggerType: 'SAFETY_HAZARD',
+        triggerReason,
+        dbPool: getDbPool(),
+      });
+
+      if (adaptationResult?.newJourneyState) {
+        record.state = adaptationResult.newJourneyState;
+        activeTripsState.set(tripId, record);
+      }
+    } catch (err) {
+      appLogger.warn(`[intelligence/safety/action] Auto-adaptation warning: ${err.message}`);
+    }
+  }
+
+  // Check if resolution requested
+  if (action === 'RESOLVE' || req.body.resolveCondition) {
+    resolveSafetyCondition({
+      tripId,
+      hazardId: target?.hazardId || 'hazard_001',
+      hazardType: target?.hazardType || 'Safety condition',
+    });
+  }
+
+  res.json({
+    message: `Safety action '${action}' recorded.`,
+    notificationId,
+    action,
+    adaptedPlan: adaptationResult ? {
+      versionNumber: adaptationResult.versionNumber,
+      changedStopsCount: adaptationResult.changedStops?.length || 0,
+      preservedStopsCount: adaptationResult.preservedStops?.length || 0,
+    } : null,
+  });
+});
+
+// ── 18. Phase 3: Safety Sources, Providers & Metrics ─────────────────────────
+router.get('/safety/sources', (_req, res) => {
+  res.json({
+    sourcesCount: 4,
+    sources: [
+      { id: 'NDMA_SACHET', name: 'NDMA SACHET CAP Feed', tier: 'OFFICIAL_ACTIVE_WARNING' },
+      { id: 'IMD', name: 'IMD Warning & Nowcast Network', tier: 'OFFICIAL_ACTIVE_WARNING' },
+      { id: 'CWC', name: 'CWC Hydrological Advisory', tier: 'OFFICIAL_FORECAST' },
+      { id: 'FSI', name: 'FSI & NASA FIRMS Thermal Hotspots', tier: 'HIGH_CONFIDENCE_LIVE_OBSERVATION' },
+    ],
+  });
+});
+
+router.get('/safety/providers', (_req, res) => {
+  const providers = getSafetyProviders();
+  res.json({
+    providersCount: providers.length,
+    providers,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+router.get('/safety/metrics', (_req, res) => {
+  const providers = getSafetyProviders();
+  const connectedCount = providers.filter(p => p.status === 'CONNECTED').length;
+  const partialCount = providers.filter(p => p.status === 'PARTIALLY_CONNECTED').length;
+
+  res.json({
+    activeEvaluatedTrips: activeTripSafety.size,
+    totalProvidersRegistered: providers.length,
+    connectedProvidersCount: connectedCount,
+    partiallyConnectedCount: partialCount,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+router.get('/trips/:id/safety/notifications', (req, res) => {
+  const tripId = req.params.id;
+  const allNotifications = getTripNotifications(tripId);
+  const safetyNotifications = allNotifications.filter(n => n.category === 'SAFETY');
+  res.json({
+    tripId,
+    notificationsCount: safetyNotifications.length,
+    notifications: safetyNotifications,
   });
 });
 

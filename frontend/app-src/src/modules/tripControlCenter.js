@@ -13,7 +13,7 @@ export function renderTripControlCenter({
   activeStop = null,
   completedStops = [],
   upcomingStops = [],
-  pacingLagMinutes = 0,
+  _pacingLagMinutes = 0,
   activeTriggers = [],
   lastAdaptation = null,
 } = {}) {
@@ -23,6 +23,8 @@ export function renderTripControlCenter({
     SUBOPTIMAL: { icon: '🟠', label: 'Suboptimal Conditions', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' },
     CRITICAL: { icon: '🔴', label: 'Adaptation Required', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
     REPLAN_RECOMMENDED: { icon: '⚠️', label: 'Replan Recommended', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+    SAFETY_CAUTION: { icon: '🛡️', label: 'Safety Caution', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+    SAFETY_ACTION_RECOMMENDED: { icon: '⚠️', label: 'Safety Action Recommended', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
   };
 
   const currentBadge = healthBadges[tripHealth] || healthBadges.ON_TRACK;
@@ -140,12 +142,18 @@ export function renderTripControlCenter({
         <div style="font-size:11px; color:#94a3b8;">
           <span style="font-weight:700; color:#cbd5e1;">Demo Reality Simulator:</span> Controlled disruption injection (SIMULATED)
         </div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button id="btn-simulate-cricket-traffic" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #0284c7, #0369a1); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
-            <span>🏏</span> Simulate Stadium Traffic (+50m)
+            <span>🏏</span> Match Traffic
           </button>
           <button id="btn-simulate-ghat-rain" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
-            <span>🌧️</span> Simulate Ghat Downpour
+            <span>🌧️</span> Ghat Downpour
+          </button>
+          <button id="btn-simulate-official-closure" data-trip-id="${tripId}" style="background:linear-gradient(135deg, #dc2626, #991b1b); color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+            <span>⛔</span> Road Closure
+          </button>
+          <button id="btn-simulate-safety-unavailable" data-trip-id="${tripId}" style="background:rgba(255,255,255,0.12); color:#cbd5e1; border:1px solid rgba(255,255,255,0.2); border-radius:6px; padding:6px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px;">
+            <span>ℹ️</span> Data Unavailable
           </button>
         </div>
       </div>
@@ -317,7 +325,59 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
         } catch (err) {
           console.error('[TripControlCenter] Failed to simulate cricket traffic:', err);
           cricketSimBtn.disabled = false;
-          cricketSimBtn.textContent = '🏏 Simulate Stadium Traffic (+50m)';
+          cricketSimBtn.textContent = '🏏 Match Traffic';
+        }
+      };
+    }
+
+    const closureBtn = containerEl.querySelector('#btn-simulate-official-closure');
+    if (closureBtn) {
+      closureBtn.onclick = async () => {
+        const tripId = closureBtn.getAttribute('data-trip-id');
+        try {
+          closureBtn.disabled = true;
+          closureBtn.textContent = 'Simulating...';
+          if (window.API?.simulateTripSafety) {
+            const res = await window.API.simulateTripSafety(tripId, { scenario: 'OFFICIAL_ROAD_CLOSURE' });
+            if (res && res.safetyEvaluation) {
+              currentTripData.tripHealth = 'CRITICAL';
+              currentTripData.activeTriggers = [
+                { type: 'ROAD_CLOSURE', message: 'Official Road Closure on corridor: detour required.' }
+              ];
+              if (callbacks.onSimulated) callbacks.onSimulated(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to simulate road closure:', err);
+          closureBtn.disabled = false;
+          closureBtn.textContent = '⛔ Road Closure';
+        }
+      };
+    }
+
+    const unavailBtn = containerEl.querySelector('#btn-simulate-safety-unavailable');
+    if (unavailBtn) {
+      unavailBtn.onclick = async () => {
+        const tripId = unavailBtn.getAttribute('data-trip-id');
+        try {
+          unavailBtn.disabled = true;
+          unavailBtn.textContent = 'Simulating...';
+          if (window.API?.simulateTripSafety) {
+            const res = await window.API.simulateTripSafety(tripId, { scenario: 'DATA_UNAVAILABLE' });
+            if (res && res.safetyEvaluation) {
+              currentTripData.tripHealth = 'INSUFFICIENT_DATA';
+              currentTripData.activeTriggers = [
+                { type: 'SAFETY_DATA_STALE', message: 'Current safety information could not be refreshed from upstream providers.' }
+              ];
+              if (callbacks.onSimulated) callbacks.onSimulated(res);
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to simulate safety data unavailable:', err);
+          unavailBtn.disabled = false;
+          unavailBtn.textContent = 'ℹ️ Data Unavailable';
         }
       };
     }

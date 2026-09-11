@@ -29,12 +29,31 @@ const TRIGGER_TYPES = Object.freeze({
   EVENT_CORRIDOR_OVERLAP: 'EVENT_CORRIDOR_OVERLAP',
   TRAFFIC_RECOVERY: 'TRAFFIC_RECOVERY',
   DISRUPTION_RESOLVED: 'DISRUPTION_RESOLVED',
+  // Phase 3 Safety & Risk Intelligence Triggers
+  SAFETY_OFFICIAL_WARNING: 'SAFETY_OFFICIAL_WARNING',
+  SAFETY_HAZARD_DETECTED: 'SAFETY_HAZARD_DETECTED',
+  SAFETY_ROUTE_EXPOSURE: 'SAFETY_ROUTE_EXPOSURE',
+  SAFETY_ESCALATION: 'SAFETY_ESCALATION',
+  SAFETY_RESOLUTION: 'SAFETY_RESOLUTION',
+  GHAT_WEATHER_RISK: 'GHAT_WEATHER_RISK',
+  FLOOD_EXPOSURE: 'FLOOD_EXPOSURE',
+  FIRE_EXPOSURE: 'FIRE_EXPOSURE',
+  LIGHTNING_EXPOSURE: 'LIGHTNING_EXPOSURE',
+  LANDSLIDE_EXPOSURE: 'LANDSLIDE_EXPOSURE',
+  EXTREME_HEAT_EXPOSURE: 'EXTREME_HEAT_EXPOSURE',
+  LOW_VISIBILITY_EXPOSURE: 'LOW_VISIBILITY_EXPOSURE',
+  SAFETY_DATA_STALE: 'SAFETY_DATA_STALE',
+  SAFETY_DATA_CONFLICT: 'SAFETY_DATA_CONFLICT',
+  SAFETY_PROVIDER_FAILURE: 'SAFETY_PROVIDER_FAILURE',
 });
 
 const TRIGGER_SEVERITY = Object.freeze({
   INFO: 'INFO',
   WATCH: 'WATCH',
+  CAUTION: 'CAUTION',
   SUBOPTIMAL: 'SUBOPTIMAL',
+  WARNING: 'WARNING',
+  SEVERE: 'SEVERE',
   CRITICAL: 'CRITICAL',
 });
 
@@ -47,8 +66,53 @@ function evaluateTriggers({
   weatherTelemetry = {},
   trafficTelemetry = {},
   travelerDna = {},
+  safetyTelemetry = {},
 } = {}) {
   const triggers = [];
+
+  // 0. Phase 3: Safety & Risk Intelligence Triggers
+  const safetySignals = Array.isArray(safetyTelemetry.signals)
+    ? safetyTelemetry.signals
+    : (Array.isArray(safetyTelemetry.activeSignals) ? safetyTelemetry.activeSignals : []);
+
+  for (const sig of safetySignals) {
+    const isHardClosure = sig.hazardType === 'ROAD_CLOSURE' || sig.hazardType === 'EVACUATION_ALERT';
+    const sev = isHardClosure || sig.severity === 'CRITICAL' ? TRIGGER_SEVERITY.CRITICAL
+      : (sig.severity === 'SEVERE' || sig.severity === 'WARNING' ? TRIGGER_SEVERITY.WARNING
+      : (sig.severity === 'CAUTION' ? TRIGGER_SEVERITY.CAUTION : TRIGGER_SEVERITY.WATCH));
+
+    if (sig.isStale) {
+      triggers.push({
+        type: TRIGGER_TYPES.SAFETY_DATA_STALE,
+        severity: TRIGGER_SEVERITY.WATCH,
+        message: `Current safety information could not be refreshed. Previous warning for ${sig.hazardType} was last confirmed ${sig.ageMinutes || 'some'} minutes ago.`,
+        signalId: sig.id,
+      });
+    } else if (sig.sourceConflict) {
+      triggers.push({
+        type: TRIGGER_TYPES.SAFETY_DATA_CONFLICT,
+        severity: TRIGGER_SEVERITY.WATCH,
+        message: `Sources disagree on ${sig.hazardType}: Official warning remains active; model forecast differs.`,
+        signalId: sig.id,
+      });
+    } else if (sig.dataState === 'OFFICIAL_WARNING') {
+      triggers.push({
+        type: TRIGGER_TYPES.SAFETY_OFFICIAL_WARNING,
+        severity: sev,
+        message: `Official Government Warning: ${sig.hazardType} active for ${sig.location?.name || 'route area'}.`,
+        hazardType: sig.hazardType,
+        signalId: sig.id,
+      });
+    } else {
+      triggers.push({
+        type: TRIGGER_TYPES.SAFETY_HAZARD_DETECTED,
+        severity: sev,
+        message: `Safety hazard detected: ${sig.hazardType} (${sig.severity || 'CAUTION'}).`,
+        hazardType: sig.hazardType,
+        signalId: sig.id,
+      });
+    }
+  }
 
   const rainTolerance = travelerDna.rainTolerance ?? 40;
   const heatTolerance = travelerDna.heatTolerance ?? 50;

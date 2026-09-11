@@ -27,15 +27,20 @@ const { t2m, m2t } = require('../timeEngine');
 // ── Decision States (Section 3) ──────────────────────────────────────────────
 const DECISION_STATES = Object.freeze({
   KEEP_PLAN: 'KEEP_PLAN',
+  CONTINUE: 'CONTINUE',
   ADAPT_PLAN: 'ADAPT_PLAN',
   ALTERNATIVE_REQUIRED: 'ALTERNATIVE_REQUIRED',
   INSUFFICIENT_DATA: 'INSUFFICIENT_DATA',
   WATCH: 'WATCH',
+  CAUTION: 'CAUTION',
   DEFER: 'DEFER',
   WAIT: 'WAIT',
+  DELAY: 'DELAY',
   REROUTE: 'REROUTE',
   REORDER: 'REORDER',
   REPLACE_STOP: 'REPLACE_STOP',
+  AVOID: 'AVOID',
+  EMERGENCY: 'EMERGENCY',
 });
 
 // ── Plan Health Dimension States (Section 8) ─────────────────────────────────
@@ -294,6 +299,23 @@ function evaluateConstraints(stop, { context = {}, travelerDna = {}, currentMinu
   const preferences = [];
 
   if (!stop) return { hasHardViolation: false, violations, preferences };
+
+  // Hard Constraint 0: Authoritative Safety Hazard or Road Closure (Phase 3)
+  const safety = context.safety || {};
+  const activeSignals = Array.isArray(safety.signals)
+    ? safety.signals
+    : (Array.isArray(safety.activeSignals) ? safety.activeSignals : []);
+  for (const sig of activeSignals) {
+    const isClosure = sig.hazardType === 'ROAD_CLOSURE' || sig.hazardType === 'EVACUATION_ALERT' || sig.hazardType === 'AUTHORITATIVE_RESTRICTION';
+    const isCritical = sig.severity === 'CRITICAL' && (sig.dataState === 'OFFICIAL_WARNING' || sig.confidence === 'HIGH');
+    if (isClosure || isCritical) {
+      violations.push({
+        type: 'HARD_SAFETY_RESTRICTION',
+        reason: `Authoritative ${sig.hazardType || 'SAFETY_HAZARD'} (${sig.source || 'Official directive'}) requires immediate avoidance/reroute.`,
+        hazardId: sig.id,
+      });
+    }
+  }
 
   // Hard Constraint 1: Destination closed or opening hours expired
   const openTimeMin = stop.open_time ? t2m(stop.open_time) : null;

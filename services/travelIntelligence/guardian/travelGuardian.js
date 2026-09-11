@@ -59,6 +59,7 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
 
   const weatherTelemetry = context.weather || {};
   const trafficTelemetry = context.traffic || {};
+  const safetyTelemetry = context.safety || {};
 
   const activeTriggers = evaluateTriggers({
     journeyState,
@@ -66,9 +67,12 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
     weatherTelemetry,
     trafficTelemetry,
     travelerDna,
+    safetyTelemetry,
   });
 
   const criticalTriggers = activeTriggers.filter(t => t.severity === TRIGGER_SEVERITY.CRITICAL);
+  const severeTriggers = activeTriggers.filter(t => t.severity === TRIGGER_SEVERITY.SEVERE || t.severity === TRIGGER_SEVERITY.WARNING);
+  const cautionTriggers = activeTriggers.filter(t => t.severity === TRIGGER_SEVERITY.CAUTION);
   const suboptimalTriggers = activeTriggers.filter(t => t.severity === TRIGGER_SEVERITY.SUBOPTIMAL);
   const watchTriggers = activeTriggers.filter(t => t.severity === TRIGGER_SEVERITY.WATCH);
 
@@ -80,6 +84,14 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
     tripHealth = TRIP_HEALTH_STATES.CRITICAL;
     shouldReplan = true;
     criticalTriggers.forEach(t => reasons.push(`[CRITICAL] ${t.message}`));
+  } else if (severeTriggers.length > 0) {
+    tripHealth = TRIP_HEALTH_STATES.SAFETY_ACTION_RECOMMENDED;
+    shouldReplan = true;
+    severeTriggers.forEach(t => reasons.push(`[SAFETY_ACTION] ${t.message}`));
+  } else if (cautionTriggers.length > 0) {
+    tripHealth = TRIP_HEALTH_STATES.SAFETY_CAUTION;
+    shouldReplan = false;
+    cautionTriggers.forEach(t => reasons.push(`[SAFETY_CAUTION] ${t.message}`));
   } else if (suboptimalTriggers.length >= 2) {
     tripHealth = TRIP_HEALTH_STATES.REPLAN_RECOMMENDED;
     shouldReplan = true;

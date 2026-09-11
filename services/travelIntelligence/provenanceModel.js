@@ -18,8 +18,10 @@ const DATA_STATES = Object.freeze({
   PREDICTED: 'PREDICTED',
   ESTIMATED: 'ESTIMATED',
   OFFICIAL: 'OFFICIAL',
+  OFFICIAL_WARNING: 'OFFICIAL_WARNING',
   HISTORICAL: 'HISTORICAL',
   STALE: 'STALE',
+  SIMULATED: 'SIMULATED',
 });
 
 const SELECTION_REASONS = Object.freeze({
@@ -141,9 +143,11 @@ function toTravelerLanguage(key, value) {
       ESTIMATED: 'Estimated',
       HISTORICAL: 'Historical Trend',
       OFFICIAL: 'Official Schedule',
+      OFFICIAL_WARNING: 'Official Government Warning',
       UNAVAILABLE: 'Unavailable',
       UNKNOWN: 'Unknown',
       STALE: 'May Be Outdated',
+      SIMULATED: 'Simulation (Demonstration Only)',
     },
     ROUTE_TYPE: {
       LIVE_TRAFFIC_ROUTE: 'Live Traffic Route',

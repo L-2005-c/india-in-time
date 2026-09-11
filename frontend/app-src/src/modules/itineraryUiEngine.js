@@ -267,6 +267,36 @@ export function renderDecisionHud(container, decisionData, onOutcome) {
     badgeIcon = 'ℹ️';
   }
 
+  // Phase 3: Unified Safety Banner if safety hazard exists
+  const safety = decisionData.safety || decisionData.safetyEvaluation || null;
+  const safetySignal = safety?.primarySignal || (safety?.signals && safety.signals[0]) || null;
+  const isSafetyActive = Boolean(safetySignal && safety.decision !== 'CONTINUE');
+
+  const safetyBannerHtml = isSafetyActive ? `
+    <div style="background:rgba(220, 38, 38, 0.16); border-left:4px solid #ef4444; border-radius:6px; padding:12px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-weight:700; font-size:12px; color:#fca5a5; display:flex; align-items:center; gap:6px;">
+          <span>${safety.safetyStatus === 'CRITICAL' ? '🚨' : '🛡️'}</span>
+          <span>${safety.safetyStatus === 'CRITICAL' ? 'CRITICAL SAFETY DIRECTIVE' : 'SAFETY ALERT ACTIVE'}</span>
+          ${safety.isSimulation ? '<span style="background:#4f46e5; color:#fff; font-size:9px; padding:1px 5px; border-radius:3px; margin-left:4px;">SIMULATION</span>' : ''}
+        </span>
+        <div style="display:flex; gap:5px; font-size:10px;">
+          <span style="padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:#cbd5e1;">Hazard: <strong>${safety.hazardConfidence || 'HIGH'}</strong></span>
+          <span style="padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:#cbd5e1;">Impact: <strong>${safety.impactConfidence || 'MEDIUM'}</strong></span>
+        </div>
+      </div>
+      <div style="font-size:12px; color:#f8fafc; font-weight:600; margin-bottom:4px;">
+        ${safetySignal.hazardType ? safetySignal.hazardType.replace(/_/g, ' ') : 'Safety Condition'} — ${safetySignal.source || 'Official Feed'} (${safetySignal.dataState || 'OFFICIAL'})
+      </div>
+      <div style="font-size:11.5px; color:#e2e8f0; line-height:1.4;">
+        ${safety.explanation?.primaryDriver || safetySignal.description || 'Route hazard active.'}
+      </div>
+      <div style="font-size:11px; color:#fca5a5; margin-top:4px;">
+        <strong>Action:</strong> ${safety.explanation?.nextStep || 'Follow official directives.'}
+      </div>
+    </div>
+  ` : '';
+
   // Phase 2: Disruption Banner if disruption telemetry or delay exists
   const hasDisruption = Boolean(explanation.whatWeKnow && explanation.whatWeKnow !== 'None');
   const disruptionConfidence = explanation.disruptionConfidence || confidence;
@@ -303,9 +333,10 @@ export function renderDecisionHud(container, decisionData, onOutcome) {
           </span>
           <span style="font-size:12px;color:#94a3b8;">Confidence: <strong style="color:#f8fafc;">${confidence}</strong></span>
         </div>
-        <span style="font-size:11px;color:#64748b;font-family:'Space Mono',monospace;">v3.0 Disruption Engine</span>
+        <span style="font-size:11px;color:#64748b;font-family:'Space Mono',monospace;">v3.0 Travel Intelligence</span>
       </div>
 
+      ${safetyBannerHtml}
       ${disruptionBannerHtml}
 
       <div style="font-size:14px;font-weight:600;color:#f1f5f9;margin-bottom:6px;">
