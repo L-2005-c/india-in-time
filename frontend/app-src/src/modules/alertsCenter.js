@@ -78,12 +78,19 @@ function detectCategory(alert) {
 // ── Render Filter Tabs ────────────────────────────────────────────────
 function renderFilterTabs(alerts, activeFilter, onFilter) {
   const tabBar = document.createElement('div');
+  tabBar.className = 'alerts-tab-bar';
   tabBar.style.display = 'flex';
   tabBar.style.gap = '6px';
   tabBar.style.marginBottom = '16px';
   tabBar.style.overflowX = 'auto';
+  tabBar.style.overflowY = 'hidden';
+  tabBar.style.webkitOverflowScrolling = 'touch';
   tabBar.style.scrollbarWidth = 'none';
-  tabBar.style.paddingBottom = '2px';
+  tabBar.style.padding = '2px 2px 6px 2px';
+  tabBar.style.width = '100%';
+  tabBar.style.maxWidth = '100%';
+  tabBar.style.boxSizing = 'border-box';
+  tabBar.style.minWidth = '0';
 
   const categories = ['ALL', 'TRAFFIC', 'WEATHER', 'SAFETY'];
   const categoryCount = { ALL: alerts.length, TRAFFIC: 0, WEATHER: 0, SAFETY: 0 };
@@ -109,9 +116,9 @@ function renderFilterTabs(alerts, activeFilter, onFilter) {
     tab.style.display = 'inline-flex';
     tab.style.alignItems = 'center';
     tab.style.gap = '5px';
-    tab.style.padding = '6px 14px';
+    tab.style.padding = '6px 12px';
     tab.style.borderRadius = '20px';
-    tab.style.fontSize = '12px';
+    tab.style.fontSize = '11.5px';
     tab.style.fontWeight = '700';
     tab.style.fontFamily = "'Plus Jakarta Sans', sans-serif";
     tab.style.cursor = 'pointer';
@@ -149,8 +156,11 @@ export function renderAlertsCenter({
 } = {}) {
   const container = document.createElement('div');
   container.className = 'alerts-center-container';
-  container.style.padding = '16px 14px 80px';
+  container.style.padding = '4px 2px 40px';
   container.style.maxWidth = '680px';
+  container.style.width = '100%';
+  container.style.boxSizing = 'border-box';
+  container.style.minWidth = '0';
   container.style.margin = '0 auto';
 
   // Heading with Back to More action
@@ -158,11 +168,18 @@ export function renderAlertsCenter({
   header.style.display = 'flex';
   header.style.justifyContent = 'space-between';
   header.style.alignItems = 'center';
-  header.style.marginBottom = '16px';
+  header.style.marginBottom = '14px';
+  header.style.flexWrap = 'wrap';
+  header.style.gap = '8px';
+  header.style.width = '100%';
+  header.style.boxSizing = 'border-box';
 
   const leftGroup = document.createElement('div');
   leftGroup.style.display = 'flex';
   leftGroup.style.alignItems = 'center';
+  leftGroup.style.gap = '8px';
+  leftGroup.style.flexWrap = 'wrap';
+  leftGroup.style.minWidth = '0';
   leftGroup.style.gap = '10px';
 
   if (typeof onBackToMore === 'function') {
@@ -311,9 +328,14 @@ export function renderAlertsCenter({
   list.style.display = 'flex';
   list.style.flexDirection = 'column';
   list.style.gap = '14px';
+  list.style.width = '100%';
+  list.style.maxWidth = '100%';
+  list.style.boxSizing = 'border-box';
+  list.style.minWidth = '0';
 
   sortedAlerts.forEach((alert) => {
     const card = document.createElement('div');
+    card.className = 'alert-card-responsive';
     const isCritical = alert.severity === 'CRITICAL' || alert.severity === 'SEVERE';
     const category = detectCategory(alert);
     const catStyle = CATEGORY_STYLES[category] || CATEGORY_STYLES.GENERAL;
@@ -328,7 +350,14 @@ export function renderAlertsCenter({
       card.style.boxShadow = 'none';
     }
     card.style.borderRadius = '14px';
-    card.style.padding = '16px';
+    card.style.padding = '14px';
+    card.style.width = '100%';
+    card.style.maxWidth = '100%';
+    card.style.boxSizing = 'border-box';
+    card.style.minWidth = '0';
+    card.style.overflow = 'hidden';
+    card.style.wordBreak = 'break-word';
+    card.style.overflowWrap = 'break-word';
 
     // Header badge row
     const cardHead = document.createElement('div');
@@ -336,11 +365,14 @@ export function renderAlertsCenter({
     cardHead.style.justifyContent = 'space-between';
     cardHead.style.alignItems = 'center';
     cardHead.style.marginBottom = '8px';
+    cardHead.style.gap = '6px';
+    cardHead.style.flexWrap = 'wrap';
 
     const badgeRow = document.createElement('div');
     badgeRow.style.display = 'flex';
     badgeRow.style.alignItems = 'center';
     badgeRow.style.gap = '6px';
+    badgeRow.style.flexWrap = 'wrap';
 
     // Category chip
     const catChip = document.createElement('span');
@@ -379,17 +411,26 @@ export function renderAlertsCenter({
 
     // Title
     const cardTitle = document.createElement('div');
-    cardTitle.style.fontSize = '16px';
+    cardTitle.className = 'alert-title-responsive';
+    cardTitle.style.fontSize = '15px';
     cardTitle.style.fontWeight = '700';
     cardTitle.style.color = '#f8fafc';
     cardTitle.style.marginBottom = '6px';
+    cardTitle.style.lineHeight = '1.35';
+    cardTitle.style.wordBreak = 'break-word';
+    cardTitle.style.overflowWrap = 'break-word';
+    cardTitle.style.maxWidth = '100%';
     cardTitle.textContent = alert.title || alert.type || 'Travel Alert';
 
     // Body message
     const cardMsg = document.createElement('div');
+    cardMsg.className = 'alert-msg-responsive';
     cardMsg.style.fontSize = '13px';
     cardMsg.style.color = '#cbd5e1';
     cardMsg.style.lineHeight = '1.45';
+    cardMsg.style.wordBreak = 'break-word';
+    cardMsg.style.overflowWrap = 'break-word';
+    cardMsg.style.maxWidth = '100%';
     cardMsg.textContent = alert.message || 'Advisory conditions active along your route.';
 
     // ── Traffic-Specific: Delay & Corridor Pill ──────────
@@ -397,9 +438,10 @@ export function renderAlertsCenter({
     if (category === 'TRAFFIC' && (alert.delayMinutes || alert.corridor || alert.trafficLevel)) {
       trafficMeta = document.createElement('div');
       trafficMeta.style.display = 'flex';
-      trafficMeta.style.gap = '8px';
+      trafficMeta.style.gap = '6px';
       trafficMeta.style.flexWrap = 'wrap';
       trafficMeta.style.marginTop = '10px';
+      trafficMeta.style.maxWidth = '100%';
 
       if (alert.delayMinutes) {
         const delayPill = document.createElement('span');
@@ -414,12 +456,17 @@ export function renderAlertsCenter({
       }
       if (alert.corridor) {
         const corridorPill = document.createElement('span');
+        corridorPill.className = 'alert-pill-responsive';
         corridorPill.style.fontSize = '11px';
         corridorPill.style.fontWeight = '600';
         corridorPill.style.padding = '3px 10px';
         corridorPill.style.borderRadius = '12px';
         corridorPill.style.background = 'rgba(255, 255, 255, 0.06)';
         corridorPill.style.color = '#94a3b8';
+        corridorPill.style.maxWidth = '100%';
+        corridorPill.style.wordBreak = 'break-word';
+        corridorPill.style.overflowWrap = 'break-word';
+        corridorPill.style.whiteSpace = 'normal';
         corridorPill.textContent = `📍 ${alert.corridor}`;
         trafficMeta.appendChild(corridorPill);
       }

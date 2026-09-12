@@ -828,15 +828,22 @@ body::before {
   background:var(--sidebar-bg);
   backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid var(--border-subtle);
+  width:100%; box-sizing:border-box;
 }
-.itin-hdr{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.itin-title{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--text-primary);}
-.itin-actions{display:flex;gap:5px;align-items:center;}
+.itin-hdr{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;box-sizing:border-box;min-width:0;}
+.itin-title{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--text-primary);flex-shrink:0;}
+.itin-actions{
+  display:flex;gap:4px;align-items:center;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  flex:1;min-width:0;justify-content:flex-end;padding:2px 2px 2px 4px;
+}
+.itin-actions::-webkit-scrollbar{display:none;}
 
 .itn-btn {
-  padding:5px 10px; border-radius:8px; font-size:9px; font-weight:700;
+  padding:4px 8px; border-radius:8px; font-size:9.5px; font-weight:700;
   cursor:pointer; border:1px solid; transition:all .15s;
-  font-family:'DM Sans',sans-serif; letter-spacing:0.3px; white-space:nowrap;
+  font-family:'DM Sans',sans-serif; letter-spacing:0.2px; white-space:nowrap;
+  flex-shrink:0;
 }
 .itn-btn:active{transform:scale(.94);}
 .itnb-gold   {background:rgba(168,85,247,.08);border-color:var(--gold-border);color:var(--gold);}
@@ -844,11 +851,26 @@ body::before {
 .itnb-green  {background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.2);color:#6ee7b7;}
 .itnb-teal   {background:var(--teal-glow);border-color:rgba(0,212,184,.2);color:var(--teal);}
 .status-chip {
-  font-size:7px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
-  padding:4px 8px; border-radius:6px;
+  font-size:7px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase;
+  padding:4px 7px; border-radius:6px;
   background:var(--tag-bg); border:1px solid var(--tag-border); color:var(--text-muted);
+  flex-shrink:0;
 }
 .status-chip.live{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.25);color:#86efac;}
+
+.btn-lbl-short{display:none;}
+.btn-lbl-full{display:inline;}
+@media (max-width:420px){
+  .btn-lbl-full{display:none;}
+  .btn-lbl-short{display:inline;}
+}
+@media (max-width:480px){
+  .itin-hdr{padding:7px 8px;gap:5px;}
+  .itin-title{font-size:14px;}
+  .itin-actions{gap:3.5px;}
+  .itn-btn{padding:4px 6.5px;font-size:8.8px;}
+  .status-chip{padding:3px 5px;font-size:6.5px;letter-spacing:1px;}
+}
 
 /* Day tabs */
 .day-tabs{display:flex;gap:6px;padding:4px 14px 10px;overflow-x:auto;scrollbar-width:none;}
@@ -5466,3 +5488,69 @@ html, body {
 [data-theme="light"] .more-utility-btn span {
   color: #64748b !important;
 }
+
+/* ═══════════════════════════════════════════
+   ALERTS CENTER RESPONSIVE FIXES
+═══════════════════════════════════════════ */
+#alerts-view {
+  width: 100% !important;
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.alerts-center-container {
+  width: 100% !important;
+  max-width: 680px !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  min-width: 0 !important;
+}
+
+.alerts-tab-bar {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+}
+.alerts-tab-bar::-webkit-scrollbar {
+  display: none !important;
+}
+
+.alert-card-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.alert-title-responsive {
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+  line-height: 1.35 !important;
+}
+
+.alert-msg-responsive {
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+  line-height: 1.45 !important;
+}
+
+.alert-pill-responsive {
+  max-width: 100% !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+

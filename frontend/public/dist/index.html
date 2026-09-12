@@ -49,8 +49,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-  <script type="module" crossorigin src="/assets/index-CyV6Gddg.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CLt-NImi.css">
+  <script type="module" crossorigin src="/assets/index-CAxw4c9Z.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-XaR76HUE.css">
 </head>
 <body>
 <a href="#app" class="skip-link">Skip to content</a>
@@ -559,7 +559,7 @@
           <div class="itin-title">Itinerary</div>
           <div class="itin-actions">
             <button class="itn-btn itnb-green" id="btn-save" style="display:none" data-action="saveIt">💾 Save</button>
-            <button class="itn-btn itnb-gold" id="btn-pass" style="display:none" data-action="openOfflinePass">🎫 Travel Pass</button>
+            <button class="itn-btn itnb-gold" id="btn-pass" style="display:none" data-action="openOfflinePass" title="Offline Travel Pass"><span class="btn-lbl-full">🎫 Travel Pass</span><span class="btn-lbl-short">🎫 Pass</span></button>
             <button class="itn-btn itnb-wa" id="btn-wa" style="display:none" data-action="waShare">💬 WhatsApp</button>
             <button class="itn-btn itnb-blue" id="btn-share" style="display:none" data-action="shareIt">📤 Share</button>
             <button class="itn-btn itnb-teal" data-action="switchToView" data-view="tools-view" data-idx="4">💸 Budget</button>
@@ -652,7 +652,7 @@
     </div>
 
     <!-- ═══ ALERTS VIEW (Dedicated Alerts Center) ═══ -->
-    <div id="alerts-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
+    <div id="alerts-view" class="view" style="display:none; overflow-y:auto; overflow-x:hidden; padding:12px 10px 110px; box-sizing:border-box; width:100%; max-width:100%;">
     </div>
 
     <!-- ═══ MORE VIEW (Travel Utilities & Secondary Tools) ═══ -->
