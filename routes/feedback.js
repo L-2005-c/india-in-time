@@ -102,12 +102,21 @@ router.post('/app', optionalAuth, async (req, res) => {
     if (message && String(message).length > 2000) {
       return res.status(400).json({ error: 'message too long (max 2000 chars)' });
     }
-    const ALLOWED_CATEGORIES = new Set(['general', 'bug', 'feature_request', 'love_it', 'confusing']);
+    const ALLOWED_CATEGORIES = new Set([
+      'general', 'bug', 'feature_request', 'love_it', 'confusing',
+      'recommendation_feedback', 'incorrect_recommendation', 'stale_information',
+      'wrong_route', 'wrong_timing', 'alert_too_late', 'too_many_alerts',
+      'assistant_misunderstood', 'ui_confusing', 'trust_unclear',
+    ]);
     const safeCategory = ALLOWED_CATEGORIES.has(category) ? category : 'general';
+
+    const feedbackContext = typeof context === 'object' && context !== null
+      ? JSON.stringify({ ...context, useful: req.body.useful ?? null })
+      : (typeof context === 'string' ? context : null);
 
     await submitAppFeedback({
       userId, rating: r, category: safeCategory, message,
-      context: context || null, userAgent: req.headers['user-agent'],
+      context: feedbackContext, userAgent: req.headers['user-agent'],
     });
     res.status(201).json({ message: 'Thanks for the feedback!' });
   } catch (err) {
