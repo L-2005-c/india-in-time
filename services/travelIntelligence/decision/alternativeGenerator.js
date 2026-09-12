@@ -20,8 +20,8 @@ const REGIONAL_ALTERNATIVE_HAVENS = [
   { id: 'araku_tribal_museum', name: 'Araku Tribal Museum', cat: 'museum', lat: 18.331, lon: 82.868, indoorOutdoor: 'indoor', open_time: '09:00', close_time: '19:00', city: 'Araku Valley', visitMinutes: 60 },
   { id: 'coffee_house_haven', name: 'Araku Valley Coffee House & Roastery', cat: 'food', lat: 18.334, lon: 82.871, indoorOutdoor: 'indoor', open_time: '08:00', close_time: '20:00', city: 'Araku Valley', visitMinutes: 45 },
   { id: 'padmapuram_craft_centre', name: 'Padmapuram Handicrafts Pavilion', cat: 'heritage', lat: 18.325, lon: 82.862, indoorOutdoor: 'covered', open_time: '09:00', close_time: '18:00', city: 'Araku Valley', visitMinutes: 45 },
-  { id: 'sub_museum_vizag', name: 'INS Kursura Submarine Museum', cat: 'museum', lat: 17.716, lon: 83.333, indoorOutdoor: 'indoor', open_time: '14:00', close_time: '20:30', city: 'Visakhapatnam', visitMinutes: 60 },
-  { id: 'aircraft_museum_vizag', name: 'TU-142 Aircraft Museum', cat: 'museum', lat: 17.717, lon: 83.334, indoorOutdoor: 'indoor', open_time: '14:00', close_time: '20:30', city: 'Visakhapatnam', visitMinutes: 50 },
+  { id: 'sub_museum_vizag', name: 'INS Kursura Submarine Museum', cat: 'museum', lat: 17.7172, lon: 83.3301, indoorOutdoor: 'indoor', open_time: '14:00', close_time: '20:30', city: 'Visakhapatnam', visitMinutes: 60 },
+  { id: 'aircraft_museum_vizag', name: 'TU-142 Aircraft Museum', cat: 'museum', lat: 17.7180, lon: 83.3299, indoorOutdoor: 'indoor', open_time: '14:00', close_time: '20:30', city: 'Visakhapatnam', visitMinutes: 50 },
 
   // Hyderabad Circuit
   { id: 'salar_jung', name: 'Salar Jung Museum', cat: 'museum', lat: 17.371, lon: 78.480, indoorOutdoor: 'indoor', open_time: '10:00', close_time: '17:00', city: 'Hyderabad', visitMinutes: 120 },

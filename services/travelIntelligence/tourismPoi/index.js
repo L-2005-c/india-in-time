@@ -15,7 +15,7 @@ const {
   TOURISM_CLASSES,
 } = require('./tourismEligibilityEngine');
 
-const { isBlacklistedEntity, isLocalityOnlyName } = require('./tourismBlacklist');
+const { isBlacklistedEntity, isLocalityOnlyName, isPermanentlyClosedPlace } = require('./tourismBlacklist');
 const { resolveWhitelist, isVerifiedShoppingDestination, VIZAG_WHITELIST, getCityWhitelist, listSupportedCities, CITY_WHITELISTS } = require('./tourismWhitelist');
 const {
   classifyTourismCategory,
@@ -73,6 +73,7 @@ module.exports = {
   // Lists
   isBlacklistedEntity,
   isLocalityOnlyName,
+  isPermanentlyClosedPlace,
   resolveWhitelist,
   isVerifiedShoppingDestination,
   VIZAG_WHITELIST,

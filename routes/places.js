@@ -14,7 +14,7 @@ const {
   getPlaces, fetchWiki, fetchCuratedCityFallback, fetchCuratedFoodFallback,
   fetchNominatimFallback, hydrateAiPlaces,
 } = require('../services/placesDiscovery');
-const { resolveCanonicalPlace } = require('../services/travelIntelligence/tourismPoi');
+const { resolveCanonicalPlace, isPermanentlyClosedPlace } = require('../services/travelIntelligence/tourismPoi');
 function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
   return [
     String(cityName || '').trim().toLowerCase(),
@@ -108,6 +108,7 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
 
     function addPlaces(list) {
       for (const p of (list || [])) {
+        if (!p || isPermanentlyClosedPlace(p)) continue;
         const k = String(p.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
         if (!k || k.length < 2 || seen.has(k)) continue;
         if (!p.coords || p.coords.length < 2) continue;
@@ -197,6 +198,7 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
       const all = filterPlacesByPrefs(
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback, ...curatedFood].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&
+          !isPermanentlyClosedPlace(p) &&
           arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
         ),
         prefs

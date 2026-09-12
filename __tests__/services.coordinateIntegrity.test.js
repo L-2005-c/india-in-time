@@ -63,4 +63,20 @@ describe('Coordinate Integrity Engine (coordinateIntegrity.js)', () => {
     expect(farCheck.withinTolerance).toBe(false);
     expect(farCheck.distanceMeters).toBeGreaterThan(5000);
   });
+
+  test('rejects offshore water coordinates into the sea for coastal cities', () => {
+    // Coordinate 550m into the Bay of Bengal east of VUDA Park
+    const waterPt = validatePoiCoordinates(17.7241, 83.3395, { cityHint: 'Visakhapatnam' });
+    expect(waterPt.valid).toBe(false);
+    expect(waterPt.reason).toBe('OFFSHORE_WATER_COORDINATES');
+
+    // Valid land coordinate for VUDA Park
+    const landPt = validatePoiCoordinates(17.7265, 83.3340, { cityHint: 'Visakhapatnam' });
+    expect(landPt.valid).toBe(true);
+
+    // Offshore into Arabian Sea off Mumbai coast
+    const mumbaiWater = validatePoiCoordinates(18.95, 72.70, { cityHint: 'Mumbai' });
+    expect(mumbaiWater.valid).toBe(false);
+    expect(mumbaiWater.reason).toBe('OFFSHORE_WATER_COORDINATES');
+  });
 });

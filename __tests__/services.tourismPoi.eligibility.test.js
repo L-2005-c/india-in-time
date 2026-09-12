@@ -285,3 +285,37 @@ describe('Exclusive categories hard mode', () => {
     expect(rejected.some((r) => /marripalem/i.test(r.name))).toBe(true);
   });
 });
+
+describe('Permanently closed places filter', () => {
+  const { isPermanentlyClosedPlace, isBlacklistedEntity } = require('../services/travelIntelligence/tourismPoi');
+
+  test('detects permanently closed attractions by name pattern', () => {
+    expect(isPermanentlyClosedPlace({ name: 'Old Amusement Park (Permanently Closed)' })).toBe(true);
+    expect(isPermanentlyClosedPlace({ name: 'Heritage Museum [Closed]' })).toBe(true);
+    expect(isPermanentlyClosedPlace({ name: 'Demolished Cinema Hall' })).toBe(true);
+    expect(isPermanentlyClosedPlace({ name: 'Defunct Theme Park' })).toBe(true);
+  });
+
+  test('detects permanently closed attractions by operational status', () => {
+    expect(isPermanentlyClosedPlace({ name: 'Central Food Court', business_status: 'CLOSED_PERMANENTLY' })).toBe(true);
+    expect(isPermanentlyClosedPlace({ name: 'City Museum', operationalStatus: 'PERMANENTLY_CLOSED' })).toBe(true);
+    expect(isPermanentlyClosedPlace({ name: 'Wave Pool', isPermanentlyClosed: true })).toBe(true);
+  });
+
+  test('detects known defunct attractions like MGM Selvee Water World', () => {
+    expect(isPermanentlyClosedPlace({ name: 'MGM Selvee Water World' })).toBe(true);
+    expect(isPermanentlyClosedPlace({ name: 'MGM Water Park' })).toBe(true);
+  });
+
+  test('isBlacklistedEntity rejects permanently closed places', () => {
+    const res = isBlacklistedEntity({ name: 'MGM Selvee Water World' });
+    expect(res.rejected).toBe(true);
+    expect(res.reason).toBe('permanently_closed');
+  });
+
+  test('active operational places are not flagged as closed', () => {
+    expect(isPermanentlyClosedPlace({ name: 'INS Kursura Submarine Museum' })).toBe(false);
+    expect(isPermanentlyClosedPlace({ name: 'Ramakrishna Beach' })).toBe(false);
+    expect(isPermanentlyClosedPlace({ name: 'Kailasagiri' })).toBe(false);
+  });
+});

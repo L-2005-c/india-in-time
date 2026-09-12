@@ -113,11 +113,82 @@ function normalizeName(name) {
     .trim();
 }
 
+const PERMANENTLY_CLOSED_PATTERNS = [
+  /\b(permanently\s*closed|closed\s*permanently)\b/i,
+  /\b(temporarily\s*closed|closed\s*temporarily)\b/i,
+  /\b(defunct|demolished|abandoned|out\s*of\s*business)\b/i,
+  /\((?:permanently\s+)?closed\)/i,
+  /\[(?:permanently\s+)?closed\]/i,
+];
+
+const KNOWN_DEFUNCT_ATTRACTIONS = new Set([
+  'mgm selvee water world',
+  'mgm water park',
+  'mgm water park vizag',
+  'taraka rama water park',
+  'mudfort amusement park',
+  'hubba bubba amusement park',
+].map(s => s.toLowerCase()));
+
+/**
+ * Returns true if the entity is permanently closed, defunct, or demolished.
+ */
+function isPermanentlyClosedPlace(place) {
+  if (!place || typeof place !== 'object') return false;
+
+  const rawName = String(place.name || place.canonicalName || place.title || '').trim();
+  const normName = normalizeName(rawName);
+
+  // 1. Defunct attraction exact match
+  if (KNOWN_DEFUNCT_ATTRACTIONS.has(normName)) {
+    return true;
+  }
+
+  // 2. Name patterns
+  for (const re of PERMANENTLY_CLOSED_PATTERNS) {
+    if (re.test(rawName)) return true;
+  }
+
+  // 3. Operational status attributes
+  const bStatus = String(place.business_status || place.businessStatus || '').toUpperCase();
+  if (bStatus === 'CLOSED_PERMANENTLY' || bStatus === 'CLOSED_TEMPORARILY') {
+    return true;
+  }
+
+  const opStatus = String(place.operationalStatus || place.status || '').toUpperCase();
+  if (opStatus === 'PERMANENTLY_CLOSED' || opStatus === 'DEFUNCT') {
+    return true;
+  }
+
+  if (place.isPermanentlyClosed === true || place.isClosed === true) {
+    return true;
+  }
+
+  // 4. OSM extratags / tags
+  const tags = place.extratags || place.tags || {};
+  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags.demolished === 'yes') {
+    return true;
+  }
+  if (String(tags.operational_status || tags.business_status || '').toLowerCase() === 'closed') {
+    return true;
+  }
+  if (String(tags.opening_hours || '').toLowerCase() === 'closed') {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Returns true if the candidate should be hard-rejected as non-tourist.
  */
 function isBlacklistedEntity(place) {
   if (!place || typeof place !== 'object') return { rejected: true, reason: 'invalid_place' };
+
+  // 0. Permanently closed or defunct check
+  if (isPermanentlyClosedPlace(place)) {
+    return { rejected: true, reason: 'permanently_closed', detail: place.name || 'Permanently Closed Venue' };
+  }
 
   const name = normalizeName(place.name);
   if (!name || name.length < 2) return { rejected: true, reason: 'empty_name' };
@@ -188,6 +259,9 @@ function isLocalityOnlyName(name) {
 module.exports = {
   isBlacklistedEntity,
   isLocalityOnlyName,
+  isPermanentlyClosedPlace,
+  PERMANENTLY_CLOSED_PATTERNS,
+  KNOWN_DEFUNCT_ATTRACTIONS,
   KNOWN_LOCALITY_NAMES,
   REJECT_OSM_TYPES,
   REJECT_OSM_CLASSES,

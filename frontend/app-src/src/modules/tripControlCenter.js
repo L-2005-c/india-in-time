@@ -12,7 +12,7 @@
  * - 100% preservation of all Phase 1-6 decision and test contract IDs
  */
 
-import { openBottomSheet } from './bottomSheet.js';
+import { openBottomSheet, closeBottomSheet } from './bottomSheet.js';
 
 const DEFAULT_CANDIDATES_BY_INTENT = {
   GO_TO_HOTEL: [
@@ -502,10 +502,10 @@ export function renderTripControlCenter({
                 const isSel = topCandidate?.id === cand.id;
                 const priceText = cand.price?.total ? `₹${cand.price.total}` : 'Standard Fare';
                 return `
-                  <div class="next-candidate-card" style="background:${isSel ? 'rgba(99, 102, 241, 0.14)' : 'rgba(255, 255, 255, 0.03)'}; border:1px solid ${isSel ? '#818cf8' : 'rgba(255, 255, 255, 0.08)'}; border-radius:10px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                      <div style="display:flex; align-items:center; gap:6px;">
-                        <strong style="font-size:13px; color:#f8fafc;">${cand.name}</strong>
+                  <div class="next-candidate-card" data-candidate-id="${cand.id}" data-intent="${selectedIntent}" style="background:${isSel ? 'rgba(99, 102, 241, 0.14)' : 'rgba(255, 255, 255, 0.03)'}; border:1px solid ${isSel ? '#818cf8' : 'rgba(255, 255, 255, 0.08)'}; border-radius:10px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <div style="flex:1; min-width:0;">
+                      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <strong style="font-size:13px; color:#f8fafc; word-break:break-word;">${cand.name}</strong>
                         <span style="font-size:9px; background:rgba(16, 185, 129, 0.15); color:#34d399; padding:1px 5px; border-radius:3px; font-weight:700;">
                           ${cand.trustState || 'SUPPORTED'}
                         </span>
@@ -514,11 +514,11 @@ export function renderTripControlCenter({
                         ${cand.durationMinutes} min (${cand.distanceKm} km) • <span style="color:#38bdf8; font-weight:700;">${priceText}</span> • ${cand.checkinStatus || 'Open'}
                       </div>
                     </div>
-                    <div style="display:flex; gap:6px;">
-                      <button class="btn-select-next-candidate" data-candidate-id="${cand.id}" style="background:${isSel ? '#6366f1' : 'rgba(255,255,255,0.08)'}; color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                      <button type="button" class="btn-select-next-candidate" data-candidate-id="${cand.id}" data-intent="${selectedIntent}" aria-label="${isSel ? 'Candidate already selected' : 'Select destination'}" style="background:${isSel ? '#6366f1' : 'rgba(255,255,255,0.08)'}; color:#fff; border:none; border-radius:6px; padding:8px 12px; min-height:40px; font-size:12px; font-weight:700; cursor:pointer; touch-action:manipulation;">
                         ${isSel ? 'Selected' : 'Select'}
                       </button>
-                      <button class="btn-view-next-details" data-candidate-id="${cand.id}" style="background:none; border:none; color:#818cf8; font-size:11px; cursor:pointer; text-decoration:underline;">
+                      <button type="button" class="btn-view-next-details" data-candidate-id="${cand.id}" data-intent="${selectedIntent}" aria-label="View details for ${cand.name}" style="background:none; border:none; color:#818cf8; font-size:12px; font-weight:600; cursor:pointer; text-decoration:underline; padding:8px 10px; min-height:40px; display:inline-flex; align-items:center; touch-action:manipulation;">
                         Details
                       </button>
                     </div>
@@ -723,6 +723,7 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
   let currentTripData = {
     presentationMode: 'TRAVELER',
     isDemoDrawerOpen: false,
+    selectedIntent: tripData.selectedIntent || 'GO_TO_HOTEL',
     ...tripData,
   };
 
@@ -1179,15 +1180,38 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
       };
     });
 
+    // Helper to safely find candidate across intent pools
+    function findCandidate(candId, preferredIntent) {
+      if (Array.isArray(currentTripData.nextLegCandidates) && currentTripData.nextLegCandidates.length) {
+        const found = currentTripData.nextLegCandidates.find(c => c.id === candId);
+        if (found) return found;
+      }
+      const intent = preferredIntent || currentTripData.selectedIntent || 'GO_TO_HOTEL';
+      const list = DEFAULT_CANDIDATES_BY_INTENT[intent];
+      if (Array.isArray(list)) {
+        const found = list.find(c => c.id === candId);
+        if (found) return found;
+      }
+      // Search across all default intents as fallback
+      for (const group of Object.values(DEFAULT_CANDIDATES_BY_INTENT)) {
+        if (Array.isArray(group)) {
+          const found = group.find(c => c.id === candId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
     // Select Next Candidate
     containerEl.querySelectorAll('.btn-select-next-candidate').forEach(btn => {
       btn.onclick = (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const candId = btn.getAttribute('data-candidate-id');
-        const list = currentTripData.nextLegCandidates || DEFAULT_CANDIDATES_BY_INTENT[currentTripData.selectedIntent] || [];
-        const found = list.find(c => c.id === candId);
+        const intent = btn.getAttribute('data-intent') || currentTripData.selectedIntent || 'GO_TO_HOTEL';
+        const found = findCandidate(candId, intent);
         if (found) {
           currentTripData.selectedCandidate = found;
+          currentTripData.selectedIntent = intent;
           render();
         }
       };
@@ -1196,25 +1220,36 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
     // View Next Candidate Details (Bottom sheet)
     containerEl.querySelectorAll('.btn-view-next-details').forEach(btn => {
       btn.onclick = (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const candId = btn.getAttribute('data-candidate-id');
-        const list = currentTripData.nextLegCandidates || DEFAULT_CANDIDATES_BY_INTENT[currentTripData.selectedIntent] || [];
-        const found = list.find(c => c.id === candId);
+        const intent = btn.getAttribute('data-intent') || currentTripData.selectedIntent || 'GO_TO_HOTEL';
+        const found = findCandidate(candId, intent);
         if (found) {
           openBottomSheet({
             title: found.name,
-            subtitle: `${found.category} • ${found.durationMinutes}m drive (${found.distanceKm} km)`,
+            subtitle: `${found.category || 'Destination'} • ${found.durationMinutes || 15}m drive (${found.distanceKm || 3} km)`,
             contentHtml: `
               <div style="font-size:14px; line-height:1.6;">
-                <p><strong>Overview:</strong> ${found.explanation || 'Verified destination.'}</p>
+                <p><strong>Overview:</strong> ${found.explanation || 'Verified destination and itinerary stop.'}</p>
                 <div style="background:rgba(255,255,255,0.04); border-radius:10px; padding:12px; margin:12px 0;">
                   <div>💰 <strong>Total Price:</strong> ₹${found.price?.total ?? 0} (inclusive of taxes)</div>
                   <div style="margin-top:4px;">🛡️ <strong>Safety Status:</strong> ${found.safetyStatus || 'CLEAR'}</div>
                   <div style="margin-top:4px;">🏛️ <strong>Trust State:</strong> ${found.trustState || 'SUPPORTED'} (${found.trustScore || 95}% score)</div>
                   <div style="margin-top:4px;">🏨 <strong>Check-in:</strong> ${found.checkinStatus || 'Available'}</div>
                 </div>
+                <button type="button" data-sheet-action="selectCandidate" class="btn-primary-action" style="background:linear-gradient(135deg, #6366f1, #8b5cf6); color:#fff; width:100%; margin-top:8px; padding:12px; border-radius:8px; font-weight:700; border:none; cursor:pointer;">
+                  ✓ Select This Destination
+                </button>
               </div>
-            `
+            `,
+            onAction: (act) => {
+              if (act === 'selectCandidate') {
+                currentTripData.selectedCandidate = found;
+                currentTripData.selectedIntent = intent;
+                closeBottomSheet();
+                render();
+              }
+            }
           });
         }
       };
@@ -1226,8 +1261,8 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
       startNextLegBtn.onclick = async (e) => {
         e.preventDefault();
         const candId = startNextLegBtn.getAttribute('data-candidate-id');
-        const activeList = currentTripData.nextLegCandidates || DEFAULT_CANDIDATES_BY_INTENT[currentTripData.selectedIntent] || [];
-        const selected = currentTripData.selectedCandidate || activeList.find(c => c.id === candId) || activeList[0];
+        const selected = currentTripData.selectedCandidate || findCandidate(candId, currentTripData.selectedIntent);
+        if (!selected) return;
 
         currentTripData.journeyLegs = currentTripData.journeyLegs || [];
         currentTripData.journeyLegs.push({

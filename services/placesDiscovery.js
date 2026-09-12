@@ -16,6 +16,7 @@ const {
   isConfidentWikiMatch, tokenOverlap, dedupePlacesByName,
   inferFallbackCategory, visitMinutesForCat,
 } = require('../utils/placesMerge');
+const { isPermanentlyClosedPlace } = require('./travelIntelligence/tourismPoi/tourismBlacklist');
 
 async function callGemini(prompt) {
   const text = await callGeminiText(prompt, {
@@ -79,6 +80,7 @@ async function getPlaces(cityName, lat, lon, totalMinutes) {
   - Include only a few hidden gems or lesser-known spots after the famous attractions.
 - Include at least ${foodCount} food entries: famous local restaurants, food streets, seafood spots, biryani joints, famous cafes, sweet shops — real named establishments only.
 - DO NOT include: generic stores, kirana shops, retail chains without tourism value, roads, streets, highways, residential areas, colonies, layouts, towns, districts, neighbourhoods, bus stands, railway stations, airports, or generic areas. Major named shopping malls ARE allowed when relevant.
+- STRICT: NEVER include permanently closed, defunct, demolished, abandoned, or out-of-business venues. Every attraction, restaurant, museum, or market MUST be operational and actively open to tourists right now.
 - CRITICAL: Provide the EXACT, official, map-searchable name for each place so it can be accurately found on GPS and maps. Do NOT use generic or abbreviated names.
 - Provide accurate 'open_time' and 'close_time' in 24-hour format. If open 24 hours, use 00:00 to 23:59.
 - Provide 'indoor_outdoor' categorization (indoor, outdoor, mixed).
@@ -174,10 +176,10 @@ async function fetchWiki(lat, lon, _cityName) {
   });
   if (!res.ok) return [];
   const data = await res.json();
-  const SKIP    = /\b(nagar|colony|peta|palle|village|layout|block|phase|mandal|taluk|district|ward|station|bypass|road|street|highway|slum|mohalla|chowk|circle|junction|sector|zone|area|suburb|locality|division|tehsil|residency|apartment|towers?|store|stores|shop|shops|supermarket|mart|boutique)\b/i;
+  const SKIP    = /\b(nagar|colony|peta|palle|village|layout|block|phase|mandal|taluk|district|ward|station|bypass|road|street|highway|slum|mohalla|chowk|circle|junction|sector|zone|area|suburb|locality|division|tehsil|residency|apartment|towers?|store|stores|shop|shops|supermarket|mart|boutique|permanently\s*closed|closed|defunct|demolished|abandoned|former)\b/i;
   const TOURIST = /beach|fort|palace|mahal|haveli|chhatri|temple|church|mosque|museum|lake|park|garden|hill|falls|cave|zoo|monument|ghat|dam|island|sanctuary|mandir|masjid|shrine|bagh|maidan|viewpoint|lighthouse|harbour|harbor|waterfall|reservoir|valley|tower|bazaar|pier|aquarium|botanical|heritage|archaeological/i;
   return (data?.query?.geosearch || [])
-    .filter(el => TOURIST.test(el.title) && !SKIP.test(el.title) && distKm(lat, lon, el.lat, el.lon) <= 35)
+    .filter(el => TOURIST.test(el.title) && !SKIP.test(el.title) && !isPermanentlyClosedPlace({ name: el.title }) && distKm(lat, lon, el.lat, el.lon) <= 35)
     .map(el => {
       const t = el.title.toLowerCase();
       const cat = t.match(/beach/)                                          ? 'beach'
@@ -307,13 +309,13 @@ async function geocodePlaceNominatim(placeName, cityName, cityLat, cityLon, cate
 }
 
 async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
-  const BAD_NAME = /\b(road|street|highway|nagar|colony|layout|phase|block|sector|ward|bypass|circle|junction|peta|palle|village|suburb|locality|apartment)\b/i;
+  const BAD_NAME = /\b(road|street|highway|nagar|colony|layout|phase|block|sector|ward|bypass|circle|junction|peta|palle|village|suburb|locality|apartment|permanently\s*closed|closed|defunct|demolished|abandoned)\b/i;
 
   // Deduplicate and pre-filter bad names before geocoding
   const seen = new Set();
   const unique = aiPlaces.filter(p => {
     const k = String(p.name || '').trim().toLowerCase();
-    if (!k || seen.has(k) || BAD_NAME.test(p.name)) return false;
+    if (!k || seen.has(k) || BAD_NAME.test(p.name) || isPermanentlyClosedPlace(p)) return false;
     seen.add(k);
     return true;
   });
@@ -601,6 +603,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
 
         // Block roads, localities, residential areas by name pattern
         if (NAME_BLOCK.test(name)) continue;
+        if (isPermanentlyClosedPlace({ name, ...row })) continue;
 
         // Block pure numeric names and single-word generic fillers
         if (/^\d+$/.test(name)) continue;
@@ -682,6 +685,7 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
           if (!name || name.length < 3) continue;
           if (NAME_BLOCK.test(name)) continue;
           if (/^\d+$/.test(name)) continue;
+          if (isPermanentlyClosedPlace({ name, ...props })) continue;
 
           const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (seen.has(key)) continue;

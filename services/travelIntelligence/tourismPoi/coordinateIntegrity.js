@@ -107,7 +107,19 @@ function validatePoiCoordinates(rawLat, rawLon, options = {}) {
     }
   }
 
-  // 3. Coordinate precision check (must have at least 3 decimal places for tourism accuracy)
+  // 3. Coastal water / offshore check
+  if (isOffshoreOrWaterCoordinate(lat, lon, cityKey)) {
+    return {
+      valid: false,
+      lat,
+      lon,
+      wasSwapped,
+      reason: 'OFFSHORE_WATER_COORDINATES',
+      confidence: 0,
+    };
+  }
+
+  // 4. Coordinate precision check (must have at least 3 decimal places for tourism accuracy)
   const latDecimals = (String(rawLat).split('.')[1] || '').length;
   const lonDecimals = (String(rawLon).split('.')[1] || '').length;
   const precisionConfidence = (latDecimals >= 4 && lonDecimals >= 4) ? 100 : (latDecimals >= 3 ? 85 : 60);
@@ -119,6 +131,41 @@ function validatePoiCoordinates(rawLat, rawLon, options = {}) {
     wasSwapped,
     confidence: wasSwapped ? Math.min(80, precisionConfidence) : precisionConfidence,
   };
+}
+
+/**
+ * Detects coordinates located offshore in the sea or ocean for coastal cities.
+ */
+function isOffshoreOrWaterCoordinate(lat, lon, cityHint = '') {
+  if (typeof lat !== 'number' || typeof lon !== 'number') return false;
+  const city = String(cityHint || '').toLowerCase().trim();
+
+  // Visakhapatnam / Vizag coastal water boundary (Bay of Bengal is to the East)
+  if (city === 'visakhapatnam' || city === 'vizag') {
+    if (lat < 17.65 && lon > 83.275) return true;
+    if (lat >= 17.65 && lat < 17.68 && lon > 83.298) return true;
+    if (lat >= 17.68 && lat < 17.705 && lon > 83.305) return true;
+    if (lat >= 17.705 && lat < 17.725 && lon > 83.3312) return true;
+    if (lat >= 17.725 && lat < 17.740 && lon > 83.3445) return true;
+    if (lat >= 17.740 && lat < 17.755 && lon > 83.3515) return true;
+    if (lat >= 17.755 && lat < 17.770 && lon > 83.3640) return true;
+    if (lat >= 17.770 && lat < 17.790 && lon > 83.3880) return true;
+    if (lat >= 17.790 && lat < 17.840 && lon > 83.4210) return true;
+    if (lat >= 17.840 && lat < 17.870 && lon > 83.4390) return true;
+    if (lat >= 17.870 && lat < 17.910 && lon > 83.4610) return true;
+  }
+
+  // Mumbai (Arabian Sea to the West)
+  if (city === 'mumbai' || city === 'bombay') {
+    if (lat >= 18.85 && lat <= 19.30 && lon < 72.78) return true;
+  }
+
+  // Chennai (Bay of Bengal to the East)
+  if (city === 'chennai' || city === 'madras') {
+    if (lat >= 12.95 && lat <= 13.15 && lon > 80.290) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -148,4 +195,5 @@ module.exports = {
   CITY_CENTROIDS,
   validatePoiCoordinates,
   checkCoordinateTolerance,
+  isOffshoreOrWaterCoordinate,
 };

@@ -64,7 +64,7 @@ function resolveCanonicalPlace(input, options = {}) {
      !/\b(fort|palace|temple|museum|beach|lake|park|hill|garden|zoo|aquarium|waterfall|bazaar|mandir|church|cathedral|mosque|dargah|memorial)\b/i.test(rawName))
   );
 
-  const blacklistCheck = isBlacklistedEntity({ name: rawName, type: rawObj.type, class: rawObj.class });
+  const blacklistCheck = isBlacklistedEntity({ ...rawObj, name: rawName, type: rawObj.type, class: rawObj.class });
   if (isLocalityOnlyName(rawName) || blacklistCheck.rejected || isRoadOrColony) {
     return null;
   }

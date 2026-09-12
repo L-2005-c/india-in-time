@@ -9,8 +9,8 @@ const { run50RouteBenchmarks } = require('../scripts/benchmarks/route-eta-benchm
 const { evaluateEtaAccuracy } = require('../services/routing/etaCalibration');
 
 describe('50-Scenario Indian Route & ETA Benchmark', () => {
-  // Allow up to 60 seconds for 50 benchmark calculations
-  jest.setTimeout(60000);
+  // Allow up to 180 seconds for 50 benchmark calculations over external networks
+  jest.setTimeout(180000);
 
   test('executes 50 diverse Indian test corridors with high consistency and low ETA MAE', async () => {
     const report = await run50RouteBenchmarks();

@@ -315,7 +315,7 @@ function loadSampleJourneyPreview(sampleRoute) {
       id: 'sample_stop_1',
       name: sampleRoute?.stops?.[0] || 'INS Kursura Submarine Museum',
       cat: 'heritage',
-      coords: [17.716, 83.333],
+      coords: [17.7172, 83.3301],
       vt: 45,
       arriveAt: '10:00',
       leaveAt: '10:45',
