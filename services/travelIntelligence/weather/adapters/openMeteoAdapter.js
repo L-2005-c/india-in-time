@@ -47,7 +47,7 @@ async function fetchFromOpenMeteo(lat, lon, { elevationM = null, timeoutMs = 900
 async function getOpenMeteoWeather(lat, lon, options = {}) {
   let raw = null;
   let lastError = null;
-  const startTime = Date.now();
+  const _startTime = Date.now();
   const elevationSpecified = Number.isFinite(Number(options.elevationM));
 
   try {

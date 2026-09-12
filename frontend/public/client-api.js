@@ -411,6 +411,37 @@
     return get(`/api/intelligence/trips/${tripId}/safety/notifications`);
   }
 
+  // ── Phase 4: Experience Value Intelligence ──────────────────────────────────
+  async function evaluateTripExperience(tripId, params = {}) {
+    return post(`/api/intelligence/trips/${tripId}/experience/evaluate`, params);
+  }
+  async function fetchTripExperienceRecommendations(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/experience/recommendations`);
+  }
+  async function recordExperienceDecision(tripId, data = {}) {
+    return post(`/api/intelligence/trips/${tripId}/experience/decide`, data);
+  }
+  async function fetchExperienceWindows(params = {}) {
+    return get('/api/intelligence/experience/windows', params);
+  }
+  async function fetchTripExperienceOutcomes(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/experience/outcomes`);
+  }
+
+  // ── Phase 5: Tourist Trust Intelligence ──────────────────────────────────────
+  async function evaluateTrust(target, context = {}, isSimulated = false) {
+    return post('/api/intelligence/trust/evaluate', { target, context, isSimulated });
+  }
+  async function fetchEntityTrust(entityId, params = {}) {
+    return get(`/api/intelligence/trust/entity/${encodeURIComponent(entityId)}`, params);
+  }
+  async function recordTrustFeedback(tripId, data = {}) {
+    return post(`/api/intelligence/trips/${tripId}/trust/feedback`, data);
+  }
+  async function fetchTrustMetrics() {
+    return get('/api/intelligence/trust/metrics');
+  }
+
   // ── Phase 6: Next Journey Intelligence ───────────────────────────────────────
   async function submitNextLegIntent(tripId, intentType, rawInput = '', options = {}) {
     return post(`/api/intelligence/trips/${tripId}/next-leg/intent`, { intentType, rawInput, ...options });
@@ -441,6 +472,8 @@
     getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
     evaluateTripDisruptions, simulateTripDisruption, fetchTripNotifications, recordNotificationAction, fetchDisruptionEvents,
     evaluateTripSafety, simulateTripSafety, fetchTripSafety, recordSafetyAction, fetchSafetyProviders, fetchSafetyMetrics, fetchSafetyNotifications,
+    evaluateTripExperience, fetchTripExperienceRecommendations, recordExperienceDecision, fetchExperienceWindows, fetchTripExperienceOutcomes,
+    evaluateTrust, fetchEntityTrust, recordTrustFeedback, fetchTrustMetrics,
     submitNextLegIntent, fetchNextLegIntents, evaluateNextLeg, fetchNextLegOptions, decideNextLeg, fetchJourneyLegs, fetchCurrentLeg,
     submitPlaceFeedback, submitAppFeedback,
     aiChat, aiVibe, aiLens, aiPrep, aiInstaSpots, aiSouvenirGuide,

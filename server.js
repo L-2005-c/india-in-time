@@ -176,8 +176,7 @@ app.use('/api/feedback', generalLimiter, feedbackRoutes);
 // Analytics
 app.use('/api/flags', flagsRoutes);
 app.use('/api/analytics', analyticsRoutes);
-// Travel Operating System & Decision Intelligence (v3.0)
-app.use('/api/intelligence', generalLimiter, intelligenceRoutes);
+app.use('/api/intelligence', optionalAuth, generalLimiter, intelligenceRoutes);
 // ── Health Checks ─────────────────────────────────────────────────────────
 const geminiService = require('./services/gemini');
 const { placesCache, geminiCache, weatherCache, geocodeCache } = require('./services/cache');

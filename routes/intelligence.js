@@ -144,6 +144,45 @@ router.get('/health', (_req, res) => {
   });
 });
 
+// ── Trip Authorization Guard (Tenant & User Isolation) ──────────────────────
+async function verifyTripAccess(req, res, next) {
+  const tripId = req.params.id;
+  if (!tripId) return next();
+
+  // Check in-memory active trips registry
+  const record = activeTripsState.get(tripId);
+  const recordOwner = record?.ownerUid;
+
+  if (recordOwner) {
+    if (req.uid && req.uid !== recordOwner) {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to access or mutate this journey.' });
+    }
+    if (!req.uid) {
+      return res.status(401).json({ error: 'Authentication required to access this saved journey.' });
+    }
+  }
+
+  // Check persistent DB trip if connected
+  try {
+    const { getTripById } = require('../db/queries');
+    const dbTrip = await getTripById(tripId);
+    if (dbTrip && dbTrip.user_id && dbTrip.user_id !== 'anonymous_guest') {
+      if (req.uid && req.uid !== dbTrip.user_id) {
+        return res.status(403).json({ error: 'Access denied: You do not have permission to access or mutate this trip.' });
+      }
+      if (!req.uid) {
+        return res.status(401).json({ error: 'Authentication required to access this trip.' });
+      }
+    }
+  } catch (_e) {
+    // DB check skipped if offline
+  }
+
+  next();
+}
+
+router.use('/trips/:id', verifyTripAccess);
+
 // ── 4. Journey State: Initialize or Update ───────────────────────────────────
 router.post('/trips/:id/state', async (req, res) => {
   const tripId = req.params.id;
@@ -156,15 +195,17 @@ router.post('/trips/:id/state', async (req, res) => {
   try {
     const state = createJourneyState({
       tripId,
-      travelerId,
+      travelerId: travelerId || req.uid,
       plan,
       initialLocation,
       startTimeMinutes,
     });
 
+    const ownerUid = req.uid || null;
     activeTripsState.set(tripId, {
       state,
       travelerDna: sanitizeDnaProfile(travelerDna || dna),
+      ownerUid,
     });
 
     // Commit Plan v1 to version audit trail

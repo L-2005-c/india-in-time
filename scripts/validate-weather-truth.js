@@ -14,7 +14,7 @@
  */
 
 const { getWeatherDiagnostics } = require('../services/travelIntelligence/weather/weatherProviderRegistry');
-const { findNearestStation, getImdClimatologicalNormal } = require('../services/travelIntelligence/weather/adapters/imdWeatherAdapter');
+const { findNearestStation: _findNearestStation, getImdClimatologicalNormal: _getImdClimatologicalNormal } = require('../services/travelIntelligence/weather/adapters/imdWeatherAdapter');
 const { evaluateForecastObservationPair } = require('../services/travelIntelligence/weather/weatherAccuracyTracker');
 
 const BENCHMARK_LOCATIONS = [

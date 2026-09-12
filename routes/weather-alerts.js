@@ -4,11 +4,8 @@
 // POST /api/weather-alerts   { lat, lon, stops: [{name, cat, ot, ct}] }
 
 const express = require('express');
-const fetch   = require('node-fetch');
 const router  = express.Router();
 const appLogger = require('../lib/logger');
-const { keepAliveAgent } = require('../lib/httpAgent');
-const { weatherCache } = require('../services/cache');
 const {
   getDeterministicWeather,
   weatherEmoji,
