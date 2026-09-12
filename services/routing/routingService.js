@@ -279,6 +279,7 @@ async function calculateRoute(origin, destination, opts = {}) {
     const closureCheck = checkRouteForClosures(cand.geometry || [from, to], {
       departureTime: departureDate,
       city: opts.city,
+      mode,
     });
 
     return {
@@ -314,6 +315,7 @@ async function calculateRoute(origin, destination, opts = {}) {
   let activeIndex = 0;
   let reroutedDueToClosure = false;
   let closureAlert = null;
+  const shouldAvoidClosures = opts.avoidClosures !== false;
 
   if (evaluatedRoutes[0].hasClosure) {
     const primaryClosure = evaluatedRoutes[0].closureDetails;
@@ -327,15 +329,16 @@ async function calculateRoute(origin, destination, opts = {}) {
       alertMessage: `Route via ${primaryClosure?.corridorName || 'primary corridor'} is closed (${primaryClosure?.reason || 'road blocked'}). Automatically rerouted via alternate route.`,
     };
 
-    // Find the first open route
-    const openIdx = evaluatedRoutes.findIndex(r => !r.hasClosure);
-    if (openIdx > 0) {
-      activeIndex = openIdx;
-      reroutedDueToClosure = true;
-    } else {
-      // All candidates hit the closure; synthesize a dynamic bypass route
-      const bypassPt = computeClosureBypassPoint(from, to, primaryClosure);
-      try {
+    if (shouldAvoidClosures) {
+      // Find the first open route
+      const openIdx = evaluatedRoutes.findIndex(r => !r.hasClosure);
+      if (openIdx > 0) {
+        activeIndex = openIdx;
+        reroutedDueToClosure = true;
+      } else {
+        // All candidates hit the closure; synthesize a dynamic bypass route
+        const bypassPt = computeClosureBypassPoint(from, to, primaryClosure);
+        try {
         const leg1 = await raceOsrmMirrors(from, bypassPt, { mode, timeoutMs: 2000 });
         const leg2 = await raceOsrmMirrors(bypassPt, to, { mode, timeoutMs: 2000 });
         if (leg1 && leg2 && Array.isArray(leg1.geometry) && Array.isArray(leg2.geometry)) {
@@ -384,6 +387,7 @@ async function calculateRoute(origin, destination, opts = {}) {
         }
       } catch (_bypassErr) {
         // Fall back to primary route with warning
+      }
       }
     }
   }

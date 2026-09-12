@@ -71,9 +71,10 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
     };
   }
 
-  // 1. Check Hill Ghat Zones
+  // 1. Check Hill Ghat Zones (both endpoints in ghat, or short route accessing ghat)
   for (const g of HILL_GHAT_ZONES) {
-    if (isCoordInZone(fromCoords[0], fromCoords[1], g) || isCoordInZone(toCoords[0], toCoords[1], g)) {
+    if ((isCoordInZone(fromCoords[0], fromCoords[1], g) && isCoordInZone(toCoords[0], toCoords[1], g)) ||
+        ((isCoordInZone(fromCoords[0], fromCoords[1], g) || isCoordInZone(toCoords[0], toCoords[1], g)) && straightKm < 6.0)) {
       return {
         corridorType: CORRIDOR_TYPE.HILL_GHAT,
         windingFactor: 1.72,
@@ -84,9 +85,10 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
     }
   }
 
-  // 2. Check Walled Bazaar Zones
+  // 2. Check Walled Bazaar Zones (both endpoints in bazaar, or short local trip < 3 km)
   for (const b of DENSE_BAZAAR_ZONES) {
-    if (isCoordInZone(fromCoords[0], fromCoords[1], b) || isCoordInZone(toCoords[0], toCoords[1], b)) {
+    if ((isCoordInZone(fromCoords[0], fromCoords[1], b) && isCoordInZone(toCoords[0], toCoords[1], b)) ||
+        ((isCoordInZone(fromCoords[0], fromCoords[1], b) || isCoordInZone(toCoords[0], toCoords[1], b)) && straightKm < 3.0)) {
       return {
         corridorType: CORRIDOR_TYPE.WALLED_BAZAAR,
         windingFactor: 1.30,

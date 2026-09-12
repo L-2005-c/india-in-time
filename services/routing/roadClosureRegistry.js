@@ -218,9 +218,11 @@ function isClosureActive(closure, departureTime) {
 
   if (tw.type === 'ALWAYS') return true;
 
-  const date = departureTime ? new Date(departureTime) : new Date();
-  const minuteOfDay = date.getHours() * 60 + date.getMinutes();
-  const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+  const d = departureTime ? new Date(departureTime) : new Date();
+  const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcMs + (5.5 * 3600000));
+  const minuteOfDay = istDate.getHours() * 60 + istDate.getMinutes();
+  const dayOfWeek = istDate.getDay(); // 0 = Sunday, 6 = Saturday
 
   if (tw.days && Array.isArray(tw.days)) {
     if (!tw.days.includes(dayOfWeek)) return false;
@@ -245,7 +247,7 @@ function isClosureActive(closure, departureTime) {
  * Analyzes whether a route polyline intersects any active road closures.
  *
  * @param {Array<Array<number>>} geometry - Route coordinates [[lat, lon], ...]
- * @param {Object} opts - Options { departureTime, city }
+ * @param {Object} opts - Options { departureTime, city, mode }
  * @returns {Object} { hasClosure, closures, primaryClosure }
  */
 function checkRouteForClosures(geometry = [], opts = {}) {
@@ -255,6 +257,7 @@ function checkRouteForClosures(geometry = [], opts = {}) {
 
   const departureTime = opts.departureTime || new Date().toISOString();
   const targetCity = String(opts.city || '').trim().toLowerCase();
+  const travelMode = opts.mode || 'driving';
 
   const matchedClosures = [];
 
@@ -269,6 +272,11 @@ function checkRouteForClosures(geometry = [], opts = {}) {
   }
 
   for (const closure of CANONICAL_ROAD_CLOSURES) {
+    // Pedestrian zones do not block pedestrian travel
+    if (travelMode === 'walking' && closure.category === CLOSURE_TYPES.PEDESTRIAN_ZONE) {
+      continue;
+    }
+
     // City filter if provided (matching city or nationwide closures)
     if (targetCity && closure.city && targetCity !== closure.city) {
       // Check if route origin/dest is nearby regardless of city string

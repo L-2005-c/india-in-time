@@ -108,6 +108,7 @@ async function run50RouteBenchmarks() {
       destName: item.name.split(' to ')[1],
       departureTime,
       city: item.city,
+      avoidClosures: false,
     });
     const latencyMs = Date.now() - start;
 
