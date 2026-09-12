@@ -318,4 +318,42 @@ describe('Permanently closed places filter', () => {
     expect(isPermanentlyClosedPlace({ name: 'Ramakrishna Beach' })).toBe(false);
     expect(isPermanentlyClosedPlace({ name: 'Kailasagiri' })).toBe(false);
   });
+
+  test('evaluateCandidate rejects permanently closed place even if whitelisted', () => {
+    const closedWhitelisted = {
+      name: 'Kailasagiri (Permanently Closed)',
+      cat: 'scenic',
+      coords: [17.749, 83.342],
+    };
+    const res = evaluateCandidate(closedWhitelisted, { city: 'Visakhapatnam' });
+    expect(res.eligible).toBe(false);
+    expect(res.rejectReason).toBe('permanently_closed');
+  });
+
+  test('getOpeningStatus reports PERMANENTLY_CLOSED for defunct place', () => {
+    const { getOpeningStatus } = require('../services/travelIntelligence/openingHoursEngine');
+    const status = getOpeningStatus({
+      name: 'Demolished Cinema',
+      cat: 'museum',
+      ot: '09:00',
+      ct: '18:00',
+    });
+    expect(status.status).toBe('PERMANENTLY_CLOSED');
+    expect(status.isOpenNow).toBe(false);
+  });
+
+  test('planAdvancedItinerary never includes permanently closed places in the plan', () => {
+    const { planAdvancedItinerary } = require('../services/travelIntelligence/advancedItineraryEngine');
+    const places = [
+      { id: '1', name: 'INS Kursura Submarine Museum', cat: 'museum', coords: [17.7172, 83.3301], vt: 60, ot: '09:00', ct: '20:00' },
+      { id: '2', name: 'MGM Selvee Water World (Defunct)', cat: 'scenic', coords: [17.720, 83.330], vt: 60, ot: '09:00', ct: '18:00' },
+      { id: '3', name: 'Ramakrishna Beach', cat: 'beach', coords: [17.714, 83.324], vt: 45, ot: '05:00', ct: '22:00' },
+      { id: '4', name: 'Closed Down Restaurant', cat: 'food', coords: [17.715, 83.325], vt: 45, ot: '11:00', ct: '23:00', business_status: 'CLOSED_PERMANENTLY' },
+    ];
+    const plan = planAdvancedItinerary(places, { city: 'Visakhapatnam', maxStops: 4 });
+    const stopNames = (plan.stops || []).map(s => s.name);
+    expect(stopNames).not.toContain('MGM Selvee Water World (Defunct)');
+    expect(stopNames).not.toContain('Closed Down Restaurant');
+  });
 });
+

@@ -9,7 +9,7 @@
  * USER REQUEST → ... → TOURISM POI DISCOVERY → [THIS ENGINE] → quality → geo → time → ...
  */
 
-const { isBlacklistedEntity, isLocalityOnlyName } = require('./tourismBlacklist');
+const { isBlacklistedEntity, isLocalityOnlyName, isPermanentlyClosedPlace } = require('./tourismBlacklist');
 const { resolveWhitelist, isVerifiedShoppingDestination } = require('./tourismWhitelist');
 const {
   classifyTourismCategory,
@@ -54,6 +54,14 @@ function evaluateCandidate(place, options = {}) {
   if (!name) {
     result.rejectReason = 'empty_name';
     result.reasons.push('Missing place name');
+    return result;
+  }
+
+  // ── Stage 0: Hard Permanently Closed Gate (Zero tolerance) ─────────────
+  if (isPermanentlyClosedPlace(place)) {
+    result.rejectReason = 'permanently_closed';
+    result.tourismClass = TOURISM_CLASSES.UNKNOWN_MAP_ENTITY;
+    result.reasons.push('Attraction or venue is permanently closed, defunct, or demolished');
     return result;
   }
 

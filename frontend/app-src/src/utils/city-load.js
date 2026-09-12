@@ -2,11 +2,15 @@
  * City / places loading pure helpers.
  */
 
+import { isPermanentlyClosedPlace } from './closed-places.js';
+
 export function normalizeFetchedPlaces(places, normalizeLatLon) {
-  return (places || []).map((p) => ({
-    ...p,
-    coords: typeof normalizeLatLon === 'function' ? normalizeLatLon(p.coords) : p.coords,
-  }));
+  return (places || [])
+    .filter((p) => !isPermanentlyClosedPlace(p))
+    .map((p) => ({
+      ...p,
+      coords: typeof normalizeLatLon === 'function' ? normalizeLatLon(p.coords) : p.coords,
+    }));
 }
 
 export function placesLoadCacheKey(lat, lon, cityName) {

@@ -3,6 +3,7 @@
  */
 import { createBreakStop } from './planner.js';
 import { stopTimeScore as defaultStopTimeScore } from '../utils/stop-scoring.js';
+import { isPermanentlyClosedPlace } from '../utils/closed-places.js';
 
 function distKm(a, b) {
   if (!a || !b || a.length < 2 || b.length < 2) return 999;
@@ -75,6 +76,7 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
     for (let i = 0; i < pool.length; i++) {
       const loc = pool[i];
       if (usedIds.has(loc.id) || day.some((d) => d.id === loc.id || d.name === loc.name)) continue;
+      if (isPermanentlyClosedPlace(loc)) continue;
       
       const isThisFood = isFood(loc);
 

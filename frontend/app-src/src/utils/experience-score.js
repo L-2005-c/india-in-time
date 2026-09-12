@@ -23,7 +23,12 @@ export function getDaypartClient(nowMin, sunsetMin = 18 * 60) {
   return 'morning';
 }
 
+import { isPermanentlyClosedPlace } from './closed-places.js';
+
 export function getOpeningStatusPure(loc, nowMin) {
+  if (isPermanentlyClosedPlace(loc)) {
+    return { status: 'closed', label: '🔴 Permanently Closed', color: 'var(--danger-color, #ef4444)', open: false, isOpenNow: false, permanentlyClosed: true };
+  }
   const ot = timeToMinutes(loc?.ot ?? '00:00');
   const ct = timeToMinutes(loc?.ct ?? '23:59');
   if (!Number.isFinite(ot) || !Number.isFinite(ct)) {

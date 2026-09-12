@@ -1,5 +1,6 @@
 // Geometry, route-ordering and place-list helper functions.
 // All pure functions — no shared app state, no DOM access.
+import { isPermanentlyClosedPlace } from './closed-places.js';
 
 const _hvMemo = new Map();
 const HV_MEMO_MAX = 2000;
@@ -83,13 +84,14 @@ function dedupePlacesByProximity(list){
 }
 
 function withHiddenGems(list, gems = []){
-  return dedupePlacesByProximity((gems && gems.length) ? [...list, ...gems] : list);
+  const combined = (gems && gems.length) ? [...list, ...gems] : list;
+  return dedupePlacesByProximity(combined.filter(p => !isPermanentlyClosedPlace(p)));
 }
 
 function mergePlacePools(...pools){
   const byName=new Map();
   for(const place of pools.flat()){
-    if(!hasValidCoords(place?.coords)) continue;
+    if(!hasValidCoords(place?.coords) || isPermanentlyClosedPlace(place)) continue;
     const key=String(place.name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     if(!key) continue;
     place.id = place.id || key;
@@ -293,9 +295,11 @@ function famousPlaceScore(stop,start){
 
 function prioritizePlanStops(stops,start,prefs=[]){
   if(!Array.isArray(stops)||!stops.length) return [];
+  const cleanStops = stops.filter(s => !isPermanentlyClosedPlace(s));
+  if(!cleanStops.length) return [];
   const wantsFood = prefs.includes('food');
-  let foodStops = stops.filter(s=>s.cat==='food');
-  let attractionStops = stops.filter(s=>s.cat!=='food');
+  let foodStops = cleanStops.filter(s=>s.cat==='food');
+  let attractionStops = cleanStops.filter(s=>s.cat!=='food');
 
   if(attractionStops.length){
     attractionStops = [...attractionStops]

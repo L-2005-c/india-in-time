@@ -13,6 +13,7 @@
 
 const { distKm } = require('../../../utils/geo');
 const { computeDnaMatch } = require('../personalTravelDna');
+const { isPermanentlyClosedPlace } = require('../tourismPoi/tourismBlacklist');
 
 // Curated high-reliability regional indoor / sheltered havens across popular circuits
 const REGIONAL_ALTERNATIVE_HAVENS = [
@@ -49,9 +50,9 @@ function findAlternativeStop(disruptedStop, {
   _currentMinute = 600,
   candidatePool = [],
 } = {}) {
-  const pool = (candidatePool && candidatePool.length > 0)
+  const pool = ((candidatePool && candidatePool.length > 0)
     ? candidatePool
-    : REGIONAL_ALTERNATIVE_HAVENS;
+    : REGIONAL_ALTERNATIVE_HAVENS).filter(c => !isPermanentlyClosedPlace(c));
 
   const targetLat = disruptedStop.lat || disruptedStop.coords?.[0];
   const targetLon = disruptedStop.lon || disruptedStop.coords?.[1];

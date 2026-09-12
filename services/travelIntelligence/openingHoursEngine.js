@@ -1,8 +1,24 @@
 // openingHoursEngine.js
 const { t2m, m2t, getISTParts } = require('./timeEngine');
 const rules = require('../../data/time-intelligence-rules.json');
+const { isPermanentlyClosedPlace } = require('./tourismPoi/tourismBlacklist');
 function categoryRules(cat) { return rules.categories[cat] || rules.categories.default; }
 function getOpeningStatus(place, now = new Date(), sun = null) {
+  if (isPermanentlyClosedPlace(place)) {
+    return {
+      status: 'PERMANENTLY_CLOSED',
+      label: 'Permanently Closed',
+      isOpenNow: false,
+      minutesToClose: 0,
+      minutesToOpen: null,
+      openTime: null,
+      closeTime: null,
+      weeklyHoliday: null,
+      nightAvailable: false,
+      dataQuality: 'provided',
+      reason: 'Permanently closed attraction or business',
+    };
+  }
   const cat = place.cat || 'default';
   const catRule = categoryRules(cat);
   const ist = getISTParts(now);

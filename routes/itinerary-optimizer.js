@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const appLogger = require('../lib/logger');
 const { distKm } = require('../utils/geo');
+const { isPermanentlyClosedPlace } = require('../services/travelIntelligence/tourismPoi');
 
 /**
  * Calculate distance between two coordinates [lat, lon]
@@ -120,7 +121,7 @@ function optimizeClusterRoute(clusters) {
  */
 async function buildOptimizedItinerary(req) {
   const {
-    places,           // Array of places with coords
+    places: rawPlaces,   // Array of places with coords
     startCoord,       // [lat, lon]
     endCoord,         // [lat, lon] - optional
     totalMinutes,     // Total time available
@@ -129,8 +130,12 @@ async function buildOptimizedItinerary(req) {
     minPlacesPerCluster: _minPlacesPerCluster = 2,
   } = req.body;
 
-  if (!Array.isArray(places) || places.length === 0) {
+  if (!Array.isArray(rawPlaces) || rawPlaces.length === 0) {
     return { error: 'No places provided' };
+  }
+  const places = rawPlaces.filter(p => !isPermanentlyClosedPlace(p));
+  if (places.length === 0) {
+    return { error: 'No open places available to plan' };
   }
 
   if (!startCoord || startCoord.length < 2) {

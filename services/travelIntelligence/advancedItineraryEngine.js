@@ -26,6 +26,7 @@ const {
 const { computeDnaMatch } = require('./personalTravelDna');
 const {
   filterEligibleCandidates,
+  isPermanentlyClosedPlace,
 } = require('./tourismPoi');
 const { calculateSolarTimes, getScenicScore } = require('./astronomyTime');
 const { analyzeClimateStrategy, scorePlaceUnderClimate } = require('./climateEngine');
@@ -775,7 +776,7 @@ function buildInfeasibleResult(requirements, warnings, candidates, diagnostics =
 
 function planAdvancedItinerary(places, rawOptions = {}) {
   const requirements = parseRequirements(rawOptions);
-  const all = Array.isArray(places) ? places : [];
+  const all = (Array.isArray(places) ? places : []).filter(p => !isPermanentlyClosedPlace(p));
 
   // ── Tourism POI Eligibility Gate (before requirement/hard filters) ──────
   // Prevents localities, residential areas, and non-tourist map entities
