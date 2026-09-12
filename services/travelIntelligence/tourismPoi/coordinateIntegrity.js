@@ -20,28 +20,34 @@ const INDIA_GEO_BOUNDS = {
 
 // Known city center centroids for sanity checks
 const CITY_CENTROIDS = {
-  visakhapatnam: { lat: 17.72, lon: 83.30, maxRadiusKm: 55 },
-  vizag: { lat: 17.72, lon: 83.30, maxRadiusKm: 55 },
-  hyderabad: { lat: 17.385, lon: 78.486, maxRadiusKm: 60 },
-  bengaluru: { lat: 12.9716, lon: 77.5946, maxRadiusKm: 50 },
-  bangalore: { lat: 12.9716, lon: 77.5946, maxRadiusKm: 50 },
-  mumbai: { lat: 18.96, lon: 72.82, maxRadiusKm: 60 },
+  visakhapatnam: { lat: 17.72, lon: 83.30, maxRadiusKm: 95 },
+  vizag: { lat: 17.72, lon: 83.30, maxRadiusKm: 95 },
+  hyderabad: { lat: 17.385, lon: 78.486, maxRadiusKm: 75 },
+  bengaluru: { lat: 12.9716, lon: 77.5946, maxRadiusKm: 60 },
+  bangalore: { lat: 12.9716, lon: 77.5946, maxRadiusKm: 60 },
+  mumbai: { lat: 18.96, lon: 72.82, maxRadiusKm: 85 },
   delhi: { lat: 28.6139, lon: 77.2090, maxRadiusKm: 55 },
   jaipur: { lat: 26.9124, lon: 75.7873, maxRadiusKm: 45 },
   goa: { lat: 15.2993, lon: 74.1240, maxRadiusKm: 70 },
-  chennai: { lat: 13.0827, lon: 80.2707, maxRadiusKm: 50 },
-  madras: { lat: 13.0827, lon: 80.2707, maxRadiusKm: 50 },
-  kochi: { lat: 9.965, lon: 76.25, maxRadiusKm: 50 },
-  cochin: { lat: 9.965, lon: 76.25, maxRadiusKm: 50 },
+  chennai: { lat: 13.0827, lon: 80.2707, maxRadiusKm: 60 },
+  madras: { lat: 13.0827, lon: 80.2707, maxRadiusKm: 60 },
+  kochi: { lat: 9.965, lon: 76.25, maxRadiusKm: 60 },
+  cochin: { lat: 9.965, lon: 76.25, maxRadiusKm: 60 },
   paderu: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
   araku: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
   lambasingi: { lat: 18.0833, lon: 82.6667, maxRadiusKm: 65 },
   tirupati: { lat: 13.6288, lon: 79.4192, maxRadiusKm: 55 },
   tirumala: { lat: 13.6833, lon: 79.3472, maxRadiusKm: 45 },
-  vijayawada: { lat: 16.5062, lon: 80.6480, maxRadiusKm: 50 },
-  bezawada: { lat: 16.5062, lon: 80.6480, maxRadiusKm: 50 },
+  vijayawada: { lat: 16.5062, lon: 80.6480, maxRadiusKm: 75 },
+  bezawada: { lat: 16.5062, lon: 80.6480, maxRadiusKm: 75 },
   kolkata: { lat: 22.5726, lon: 88.3639, maxRadiusKm: 50 },
   pune: { lat: 18.5204, lon: 73.8567, maxRadiusKm: 50 },
+  udaipur: { lat: 24.5854, lon: 73.7125, maxRadiusKm: 50 },
+  agra: { lat: 27.1767, lon: 78.0081, maxRadiusKm: 50 },
+  varanasi: { lat: 25.3176, lon: 82.9739, maxRadiusKm: 50 },
+  mysore: { lat: 12.2958, lon: 76.6394, maxRadiusKm: 50 },
+  mysuru: { lat: 12.2958, lon: 76.6394, maxRadiusKm: 50 },
+  munnar: { lat: 10.0889, lon: 77.0595, maxRadiusKm: 50 },
 };
 
 /**
@@ -148,11 +154,12 @@ function isOffshoreOrWaterCoordinate(lat, lon, cityHint = '') {
     if (lat >= 17.705 && lat < 17.725 && lon > 83.3312) return true;
     if (lat >= 17.725 && lat < 17.740 && lon > 83.3445) return true;
     if (lat >= 17.740 && lat < 17.755 && lon > 83.3515) return true;
-    if (lat >= 17.755 && lat < 17.770 && lon > 83.3640) return true;
+    if (lat >= 17.755 && lat < 17.770 && lon > 83.3685) return true;
     if (lat >= 17.770 && lat < 17.790 && lon > 83.3880) return true;
     if (lat >= 17.790 && lat < 17.840 && lon > 83.4210) return true;
     if (lat >= 17.840 && lat < 17.870 && lon > 83.4390) return true;
-    if (lat >= 17.870 && lat < 17.910 && lon > 83.4610) return true;
+    if (lat >= 17.870 && lat < 17.885 && lon > 83.4380) return true;
+    if (lat >= 17.885 && lat < 17.910 && lon > 83.4560) return true;
   }
 
   // Mumbai (Arabian Sea to the West)
