@@ -37,6 +37,7 @@ const {
   getDecisionMetrics,
   getTripDecisionHistory,
   DECISION_STATES,
+  productionLearningEngine,
 } = require('../services/travelIntelligence/decision/adaptiveDecisionEngine');
 const { commitPlanVersion, getPlanVersionHistory } = require('../services/travelIntelligence/journey/planVersioning');
 const { sanitizeDnaProfile } = require('../services/travelIntelligence/personalTravelDna');
@@ -427,12 +428,50 @@ router.post('/decide', async (req, res) => {
 
 // Record user decision outcome (ACCEPTED, REJECTED, IGNORED, COMPLETED)
 router.post('/trips/:id/decision/outcome', (req, res) => {
-  const { decisionId, outcome, notes } = req.body || {};
+  const {
+    decisionId,
+    outcome,
+    notes,
+    legId,
+    cohortId,
+    decisionType,
+    recommendation,
+    travelerAction,
+    feedback,
+    dataState,
+    providerContext,
+    latencyMs,
+    isReversal,
+    isOverride,
+    isFalsePositive,
+    falsePositiveCause,
+    isFalseNegative,
+    falseNegativeCause,
+    isSafetyEscalation,
+  } = req.body || {};
   if (!decisionId) {
     return res.status(400).json({ error: 'decisionId is required' });
   }
 
-  const result = recordDecisionOutcome(decisionId, outcome || 'ACCEPTED', notes);
+  const result = recordDecisionOutcome(decisionId, outcome || 'ACCEPTED', notes, {
+    tripId: req.params.id,
+    legId,
+    cohortId,
+    decisionType,
+    recommendation,
+    travelerAction,
+    feedback,
+    dataState,
+    providerContext,
+    latencyMs,
+    isReversal,
+    isOverride,
+    isFalsePositive,
+    falsePositiveCause,
+    isFalseNegative,
+    falseNegativeCause,
+    isSafetyEscalation,
+  });
   res.json(result);
 });
 
@@ -443,10 +482,36 @@ router.get('/trips/:id/decision/history', (req, res) => {
   res.json({ tripId, decisionsCount: history.length, history });
 });
 
-// Operational metrics of the decision engine
+// Operational metrics of the decision engine (including Phase 9A Section 8 metrics)
 router.get('/decisions/metrics', (_req, res) => {
   const metrics = getDecisionMetrics();
   res.json(metrics);
+});
+
+// Phase 9A Pilot Learning: Detailed Decision Quality Metrics (10 metrics)
+router.get('/pilot/metrics', (_req, res) => {
+  const metrics = productionLearningEngine.getDecisionQualityMetrics();
+  res.json(metrics);
+});
+
+// Phase 9A Pilot Learning: Record Alert Timeliness Latencies (Section 12)
+router.post('/pilot/timeliness', (req, res) => {
+  try {
+    const latencies = productionLearningEngine.recordAlertTimeliness(req.body || {});
+    res.json({ success: true, latencies });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Phase 9A Pilot Learning: Record Source Disagreement (Section 14)
+router.post('/pilot/disagreement', (req, res) => {
+  try {
+    const record = productionLearningEngine.recordSourceDisagreement(req.body || {});
+    res.json({ success: true, record });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ── 9. Contextual Plan Adaptation (Replan) ───────────────────────────────────

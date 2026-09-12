@@ -23,6 +23,7 @@ const { findAlternativeStop, REGIONAL_ALTERNATIVE_HAVENS } = require('./alternat
 const { STOP_STATUSES } = require('../journey/journeyStateEngine');
 const { computeDnaMatch, DEFAULT_TRAVEL_DNA } = require('../personalTravelDna');
 const { t2m, m2t } = require('../timeEngine');
+const productionLearningEngine = require('./productionLearningEngine');
 
 // ── Decision States (Section 3) ──────────────────────────────────────────────
 const DECISION_STATES = Object.freeze({
@@ -820,9 +821,9 @@ function recordDecisionAudit({
 }
 
 /**
- * Records user outcome on a decision (Section 28).
+ * Records user outcome on a decision (Section 28 & Phase 9A Section 7).
  */
-function recordDecisionOutcome(decisionId, outcome = 'ACCEPTED', notes = '') {
+function recordDecisionOutcome(decisionId, outcome = 'ACCEPTED', notes = '', details = {}) {
   const record = inMemoryDecisionAudits.find(d => d.decisionId === decisionId);
   const normalizedOutcome = String(outcome).toUpperCase();
 
@@ -830,12 +831,49 @@ function recordDecisionOutcome(decisionId, outcome = 'ACCEPTED', notes = '') {
     record.outcome = normalizedOutcome;
     record.outcomeNotes = notes;
     record.outcomeRecordedAt = new Date().toISOString();
+    record.legId = details.legId || record.legId || null;
+    record.decisionType = details.decisionType || record.decisionType || record.decision || 'ADAPTIVE_DECISION';
+    record.decisionState = record.decision || details.decisionState || 'KEEP_PLAN';
+    record.recommendation = details.recommendation || record.selectedAlternative || null;
+    record.travelerAction = details.travelerAction || normalizedOutcome;
+    record.actionTimestamp = details.actionTimestamp || record.outcomeRecordedAt;
+    record.feedback = details.feedback || (notes ? { notes } : null);
+    record.dataState = details.dataState || record.dataState || 'LIVE';
+    record.providerContext = details.providerContext || null;
   }
 
   if (normalizedOutcome === 'ACCEPTED') decisionMetrics.acceptedCount++;
   else if (normalizedOutcome === 'REJECTED') decisionMetrics.rejectedCount++;
   else if (normalizedOutcome === 'IGNORED') decisionMetrics.ignoredCount++;
   else if (normalizedOutcome === 'COMPLETED') decisionMetrics.completedCount++;
+
+  // Forward to Phase 9A Production Learning Engine
+  try {
+    productionLearningEngine.recordDecisionOutcome({
+      decisionId,
+      tripId: details.tripId || record?.tripId || 'trip_anonymous',
+      legId: details.legId || record?.legId || 'leg_default',
+      cohortId: details.cohortId,
+      decisionType: details.decisionType || record?.decision,
+      decisionState: record?.decision || 'KEEP_PLAN',
+      recommendation: details.recommendation || record?.selectedAlternative,
+      travelerAction: normalizedOutcome,
+      outcome: details.outcome || (normalizedOutcome === 'ACCEPTED' ? 'SUCCESS' : 'PARTIAL'),
+      feedback: details.feedback || (notes ? { useful: normalizedOutcome === 'ACCEPTED', notes } : null),
+      dataState: details.dataState || 'LIVE',
+      providerContext: details.providerContext,
+      latencyMs: details.latencyMs,
+      isReversal: details.isReversal,
+      isOverride: details.isOverride,
+      isFalsePositive: details.isFalsePositive,
+      falsePositiveCause: details.falsePositiveCause,
+      isFalseNegative: details.isFalseNegative,
+      falseNegativeCause: details.falseNegativeCause,
+      isSafetyEscalation: details.isSafetyEscalation,
+    });
+  } catch (_err) {
+    // Non-blocking telemetry
+  }
 
   return {
     success: true,
@@ -845,7 +883,7 @@ function recordDecisionOutcome(decisionId, outcome = 'ACCEPTED', notes = '') {
 }
 
 /**
- * Returns operational metrics of the decision engine (Section 29).
+ * Returns operational metrics of the decision engine (Section 29 & Phase 9A Section 8).
  */
 function getDecisionMetrics() {
   const total = decisionMetrics.totalDecisions;
@@ -853,10 +891,13 @@ function getDecisionMetrics() {
     ? Math.round((decisionMetrics.acceptedCount / (decisionMetrics.acceptedCount + decisionMetrics.rejectedCount)) * 100)
     : 100;
 
+  const qualityMetrics = productionLearningEngine.getDecisionQualityMetrics();
+
   return {
     ...decisionMetrics,
     acceptanceRatePercent: acceptanceRate,
     auditTrailLength: inMemoryDecisionAudits.length,
+    qualityMetrics,
   };
 }
 
@@ -888,5 +929,6 @@ module.exports = {
   getTripDecisionHistory,
   inMemoryDecisionAudits,
   DEFAULT_TRAVEL_DNA,
+  productionLearningEngine,
 };
 
