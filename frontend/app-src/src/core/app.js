@@ -25,6 +25,7 @@ import * as _whatIfSimulatorUi from '../modules/whatIfSimulatorUi.js';
 import * as _tripHealthScore from '../modules/tripHealthScore.js';
 import * as _mapHud from '../modules/mapHud.js';
 import * as _aiDrawer from '../modules/aiDrawer.js';
+import { renderRouteAlternativesHud, renderRoutePolylinesOnMap } from '../modules/routeAlternativesUi.js';
 import { startVoiceInput as _startVoiceInputMod, handleCaption as _handleCaptionMod, handleTranslate as _handleTranslateMod } from '../modules/aiMedia.js';
 import { getDaypartClient as _getDaypartClient, getOpeningStatusPure as _getOpeningStatusPure, getCrowdPredictionPure as _getCrowdPredictionPure, calculateExperienceScorePure as _calculateExperienceScorePure } from '../utils/experience-score.js';
 import { isPlausibleGpsFix as _isPlausibleGpsFix, createGpsFixCoordinator as _createGpsFixCoordinator } from '../utils/gps.js';
@@ -2080,18 +2081,14 @@ function renderMapMarkers() {
     enrichPlacesWithTravelIntel(window.LOCS);
   }
 }
-
-// …
-const ROAD_ROUTE_MIRRORS = [
-  'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
-  'https://router.project-osrm.org/route/v1/driving/'
-];
+const ROAD_ROUTE_MIRRORS = ['https://routing.openstreetmap.de/routed-car/route/v1/driving/', 'https://router.project-osrm.org/route/v1/driving/'];
 async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
   if (!raw || raw.length < 2) return false;
   try {
     let fullGeometry = null, distanceFormatted = null, durationFormatted = null, nextStepInstruction = null;
     if (raw.length === 2) {
-      const res = await fetch(`/api/v1/routing/route?origin=${raw[0][0]},${raw[0][1]}&destination=${raw[1][0]},${raw[1][1]}&mode=driving`, { signal: AbortSignal.timeout(4000) });
+      const cityParam = typeof currentCityName !== 'undefined' && currentCityName ? `&city=${encodeURIComponent(currentCityName)}` : '';
+      const res = await fetch(`/api/v1/routing/route?origin=${raw[0][0]},${raw[0][1]}&destination=${raw[1][0]},${raw[1][1]}&mode=driving${cityParam}`, { signal: AbortSignal.timeout(4000) });
       if (res.ok) {
         const d = await res.json();
         if (d.success && Array.isArray(d.route?.geometry) && d.route.geometry.length >= 2) {
@@ -2103,6 +2100,9 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
             durationFormatted = d.duration?.formatted || fmtM(routeStops[targetIdx].tt);
           }
           if (d.route.steps?.[0]?.instruction) nextStepInstruction = d.route.steps[0].instruction;
+          const navCard = document.getElementById('nav-card');
+          if (navCard) renderRouteAlternativesHud(navCard, d, (selIdx, selRoute) => { if (selRoute?.geometry && map) renderRoutePolylinesOnMap(map, d, selIdx); });
+          if (map) renderRoutePolylinesOnMap(map, d, d.activeRouteIndex || 0);
         }
       }
     } else {

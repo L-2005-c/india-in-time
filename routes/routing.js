@@ -17,7 +17,7 @@ const appLogger = require('../lib/logger');
  */
 router.get('/route', async (req, res) => {
   try {
-    const { origin, destination, mode, departureTime, originName, destName, preference } = req.query;
+    const { origin, destination, mode, departureTime, originName, destName, preference, city, weatherRainMm, avoidClosures, includeAlternatives } = req.query;
 
     if (!origin || !destination) {
       return res.status(400).json({
@@ -33,6 +33,10 @@ router.get('/route', async (req, res) => {
       originName,
       destName,
       preference,
+      city,
+      weatherRainMm: weatherRainMm ? Number(weatherRainMm) : 0,
+      avoidClosures: avoidClosures !== 'false',
+      includeAlternatives: includeAlternatives !== 'false',
     });
 
     if (!route.success) {
@@ -52,7 +56,7 @@ router.get('/route', async (req, res) => {
  */
 router.post('/matrix', async (req, res) => {
   try {
-    const { stops, mode, departureTime, preference } = req.body;
+    const { stops, mode, departureTime, preference, city, weatherRainMm, avoidClosures } = req.body;
 
     if (!Array.isArray(stops) || stops.length < 2) {
       return res.status(400).json({
@@ -66,6 +70,9 @@ router.post('/matrix', async (req, res) => {
       mode: mode || 'driving',
       departureTime,
       preference,
+      city,
+      weatherRainMm: weatherRainMm ? Number(weatherRainMm) : 0,
+      avoidClosures: avoidClosures !== false,
     });
 
     res.json(matrix);
@@ -81,7 +88,7 @@ router.post('/matrix', async (req, res) => {
  */
 router.get('/eta', async (req, res) => {
   try {
-    const { origin, destination, mode, departureTime } = req.query;
+    const { origin, destination, mode, departureTime, city } = req.query;
     if (!origin || !destination) {
       return res.status(400).json({ success: false, error: 'origin and destination required' });
     }
@@ -89,6 +96,7 @@ router.get('/eta', async (req, res) => {
     const route = await calculateRoute(origin, destination, {
       mode: mode || 'driving',
       departureTime,
+      city,
     });
 
     if (!route.success) {

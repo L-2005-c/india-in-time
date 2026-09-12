@@ -14,6 +14,8 @@ const { buildCacheKey, getCachedRoute, setCachedRoute } = require('./routeCache'
 const { computeCalibratedCorridorMetrics, classifyCorridor } = require('./corridorSpeedModel');
 const { raceOsrmMirrors } = require('./mirrorRacer');
 const { evaluateScenicQuality, enrichTurnByTurnSteps, evaluateComfortRating } = require('./routeQualityEngine');
+const { calibrateIndianEta } = require('./etaCalibrationEngine');
+const { checkRouteForClosures, computeClosureBypassPoint } = require('./roadClosureRegistry');
 
 const ROUTING_TIMEOUT_MS = Number(process.env.ROUTING_TIMEOUT_MS) || 4000;
 
@@ -50,7 +52,7 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
   const departure = opts.departureTime
     ? `&departure_time=${Math.floor(new Date(opts.departureTime).getTime() / 1000)}`
     : '&departure_time=now';
-  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&mode=${mode}&traffic_model=best_guess${departure}&key=${key}`;
+  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${fromCoords[0]},${fromCoords[1]}&destination=${toCoords[0]},${toCoords[1]}&mode=${mode}&traffic_model=best_guess${departure}&alternatives=true&key=${key}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs || ROUTING_TIMEOUT_MS);
@@ -61,31 +63,40 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
     const body = await res.json();
     if (body.status !== 'OK' || !body.routes?.[0]?.legs?.[0]) return null;
 
-    const leg = body.routes[0].legs[0];
-    const durationSec = leg.duration?.value || Math.round((leg.distance?.value || 1000) / 7.5);
-    const durationInTrafficSec = leg.duration_in_traffic?.value || durationSec;
-    const distanceM = leg.distance?.value || Math.round(distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) * 1420);
+    const candidateRoutes = body.routes.slice(0, 3).map((r, rIdx) => {
+      const leg = r.legs[0];
+      const durationSec = leg.duration?.value || Math.round((leg.distance?.value || 1000) / 7.5);
+      const durationInTrafficSec = leg.duration_in_traffic?.value || durationSec;
+      const distanceM = leg.distance?.value || Math.round(distKm(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]) * 1420);
 
-    const steps = (leg.steps || []).map(s => ({
-      instruction: (s.html_instructions || '').replace(/<[^>]*>?/gm, ''),
-      distanceM: s.distance?.value || 0,
-      durationSec: s.duration?.value || 0,
-      maneuver: s.maneuver || 'continue',
-    }));
+      const steps = (leg.steps || []).map(s => ({
+        instruction: (s.html_instructions || '').replace(/<[^>]*>?/gm, ''),
+        distanceM: s.distance?.value || 0,
+        durationSec: s.duration?.value || 0,
+        maneuver: s.maneuver || 'continue',
+      }));
 
-    const hasLive = Boolean(leg.duration_in_traffic?.value);
+      const hasLive = Boolean(leg.duration_in_traffic?.value);
+      return {
+        routeIndex: rIdx,
+        provider: 'google',
+        routeType: hasLive ? 'LIVE_TRAFFIC_ROUTE' : 'ROAD_NETWORK_ESTIMATE',
+        provenance: hasLive ? 'LIVE_TRAFFIC' : 'ROAD_NETWORK_ESTIMATE',
+        distanceMeters: distanceM,
+        durationSeconds: durationSec,
+        durationInTrafficSeconds: durationInTrafficSec,
+        hasRealtimeTraffic: hasLive,
+        summary: r.summary || (rIdx === 0 ? 'Fastest route' : `Alternate route ${rIdx}`),
+        steps,
+        confidenceLevel: 'HIGH',
+        confidenceScore: 92,
+      };
+    });
+
+    const primary = candidateRoutes[0];
     return {
-      provider: 'google',
-      routeType: hasLive ? 'LIVE_TRAFFIC_ROUTE' : 'ROAD_NETWORK_ESTIMATE',
-      provenance: hasLive ? 'LIVE_TRAFFIC' : 'ROAD_NETWORK_ESTIMATE',
-      distanceMeters: distanceM,
-      durationSeconds: durationSec,
-      durationInTrafficSeconds: durationInTrafficSec,
-      hasRealtimeTraffic: hasLive,
-      summary: body.routes[0].summary || 'Fastest route',
-      steps,
-      confidenceLevel: 'HIGH',
-      confidenceScore: 92,
+      ...primary,
+      routes: candidateRoutes,
     };
   } catch (_e) {
     return null;
@@ -101,7 +112,8 @@ async function fetchGoogleRoute(fromCoords, toCoords, opts = {}) {
 function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
   const metrics = computeCalibratedCorridorMetrics(fromCoords, toCoords, opts);
 
-  return {
+  const primary = {
+    routeIndex: 0,
     provider: 'geodesic_heuristic',
     routeType: 'GEODESIC_HEURISTIC_ESTIMATE',
     provenance: 'GEODESIC_HEURISTIC_ESTIMATE',
@@ -111,7 +123,7 @@ function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
     durationInTrafficSeconds: null,
     hasRealtimeTraffic: false,
     geometry: [fromCoords, toCoords],
-    summary: `Estimated travel time (${metrics.corridor.description})`,
+    summary: `Primary route (${metrics.corridor.description})`,
     steps: [{
       instruction: `Direct route estimate via ${metrics.corridor.corridorType.toLowerCase().replace(/_/g, ' ')}`,
       distanceM: metrics.distanceMeters,
@@ -123,6 +135,39 @@ function calculateHeuristicEstimateFallback(fromCoords, toCoords, opts = {}) {
     corridorType: metrics.corridor.corridorType,
     bottleneckDelayMinutes: metrics.bottleneck.delayMinutes,
     limitations: 'Calculated using terrain-calibrated road winding factor without road-network topology verification.',
+  };
+
+  // Alternate route via outer bypass perimeter
+  const altDist = Math.round(metrics.distanceMeters * 1.14);
+  const altDur = Math.round(metrics.totalEstimatedSec * 1.10);
+  const midLat = (fromCoords[0] + toCoords[0]) / 2 + 0.015;
+  const midLon = (fromCoords[1] + toCoords[1]) / 2 + 0.015;
+  const alternate = {
+    routeIndex: 1,
+    provider: 'geodesic_heuristic',
+    routeType: 'GEODESIC_HEURISTIC_ESTIMATE',
+    provenance: 'GEODESIC_HEURISTIC_ESTIMATE',
+    isRoadNetworkTruth: false,
+    distanceMeters: altDist,
+    durationSeconds: altDur,
+    durationInTrafficSeconds: null,
+    hasRealtimeTraffic: false,
+    geometry: [fromCoords, [midLat, midLon], toCoords],
+    summary: 'Alternate bypass corridor',
+    steps: [{
+      instruction: 'Alternate route via outer ring perimeter',
+      distanceM: altDist,
+      durationSec: altDur,
+      maneuver: 'depart',
+    }],
+    confidenceLevel: 'LOW',
+    confidenceScore: 60,
+    corridorType: metrics.corridor.corridorType,
+  };
+
+  return {
+    ...primary,
+    routes: [primary, alternate],
   };
 }
 
@@ -204,38 +249,207 @@ async function calculateRoute(origin, destination, opts = {}) {
     rawRoute = calculateHeuristicEstimateFallback(from, to, { ...opts, mode });
   }
 
+  // Multi-route Candidates List
+  let candidateList = Array.isArray(rawRoute.routes) && rawRoute.routes.length > 0
+    ? rawRoute.routes
+    : [rawRoute];
+
   // Corridor & Quality Assessment
   const corridorMeta = classifyCorridor(from, to, { mode });
-  const scenicMeta = evaluateScenicQuality(from, to, rawRoute.steps || [], corridorMeta.corridorType);
-  const comfortMeta = evaluateComfortRating(corridorMeta.corridorType, mode);
-  const enrichedSteps = enrichTurnByTurnSteps(rawRoute.steps || [], rawRoute.geometry);
 
-  // Traffic Enrichment
-  const trafficMeta = normalizeTrafficMetadata({
-    durationSec: rawRoute.durationSeconds,
-    durationInTrafficSec: rawRoute.durationInTrafficSeconds,
-    provider: rawRoute.provider,
-    departureMinute,
-    dayOfWeek,
-    city: opts.city || '',
-    weatherRainMm: opts.weatherRainMm || 0,
-    hasRealtimeSignal: rawRoute.hasRealtimeTraffic,
+  // Process all candidate routes with ETA calibration and closure checks
+  const evaluatedRoutes = candidateList.map((cand, idx) => {
+    const calibrated = calibrateIndianEta({
+      from,
+      to,
+      distanceMeters: cand.distanceMeters,
+      rawDurationSeconds: cand.durationSeconds,
+      durationInTrafficSeconds: cand.durationInTrafficSeconds,
+      provider: cand.provider,
+      mode,
+      departureTime: departureDate,
+      city: opts.city,
+      weatherRainMm: opts.weatherRainMm,
+    });
+
+    const candSteps = cand.steps || [];
+    const enriched = enrichTurnByTurnSteps(candSteps, cand.geometry);
+    const scenic = evaluateScenicQuality(from, to, candSteps, corridorMeta.corridorType);
+    const comfort = evaluateComfortRating(corridorMeta.corridorType, mode);
+    const closureCheck = checkRouteForClosures(cand.geometry || [from, to], {
+      departureTime: departureDate,
+      city: opts.city,
+    });
+
+    return {
+      index: idx,
+      id: `route_option_${idx + 1}`,
+      provider: cand.provider,
+      summary: cand.summary || (idx === 0 ? 'Fastest route' : `Alternate route ${idx}`),
+      distanceMeters: cand.distanceMeters,
+      distanceKm: Math.round((cand.distanceMeters / 1000) * 10) / 10,
+      durationSeconds: calibrated.durationSeconds,
+      trafficDurationSeconds: calibrated.trafficDurationSeconds,
+      durationMinutes: calibrated.baseDurationMinutes || Math.max(1, Math.round(calibrated.durationSeconds / 60)),
+      trafficDurationMinutes: calibrated.trafficDurationMinutes,
+      geometry: cand.geometry || [from, to],
+      steps: enriched,
+      hasRealtimeTraffic: cand.hasRealtimeTraffic || calibrated.isAuthoritativeLive,
+      trafficStatus: calibrated.trafficStatus || TRAFFIC_STATUS.LOW,
+      congestionFactor: calibrated.congestionFactor || 1.0,
+      hasClosure: closureCheck.hasClosure,
+      closureDetails: closureCheck.primaryClosure,
+      allClosures: closureCheck.closures,
+      status: closureCheck.hasClosure ? 'ROAD_CLOSED' : 'OPEN',
+      corridorType: corridorMeta.corridorType,
+      isScenicRoute: scenic.isScenic,
+      scenicScore: scenic.score,
+      comfortTier: comfort.tier,
+      confidenceScore: cand.confidenceScore || 80,
+      confidenceLevel: cand.confidenceLevel || 'MEDIUM',
+    };
   });
 
-  const durationSeconds = rawRoute.durationSeconds;
-  const trafficAwareSeconds = rawRoute.durationInTrafficSeconds || Math.round(durationSeconds * trafficMeta.congestionFactor);
-  const trafficAwareMinutes = Math.max(1, Math.round(trafficAwareSeconds / 60));
+  // Road Closure Detection & Automatic Alternate Rerouting
+  let activeIndex = 0;
+  let reroutedDueToClosure = false;
+  let closureAlert = null;
 
-  const projectedArrival = new Date(departureDate.getTime() + (trafficAwareSeconds * 1000)).toISOString();
-  const distanceKm = Math.round((rawRoute.distanceMeters / 1000) * 10) / 10;
+  if (evaluatedRoutes[0].hasClosure) {
+    const primaryClosure = evaluatedRoutes[0].closureDetails;
+    closureAlert = {
+      hasClosure: true,
+      severity: primaryClosure?.severity || 'CRITICAL',
+      closureName: primaryClosure?.name || 'Road Closed',
+      corridorName: primaryClosure?.corridorName || 'Transit corridor',
+      reason: primaryClosure?.reason || 'Corridor closed to transit',
+      diversionAdvice: primaryClosure?.diversionAdvice || 'Use recommended alternate route',
+      alertMessage: `Route via ${primaryClosure?.corridorName || 'primary corridor'} is closed (${primaryClosure?.reason || 'road blocked'}). Automatically rerouted via alternate route.`,
+    };
 
+    // Find the first open route
+    const openIdx = evaluatedRoutes.findIndex(r => !r.hasClosure);
+    if (openIdx > 0) {
+      activeIndex = openIdx;
+      reroutedDueToClosure = true;
+    } else {
+      // All candidates hit the closure; synthesize a dynamic bypass route
+      const bypassPt = computeClosureBypassPoint(from, to, primaryClosure);
+      try {
+        const leg1 = await raceOsrmMirrors(from, bypassPt, { mode, timeoutMs: 2000 });
+        const leg2 = await raceOsrmMirrors(bypassPt, to, { mode, timeoutMs: 2000 });
+        if (leg1 && leg2 && Array.isArray(leg1.geometry) && Array.isArray(leg2.geometry)) {
+          const bypassGeom = [...leg1.geometry, ...leg2.geometry];
+          const bypassDist = (leg1.distanceMeters || 0) + (leg2.distanceMeters || 0);
+          const bypassCal = calibrateIndianEta({
+            from,
+            to,
+            distanceMeters: bypassDist,
+            provider: 'osrm',
+            mode,
+            departureTime: departureDate,
+            city: opts.city,
+          });
+
+          const bypassRoute = {
+            index: evaluatedRoutes.length,
+            id: 'route_option_bypass',
+            provider: 'osrm_bypass',
+            summary: `Bypass via ${primaryClosure.corridorName} detour`,
+            distanceMeters: bypassDist,
+            distanceKm: Math.round((bypassDist / 1000) * 10) / 10,
+            durationSeconds: bypassCal.durationSeconds,
+            trafficDurationSeconds: bypassCal.trafficDurationSeconds,
+            durationMinutes: Math.max(1, Math.round(bypassCal.durationSeconds / 60)),
+            trafficDurationMinutes: bypassCal.trafficDurationMinutes,
+            geometry: bypassGeom,
+            steps: [...(leg1.steps || []), ...(leg2.steps || [])],
+            hasRealtimeTraffic: false,
+            trafficStatus: bypassCal.trafficStatus || TRAFFIC_STATUS.LOW,
+            congestionFactor: bypassCal.congestionFactor || 1.1,
+            hasClosure: false,
+            closureDetails: null,
+            allClosures: [],
+            status: 'OPEN',
+            corridorType: corridorMeta.corridorType,
+            isScenicRoute: false,
+            scenicScore: 50,
+            comfortTier: 'GOOD',
+            confidenceScore: 78,
+            confidenceLevel: 'MEDIUM',
+          };
+          evaluatedRoutes.push(bypassRoute);
+          activeIndex = evaluatedRoutes.length - 1;
+          reroutedDueToClosure = true;
+        }
+      } catch (_bypassErr) {
+        // Fall back to primary route with warning
+      }
+    }
+  }
+
+  // Calculate fastest/shortest metrics among viable routes (or all)
+  const viableRoutes = evaluatedRoutes.filter(r => !r.hasClosure);
+  const benchmarkSet = viableRoutes.length > 0 ? viableRoutes : evaluatedRoutes;
+  const fastestDuration = Math.min(...benchmarkSet.map(r => r.trafficDurationSeconds));
+  const shortestDistance = Math.min(...benchmarkSet.map(r => r.distanceMeters));
+
+  const candidateDtos = evaluatedRoutes.map((r) => {
+    const isFastest = r.trafficDurationSeconds === fastestDuration && !r.hasClosure;
+    const isShortest = r.distanceMeters === shortestDistance;
+    const timeDeltaMinutes = Math.max(0, Math.round((r.trafficDurationSeconds - fastestDuration) / 60));
+    const isRecommended = (r.index === activeIndex);
+
+    let summaryLabel = r.summary;
+    if (r.hasClosure) {
+      summaryLabel = `⛔ Closed: ${r.summary}`;
+    } else if (isFastest) {
+      summaryLabel = `${r.summary} (Fastest route)`;
+    } else if (timeDeltaMinutes > 0) {
+      summaryLabel = `${r.summary} (+${timeDeltaMinutes} mins)`;
+    }
+
+    return {
+      index: r.index,
+      id: r.id,
+      summary: summaryLabel,
+      baseSummary: r.summary,
+      distance: {
+        meters: r.distanceMeters,
+        kilometers: r.distanceKm,
+        formatted: formatDistance(r.distanceMeters),
+      },
+      duration: {
+        seconds: r.durationSeconds,
+        minutes: r.durationMinutes,
+        trafficAwareSeconds: r.trafficDurationSeconds,
+        trafficAwareMinutes: r.trafficDurationMinutes,
+        formatted: formatDuration(r.trafficDurationMinutes),
+      },
+      timeDeltaMinutes,
+      timeDeltaFormatted: timeDeltaMinutes > 0 ? `+${timeDeltaMinutes} min` : 'Fastest',
+      isFastest,
+      isShortest,
+      isRecommended,
+      hasClosure: r.hasClosure,
+      closureDetails: r.closureDetails,
+      status: r.status,
+      geometry: r.geometry,
+      steps: r.steps,
+      trafficStatus: r.trafficStatus,
+      congestionFactor: r.congestionFactor,
+    };
+  });
+
+  const selectedRoute = evaluatedRoutes[activeIndex] || evaluatedRoutes[0];
+  const projectedArrival = new Date(departureDate.getTime() + (selectedRoute.trafficDurationSeconds * 1000)).toISOString();
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${from[0]},${from[1]}&destination=${to[0]},${to[1]}&travelmode=${mode === 'walking' ? 'walking' : mode === 'transit' ? 'transit' : 'driving'}`;
 
-  const isFallback = rawRoute.provider === 'geodesic_heuristic';
-  const routeType = rawRoute.routeType || (
-    rawRoute.provider === 'google' && rawRoute.hasRealtimeTraffic
+  const isFallback = selectedRoute.provider === 'geodesic_heuristic';
+  const routeType = selectedRoute.routeType || (
+    selectedRoute.provider === 'google' && selectedRoute.hasRealtimeTraffic
       ? 'LIVE_TRAFFIC_ROUTE'
-      : (rawRoute.provider === 'osrm' ? 'ROAD_NETWORK_ESTIMATE' : 'GEODESIC_HEURISTIC_ESTIMATE')
+      : (selectedRoute.provider === 'osrm' ? 'ROAD_NETWORK_ESTIMATE' : 'GEODESIC_HEURISTIC_ESTIMATE')
   );
   const fallbackReason = isFallback
     ? (isLiveDisabled ? 'Live routing explicitly disabled by configuration' : 'Live and road-network providers (Google, OSRM) unavailable or timed out')
@@ -245,51 +459,65 @@ async function calculateRoute(origin, destination, opts = {}) {
     success: true,
     origin: { lat: from[0], lon: from[1], name: opts.originName || 'Origin', id: opts.originId || null },
     destination: { lat: to[0], lon: to[1], name: opts.destName || 'Destination', id: opts.destId || null },
-    distanceMeters: rawRoute.distanceMeters,
-    durationSeconds,
-    trafficDurationSeconds: trafficAwareSeconds,
+    distanceMeters: selectedRoute.distanceMeters,
+    durationSeconds: selectedRoute.durationSeconds,
+    trafficDurationSeconds: selectedRoute.trafficDurationSeconds,
     departureAt: departureDate.toISOString(),
     arrivalAt: projectedArrival,
     travelMode: mode,
-    provider: rawRoute.provider,
+    provider: selectedRoute.provider,
     routeType,
     fallbackReason,
     dataFreshness: new Date().toISOString(),
-    trafficStatus: trafficMeta.status,
+    trafficStatus: selectedRoute.trafficStatus,
     provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
     fallback: isFallback,
     timestamp: new Date().toISOString(),
     distance: {
-      meters: rawRoute.distanceMeters,
-      kilometers: distanceKm,
-      formatted: formatDistance(rawRoute.distanceMeters),
+      meters: selectedRoute.distanceMeters,
+      kilometers: selectedRoute.distanceKm,
+      formatted: formatDistance(selectedRoute.distanceMeters),
     },
     duration: {
-      seconds: durationSeconds,
-      minutes: Math.max(1, Math.round(durationSeconds / 60)),
-      trafficAwareSeconds,
-      trafficAwareMinutes,
-      formatted: formatDuration(trafficAwareMinutes),
+      seconds: selectedRoute.durationSeconds,
+      minutes: selectedRoute.durationMinutes,
+      trafficAwareSeconds: selectedRoute.trafficDurationSeconds,
+      trafficAwareMinutes: selectedRoute.trafficDurationMinutes,
+      formatted: formatDuration(selectedRoute.trafficDurationMinutes),
     },
-    traffic: trafficMeta,
+    traffic: {
+      status: selectedRoute.trafficStatus,
+      congestionFactor: selectedRoute.congestionFactor,
+      delayMinutes: Math.max(0, Math.round((selectedRoute.trafficDurationSeconds - selectedRoute.durationSeconds) / 60)),
+      provenance: selectedRoute.hasRealtimeTraffic ? 'live_traffic' : 'predicted_traffic',
+      freshness: new Date().toISOString(),
+      label: `${selectedRoute.trafficStatus} traffic`,
+    },
     timestamps: {
       departure: departureDate.toISOString(),
       projectedArrival,
     },
     route: {
-      geometry: rawRoute.geometry || [from, to],
-      summary: rawRoute.summary,
-      steps: enrichedSteps,
+      geometry: selectedRoute.geometry || [from, to],
+      summary: selectedRoute.summary,
+      steps: selectedRoute.steps,
       googleMapsUrl,
-      corridorType: corridorMeta.corridorType,
-      isScenicRoute: scenicMeta.isScenic,
-      scenicScore: scenicMeta.score,
-      comfortTier: comfortMeta.tier,
+      corridorType: selectedRoute.corridorType,
+      isScenicRoute: selectedRoute.isScenicRoute,
+      scenicScore: selectedRoute.scenicScore,
+      comfortTier: selectedRoute.comfortTier,
     },
+    // Multi-Route Google Maps Extensions
+    routes: candidateDtos,
+    activeRouteIndex: activeIndex,
+    hasClosure: selectedRoute.hasClosure,
+    closureDetails: selectedRoute.closureDetails,
+    reroutedDueToClosure,
+    closureAlert,
     confidence: {
-      score: rawRoute.confidenceScore,
-      level: rawRoute.confidenceLevel || (rawRoute.confidenceScore >= 85 ? 'HIGH' : (rawRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW')),
-      source: rawRoute.provider,
+      score: selectedRoute.confidenceScore,
+      level: selectedRoute.confidenceLevel || (selectedRoute.confidenceScore >= 85 ? 'HIGH' : (selectedRoute.confidenceScore >= 70 ? 'MEDIUM' : 'LOW')),
+      source: selectedRoute.provider,
       routeType,
       isRoadNetworkTruth: rawRoute.isRoadNetworkTruth !== false,
       provenance: rawRoute.provenance || 'PROVIDER_DERIVED',
@@ -400,6 +628,8 @@ async function calculateRouteMatrix(stops = [], opts = {}) {
         formatted: formatDuration(Math.round(totalDurationSeconds / 60)),
       },
       totalTrafficDelayMinutes,
+      hasAnyClosure: finalLegs.some(l => l?.hasClosure || l?.closureAlert),
+      reroutedLegsCount: finalLegs.filter(l => l?.reroutedDueToClosure).length,
     },
   };
 }

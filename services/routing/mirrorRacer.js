@@ -96,7 +96,7 @@ async function raceOsrmMirrors(fromCoords, toCoords, opts = {}) {
   const timeoutTimer = setTimeout(() => parentController.abort(), timeoutMs);
 
   const fetchPromises = mirrorUrls.map(async (baseUrl) => {
-    const url = `${baseUrl}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=true`;
+    const url = `${baseUrl}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=3`;
     const start = Date.now();
 
     try {
@@ -119,37 +119,51 @@ async function raceOsrmMirrors(fromCoords, toCoords, opts = {}) {
       const latency = Date.now() - start;
       recordMirrorSuccess(baseUrl.split('/routed-')[0], latency);
 
-      const route = body.routes[0];
-      const leg = route.legs?.[0];
-      const distanceM = Math.round(route.distance);
-      const durationSec = Math.round(route.duration);
+      const candidateRoutes = body.routes.slice(0, 3).map((route, rIdx) => {
+        const leg = route.legs?.[0];
+        const distanceM = Math.round(route.distance);
+        const durationSec = Math.round(route.duration);
 
-      const geometry = Array.isArray(route.geometry?.coordinates)
-        ? route.geometry.coordinates.map(c => [c[1], c[0]])
-        : null;
+        const geometry = Array.isArray(route.geometry?.coordinates)
+          ? route.geometry.coordinates.map(c => [c[1], c[0]])
+          : null;
 
-      const steps = (leg?.steps || []).map(s => ({
-        instruction: s.name ? `via ${s.name}` : (s.maneuver?.type || 'continue'),
-        distanceM: Math.round(s.distance || 0),
-        durationSec: Math.round(s.duration || 0),
-        maneuver: s.maneuver?.modifier || s.maneuver?.type || 'continue',
-        streetName: s.name || null,
-      }));
+        const steps = (leg?.steps || []).map(s => ({
+          instruction: s.name ? `via ${s.name}` : (s.maneuver?.type || 'continue'),
+          distanceM: Math.round(s.distance || 0),
+          durationSec: Math.round(s.duration || 0),
+          maneuver: s.maneuver?.modifier || s.maneuver?.type || 'continue',
+          streetName: s.name || null,
+        }));
 
+        let summary = leg?.summary;
+        if (!summary) {
+          const streetNames = steps.filter(s => s.streetName).map(s => s.streetName);
+          summary = streetNames.length > 0 ? `via ${streetNames[0]}` : `Route ${rIdx + 1}`;
+        }
+
+        return {
+          routeIndex: rIdx,
+          provider: 'osrm',
+          routeType: 'ROAD_NETWORK_ESTIMATE',
+          provenance: 'ROAD_NETWORK_ESTIMATE',
+          distanceMeters: distanceM,
+          durationSeconds: durationSec,
+          durationInTrafficSeconds: null,
+          hasRealtimeTraffic: false,
+          geometry,
+          summary,
+          steps,
+          confidenceLevel: 'MEDIUM',
+          confidenceScore: 80,
+          latencyMs: latency,
+        };
+      });
+
+      const primary = candidateRoutes[0];
       return {
-        provider: 'osrm',
-        routeType: 'ROAD_NETWORK_ESTIMATE',
-        provenance: 'ROAD_NETWORK_ESTIMATE',
-        distanceMeters: distanceM,
-        durationSeconds: durationSec,
-        durationInTrafficSeconds: null,
-        hasRealtimeTraffic: false,
-        geometry,
-        summary: leg?.summary || (steps[0]?.instruction ? steps[0].instruction : 'Standard route'),
-        steps,
-        confidenceLevel: 'MEDIUM',
-        confidenceScore: 80,
-        latencyMs: latency,
+        ...primary,
+        routes: candidateRoutes,
       };
     } catch (err) {
       if (err.name === 'AbortError') return null;

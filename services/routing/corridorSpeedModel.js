@@ -86,7 +86,7 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
 
   // 2. Check Walled Bazaar Zones
   for (const b of DENSE_BAZAAR_ZONES) {
-    if (isCoordInZone(fromCoords[0], fromCoords[1], b) && isCoordInZone(toCoords[0], toCoords[1], b)) {
+    if (isCoordInZone(fromCoords[0], fromCoords[1], b) || isCoordInZone(toCoords[0], toCoords[1], b)) {
       return {
         corridorType: CORRIDOR_TYPE.WALLED_BAZAAR,
         windingFactor: 1.30,

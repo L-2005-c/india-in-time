@@ -154,6 +154,10 @@ export async function fetchRoute(origin, destination, options = {}) {
     mode: options.mode || 'driving',
     ...(options.departureTime ? { departureTime: options.departureTime } : {}),
     ...(options.preference ? { preference: options.preference } : {}),
+    ...(options.city ? { city: options.city } : {}),
+    ...(options.weatherRainMm ? { weatherRainMm: options.weatherRainMm } : {}),
+    ...(options.avoidClosures !== undefined ? { avoidClosures: options.avoidClosures } : {}),
+    ...(options.includeAlternatives !== undefined ? { includeAlternatives: options.includeAlternatives } : {}),
   });
   return api.get(`/api/v1/routing/route?${params.toString()}`);
 }
@@ -167,6 +171,9 @@ export async function fetchRouteMatrix(stops, options = {}) {
     mode: options.mode || 'driving',
     departureTime: options.departureTime,
     preference: options.preference,
+    city: options.city,
+    weatherRainMm: options.weatherRainMm,
+    avoidClosures: options.avoidClosures,
   });
 }
 
@@ -181,6 +188,7 @@ export async function fetchEta(origin, destination, options = {}) {
     destination: destStr,
     mode: options.mode || 'driving',
     ...(options.departureTime ? { departureTime: options.departureTime } : {}),
+    ...(options.city ? { city: options.city } : {}),
   });
   return api.get(`/api/v1/routing/eta?${params.toString()}`);
 }

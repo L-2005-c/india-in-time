@@ -5554,3 +5554,177 @@ html, body {
   overflow-wrap: break-word !important;
 }
 
+/* ═══════════════════════════════════════════
+   GOOGLE MAPS-GRADE ROUTE ALTERNATIVES & CLOSURES
+═══════════════════════════════════════════ */
+.route-alternatives-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.route-closure-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #fecaca;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15);
+}
+
+.route-closure-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.route-closure-content strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ef4444;
+  margin-bottom: 2px;
+}
+
+.route-closure-content p {
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0;
+  color: rgba(254, 202, 202, 0.9);
+}
+
+.route-chips-scroll-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.route-chips-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.route-choice-chip {
+  flex: 1;
+  min-width: 130px;
+  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.route-choice-chip:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(0, 200, 240, 0.4);
+  transform: translateY(-1px);
+}
+
+.route-choice-chip.is-selected {
+  background: rgba(0, 200, 240, 0.12);
+  border-color: #00c8f0;
+  box-shadow: 0 0 16px rgba(0, 200, 240, 0.3), inset 0 0 12px rgba(0, 200, 240, 0.08);
+}
+
+.route-choice-chip.is-closed {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.route-choice-chip.is-closed.is-selected {
+  border-color: #ef4444;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
+}
+
+.route-chip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.route-chip-duration {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.route-chip-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.route-chip-badge.badge-fastest {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.route-chip-badge.badge-closed {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.route-chip-meta {
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.3;
+}
+
+.route-chip-dist {
+  font-weight: 600;
+}
+
+.route-chip-summary {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.road-closure-marker-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.closure-popup-content {
+  min-width: 200px;
+  max-width: 260px;
+  line-height: 1.4;
+}
+
+
