@@ -60,13 +60,13 @@ ${trkPoints}
 export function renderMapHudDock() {
   return `
     <div id="map-hud-dock" class="map-hud-dock">
-      <button class="map-hud-pill" data-action="toggleMapLayer" title="Switch Map View Layer">
+      <button class="map-hud-pill" data-action="toggleMapLayer" title="Switch Map View Layer" style="display:none;" aria-hidden="true">
         <span>🗺️</span> <span id="map-layer-label">Vector</span>
       </button>
-      <button class="map-hud-pill" data-action="exportGoogleMapsTrip" id="hud-btn-gmaps" title="Open Full Multi-Stop Route in Google Maps">
+      <button class="map-hud-pill hud-pill-highlight" data-action="exportGoogleMapsTrip" id="hud-btn-gmaps" title="Open Full Multi-Stop Route in Google Maps">
         <span>🧭</span> <span>Google Maps Sync</span>
       </button>
-      <button class="map-hud-pill" data-action="exportGpxTrack" id="hud-btn-gpx" title="Download GPX GPS Track">
+      <button class="map-hud-pill" data-action="exportGpxTrack" id="hud-btn-gpx" title="Download GPX GPS Track" style="display:none;" aria-hidden="true">
         <span>📥</span> <span>GPX</span>
       </button>
       <button class="map-hud-pill" data-action="toggleMapFullscreen" title="Toggle Fullscreen Map">

@@ -218,13 +218,13 @@
     <div id="map-view" class="view active">
       <div id="map"></div>
       <div id="map-hud-dock" class="map-hud-dock">
-        <button class="map-hud-pill" data-action="toggleMapLayer" title="Switch Map View Layer">
+        <button class="map-hud-pill" data-action="toggleMapLayer" title="Switch Map View Layer" style="display:none;" aria-hidden="true">
           <span>🗺️</span> <span id="map-layer-label">Vector</span>
         </button>
         <button class="map-hud-pill hud-pill-highlight" data-action="exportGoogleMapsTrip" id="hud-btn-gmaps" title="Open Full Multi-Stop Route in Google Maps">
           <span>🧭</span> <span>Google Maps Sync</span>
         </button>
-        <button class="map-hud-pill" data-action="exportGpxTrack" id="hud-btn-gpx" title="Download GPX GPS Track">
+        <button class="map-hud-pill" data-action="exportGpxTrack" id="hud-btn-gpx" title="Download GPX GPS Track" style="display:none;" aria-hidden="true">
           <span>📥</span> <span>GPX</span>
         </button>
         <button class="map-hud-pill" data-action="toggleMapFullscreen" title="Toggle Fullscreen Map">
@@ -645,21 +645,22 @@
       </div>
     </div>
 
-    <!-- ═══ JOURNEY VIEW (Primary Traveler Experience HUD) ═══ -->
+    <!-- ═══ JOURNEY VIEW (Primary Traveler Experience HUD & Launchpad) ═══ -->
     <div id="journey-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
+      <div id="journey-launchpad"></div>
     </div>
 
     <!-- ═══ ALERTS VIEW (Dedicated Alerts Center) ═══ -->
     <div id="alerts-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
     </div>
 
-    <!-- ═══ MORE VIEW (Developer Simulation & Secondary Tools) ═══ -->
+    <!-- ═══ MORE VIEW (Travel Utilities & Secondary Tools) ═══ -->
     <div id="more-view" class="view" style="display:none; overflow-y:auto; padding:14px 14px 80px;">
     </div>
 
   </div>
 
-  <!-- BOTTOM NAV (5 Core Traveler Tabs) -->
+  <!-- BOTTOM NAV (5 Core Traveler Tabs: Map, Journey, Plan, Assistant, More) -->
   <nav id="bottom-nav" role="navigation" aria-label="Main navigation">
     <div class="nav-item active" role="button" tabindex="0" data-action="switchToView" data-view="map-view" data-idx="0" aria-current="page">
       <span class="nav-ico" aria-hidden="true">🗺️</span><span class="nav-lbl">Map</span>
@@ -670,12 +671,12 @@
     <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="plan-view" data-idx="2">
       <span class="nav-ico" aria-hidden="true">📋</span><span class="nav-lbl">Plan</span>
     </div>
-    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="alerts-view" data-idx="3">
-      <span class="nav-ico" aria-hidden="true">⚠️</span><span class="nav-lbl">Alerts</span>
-      <span id="nav-alert-badge" class="nav-badge-count" style="display:none">0</span>
+    <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="chat-view" data-idx="3">
+      <span class="nav-ico" aria-hidden="true">🤖</span><span class="nav-lbl">Assistant</span>
     </div>
     <div class="nav-item" role="button" tabindex="0" data-action="switchToView" data-view="more-view" data-idx="4">
       <span class="nav-ico" aria-hidden="true">☰</span><span class="nav-lbl">More</span>
+      <span id="nav-alert-badge" class="nav-badge-count" style="display:none">0</span>
     </div>
   </nav>
 

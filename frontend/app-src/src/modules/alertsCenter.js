@@ -85,18 +85,12 @@ function renderFilterTabs(alerts, activeFilter, onFilter) {
   tabBar.style.scrollbarWidth = 'none';
   tabBar.style.paddingBottom = '2px';
 
-  const categories = ['ALL'];
-  const categoryCount = {};
+  const categories = ['ALL', 'TRAFFIC', 'WEATHER', 'SAFETY'];
+  const categoryCount = { ALL: alerts.length, TRAFFIC: 0, WEATHER: 0, SAFETY: 0 };
   alerts.forEach(a => {
     const cat = detectCategory(a);
     categoryCount[cat] = (categoryCount[cat] || 0) + 1;
   });
-  if (categoryCount.TRAFFIC) categories.push('TRAFFIC');
-  if (categoryCount.WEATHER) categories.push('WEATHER');
-  if (categoryCount.SAFETY) categories.push('SAFETY');
-
-  // Only render tabs if there's more than one category
-  if (categories.length <= 2) return null;
 
   const CATEGORY_LABELS = {
     ALL: { label: 'All', icon: '📋', count: alerts.length },
@@ -151,6 +145,7 @@ export function renderAlertsCenter({
   onSaferOption = null,
   activeFilter = 'ALL',
   onFilterChange = null,
+  onBackToMore = null,
 } = {}) {
   const container = document.createElement('div');
   container.className = 'alerts-center-container';
@@ -158,12 +153,37 @@ export function renderAlertsCenter({
   container.style.maxWidth = '680px';
   container.style.margin = '0 auto';
 
-  // Heading
+  // Heading with Back to More action
   const header = document.createElement('div');
   header.style.display = 'flex';
   header.style.justifyContent = 'space-between';
   header.style.alignItems = 'center';
   header.style.marginBottom = '16px';
+
+  const leftGroup = document.createElement('div');
+  leftGroup.style.display = 'flex';
+  leftGroup.style.alignItems = 'center';
+  leftGroup.style.gap = '10px';
+
+  if (typeof onBackToMore === 'function') {
+    const backBtn = document.createElement('button');
+    backBtn.id = 'alerts-btn-back-to-more';
+    backBtn.type = 'button';
+    backBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+    backBtn.style.border = '1px solid rgba(255, 255, 255, 0.12)';
+    backBtn.style.borderRadius = '8px';
+    backBtn.style.padding = '6px 12px';
+    backBtn.style.fontSize = '12px';
+    backBtn.style.fontWeight = '700';
+    backBtn.style.color = '#cbd5e1';
+    backBtn.style.cursor = 'pointer';
+    backBtn.style.display = 'inline-flex';
+    backBtn.style.alignItems = 'center';
+    backBtn.style.gap = '4px';
+    backBtn.innerHTML = '‹ Back to More';
+    backBtn.addEventListener('click', onBackToMore);
+    leftGroup.appendChild(backBtn);
+  }
 
   const title = document.createElement('h2');
   title.style.fontSize = '20px';
@@ -171,6 +191,7 @@ export function renderAlertsCenter({
   title.style.margin = '0';
   title.style.color = 'var(--text-primary, #f8fafc)';
   title.textContent = 'Alerts & Safety';
+  leftGroup.appendChild(title);
 
   const countBadge = document.createElement('span');
   countBadge.style.fontSize = '12px';
@@ -188,7 +209,7 @@ export function renderAlertsCenter({
     countBadge.textContent = 'All Clear';
   }
 
-  header.appendChild(title);
+  header.appendChild(leftGroup);
   header.appendChild(countBadge);
   container.appendChild(header);
 

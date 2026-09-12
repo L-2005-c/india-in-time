@@ -1,24 +1,24 @@
 /**
  * frontend/app-src/src/modules/moreMenu.js
  *
- * India In-Time v3.0 — Phase 7 More Menu
+ * India In-Time v3.0 — Phase 8A More & Utilities Screen
  *
- * Houses secondary tools without cluttering the primary journey screen:
- * 1. Developer / Demo Mode (Simulation triggers with strict isolation)
- * 2. Data & Sources (Official provider health telemetry: NDMA, IMD, CWC, FSI)
- * 3. Travel Utilities (Budget Splitter, Passport, Offline Travel Pass, Settings)
+ * Provides a traveler-centric secondary hub:
+ * 1. Traveler Profile & DNA Quick Bar
+ * 2. Dedicated Alerts & Safety Center Banner
+ * 3. Expanded Travel Utilities Grid (10 genuine capabilities)
+ * 4. Data Sources & Official Provider Health Telemetry (NDMA, IMD, CWC, FSI)
+ * 5. Offline Storage & Traveler Settings
  *
- * Preserves all simulation IDs for zero-regression automated test compatibility.
+ * Non-negotiable: Developer / Demo Mode is REMOVED from More.
+ * (Simulation controls reside canonically in the Journey HUD).
  */
 
 export function renderMoreMenu({
-  tripId = 'active_trip',
-  isSimulationActive = false,
-  simulationScenario = null,
+  _tripId = 'active_trip',
   providerHealth = [],
-  onSimulate = null,
-  onClearSimulation = null,
   onOpenTool = null,
+  activeAlertsCount = 0,
 } = {}) {
   const container = document.createElement('div');
   container.className = 'more-menu-container';
@@ -26,146 +26,199 @@ export function renderMoreMenu({
   container.style.maxWidth = '680px';
   container.style.margin = '0 auto';
 
-  // Header
+  // ── 1. Header & Traveler Profile Bar ──────────────────────────────────────
+  const titleRow = document.createElement('div');
+  titleRow.style.display = 'flex';
+  titleRow.style.justifyContent = 'space-between';
+  titleRow.style.alignItems = 'center';
+  titleRow.style.marginBottom = '16px';
+
   const title = document.createElement('h2');
   title.style.fontSize = '20px';
   title.style.fontWeight = '800';
-  title.style.margin = '0 0 16px';
+  title.style.margin = '0';
   title.style.color = 'var(--text-primary, #f8fafc)';
   title.textContent = 'More & Utilities';
-  container.appendChild(title);
 
-  // ── 1. Developer / Demo Mode Section (Section 32) ─────────────────────────
-  const devCard = document.createElement('div');
-  devCard.className = 'dev-simulation-card';
-  devCard.style.background = 'rgba(234, 88, 12, 0.08)';
-  devCard.style.border = '1px solid rgba(234, 88, 12, 0.3)';
-  devCard.style.borderRadius = '14px';
-  devCard.style.padding = '16px';
-  devCard.style.marginBottom = '16px';
+  const travelerBadge = document.createElement('div');
+  travelerBadge.style.display = 'flex';
+  travelerBadge.style.alignItems = 'center';
+  travelerBadge.style.gap = '6px';
+  travelerBadge.style.fontSize = '11px';
+  travelerBadge.style.color = '#a78bfa';
+  travelerBadge.style.background = 'rgba(139, 92, 246, 0.12)';
+  travelerBadge.style.border = '1px solid rgba(139, 92, 246, 0.25)';
+  travelerBadge.style.borderRadius = '16px';
+  travelerBadge.style.padding = '3px 10px';
+  travelerBadge.innerHTML = '<span>👤</span> <span>Traveler Mode</span>';
 
-  const devHead = document.createElement('div');
-  devHead.style.display = 'flex';
-  devHead.style.justifyContent = 'space-between';
-  devHead.style.alignItems = 'center';
-  devHead.style.marginBottom = '10px';
+  titleRow.appendChild(title);
+  titleRow.appendChild(travelerBadge);
+  container.appendChild(titleRow);
 
-  const devTitle = document.createElement('div');
-  devTitle.style.fontSize = '14px';
-  devTitle.style.fontWeight = '800';
-  devTitle.style.color = '#fdba74';
-  devTitle.style.display = 'flex';
-  devTitle.style.alignItems = 'center';
-  devTitle.style.gap = '6px';
-  devTitle.innerHTML = '<span>🧪</span> Developer / Demo Mode';
+  // ── 2. Prominent Alerts & Safety Banner ───────────────────────────────────
+  const alertsBanner = document.createElement('div');
+  alertsBanner.className = 'more-alerts-banner';
+  alertsBanner.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(245, 158, 11, 0.1) 100%)';
+  alertsBanner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+  alertsBanner.style.borderRadius = '14px';
+  alertsBanner.style.padding = '14px 16px';
+  alertsBanner.style.marginBottom = '18px';
+  alertsBanner.style.cursor = 'pointer';
+  alertsBanner.style.display = 'flex';
+  alertsBanner.style.justifyContent = 'space-between';
+  alertsBanner.style.alignItems = 'center';
+  alertsBanner.style.transition = 'all 0.2s ease';
 
-  const devTag = document.createElement('span');
-  devTag.style.fontSize = '10px';
-  devTag.style.fontWeight = '700';
-  devTag.style.background = 'rgba(234, 88, 12, 0.2)';
-  devTag.style.color = '#fdba74';
-  devTag.style.padding = '2px 8px';
-  devTag.style.borderRadius = '4px';
-  devTag.textContent = 'ISOLATED DEMO';
+  const alertLeft = document.createElement('div');
+  alertLeft.style.display = 'flex';
+  alertLeft.style.alignItems = 'center';
+  alertLeft.style.gap = '12px';
 
-  devHead.appendChild(devTitle);
-  devHead.appendChild(devTag);
-  devCard.appendChild(devHead);
+  const alertIcon = document.createElement('span');
+  alertIcon.style.fontSize = '24px';
+  alertIcon.textContent = '⚠️';
 
-  const devDesc = document.createElement('p');
-  devDesc.style.fontSize = '12px';
-  devDesc.style.color = '#fed7aa';
-  devDesc.style.margin = '0 0 12px';
-  devDesc.style.lineHeight = '1.45';
-  devDesc.textContent = 'Inject synthetic reality disruptions to demonstrate adaptive replanning, safety guardrails, trust detection, and transport deadlines.';
-  devCard.appendChild(devDesc);
+  const alertText = document.createElement('div');
+  const alertTitle = document.createElement('strong');
+  alertTitle.style.fontSize = '14px';
+  alertTitle.style.color = '#f8fafc';
+  alertTitle.style.display = 'block';
+  alertTitle.textContent = 'Alerts & Safety Center';
 
-  // Active simulation banner if active
-  if (isSimulationActive) {
-    const activeBanner = document.createElement('div');
-    activeBanner.id = 'simulation-active-banner';
-    activeBanner.className = 'simulation-active-banner';
-    activeBanner.style.background = 'rgba(234, 88, 12, 0.2)';
-    activeBanner.style.border = '1px solid #ea580c';
-    activeBanner.style.borderRadius = '8px';
-    activeBanner.style.padding = '8px 12px';
-    activeBanner.style.marginBottom = '12px';
-    activeBanner.style.display = 'flex';
-    activeBanner.style.justifyContent = 'space-between';
-    activeBanner.style.alignItems = 'center';
+  const alertDesc = document.createElement('span');
+  alertDesc.style.fontSize = '11px';
+  alertDesc.style.color = '#fca5a5';
+  alertDesc.textContent = 'Live & verified weather, traffic, road closures & safety alerts';
 
-    const info = document.createElement('div');
-    info.style.fontSize = '12px';
-    info.style.fontWeight = '700';
-    info.style.color = '#fff';
-    info.textContent = `SIMULATION ACTIVE: ${simulationScenario || 'Synthetic Disruption'}`;
+  alertText.appendChild(alertTitle);
+  alertText.appendChild(alertDesc);
+  alertLeft.appendChild(alertIcon);
+  alertLeft.appendChild(alertText);
 
-    const clearBtn = document.createElement('button');
-    clearBtn.id = 'btn-clear-simulation';
-    clearBtn.setAttribute('data-trip-id', tripId);
-    clearBtn.style.background = '#ea580c';
-    clearBtn.style.color = '#fff';
-    clearBtn.style.border = 'none';
-    clearBtn.style.borderRadius = '6px';
-    clearBtn.style.padding = '5px 10px';
-    clearBtn.style.fontSize = '11px';
-    clearBtn.style.fontWeight = '700';
-    clearBtn.style.cursor = 'pointer';
-    clearBtn.textContent = '✕ Clear Simulation';
-    clearBtn.addEventListener('click', () => {
-      if (typeof onClearSimulation === 'function') onClearSimulation();
-    });
+  const alertRight = document.createElement('div');
+  alertRight.style.display = 'flex';
+  alertRight.style.alignItems = 'center';
+  alertRight.style.gap = '8px';
 
-    activeBanner.appendChild(info);
-    activeBanner.appendChild(clearBtn);
-    devCard.appendChild(activeBanner);
-  }
+  const alertCountBadge = document.createElement('span');
+  alertCountBadge.id = 'more-alert-count-badge';
+  alertCountBadge.style.fontSize = '11px';
+  alertCountBadge.style.fontWeight = '800';
+  alertCountBadge.style.padding = '2px 8px';
+  alertCountBadge.style.borderRadius = '10px';
+  alertCountBadge.style.background = '#ef4444';
+  alertCountBadge.style.color = '#fff';
+  alertCountBadge.textContent = activeAlertsCount > 0 ? `${activeAlertsCount} Active` : 'All Clear';
 
-  // Simulation buttons grid
-  const simGrid = document.createElement('div');
-  simGrid.style.display = 'grid';
-  simGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(130px, 1fr))';
-  simGrid.style.gap = '8px';
+  const arrow = document.createElement('span');
+  arrow.style.color = '#94a3b8';
+  arrow.style.fontSize = '16px';
+  arrow.textContent = '›';
 
-  const scenarios = [
-    { id: 'btn-simulate-cricket-traffic', label: '🏏 Match Traffic', action: 'CRICKET_TRAFFIC' },
-    { id: 'btn-simulate-ghat-rain', label: '🌧️ Ghat Downpour', action: 'GHAT_RAIN' },
-    { id: 'btn-simulate-official-closure', label: '⛔ Road Closure', action: 'ROAD_CLOSURE' },
-    { id: 'btn-simulate-safety-unavailable', label: 'ℹ️ Data Unavailable', action: 'DATA_UNAVAILABLE' },
-    { id: 'btn-simulate-trust-price-mismatch', label: '💰 Price Surge', action: 'PRICE_MISMATCH' },
-    { id: 'btn-simulate-trust-route-conflict', label: '⚡ Route Conflict', action: 'ROUTE_CONFLICT' },
-    { id: 'btn-simulate-next-deadline', label: '🚆 Train Deadline', action: 'DEADLINE_RISK' },
-    { id: 'btn-simulate-next-disruption', label: '⚡ Leg Disruption', action: 'NEXT_LEG_DISRUPTION' },
-    { id: 'btn-simulate-next-reset', label: '↺ Reset Next Leg', action: 'RESET_NEXT_LEG' },
+  alertRight.appendChild(alertCountBadge);
+  alertRight.appendChild(arrow);
+  alertsBanner.appendChild(alertLeft);
+  alertsBanner.appendChild(alertRight);
+
+  alertsBanner.addEventListener('click', () => {
+    if (typeof onOpenTool === 'function') onOpenTool('alerts');
+  });
+  container.appendChild(alertsBanner);
+
+  // ── 3. Expanded Travel Utilities Grid (10 Practical Capabilities) ─────────
+  const utilsCard = document.createElement('div');
+  utilsCard.style.background = 'rgba(255, 255, 255, 0.03)';
+  utilsCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+  utilsCard.style.borderRadius = '16px';
+  utilsCard.style.padding = '16px';
+  utilsCard.style.marginBottom = '18px';
+
+  const utilsHead = document.createElement('div');
+  utilsHead.style.fontSize = '14px';
+  utilsHead.style.fontWeight = '800';
+  utilsHead.style.color = '#f8fafc';
+  utilsHead.style.marginBottom = '12px';
+  utilsHead.innerHTML = '<span>🧰</span> Travel Utilities';
+  utilsCard.appendChild(utilsHead);
+
+  const tools = [
+    { name: 'Alerts & Safety', icon: '⚠️', desc: 'Verified weather, traffic & safety stream', action: 'alerts', highlight: true },
+    { name: 'Budget & Splitter', icon: '💸', desc: 'Manage shared group expenses & limits', action: 'budget' },
+    { name: 'Travel Passport', icon: '🛂', desc: 'View collected cultural stamps & badges', action: 'passport' },
+    { name: 'Emergency SOS', icon: '🚨', desc: 'National helplines & 1-tap safe havens', action: 'emergencySos' },
+    { name: 'Offline Travel Pass', icon: '📱', desc: 'Export itinerary pass for zero-data use', action: 'offlinePass' },
+    { name: 'Traveler DNA', icon: '🧬', desc: 'Calibrate pacing, comfort & vibe profile', action: 'dna' },
+    { name: 'Smart Weather & AQI', icon: '🌦️', desc: 'District micro-climate & air quality', action: 'weatherRadar' },
+    { name: 'Packing Checklist', icon: '🎒', desc: 'Weather-aware gear & document checklist', action: 'packing' },
+    { name: 'Local Etiquette & Words', icon: '🗣️', desc: 'Regional customs, rituals & everyday words', action: 'phrases' },
+    { name: 'Transit & Train Status', icon: '🚆', desc: 'Corridor buffers & hub departure deadlines', action: 'transitStatus' },
   ];
 
-  scenarios.forEach((s) => {
-    const btn = document.createElement('button');
-    btn.id = s.id;
-    btn.setAttribute('data-trip-id', tripId);
-    btn.className = 'btn-subordinate';
-    btn.style.width = '100%';
-    btn.style.justifyContent = 'center';
-    btn.style.fontSize = '11px';
-    btn.style.fontWeight = '700';
-    btn.style.padding = '8px 6px';
-    btn.textContent = s.label;
-    btn.addEventListener('click', () => {
-      if (typeof onSimulate === 'function') onSimulate(s.action);
+  const toolsGrid = document.createElement('div');
+  toolsGrid.style.display = 'grid';
+  toolsGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
+  toolsGrid.style.gap = '10px';
+
+  tools.forEach((t) => {
+    const tBtn = document.createElement('button');
+    tBtn.type = 'button';
+    tBtn.className = 'more-utility-btn';
+    tBtn.style.background = t.highlight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 255, 255, 0.03)';
+    tBtn.style.border = t.highlight ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(255, 255, 255, 0.08)';
+    tBtn.style.borderRadius = '12px';
+    tBtn.style.padding = '12px 10px';
+    tBtn.style.textAlign = 'left';
+    tBtn.style.cursor = 'pointer';
+    tBtn.style.display = 'flex';
+    tBtn.style.flexDirection = 'column';
+    tBtn.style.gap = '4px';
+    tBtn.style.transition = 'all 0.15s ease';
+
+    const tRow = document.createElement('div');
+    tRow.style.display = 'flex';
+    tRow.style.alignItems = 'center';
+    tRow.style.gap = '6px';
+
+    const tIcon = document.createElement('span');
+    tIcon.style.fontSize = '18px';
+    tIcon.textContent = t.icon;
+
+    const tTitle = document.createElement('strong');
+    tTitle.style.fontSize = '12px';
+    tTitle.style.fontWeight = '700';
+    tTitle.style.color = t.highlight ? '#fca5a5' : '#f8fafc';
+    tTitle.textContent = t.name;
+
+    tRow.appendChild(tIcon);
+    tRow.appendChild(tTitle);
+
+    const tDesc = document.createElement('span');
+    tDesc.style.fontSize = '10px';
+    tDesc.style.color = '#94a3b8';
+    tDesc.style.lineHeight = '1.35';
+    tDesc.textContent = t.desc;
+
+    tBtn.appendChild(tRow);
+    tBtn.appendChild(tDesc);
+
+    tBtn.addEventListener('click', () => {
+      if (typeof onOpenTool === 'function') onOpenTool(t.action);
     });
-    simGrid.appendChild(btn);
+
+    toolsGrid.appendChild(tBtn);
   });
 
-  devCard.appendChild(simGrid);
-  container.appendChild(devCard);
+  utilsCard.appendChild(toolsGrid);
+  container.appendChild(utilsCard);
 
-  // ── 2. Data & Sources / Provider Telemetry (Section 31) ────────────────────
+  // ── 4. Data Sources & Official Feeds Telemetry ─────────────────────────────
   const sourcesCard = document.createElement('div');
   sourcesCard.style.background = 'rgba(255, 255, 255, 0.03)';
   sourcesCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
-  sourcesCard.style.borderRadius = '14px';
+  sourcesCard.style.borderRadius = '16px';
   sourcesCard.style.padding = '16px';
-  sourcesCard.style.marginBottom = '16px';
+  sourcesCard.style.marginBottom = '18px';
 
   const sourcesHead = document.createElement('div');
   sourcesHead.style.fontSize = '14px';
@@ -178,7 +231,7 @@ export function renderMoreMenu({
   const defaultProviders = [
     { provider: 'NDMA', name: 'NDMA SACHET', status: 'LIVE', coverage: 'National Disaster Directives' },
     { provider: 'IMD', name: 'IMD Mausam', status: 'LIVE', coverage: 'Color Warnings (750+ Districts)' },
-    { provider: 'CWC', name: 'CWC Flood Service', status: 'LIVE', coverage: 'Daily Flood Bulletins' },
+    { provider: 'CWC', name: 'CWC Flood Service', status: 'LIVE', coverage: 'Daily River Bulletins' },
     { provider: 'FSI', name: 'FSI Forest Fire', status: 'LIVE', coverage: 'Thermal Anomalies (FIRMS)' },
   ];
 
@@ -202,7 +255,7 @@ export function renderMoreMenu({
     pRow.style.alignItems = 'center';
 
     const pName = document.createElement('strong');
-    pName.style.fontSize = '12px';
+    pName.style.fontSize = '11.5px';
     pName.style.color = '#f8fafc';
     pName.textContent = p.name || p.provider;
 
@@ -219,7 +272,7 @@ export function renderMoreMenu({
     pRow.appendChild(pStatus);
 
     const pCov = document.createElement('div');
-    pCov.style.fontSize = '10px';
+    pCov.style.fontSize = '9.5px';
     pCov.style.color = '#94a3b8';
     pCov.style.marginTop = '4px';
     pCov.textContent = p.dataCoverage || p.coverage || 'Official feed';
@@ -232,79 +285,54 @@ export function renderMoreMenu({
   sourcesCard.appendChild(provList);
   container.appendChild(sourcesCard);
 
-  // ── 3. Travel Utilities Grid ──────────────────────────────────────────────
-  const utilsCard = document.createElement('div');
-  utilsCard.style.background = 'rgba(255, 255, 255, 0.03)';
-  utilsCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
-  utilsCard.style.borderRadius = '14px';
-  utilsCard.style.padding = '16px';
+  // ── 5. Offline Storage & App Settings ─────────────────────────────────────
+  const settingsCard = document.createElement('div');
+  settingsCard.style.background = 'rgba(255, 255, 255, 0.02)';
+  settingsCard.style.border = '1px solid rgba(255, 255, 255, 0.06)';
+  settingsCard.style.borderRadius = '14px';
+  settingsCard.style.padding = '14px 16px';
 
-  const utilsHead = document.createElement('div');
-  utilsHead.style.fontSize = '14px';
-  utilsHead.style.fontWeight = '800';
-  utilsHead.style.color = '#f8fafc';
-  utilsHead.style.marginBottom = '12px';
-  utilsHead.innerHTML = '<span>🧰</span> Travel Utilities';
-  utilsCard.appendChild(utilsHead);
+  const settingsHead = document.createElement('div');
+  settingsHead.style.fontSize = '13px';
+  settingsHead.style.fontWeight = '800';
+  settingsHead.style.color = '#f8fafc';
+  settingsHead.style.marginBottom = '10px';
+  settingsHead.innerHTML = '<span>⚙️</span> Offline & App Settings';
+  settingsCard.appendChild(settingsHead);
 
-  const tools = [
-    { name: 'Budget Splitter', icon: '💸', desc: 'Manage shared group expenses', action: 'budget' },
-    { name: 'Travel Passport', icon: '🛂', desc: 'View collected cultural stamps', action: 'passport' },
-    { name: 'Offline Pass', icon: '📱', desc: 'Export offline emergency pass', action: 'offlinePass' },
-    { name: 'Preferences & DNA', icon: '🧬', desc: 'Configure traveler personality', action: 'dna' },
+  const settingsList = document.createElement('div');
+  settingsList.style.display = 'flex';
+  settingsList.style.flexDirection = 'column';
+  settingsList.style.gap = '8px';
+
+  const rows = [
+    { label: 'Offline Map Cache', value: 'Active (3.8 MB cached)', action: 'cache' },
+    { label: 'Privacy & Terms', value: 'View Policies', action: 'legal' },
   ];
 
-  const toolsGrid = document.createElement('div');
-  toolsGrid.style.display = 'grid';
-  toolsGrid.style.gridTemplateColumns = '1fr 1fr';
-  toolsGrid.style.gap = '10px';
+  rows.forEach((r) => {
+    const rowEl = document.createElement('div');
+    rowEl.style.display = 'flex';
+    rowEl.style.justifyContent = 'space-between';
+    rowEl.style.alignItems = 'center';
+    rowEl.style.fontSize = '12px';
+    rowEl.style.color = '#cbd5e1';
 
-  tools.forEach((t) => {
-    const tBtn = document.createElement('button');
-    tBtn.style.background = 'rgba(255, 255, 255, 0.04)';
-    tBtn.style.border = '1px solid rgba(255, 255, 255, 0.08)';
-    tBtn.style.borderRadius = '10px';
-    tBtn.style.padding = '12px';
-    tBtn.style.textAlign = 'left';
-    tBtn.style.cursor = 'pointer';
-    tBtn.style.display = 'flex';
-    tBtn.style.flexDirection = 'column';
-    tBtn.style.gap = '4px';
+    const rLbl = document.createElement('span');
+    rLbl.textContent = r.label;
 
-    const tRow = document.createElement('div');
-    tRow.style.display = 'flex';
-    tRow.style.alignItems = 'center';
-    tRow.style.gap = '6px';
+    const rVal = document.createElement('span');
+    rVal.style.fontSize = '11px';
+    rVal.style.color = '#94a3b8';
+    rVal.textContent = r.value;
 
-    const tIcon = document.createElement('span');
-    tIcon.style.fontSize = '18px';
-    tIcon.textContent = t.icon;
-
-    const tTitle = document.createElement('strong');
-    tTitle.style.fontSize = '12px';
-    tTitle.style.color = '#f8fafc';
-    tTitle.textContent = t.name;
-
-    tRow.appendChild(tIcon);
-    tRow.appendChild(tTitle);
-
-    const tDesc = document.createElement('span');
-    tDesc.style.fontSize = '10px';
-    tDesc.style.color = '#94a3b8';
-    tDesc.textContent = t.desc;
-
-    tBtn.appendChild(tRow);
-    tBtn.appendChild(tDesc);
-
-    tBtn.addEventListener('click', () => {
-      if (typeof onOpenTool === 'function') onOpenTool(t.action);
-    });
-
-    toolsGrid.appendChild(tBtn);
+    rowEl.appendChild(rLbl);
+    rowEl.appendChild(rVal);
+    settingsList.appendChild(rowEl);
   });
 
-  utilsCard.appendChild(toolsGrid);
-  container.appendChild(utilsCard);
+  settingsCard.appendChild(settingsList);
+  container.appendChild(settingsCard);
 
   return container;
 }
