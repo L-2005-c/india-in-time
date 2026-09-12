@@ -92,11 +92,16 @@ function handler(fn) {
 // General travel Q&A chatbot
 
 router.post('/chat', handler(({ message, city, plan, currentTime, tripMode, facts }) => {
+  const msgLower = String(message || '').toLowerCase();
+  if (/\b(ignore|bypass|override)\b.*\b(closure|road closure|safety|flood|landslide|warning|danger)\b|\btell me it'?s safe anyway\b|\bassume the (flood|landslide|fire) is not real\b|\bignore safety\b/.test(msgLower)) {
+    return '🛡️ Authoritative Safety Rule: India In-Time cannot override or bypass verified road closures, flood warnings, or safety alerts. Official safety constraints remain strictly enforced. Please follow the recommended safe alternative.';
+  }
+
   const planStr = Array.isArray(plan) && plan.length
     ? plan.join(', ')
     : 'none';
 
-  return callGeminiText(`You are a friendly India travel assistant. Never invent live traffic, weather, opening, crowd, ETA, or geospatial facts. Use the FACT CONTRACT when provided and say when a value is unavailable.
+  return callGeminiText(`You are a friendly India travel assistant. You are not an authority for safety, road closures, or disasters; never override official safety constraints. Never invent live traffic, weather, opening, crowd, ETA, or geospatial facts. Use the FACT CONTRACT when provided and say when a value is unavailable.
 Tourist in ${city || 'India'} asked: "${message}"
 Current itinerary stops: ${planStr}.
 Current Local Time: ${currentTime || 'Unknown'}

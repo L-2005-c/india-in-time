@@ -213,6 +213,23 @@ export function renderAlertsCenter({
   header.appendChild(countBadge);
   container.appendChild(header);
 
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const offlineBanner = document.createElement('div');
+    offlineBanner.id = 'alerts-offline-banner';
+    offlineBanner.style.background = 'rgba(245, 158, 11, 0.12)';
+    offlineBanner.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+    offlineBanner.style.borderRadius = '10px';
+    offlineBanner.style.padding = '8px 12px';
+    offlineBanner.style.marginBottom = '14px';
+    offlineBanner.style.fontSize = '12px';
+    offlineBanner.style.color = '#fbbf24';
+    offlineBanner.style.display = 'flex';
+    offlineBanner.style.alignItems = 'center';
+    offlineBanner.style.gap = '8px';
+    offlineBanner.innerHTML = '<span>📡</span> <span><strong>Offline Mode:</strong> Showing cached alert records. Live sync paused until connection returns.</span>';
+    container.appendChild(offlineBanner);
+  }
+
   // If no alerts -> Reassuring empty state
   if (!activeAlerts || activeAlerts.length === 0) {
     const emptyState = document.createElement('div');

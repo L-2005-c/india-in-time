@@ -214,3 +214,15 @@ export function formatActionableAssistantResponse({
 
   return wrap;
 }
+
+/**
+ * Validates whether a user prompt attempts to override or bypass authoritative safety.
+ * Returns an explanatory safety notice if an override is attempted, or null otherwise.
+ */
+export function checkSafetyOverride(promptText) {
+  const q = String(promptText || '').toLowerCase();
+  if (/\b(ignore|bypass|override)\b.*\b(closure|road closure|safety|flood|landslide|warning|danger)\b|\btell me it'?s safe anyway\b|\bassume the (flood|landslide|fire) is not real\b|\bignore safety\b/.test(q)) {
+    return '🛡️ <strong>Authoritative Safety Rule:</strong> India In-Time cannot override or bypass verified road closures, flood warnings, or safety alerts. Official safety constraints remain strictly enforced. Please follow the recommended safe alternative.';
+  }
+  return null;
+}

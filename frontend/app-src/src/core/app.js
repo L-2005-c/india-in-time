@@ -1758,6 +1758,11 @@ async function bestTimeToVisit(query){
 async function handleChat(){
   const inp=document.getElementById('chat-in');const val=inp.value.trim();if(!val)return;
   addMsg(escapeHtml(val),false);inp.value='';const lq=val.toLowerCase();const typing=addTypingIndicator();
+  if(lq.match(/\b(ignore|bypass|override)\b.*\b(closure|road closure|safety|flood|warning)\b|\btell me it'?s safe anyway\b|\bassume the flood is not real\b/)){
+    typing.remove();
+    addMsg('🛡️ <strong>Authoritative Safety Rule:</strong> India In-Time cannot override or bypass verified road closures, flood warnings, or safety alerts. Official safety constraints remain strictly enforced. Please follow the recommended safe alternative.');
+    return;
+  }
   if(lq.match(/\b(best|good|right|ideal|perfect)\s+time\b|\bwhen\s+(should|to|can|is)\b.*\b(visit|go|see|explore)\b|\bwhen('s| is)?\s+the\s+best\b/)){
     const rep=await bestTimeToVisit(val);
     typing.remove();
