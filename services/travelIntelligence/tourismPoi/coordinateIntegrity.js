@@ -93,9 +93,13 @@ function validatePoiCoordinates(rawLat, rawLon, options = {}) {
     };
   }
 
-  // 2. City proximity check (if cityHint provided)
+  // 2. City proximity check (if cityHint or cityCoords provided)
   const cityKey = String(options.cityHint || '').toLowerCase().trim();
-  const centroid = CITY_CENTROIDS[cityKey];
+  const centroid = CITY_CENTROIDS[cityKey] || (
+    options.cityCoords && typeof options.cityCoords.lat === 'number' && typeof options.cityCoords.lon === 'number'
+      ? { lat: options.cityCoords.lat, lon: options.cityCoords.lon, maxRadiusKm: options.maxRadiusKm || 65 }
+      : null
+  );
 
   if (centroid) {
     const dKm = distKm(centroid.lat, centroid.lon, lat, lon);
@@ -140,7 +144,7 @@ function validatePoiCoordinates(rawLat, rawLon, options = {}) {
 }
 
 /**
- * Detects coordinates located offshore in the sea or ocean for coastal cities.
+ * Detects coordinates located offshore in the sea or ocean for coastal cities across India.
  */
 function isOffshoreOrWaterCoordinate(lat, lon, cityHint = '') {
   if (typeof lat !== 'number' || typeof lon !== 'number') return false;
@@ -170,6 +174,31 @@ function isOffshoreOrWaterCoordinate(lat, lon, cityHint = '') {
   // Chennai (Bay of Bengal to the East)
   if (city === 'chennai' || city === 'madras') {
     if (lat >= 12.95 && lat <= 13.15 && lon > 80.290) return true;
+  }
+
+  // Goa (Arabian Sea to the West)
+  if (city === 'goa') {
+    if (lon < 73.68) return true;
+  }
+
+  // Kochi / Cochin (Arabian Sea to the West of Vypin island / Fort Kochi)
+  if (city === 'kochi' || city === 'cochin') {
+    if (lon < 76.170) return true;
+  }
+
+  // Pondicherry / Puducherry (Bay of Bengal to the East)
+  if (city === 'pondicherry' || city === 'puducherry') {
+    if (lon > 79.842) return true;
+  }
+
+  // Puri / Konark (Bay of Bengal to the South/East)
+  if (city === 'puri' || city === 'konark') {
+    if (lat < 19.78 && lon > 85.80) return true;
+  }
+
+  // Kanyakumari (Southernmost cape)
+  if (city === 'kanyakumari') {
+    if (lat < 8.075) return true;
   }
 
   return false;

@@ -14,7 +14,7 @@ const {
   getPlaces, fetchWiki, fetchCuratedCityFallback, fetchCuratedFoodFallback,
   fetchNominatimFallback, hydrateAiPlaces,
 } = require('../services/placesDiscovery');
-const { resolveCanonicalPlace, isPermanentlyClosedPlace } = require('../services/travelIntelligence/tourismPoi');
+const { resolveCanonicalPlace, isPermanentlyClosedPlace, validatePoiCoordinates } = require('../services/travelIntelligence/tourismPoi');
 function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
   return [
     String(cityName || '').trim().toLowerCase(),
@@ -112,6 +112,15 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
         const k = String(p.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
         if (!k || k.length < 2 || seen.has(k)) continue;
         if (!p.coords || p.coords.length < 2) continue;
+        const integrity = validatePoiCoordinates(p.coords[0], p.coords[1], {
+          cityHint: cityName,
+          category: p.cat,
+        });
+        if (!integrity.valid) {
+          appLogger.warn(`[places] Rejected "${p.name}" with invalid/offshore coords [${p.coords}]: ${integrity.reason}`);
+          continue;
+        }
+        p.coords = [integrity.lat, integrity.lon];
         seen.add(k);
         merged.push(p);
       }
@@ -153,7 +162,11 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
     // Canonical enrichment & quality scoring pass
     const canonicalPlaces = [];
     for (const p of dedupedMerged) {
-      const canonical = resolveCanonicalPlace(p, { cityHint: cityName, categoryHint: p.cat });
+      const canonical = resolveCanonicalPlace(p, {
+        cityHint: cityName,
+        categoryHint: p.cat,
+        cityCoords: { lat, lon },
+      });
       if (canonical) {
         canonicalPlaces.push({
           ...p,
@@ -169,7 +182,16 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
           qualityScore: canonical.qualityScore,
         });
       } else {
-        canonicalPlaces.push(p);
+        const integrity = validatePoiCoordinates(p.coords[0], p.coords[1], {
+          cityHint: cityName,
+          category: p.cat,
+        });
+        if (integrity.valid) {
+          canonicalPlaces.push({
+            ...p,
+            coords: [integrity.lat, integrity.lon],
+          });
+        }
       }
     }
 

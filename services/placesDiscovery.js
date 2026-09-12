@@ -17,6 +17,7 @@ const {
   inferFallbackCategory, visitMinutesForCat,
 } = require('../utils/placesMerge');
 const { isPermanentlyClosedPlace } = require('./travelIntelligence/tourismPoi/tourismBlacklist');
+const { validatePoiCoordinates } = require('./travelIntelligence/tourismPoi/coordinateIntegrity');
 
 async function callGemini(prompt) {
   const text = await callGeminiText(prompt, {
@@ -299,13 +300,18 @@ async function geocodePlaceViaPhoton(placeName, cityName, cityLat, cityLon, cate
 }
 
 async function geocodePlaceNominatim(placeName, cityName, cityLat, cityLon, category = 'scenic') {
-  const viaNominatim = await geocodePlaceViaNominatimOnly(placeName, cityName, cityLat, cityLon, category).catch(() => null);
-  if (viaNominatim) return viaNominatim;
-  // Nominatim came back empty/blocked — try Photon before giving up. This is
-  // what keeps non-curated cities from silently returning 0 places whenever
-  // Nominatim is having a bad day (which, per its own usage policy, is often
-  // for the exact traffic pattern a live server produces).
-  return geocodePlaceViaPhoton(placeName, cityName, cityLat, cityLon, category).catch(() => null);
+  let geo = await geocodePlaceViaNominatimOnly(placeName, cityName, cityLat, cityLon, category).catch(() => null);
+  if (!geo) {
+    geo = await geocodePlaceViaPhoton(placeName, cityName, cityLat, cityLon, category).catch(() => null);
+  }
+  if (!geo) return null;
+  const integrity = validatePoiCoordinates(geo.lat, geo.lon, {
+    cityHint: cityName,
+    category,
+    cityCoords: { lat: cityLat, lon: cityLon },
+  });
+  if (!integrity.valid) return null;
+  return { lat: integrity.lat, lon: integrity.lon };
 }
 
 async function fixAiCoordsViaNominatim(aiPlaces, cityLat, cityLon, cityName) {
