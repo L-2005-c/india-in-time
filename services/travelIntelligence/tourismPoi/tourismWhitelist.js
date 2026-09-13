@@ -211,6 +211,10 @@ const AGRA = [
   entry('Itmad-ud-Daulah', 'heritage', 'A', 27.1929, 78.0310, ['baby taj']),
   entry('Akbar Tomb Sikandra', 'heritage', 'A', 27.2207, 77.9506, ['sikandra']),
   entry('Jama Masjid Agra', 'temple', 'B', 27.1837, 78.0179),
+  entry('Fatehpur Sikri', 'heritage', 'S', 27.0945, 77.6679, ['fatehpur sikri complex']),
+  entry('Buland Darwaza', 'heritage', 'S', 27.0941, 77.6631, ['gate of magnificence']),
+  entry('Tomb of Salim Chishti', 'temple', 'A', 27.0949, 77.6644, ['salim chishti dargah']),
+  entry('Sadar Bazaar Agra', 'shopping', 'A', 27.1602, 78.0102, ['sadar bazaar']),
 ];
 
 const VARANASI = [
@@ -220,6 +224,24 @@ const VARANASI = [
   entry('Sarnath', 'heritage', 'S', 25.3716, 83.0252),
   entry('Ramnagar Fort', 'heritage', 'A', 25.2694, 83.0292),
   entry('Manikarnika Ghat', 'scenic', 'A', 25.3102, 83.0140),
+  entry('Dhamek Stupa Sarnath', 'heritage', 'S', 25.3808, 83.0245, ['dhamekh stupa']),
+  entry('Sarnath Archaeological Museum', 'museum', 'A', 25.3815, 83.0232, ['sarnath museum']),
+  entry('Banaras Hindu University & New Vishwanath Temple', 'temple', 'S', 25.2658, 82.9895, ['bhu vishwanath temple', 'new vt']),
+  entry('Tulsi Manas Temple', 'temple', 'A', 25.2830, 83.0005, ['tulsi manas mandir']),
+  entry('Sankat Mochan Hanuman Temple', 'temple', 'A', 25.2818, 82.9995, ['sankat mochan']),
+];
+
+const UDAIPUR = [
+  entry('City Palace Udaipur', 'heritage', 'S', 24.5764, 73.6835, ['city palace', 'udaipur city palace']),
+  entry('Lake Pichola', 'scenic', 'S', 24.5750, 73.6780, ['pichola lake']),
+  entry('Jag Mandir', 'heritage', 'S', 24.5677, 73.6775, ['lake garden palace']),
+  entry('Saheliyon Ki Bari', 'park', 'A', 24.6025, 73.6875, ['courtyard of maidens']),
+  entry('Fateh Sagar Lake', 'scenic', 'A', 24.6015, 73.6745, ['fatehsagar']),
+  entry('Jagdish Temple', 'temple', 'A', 24.5794, 73.6847, ['jagdish mandir']),
+  entry('Sajjangarh Monsoon Palace', 'scenic', 'S', 24.5898, 73.6375, ['monsoon palace', 'sajjangarh']),
+  entry('Bagore Ki Haveli', 'museum', 'A', 24.5798, 73.6828, ['bagore ki haveli museum']),
+  entry('Ambrai Ghat (Manjhi Ghat)', 'viewpoint', 'A', 24.5788, 73.6818, ['ambrai ghat']),
+  entry('Shilpgram Crafts Village', 'heritage', 'A', 24.6198, 73.6560, ['shilpgram']),
 ];
 
 const KOLKATA = [
@@ -323,7 +345,7 @@ const CITY_WHITELISTS = {
   mysore: MYSORE,
   mysuru: MYSORE,
   munnar: MUNNAR,
-  udaipur: [], // seeds-only for now; classifier still applies
+  udaipur: UDAIPUR,
 };
 
 function buildIndex(entries) {
