@@ -43,3 +43,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Scratch & Local Temp
+scratch/

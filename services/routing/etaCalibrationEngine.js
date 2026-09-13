@@ -15,14 +15,22 @@ const { normalizeTrafficMetadata, getPredictiveTraffic } = require('./trafficCla
 
 // Maximum plausible speeds on Indian roads by corridor (km/h)
 const INDIAN_SPEED_LIMITS_KMH = Object.freeze({
-  [CORRIDOR_TYPE.HIGHWAY_EXPRESSWAY]: 75.0,
-  [CORRIDOR_TYPE.URBAN_ARTERIAL]: 38.0,
-  [CORRIDOR_TYPE.DENSE_DOWNTOWN]: 24.0,
+  [CORRIDOR_TYPE.HIGHWAY_EXPRESSWAY]: 80.0,
+  [CORRIDOR_TYPE.URBAN_ARTERIAL]: 40.0,
+  [CORRIDOR_TYPE.DENSE_DOWNTOWN]: 26.0,
   [CORRIDOR_TYPE.WALLED_BAZAAR]: 14.0,
-  [CORRIDOR_TYPE.HILL_GHAT]: 26.0,
-  [CORRIDOR_TYPE.COASTAL_DRIVE]: 35.0,
+  [CORRIDOR_TYPE.HILL_GHAT]: 28.0,
+  [CORRIDOR_TYPE.COASTAL_DRIVE]: 40.0,
   [CORRIDOR_TYPE.PEDESTRIAN_WALK]: 4.8,
 });
+
+// Low-congestion leisure / tourism cities where signal delays are minimal
+const LOW_SIGNAL_CITIES = new Set([
+  'goa', 'pondicherry', 'puducherry', 'udaipur', 'jodhpur', 'pushkar',
+  'munnar', 'ooty', 'coorg', 'kodaikanal', 'shimla', 'manali',
+  'rishikesh', 'alleppey', 'alappuzha', 'varkala', 'hampi',
+  'leh', 'ladakh', 'meghalaya', 'gangtok', 'darjeeling',
+]);
 
 /**
  * Calibrates route duration and travel times for Indian roads.
@@ -88,13 +96,20 @@ function calibrateIndianEta({
     const rawSec = Number(rawDurationSeconds);
     if (Number.isFinite(rawSec) && rawSec > 0) {
       const impliedSpeedKmH = (roadKm / (rawSec / 3600));
-      if (impliedSpeedKmH > speedCapKmH) {
+      if (impliedSpeedKmH > speedCapKmH * 1.15) {
         // OSRM speed is unrealistically fast (European speed profile) -> calibrate to Indian corridor speed
-        baseDurationSec = Math.max(rawSec, Math.round((roadKm / baseSpeedKmH) * 3600));
+        // Use a blend: 60% OSRM raw + 40% physics-capped to avoid over-correction
+        const physicsSec = Math.round((roadKm / baseSpeedKmH) * 3600);
+        baseDurationSec = Math.round(rawSec * 0.6 + physicsSec * 0.4);
+      } else if (impliedSpeedKmH > speedCapKmH) {
+        // Marginally over speed cap — apply gentle correction
+        const physicsSec = Math.round((roadKm / baseSpeedKmH) * 3600);
+        baseDurationSec = Math.round(rawSec * 0.75 + physicsSec * 0.25);
       } else if (impliedSpeedKmH < 6.0 && roadKm > 0.5) {
         // Unusually slow raw duration -> ensure reasonable baseline
         baseDurationSec = Math.round((roadKm / baseSpeedKmH) * 3600);
       } else {
+        // OSRM speed is within Indian corridor envelope — trust it
         baseDurationSec = Math.round(rawSec);
       }
     } else {
@@ -104,12 +119,19 @@ function calibrateIndianEta({
   }
 
   // 4. Junction & Traffic Signal Delay (Indian urban arterials)
+  //    Reduced for leisure / low-congestion cities where signal infrastructure is sparse
   let signalDelaySec = 0;
+  const cityKey = String(city || '').trim().toLowerCase();
+  const isLowSignalCity = LOW_SIGNAL_CITIES.has(cityKey);
   if (travelMode !== 'walking' && roadKm >= 1.5) {
-    const signalsPerKm = corridorMeta.signalsPerKm || (corridorType === CORRIDOR_TYPE.URBAN_ARTERIAL ? 0.6 : 0.2);
+    let signalsPerKm = corridorMeta.signalsPerKm || (corridorType === CORRIDOR_TYPE.URBAN_ARTERIAL ? 0.6 : 0.2);
+    // Leisure cities have far fewer traffic signals
+    if (isLowSignalCity) signalsPerKm *= 0.3;
+    // Highway corridors have minimal signals
+    if (corridorType === CORRIDOR_TYPE.HIGHWAY_EXPRESSWAY) signalsPerKm = Math.min(signalsPerKm, 0.08);
     const estimatedSignals = Math.max(0, roadKm * signalsPerKm);
-    // Average 20 seconds waiting time per signal cycle
-    signalDelaySec = Math.round(estimatedSignals * 20);
+    // Average 18 seconds waiting time per signal cycle (slightly lower than old 20 to reflect modern sync signals)
+    signalDelaySec = Math.round(estimatedSignals * 18);
   }
 
   // 5. Destination Approach / Parking Bottleneck
@@ -124,6 +146,8 @@ function calibrateIndianEta({
   const netBaseDurationSec = Math.max(60, baseDurationSec + signalDelaySec + bottleneckDelaySec);
 
   // 6. Time-of-Day Traffic Congestion Multiplier (Calibrated to Indian Standard Time)
+  //    For OSRM provider, apply a dampened congestion factor since OSRM durations
+  //    already partially account for road geometry and average speeds.
   const depDate = departureTime ? new Date(departureTime) : new Date();
   const utcMs = depDate.getTime() + (depDate.getTimezoneOffset() * 60000);
   const istDate = new Date(utcMs + (5.5 * 3600000));
@@ -141,7 +165,18 @@ function calibrateIndianEta({
     hasRealtimeSignal: false,
   });
 
-  const trafficFactor = travelMode === 'walking' ? 1.0 : trafficMeta.congestionFactor;
+  // Dampen congestion factor for OSRM routes (road-network durations already include realistic speeds)
+  // and for leisure cities where congestion rarely reaches metro levels
+  let rawTrafficFactor = travelMode === 'walking' ? 1.0 : trafficMeta.congestionFactor;
+  if (travelMode !== 'walking' && provider === 'osrm' && rawTrafficFactor > 1.0) {
+    // OSRM gives road-aware durations; apply only 50% of the congestion overhead
+    rawTrafficFactor = 1.0 + (rawTrafficFactor - 1.0) * 0.50;
+  }
+  if (isLowSignalCity && rawTrafficFactor > 1.0) {
+    // Leisure cities rarely experience metro-grade congestion
+    rawTrafficFactor = 1.0 + (rawTrafficFactor - 1.0) * 0.40;
+  }
+  const trafficFactor = rawTrafficFactor;
   const trafficAwareSec = Math.round(netBaseDurationSec * trafficFactor);
   const trafficMinutes = Math.max(1, Math.round(trafficAwareSec / 60));
   const baseMinutes = Math.max(1, Math.round(netBaseDurationSec / 60));

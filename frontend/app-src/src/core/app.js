@@ -2106,7 +2106,8 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
         }
       }
     } else {
-      const res = await fetch(`/api/v1/routing/matrix`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stops: raw.map(c => ({ coords: c })), mode: 'driving' }), signal: AbortSignal.timeout(5000) });
+      const cityParam = typeof currentCityName !== 'undefined' && currentCityName ? currentCityName : '';
+      const res = await fetch(`/api/v1/routing/matrix`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stops: raw.map(c => ({ coords: c })), mode: 'driving', city: cityParam }), signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const d = await res.json();
         if (d.success && Array.isArray(d.legs) && d.legs.length > 0) {
@@ -2139,7 +2140,7 @@ async function fetchRoadRoute(raw, {accent, tripActive, routeStops}){
       applyMapHeadingRotation();
       return true;
     }
-  } catch (_e) { /* fallback to client OSRM mirrors */ }
+  } catch (routeErr) { browserLogger.warn('Backend route API failed, falling back to client OSRM mirrors:', routeErr); }
 
   const coords = raw.map(p => `${p[1]},${p[0]}`).join(';');
   for (let mIdx = 0; mIdx < ROAD_ROUTE_MIRRORS.length; mIdx++) {

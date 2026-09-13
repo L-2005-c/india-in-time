@@ -126,6 +126,7 @@ function enrichTurnByTurnSteps(rawSteps = [], geometry = null) {
 function evaluateComfortRating(corridorType, mode = 'driving') {
   if (mode === 'walking') return { tier: 'PEDESTRIAN_PATH', ...COMFORT_TIERS.PEDESTRIAN_PATH };
   if (corridorType === 'HIGHWAY_EXPRESSWAY') return { tier: 'EXCELLENT', ...COMFORT_TIERS.EXCELLENT };
+  if (corridorType === 'COASTAL_DRIVE') return { tier: 'EXCELLENT', ...COMFORT_TIERS.EXCELLENT };
   if (corridorType === 'HILL_GHAT') return { tier: 'WINDING_GHAT', ...COMFORT_TIERS.WINDING_GHAT };
   if (corridorType === 'WALLED_BAZAAR') return { tier: 'FAIR', ...COMFORT_TIERS.FAIR };
   return { tier: 'GOOD', ...COMFORT_TIERS.GOOD };

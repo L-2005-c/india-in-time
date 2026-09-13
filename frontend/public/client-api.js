@@ -97,6 +97,39 @@
     );
   }
 
+  // ── Routing ─────────────────────────────────────────────────────────────────
+
+  async function fetchRoute(origin, destination, opts = {}) {
+    const { mode = 'driving', departureTime, city, avoidClosures } = opts;
+    const params = {
+      origin: `${origin[0]},${origin[1]}`,
+      destination: `${destination[0]},${destination[1]}`,
+      mode,
+    };
+    if (departureTime) params.departureTime = departureTime;
+    if (city) params.city = city;
+    if (avoidClosures === false) params.avoidClosures = 'false';
+    const key = `route:${params.origin}:${params.destination}:${mode}`;
+    return cachedRequest(key, 2 * 60 * 1000, () => get('/api/v1/routing/route', params));
+  }
+
+  async function fetchRouteMatrix(stops, opts = {}) {
+    return post('/api/v1/routing/matrix', { stops, ...opts }, 8000);
+  }
+
+  async function fetchEta(origin, destination, opts = {}) {
+    const { mode = 'driving', departureTime, city } = opts;
+    const params = {
+      origin: `${origin[0]},${origin[1]}`,
+      destination: `${destination[0]},${destination[1]}`,
+      mode,
+    };
+    if (departureTime) params.departureTime = departureTime;
+    if (city) params.city = city;
+    const key = `eta:${params.origin}:${params.destination}:${mode}`;
+    return cachedRequest(key, 60 * 1000, () => get('/api/v1/routing/eta', params));
+  }
+
   // ── Weather ──────────────────────────────────────────────────────────────────
 
   async function fetchWeather(lat, lon) {
@@ -467,7 +500,7 @@
 
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
-    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
+    geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, fetchRoute, fetchRouteMatrix, fetchEta, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
     initJourneyState, advanceJourneyProgress, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
     getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
     evaluateTripDisruptions, simulateTripDisruption, fetchTripNotifications, recordNotificationAction, fetchDisruptionEvents,

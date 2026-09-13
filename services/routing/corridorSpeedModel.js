@@ -99,7 +99,29 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
     }
   }
 
-  // 3. Distance & Alignment Based Classification
+  // 3. Coastal Drive Zones (scenic seaside corridors with moderate speeds)
+  const COASTAL_DRIVE_ZONES = [
+    { name: 'Goa North Coast (Baga–Calangute–Candolim–Aguada)', bounds: { minLat: 15.48, maxLat: 15.57, minLon: 73.73, maxLon: 73.80 } },
+    { name: 'Goa South Coast (Colva–Palolem)', bounds: { minLat: 15.00, maxLat: 15.35, minLon: 73.85, maxLon: 74.10 } },
+    { name: 'Vizag Beach Road (RK Beach–Rushikonda–Bheemunipatnam)', bounds: { minLat: 17.70, maxLat: 17.90, minLon: 83.28, maxLon: 83.46 } },
+    { name: 'Mumbai Marine Drive–Worli Sea Face', bounds: { minLat: 18.92, maxLat: 19.05, minLon: 72.81, maxLon: 72.84 } },
+    { name: 'Chennai Marina–ECR Coastal', bounds: { minLat: 12.85, maxLat: 13.06, minLon: 80.25, maxLon: 80.29 } },
+    { name: 'Pondicherry Promenade', bounds: { minLat: 11.91, maxLat: 11.95, minLon: 79.82, maxLon: 79.84 } },
+  ];
+
+  for (const cz of COASTAL_DRIVE_ZONES) {
+    if ((isCoordInZone(fromCoords[0], fromCoords[1], cz) || isCoordInZone(toCoords[0], toCoords[1], cz)) && straightKm < 15.0) {
+      return {
+        corridorType: CORRIDOR_TYPE.COASTAL_DRIVE,
+        windingFactor: 1.18,
+        baseSpeedKmH: 38.0,
+        signalsPerKm: 0.15,
+        description: `Coastal scenic drive (${cz.name})`,
+      };
+    }
+  }
+
+  // 4. Distance & Alignment Based Classification
   if (straightKm >= 20.0) {
     return {
       corridorType: CORRIDOR_TYPE.HIGHWAY_EXPRESSWAY,

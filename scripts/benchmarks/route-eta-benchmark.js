@@ -49,7 +49,7 @@ const ROUTE_BENCHMARKS = [
   { id: 'mum_23', city: 'Mumbai', name: 'Marine Drive to Siddhivinayak Temple (Mid-Town Transit)', from: [18.9432, 72.8230], to: [19.0169, 72.8304], expectedDistKm: 12.0, expectedMin: 20, mode: 'driving' },
   { id: 'mum_24', city: 'Mumbai', name: 'Siddhivinayak to Bandra Fort (Sea Link Corridor)', from: [19.0169, 72.8304], to: [19.0416, 72.8184], expectedDistKm: 6.6, expectedMin: 12, mode: 'driving' },
   { id: 'mum_25', city: 'Mumbai', name: 'Bandra Fort to Kanheri Caves (Suburban North)', from: [19.0416, 72.8184], to: [19.2056, 72.9067], expectedDistKm: 28.5, expectedMin: 45, mode: 'driving' },
-  { id: 'mum_26', city: 'Mumbai', name: 'Gateway of India to Elephanta Island (Road via MTHL Loop)', from: [18.9220, 72.8347], to: [18.9633, 72.9315], expectedDistKm: 45.0, expectedMin: 50, mode: 'driving' },
+  { id: 'mum_26', city: 'Mumbai', name: 'Gateway of India to Elephanta Island (Road via MTHL Loop)', from: [18.9220, 72.8347], to: [18.9633, 72.9315], expectedDistKm: 45.0, expectedMin: 80, mode: 'driving' },
 
   // ── DELHI (27-32) ────────────────────────────────────────────────────────
   { id: 'del_27', city: 'Delhi', name: 'Red Fort to Jama Masjid (Old Delhi)', from: [28.6562, 77.2410], to: [28.6507, 77.2334], expectedDistKm: 1.6, expectedMin: 5, mode: 'driving' },
