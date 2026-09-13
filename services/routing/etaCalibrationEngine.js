@@ -9,9 +9,8 @@
  * traffic signal friction, peak-hour congestion curves, and tourist bottleneck delays.
  * Ensures ETAs match Google Maps ground truth within ±2 to 5 minutes across Indian corridors.
  */
-
 const { classifyCorridor, evaluateDestinationBottleneck, CORRIDOR_TYPE } = require('./corridorSpeedModel');
-const { normalizeTrafficMetadata, getPredictiveTraffic } = require('./trafficClassifier');
+const { normalizeTrafficMetadata } = require('./trafficClassifier');
 
 // Maximum plausible speeds on Indian roads by corridor (km/h)
 const INDIAN_SPEED_LIMITS_KMH = Object.freeze({

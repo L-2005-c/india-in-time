@@ -9,7 +9,7 @@
 
 const { distKm } = require('../../utils/geo');
 const { validateRouteCoordinates } = require('./coordinateValidator');
-const { normalizeTrafficMetadata, TRAFFIC_STATUS } = require('./trafficClassifier');
+const { TRAFFIC_STATUS } = require('./trafficClassifier');
 const { buildCacheKey, getCachedRoute, setCachedRoute } = require('./routeCache');
 const { computeCalibratedCorridorMetrics, classifyCorridor } = require('./corridorSpeedModel');
 const { raceOsrmMirrors } = require('./mirrorRacer');
@@ -212,7 +212,7 @@ async function calculateRoute(origin, destination, opts = {}) {
 
   const departureDate = opts.departureTime ? new Date(opts.departureTime) : new Date();
   const departureMinute = departureDate.getHours() * 60 + departureDate.getMinutes();
-  const dayOfWeek = departureDate.getDay();
+  const _dayOfWeek = departureDate.getDay();
   const mode = opts.mode || 'driving';
   const preference = opts.preference || 'balanced';
 
@@ -250,7 +250,7 @@ async function calculateRoute(origin, destination, opts = {}) {
   }
 
   // Multi-route Candidates List
-  let candidateList = Array.isArray(rawRoute.routes) && rawRoute.routes.length > 0
+  const candidateList = Array.isArray(rawRoute.routes) && rawRoute.routes.length > 0
     ? rawRoute.routes
     : [rawRoute];
 
