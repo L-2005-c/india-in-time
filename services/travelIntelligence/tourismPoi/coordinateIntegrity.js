@@ -103,7 +103,10 @@ function validatePoiCoordinates(rawLat, rawLon, options = {}) {
 
   if (centroid) {
     const dKm = distKm(centroid.lat, centroid.lon, lat, lon);
-    const maxAllowed = options.category === 'food' ? Math.min(25, centroid.maxRadiusKm) : centroid.maxRadiusKm;
+    // For compact cities, restrict food radius to 30km; for expansive tourist regions (e.g. Goa, Paderu/Araku, Mumbai), allow regional centroid radius
+    const maxAllowed = (options.category === 'food' && centroid.maxRadiusKm <= 55)
+      ? Math.min(30, centroid.maxRadiusKm)
+      : centroid.maxRadiusKm;
 
     if (dKm > maxAllowed) {
       return {
