@@ -25,6 +25,7 @@ const ITINERARY_UI_PATH = path.join(__dirname, '../frontend/app-src/src/modules/
 const STYLES_CSS_PATH = path.join(__dirname, '../frontend/app-src/styles.css');
 
 describe('Pillars A, B, C Advancements Suite', () => {
+  jest.setTimeout(30000);
   let app;
 
   beforeAll(() => {

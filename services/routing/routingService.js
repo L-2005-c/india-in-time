@@ -211,8 +211,10 @@ async function calculateRoute(origin, destination, opts = {}) {
   }
 
   const departureDate = opts.departureTime ? new Date(opts.departureTime) : new Date();
-  const departureMinute = departureDate.getHours() * 60 + departureDate.getMinutes();
-  const _dayOfWeek = departureDate.getDay();
+  const depMs = departureDate.getTime();
+  const istEpoch = new Date(depMs + (5.5 * 3600000));
+  const departureMinute = istEpoch.getUTCHours() * 60 + istEpoch.getUTCMinutes();
+  const _dayOfWeek = istEpoch.getUTCDay();
   const mode = opts.mode || 'driving';
   const preference = opts.preference || 'balanced';
 

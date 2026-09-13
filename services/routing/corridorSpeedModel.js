@@ -110,12 +110,14 @@ function classifyCorridor(fromCoords, toCoords, opts = {}) {
   ];
 
   for (const cz of COASTAL_DRIVE_ZONES) {
-    if ((isCoordInZone(fromCoords[0], fromCoords[1], cz) || isCoordInZone(toCoords[0], toCoords[1], cz)) && straightKm < 15.0) {
+    const fromIn = isCoordInZone(fromCoords[0], fromCoords[1], cz);
+    const toIn = isCoordInZone(toCoords[0], toCoords[1], cz);
+    if ((fromIn && toIn) || ((fromIn || toIn) && straightKm < 5.0)) {
       return {
         corridorType: CORRIDOR_TYPE.COASTAL_DRIVE,
         windingFactor: 1.18,
         baseSpeedKmH: 38.0,
-        signalsPerKm: 0.15,
+        signalsPerKm: 0.25,
         description: `Coastal scenic drive (${cz.name})`,
       };
     }
