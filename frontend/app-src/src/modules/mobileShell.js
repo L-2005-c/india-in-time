@@ -118,9 +118,6 @@ function renderBottomNav(navEl) {
     item.className = `nav-item ${idx === activeTabIdx ? 'active' : ''}`;
     item.setAttribute('role', 'button');
     item.setAttribute('tabindex', '0');
-    item.setAttribute('data-action', 'switchToView');
-    item.setAttribute('data-view', t.id);
-    item.setAttribute('data-idx', String(idx));
     if (idx === activeTabIdx) {
       item.setAttribute('aria-current', 'page');
     }
@@ -145,6 +142,9 @@ function renderBottomNav(navEl) {
       item.appendChild(badge);
     }
 
+    // These navigation items own their interaction. Adding data-action here
+    // also invoked core/app.js's document-level handler, making each tap
+    // switch views twice and causing visible mobile navigation glitches.
     item.addEventListener('click', () => {
       switchMobileTab(t.id, idx);
     });

@@ -236,15 +236,29 @@ export function initSplash3D(onComplete) {
   const splash = document.getElementById('splash');
   if (!splash) return;
 
-  // Initialize Web Audio context and gesture listener for autoplay policy
-  initAudioEngine();
+  // The intro is decorative, so it must yield on devices that are likely to
+  // have a constrained GPU/CPU or when the user asks for less motion.
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  const isMobile = window.innerWidth <= 640;
+  const isConstrainedDevice = Boolean(
+    prefersReducedMotion ||
+    connection?.saveData ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
+  );
+  splash.classList.toggle('performance-lite', isConstrainedDevice);
+
+  // Creating an AudioContext during boot can compete with rendering and is
+  // usually suspended by browser autoplay rules anyway. Create it only after
+  // a real user gesture.
   const unlockAudio = () => {
     ensureAudioStarted();
-    ['pointerdown', 'touchstart', 'click', 'keydown', 'mousemove'].forEach(ev => {
+    ['pointerdown', 'keydown'].forEach(ev => {
       window.removeEventListener(ev, unlockAudio);
     });
   };
-  ['pointerdown', 'touchstart', 'click', 'keydown', 'mousemove'].forEach(ev => {
+  ['pointerdown', 'keydown'].forEach(ev => {
     window.addEventListener(ev, unlockAudio, { once: true, passive: true });
     cleanupFns.push(() => window.removeEventListener(ev, unlockAudio));
   });
@@ -288,7 +302,7 @@ export function initSplash3D(onComplete) {
   let height = window.innerHeight;
 
   const onResize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, isConstrainedDevice ? 1.25 : 2);
     width = window.innerWidth;
     height = window.innerHeight;
     canvas.width = Math.floor(width * dpr);
@@ -301,10 +315,11 @@ export function initSplash3D(onComplete) {
   window.addEventListener('resize', onResize);
   cleanupFns.push(() => window.removeEventListener('resize', onResize));
 
-  // Generate 3D point cloud of cosmic waypoints (lighter on mobile for clarity)
-  const isMobile = window.innerWidth <= 640;
+  // The line renderer compares every visible point to every other point, so
+  // point count has a quadratic rendering cost. Keep the full effect on
+  // capable desktops while using a lighter profile on mobile/low-power devices.
   const points = [];
-  const NUM_POINTS = isMobile ? 38 : 85;
+  const NUM_POINTS = isConstrainedDevice ? (isMobile ? 18 : 42) : (isMobile ? 26 : 52);
 
   for (let i = 0; i < NUM_POINTS; i++) {
     const theta = Math.random() * Math.PI * 2;
@@ -342,8 +357,10 @@ export function initSplash3D(onComplete) {
     targetStageRotY = mx * 10;
     targetStageRotX = -my * 8;
   };
-  window.addEventListener('mousemove', onMouseMove, { passive: true });
-  cleanupFns.push(() => window.removeEventListener('mousemove', onMouseMove));
+  if (!prefersReducedMotion) {
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+    cleanupFns.push(() => window.removeEventListener('mousemove', onMouseMove));
+  }
 
   // 3D Parallax on Mobile Gyroscope - subtle, non-dizzy micro-tilt
   const onDeviceOrientation = (e) => {
@@ -356,12 +373,23 @@ export function initSplash3D(onComplete) {
     targetStageRotY = tiltX * 4;
     targetStageRotX = -tiltY * 3;
   };
-  window.addEventListener('deviceorientation', onDeviceOrientation, { passive: true });
-  cleanupFns.push(() => window.removeEventListener('deviceorientation', onDeviceOrientation));
+  if (!prefersReducedMotion && !isConstrainedDevice) {
+    window.addEventListener('deviceorientation', onDeviceOrientation, { passive: true });
+    cleanupFns.push(() => window.removeEventListener('deviceorientation', onDeviceOrientation));
+  }
 
   // Render Loop
-  function render() {
+  let lastRenderAt = 0;
+  function render(timestamp) {
     if (isDismissed) return;
+
+    // Keep the decorative background smooth without rendering more often than
+    // needed. The browser/display may still impose a lower refresh rate.
+    if (lastRenderAt && timestamp - lastRenderAt < 11.1) {
+      animId = requestAnimationFrame(render);
+      return;
+    }
+    lastRenderAt = timestamp;
 
     ctx.clearRect(0, 0, width, height);
 
@@ -468,7 +496,9 @@ export function initSplash3D(onComplete) {
     animId = requestAnimationFrame(render);
   }
 
-  animId = requestAnimationFrame(render);
+  if (!prefersReducedMotion) {
+    animId = requestAnimationFrame(render);
+  }
 
   const onVisibilityChange = () => {
     if (isDismissed) return;
@@ -477,7 +507,7 @@ export function initSplash3D(onComplete) {
         cancelAnimationFrame(animId);
         animId = null;
       }
-    } else if (!animId) {
+    } else if (!animId && !prefersReducedMotion) {
       animId = requestAnimationFrame(render);
     }
   };

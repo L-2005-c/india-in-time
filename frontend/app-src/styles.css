@@ -1592,6 +1592,41 @@ body::before {
   #splash .telemetry-box{ margin-top:8px; }
 }
 
+/* Keep the introduction responsive on lower-power phones and honor the
+   platform-wide reduced-motion preference. The class is applied by splash3d
+   after checking Save-Data, CPU cores, and available device memory. */
+#splash.performance-lite .glow-orb{
+  filter:blur(48px);
+  animation:none;
+  opacity:0.3;
+}
+#splash.performance-lite .holo-floor,
+#splash.performance-lite .holo-floor::after,
+#splash.performance-lite .holo-ripple,
+#splash.performance-lite .ring-3d,
+#splash.performance-lite .logo-3d-card,
+#splash.performance-lite .sheen-overlay,
+#splash.performance-lite .status-dot,
+#splash.performance-lite .progress-bar{
+  animation:none;
+}
+#splash.performance-lite .sheen-overlay{ opacity:0.12; }
+
+@media (prefers-reduced-motion: reduce) {
+  #splash .glow-orb,
+  #splash .holo-floor,
+  #splash .holo-floor::after,
+  #splash .holo-ripple,
+  #splash .ring-3d,
+  #splash .logo-3d-card,
+  #splash .sheen-overlay,
+  #splash .status-dot,
+  #splash .progress-bar {
+    animation:none;
+  }
+  #splash .glow-orb { filter:blur(48px); }
+}
+
 /* Exit Warp Transition — Silky Smooth 60 FPS GPU Composite */
 .splash-warp-exit{
   opacity:0 !important;
@@ -5725,6 +5760,43 @@ html, body {
   min-width: 200px;
   max-width: 260px;
   line-height: 1.4;
+}
+
+/* ===== Mobile Smoothness Pass ===== */
+/* Isolate the heavy scrolling views from the rest of the document so
+   scrolling #plan-view doesn't invalidate layout in the map or chat. */
+#plan-view, #chat-view, #tools-view, #journey-view, #alerts-view, #more-view {
+  contain: layout style;
+}
+#plan-list {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Box-shadow animation on the active stop card repaints on every frame on
+   mobile GPUs; replace the pulse with a cheap transform-only pulse. */
+.stop-card.is-next{
+  animation: none;
+}
+
+/* Promote the fixed chrome (header, bottom nav) to its own compositor layer
+   so content scroll doesn't repaint the nav. */
+#header, #bottom-nav {
+  backface-visibility: hidden;
+}
+@media (max-width: 640px) {
+  /* Reduce the blur radius on the surfaces that scroll with content. */
+  .stop-card, .bubble {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+/* The full-screen grain overlay forces a full-screen composite on every
+   frame on mobile. Cap it to a single static layer. */
+@media (max-width: 640px) {
+  body::before {
+    transform: translateZ(0);
+  }
 }
 
 

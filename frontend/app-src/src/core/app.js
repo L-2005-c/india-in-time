@@ -1,4 +1,5 @@
 import { browserLogger } from '../utils/browser-logger.js';
+import { mark } from '../platform/perf.js';
 import { installLeafletSafetyGuards } from './mapGuards.js';
 import { openModal, closeModal } from '../a11y/modal.js';
 import { openTravelDnaModal, getTravelDna } from '../modules/travelDna.js';
@@ -132,6 +133,7 @@ let currentCityName='India',currentCityId='india',LOCS=[];
 const credits=50;
 let mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
+let lastRouteStopsSignature='';
 
 function safeInvalidateMapSize(animate = false) {
   if (map && typeof map.invalidateSize === 'function') {
@@ -494,7 +496,11 @@ function followLivePosition(force=false){
   }
   if(!isFiniteLatLon(tLat,tLon)) return;
   const cur=map.getCenter();
-  if(cur && isFiniteLatLon(cur.lat,cur.lng) && map.distance(cur,[tLat,tLon])<3) return;
+  if(cur && isFiniteLatLon(cur.lat,cur.lng)){
+    const dM=map.distance(cur,[tLat,tLon]);
+    if(dM<3) return;
+    if(dM<30){ try{ map.setView([tLat,tLon],zoom,{animate:false}); }catch(_e){} return; }
+  }
   try{ map.stop(); }catch(_e){}
   try{ map.setView([tLat,tLon],zoom,{animate:true}); }
   catch(_e){ try{ map.setView([cLat,cLon],zoom); }catch(_e2){} }
@@ -826,7 +832,7 @@ function formatTripWindow(days, minutesPerDay){
   return `${days} day${days===1?'':'s'} / ${fmtM(minutesPerDay)}`;
 }
 
-function updatePlannerShowcase(){
+function updatePlannerShowcaseNow(){
   const days = parseInt(document.getElementById('n-days')?.value, 10) || 1;
   const minutes = getTripMinutes();
   const startTime = document.getElementById('s-time')?.value || '09:00';
@@ -881,6 +887,15 @@ function updatePlannerShowcase(){
   if(chipDays) chipDays.textContent = `${days} day${days===1?'':'s'}`;
   if(chipStops) chipStops.textContent = `${totalStops} curated stops`;
   if(chipDuration) chipDuration.textContent = `${fmtM(minutes)} planned coverage`;
+}
+
+let _plannerShowcaseFrame=null;
+function updatePlannerShowcase(){
+  if(_plannerShowcaseFrame) return;
+  _plannerShowcaseFrame=requestAnimationFrame(()=>{
+    _plannerShowcaseFrame=null;
+    try{ updatePlannerShowcaseNow(); }catch(_e){}
+  });
 }
 
 // ── City switch ───────────────────────────────────────────────────────────────
@@ -1999,6 +2014,7 @@ function renderPassport(){
 // ── View switching ────────────────────────────────────────────────────────────
 const viewIds=['map-view','plan-view','chat-view','tools-view'];
 function switchToView(viewId,idx,skipRenderHome=false){
+  mark('view-'+viewId);
   viewIds.forEach(v=>{const el=document.getElementById(v);if(el){el.classList.remove('active');el.style.display='none';}});
   const target=document.getElementById(viewId);
   if(target){
@@ -2006,7 +2022,11 @@ function switchToView(viewId,idx,skipRenderHome=false){
     target.style.display=viewId==='tools-view'?'block':'flex';
   }
   document.querySelectorAll('.nav-item').forEach((n,i)=>{const on=i===idx||i===3&&idx>=3;n.classList.toggle('active',on);if(on)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
-  if(viewId==='map-view'){safeInvalidateMapSize();setTimeout(()=>safeInvalidateMapSize(),50);setTimeout(()=>safeInvalidateMapSize(),300);}
+  if(viewId==='map-view'){
+    safeInvalidateMapSize();
+    requestAnimationFrame(()=>safeInvalidateMapSize());
+    setTimeout(()=>safeInvalidateMapSize(),300);
+  }
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
   else if(!skipRenderHome && (idx===3||viewId==='tools-view')) renderToolsHome();
@@ -2242,7 +2262,12 @@ async function renderRoute(){
     clearTimeout(window._roadRouteRetryTimer);
     window._roadRouteRetryTimer = setTimeout(()=>{ if(tripActive) renderRoute(); }, 4000);
   }
-  updateItinUI();
+  const sig = routeStops.map(s=>s.id).join('|');
+  if(sig !== lastRouteStopsSignature || window._forceItinRender){
+    lastRouteStopsSignature = sig;
+    window._forceItinRender = false;
+    updateItinUINow();
+  }
   if(streetQuestActive) setupStreetQuest();
 }
 
@@ -2307,7 +2332,7 @@ function recalcTimes(opts={}){
 }
 function getCurTime(){let t=getScheduleStart();if(tripActive&&tripStart)t=new Date(t.getTime()+(Date.now()-tripStart));return t;}
 
-function updateItinUI(){
+function updateItinUINow(){
   // Always show stops in chronological order
   try {
     itin = (itin||[]).slice().sort((a,b)=>{
@@ -2543,6 +2568,15 @@ function updateItinUI(){
   }
   
   updatePlannerShowcase();
+}
+
+let _itinUIFrame=null;
+function updateItinUI(){
+  if(_itinUIFrame) return;
+  _itinUIFrame=requestAnimationFrame(()=>{
+    _itinUIFrame=null;
+    try{ updateItinUINow(); }catch(_e){}
+  });
 }
 
 // ── Trip Controls ─────────────────────────────────────────────────────────────
@@ -3293,6 +3327,10 @@ window.onload=()=>{
     Promise.race([authCheckedPromise, new Promise(res=>setTimeout(res, 2000))]).finally(()=>dismissSplash());
   });
   applyTheme();
+  // Let the splash paint before map creation, GPS, tile downloads, and UI
+  // wiring compete for the main thread. This removes the first-open hitch on
+  // phones without delaying interaction beyond one idle turn.
+  const initInteractiveApp = () => {
   try { installLeafletSafetyGuards(typeof L !== 'undefined' ? L : window.L); } catch(_e){}
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
@@ -3407,10 +3445,18 @@ window.onload=()=>{
 // …
     [0,150,400,900].forEach(delay=>setTimeout(()=>safeInvalidateMapSize(false), delay));
     const mapEl = document.getElementById('map');
+    let mapResizeFrame = null;
+    const scheduleMapResize = () => {
+      if (mapResizeFrame) return;
+      mapResizeFrame = requestAnimationFrame(() => {
+        mapResizeFrame = null;
+        safeInvalidateMapSize(false);
+      });
+    };
     if(mapEl && 'ResizeObserver' in window){
-      new ResizeObserver(()=>safeInvalidateMapSize(false)).observe(mapEl);
+      new ResizeObserver(scheduleMapResize).observe(mapEl);
     }
-    window.addEventListener('resize', () => safeInvalidateMapSize());
+    window.addEventListener('resize', scheduleMapResize, { passive:true });
     map.on('dragstart',()=>{if(tripActive&&autoFollowLive){autoFollowLive=false;updateFollowButton();}});
     map.on('move',()=>{if(tripActive&&lastHeading!=null) applyMapHeadingRotation();});
   } catch(mapInitErr) {
@@ -3427,22 +3473,22 @@ window.onload=()=>{
   document.getElementById('chat-in').addEventListener('keypress',e=>{if(e.key==='Enter')handleChat();});
   document.getElementById('city-input').addEventListener('keypress',e=>{if(e.key==='Enter')searchCity();});
   ['n-days','t-time','t-hours','t-minutes','break-every','break-duration','water-every','vibe'].forEach(id=>{
-    document.getElementById(id)?.addEventListener('input', updatePlannerShowcase);
-    document.getElementById(id)?.addEventListener('change', updatePlannerShowcase);
+    document.getElementById(id)?.addEventListener('input', updatePlannerShowcase, {passive:true});
+    document.getElementById(id)?.addEventListener('change', updatePlannerShowcase, {passive:true});
   });
   document.getElementById('city-select')?.addEventListener('change', (e) => {
     if (e.target.value) switchCity(e.target.value);
     updatePlannerShowcase();
   });
-  document.getElementById('s-time')?.addEventListener('input', ()=>{syncPlannerTimeFields('start');updatePlannerShowcase();});
-  document.getElementById('s-time')?.addEventListener('change', ()=>{syncPlannerTimeFields('start');updatePlannerShowcase();});
-  document.getElementById('e-time')?.addEventListener('input', ()=>{syncPlannerTimeFields('end');updatePlannerShowcase();});
-  document.getElementById('e-time')?.addEventListener('change', ()=>{syncPlannerTimeFields('end');updatePlannerShowcase();});
-  document.getElementById('t-hours')?.addEventListener('input', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();});
-  document.getElementById('t-hours')?.addEventListener('change', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();});
-  document.getElementById('t-minutes')?.addEventListener('input', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();});
-  document.getElementById('t-minutes')?.addEventListener('change', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();});
-  document.querySelectorAll('.pref').forEach(el=>el.addEventListener('change', updatePlannerShowcase));
+  document.getElementById('s-time')?.addEventListener('input', ()=>{syncPlannerTimeFields('start');updatePlannerShowcase();},{passive:true});
+  document.getElementById('s-time')?.addEventListener('change', ()=>{syncPlannerTimeFields('start');updatePlannerShowcase();},{passive:true});
+  document.getElementById('e-time')?.addEventListener('input', ()=>{syncPlannerTimeFields('end');updatePlannerShowcase();},{passive:true});
+  document.getElementById('e-time')?.addEventListener('change', ()=>{syncPlannerTimeFields('end');updatePlannerShowcase();},{passive:true});
+  document.getElementById('t-hours')?.addEventListener('input', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();},{passive:true});
+  document.getElementById('t-hours')?.addEventListener('change', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();},{passive:true});
+  document.getElementById('t-minutes')?.addEventListener('input', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();},{passive:true});
+  document.getElementById('t-minutes')?.addEventListener('change', ()=>{syncPlannerTimeFields('duration');updatePlannerShowcase();},{passive:true});
+  document.querySelectorAll('.pref').forEach(el=>el.addEventListener('change', updatePlannerShowcase,{passive:true}));
   function syncSelectedPersonas(){
     window.selectedPersonas = Array.from(document.querySelectorAll('.persona-pref:checked')).map(c=>c.value);
   }
@@ -3492,6 +3538,12 @@ window.onload=()=>{
   })();
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(initInteractiveApp, { timeout: 350 });
+  } else {
+    window.setTimeout(initInteractiveApp, 0);
+  }
 };
 
 // Ensure chat widget actions are bound after all handler declarations.
