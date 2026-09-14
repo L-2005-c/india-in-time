@@ -3539,11 +3539,7 @@ window.onload=()=>{
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
   };
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(initInteractiveApp, { timeout: 350 });
-  } else {
-    window.setTimeout(initInteractiveApp, 0);
-  }
+  initInteractiveApp();
 };
 
 // Ensure chat widget actions are bound after all handler declarations.

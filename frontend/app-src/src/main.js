@@ -19,6 +19,9 @@ if (typeof document !== 'undefined') {
       initializeThemeSystem();
       ensureFocusVisibleStyles();
       initConnectivityObserver();
+      if (modules.mobileShell?.initMobileShell) {
+        modules.mobileShell.initMobileShell();
+      }
       await hydrateFlagsFromServer();
       window.__a11yAnnounce = announce;
       window.__appState = state;
@@ -26,9 +29,6 @@ if (typeof document !== 'undefined') {
       window.__experienceScore = modules.experienceScore || null;
       window.__travelTime = modules.travelTime || null;
       window.__sunTimes = modules.sunTimes || null;
-      if (modules.mobileShell?.initMobileShell) {
-        modules.mobileShell.initMobileShell();
-      }
       mark('boot-ready');
       emit('app:ready', { timing: reportNavigationTiming() });
     } catch (e) {

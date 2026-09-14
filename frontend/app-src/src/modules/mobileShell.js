@@ -118,6 +118,8 @@ function renderBottomNav(navEl) {
     item.className = `nav-item ${idx === activeTabIdx ? 'active' : ''}`;
     item.setAttribute('role', 'button');
     item.setAttribute('tabindex', '0');
+    item.dataset.view = t.id;
+    item.dataset.idx = String(idx);
     if (idx === activeTabIdx) {
       item.setAttribute('aria-current', 'page');
     }

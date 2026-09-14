@@ -1371,21 +1371,28 @@ export async function initActiveTripControlCenter(containerEl, tripPlan, travele
     status: 'PLANNED',
   }));
 
-  let st = null;
+  const controller = mountTripControlCenter(containerEl, {
+    tripId,
+    planVersion: 1,
+    tripHealth: 'ON_TRACK',
+    activeStop: flatStops[0],
+    completedStops: [],
+    upcomingStops: flatStops.slice(1),
+  });
+
   if (window.API?.initJourneyState) {
     try {
-      st = await window.API.initJourneyState(tripId, flatStops, travelerDna);
+      const st = await window.API.initJourneyState(tripId, flatStops, travelerDna);
+      controller?.update({
+        planVersion: st?.activePlanVersion || 1,
+        tripHealth: st?.tripHealth || 'ON_TRACK',
+        activeStop: st?.activeStop || flatStops[0],
+        upcomingStops: st?.upcomingStops || flatStops.slice(1),
+      });
     } catch (err) {
-      console.warn('[TripControlCenter] Backend init failed, using local mount:', err);
+      console.warn('[TripControlCenter] Backend init failed, keeping local mount:', err);
     }
   }
 
-  return mountTripControlCenter(containerEl, {
-    tripId,
-    planVersion: st?.activePlanVersion || 1,
-    tripHealth: st?.tripHealth || 'ON_TRACK',
-    activeStop: st?.activeStop || flatStops[0],
-    completedStops: [],
-    upcomingStops: st?.upcomingStops || flatStops.slice(1),
-  });
+  return controller;
 }
