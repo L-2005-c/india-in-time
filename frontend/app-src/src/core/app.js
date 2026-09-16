@@ -3564,8 +3564,8 @@ window.onload=()=>{
   // Yield frames so the 3D splash canvas, gyro listener, and audio drone
   // establish their initial 60fps presentation before heavy map setup & network fetches begin
   const scheduleInteractiveApp = () => {
-    if (typeof requestIdleCallback === 'function') {
-      requestIdleCallback(() => initInteractiveApp(), { timeout: 250 });
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => initInteractiveApp(), { timeout: 250 });
     } else {
       setTimeout(initInteractiveApp, 40);
     }

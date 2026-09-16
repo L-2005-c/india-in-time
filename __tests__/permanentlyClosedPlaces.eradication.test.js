@@ -7,7 +7,6 @@ const itineraryRouter = require('../routes/itinerary-optimizer');
 const { isPermanentlyClosedPlace } = require('../services/travelIntelligence/tourismPoi/tourismBlacklist');
 const { suggestOpenAlternatives, rankPlacesForDay } = require('../services/travelIntelligence');
 const { clusterPlaces, buildMultiDayItinerary } = require('../services/travelIntelligence/multiDayPlanner');
-const { getCitySeeds } = require('../data/city-seeds');
 
 function createApp() {
   const a = express();
