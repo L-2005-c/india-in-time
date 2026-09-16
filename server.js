@@ -421,8 +421,9 @@ app.use(express.static(config.publicDir, {
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
     }
-    // Prevent caching for critical app shell files
+    // Prevent caching for critical app shell and admin files
     if (
+      filePath.includes('admin-') ||
       filePath.endsWith('sw.js') ||
       filePath.endsWith('client-api.js') ||
       filePath.endsWith('api.js') ||

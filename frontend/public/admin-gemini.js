@@ -1,4 +1,4 @@
-import { watchAdminAuth, signInAdmin, adminFetch } from './admin-auth.js';
+import { watchAdminAuth, signInAdmin, adminFetch } from './admin-auth.js?v=2';
 
 const loadBtn = document.getElementById('load');
 const signInBtn = document.getElementById('sign-in');
