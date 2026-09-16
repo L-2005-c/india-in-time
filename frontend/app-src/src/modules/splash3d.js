@@ -56,44 +56,52 @@ function startCosmicDrone() {
   try {
     const now = audioCtx.currentTime;
 
-    // Gentle low-pass filter for warm cosmic depth
+    // Cinematic deep resonant low-pass filter
     const filter = audioCtx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(340, now);
-    filter.Q.setValueAtTime(1.8, now);
+    filter.frequency.setValueAtTime(260, now);
+    filter.Q.setValueAtTime(2.2, now);
 
     droneGain = audioCtx.createGain();
     droneGain.gain.setValueAtTime(0.0001, now);
-    droneGain.gain.exponentialRampToValueAtTime(0.08, now + 1.2);
+    droneGain.gain.exponentialRampToValueAtTime(0.09, now + 1.6);
 
     droneGain.connect(filter);
     filter.connect(masterGain);
 
-    // Root note: A2 (110Hz)
-    const osc1 = audioCtx.createOscillator();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(110, now);
+    // Deep cinematic sub-bass braam anchor: D1 (36.7Hz) with subtle slow glide
+    const sub = audioCtx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(42, now);
+    sub.frequency.exponentialRampToValueAtTime(36.7, now + 2.5);
 
-    // Harmonic fifth: E3 (164.81Hz) with slight chorus detune
-    const osc2 = audioCtx.createOscillator();
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(164.81, now);
-    osc2.detune.setValueAtTime(3.5, now);
+    // Root fundamental: D2 (73.42Hz) warm analog triangle
+    const root = audioCtx.createOscillator();
+    root.type = 'triangle';
+    root.frequency.setValueAtTime(73.42, now);
 
-    // Sub-bass anchor: A1 (55Hz)
-    const osc3 = audioCtx.createOscillator();
-    osc3.type = 'sine';
-    osc3.frequency.setValueAtTime(55, now);
+    // Warm fifth: A2 (110Hz) with gentle shimmer detune
+    const fifth = audioCtx.createOscillator();
+    fifth.type = 'sine';
+    fifth.frequency.setValueAtTime(110, now);
+    fifth.detune.setValueAtTime(4, now);
 
-    osc1.connect(droneGain);
-    osc2.connect(droneGain);
-    osc3.connect(droneGain);
+    // Suspended cinematic octave: D3 (146.83Hz)
+    const oct = audioCtx.createOscillator();
+    oct.type = 'sine';
+    oct.frequency.setValueAtTime(146.83, now);
 
-    osc1.start(now);
-    osc2.start(now);
-    osc3.start(now);
+    sub.connect(droneGain);
+    root.connect(droneGain);
+    fifth.connect(droneGain);
+    oct.connect(droneGain);
 
-    droneOscs = [osc1, osc2, osc3];
+    sub.start(now);
+    root.start(now);
+    fifth.start(now);
+    oct.start(now);
+
+    droneOscs = [sub, root, fifth, oct];
   } catch (_e) {}
 }
 
@@ -120,27 +128,28 @@ function playTelemetryBlip(stageIdx) {
   ensureAudioStarted();
   try {
     const now = audioCtx.currentTime;
-    const freqs = [
-      [659.25, 880.00],    // E5, A5
-      [783.99, 1046.50],   // G5, C6
-      [880.00, 1318.51],   // A5, E6
-      [1046.50, 1567.98]   // C6, G6
+    // Resonant singing-bowl & golden temple bell harmonics (D4, F#4, A4, D5)
+    const tones = [
+      [293.66, 587.33, 880.00],  // D4, D5, A5
+      [369.99, 739.99, 1108.73], // F#4, F#5, C#6
+      [440.00, 880.00, 1318.51], // A4, A5, E6
+      [587.33, 1174.66, 1760.00] // D5, D6, A6
     ];
-    const pair = freqs[Math.min(stageIdx, freqs.length - 1)] || [880, 1320];
+    const freqs = tones[Math.min(stageIdx, tones.length - 1)] || [440, 880, 1320];
 
-    const blipGain = audioCtx.createGain();
-    blipGain.gain.setValueAtTime(0.0001, now);
-    blipGain.gain.linearRampToValueAtTime(0.07, now + 0.012);
-    blipGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
-    blipGain.connect(masterGain);
+    const bellGain = audioCtx.createGain();
+    bellGain.gain.setValueAtTime(0.0001, now);
+    bellGain.gain.linearRampToValueAtTime(0.08, now + 0.02);
+    bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+    bellGain.connect(masterGain);
 
-    pair.forEach((f, idx) => {
+    freqs.forEach((f, idx) => {
       const osc = audioCtx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + idx * 0.02);
-      osc.connect(blipGain);
-      osc.start(now + idx * 0.02);
-      osc.stop(now + 0.13);
+      osc.type = idx === 0 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(f, now);
+      osc.connect(bellGain);
+      osc.start(now);
+      osc.stop(now + 1.0);
     });
   } catch (_e) {}
 }
@@ -150,10 +159,10 @@ function playReadyChime() {
   ensureAudioStarted();
   try {
     const now = audioCtx.currentTime;
-    // Radiant harmonic arpeggio: C5, E5, G5, B5, C6
-    const chord = [523.25, 659.25, 783.99, 987.77, 1046.50];
+    // Majestic golden chord flourish: D4, A4, D5, F#5, A5, D6
+    const chord = [293.66, 440.00, 587.33, 739.99, 880.00, 1174.66];
     chord.forEach((freq, i) => {
-      const t = now + i * 0.055;
+      const t = now + i * 0.065;
       const osc = audioCtx.createOscillator();
       const noteGain = audioCtx.createGain();
 
@@ -161,14 +170,14 @@ function playReadyChime() {
       osc.frequency.setValueAtTime(freq, t);
 
       noteGain.gain.setValueAtTime(0.0001, t);
-      noteGain.gain.linearRampToValueAtTime(0.075, t + 0.015);
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+      noteGain.gain.linearRampToValueAtTime(0.09, t + 0.02);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
 
       osc.connect(noteGain);
       noteGain.connect(masterGain);
 
       osc.start(t);
-      osc.stop(t + 1.0);
+      osc.stop(t + 1.5);
     });
   } catch (_e) {}
 }
@@ -287,6 +296,18 @@ export function initSplash3D(onComplete) {
     cleanupFns.push(() => skipBtn.removeEventListener('click', handleSkip));
   }
 
+  // Hero explore button binding
+  const heroBtn = splash.querySelector('.btn-hero-explore');
+  if (heroBtn) {
+    const handleHeroClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissSplash();
+    };
+    heroBtn.addEventListener('click', handleHeroClick);
+    cleanupFns.push(() => heroBtn.removeEventListener('click', handleHeroClick));
+  }
+
   const canvas = document.getElementById('splash-star-canvas');
   const stage = document.getElementById('splash-stage-3d');
   const pBar = document.getElementById('splash-progress-bar');
@@ -319,20 +340,24 @@ export function initSplash3D(onComplete) {
   // The line renderer compares every visible point to every other point, so
   // point count has a quadratic rendering cost. Keep the full effect on
   // capable desktops while using a lighter profile on mobile/low-power devices.
+  // Golden stardust and floating ember field
   const points = [];
-  const NUM_POINTS = isConstrainedDevice ? (isMobile ? 18 : 42) : (isMobile ? 26 : 52);
+  const NUM_POINTS = isConstrainedDevice ? (isMobile ? 18 : 42) : (isMobile ? 26 : 54);
+  const GOLDEN_PALETTE = ['#fde047', '#f59e0b', '#ffffff', '#fbbf24', '#fed7aa', '#38bdf8'];
 
   for (let i = 0; i < NUM_POINTS; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = (Math.random() - 0.5) * Math.PI;
-    const radius = (isMobile ? 160 : 250) + Math.random() * (isMobile ? 100 : 190);
+    const radius = (isMobile ? 170 : 260) + Math.random() * (isMobile ? 120 : 220);
+    const isBokeh = Math.random() < 0.18;
     points.push({
       x: radius * Math.cos(phi) * Math.cos(theta),
       y: radius * Math.sin(phi) * 0.72,
       z: radius * Math.cos(phi) * Math.sin(theta),
-      size: Math.random() * 2.0 + 0.7,
-      color: i % 3 === 0 ? '#10b981' : (i % 3 === 1 ? '#f97316' : '#38bdf8'),
+      size: isBokeh ? Math.random() * 3.2 + 2.2 : Math.random() * 1.8 + 0.8,
+      color: GOLDEN_PALETTE[i % GOLDEN_PALETTE.length],
       pulse: Math.random() * Math.PI * 2,
+      isBokeh,
     });
   }
 
@@ -482,21 +507,21 @@ export function initSplash3D(onComplete) {
       }
     }
 
-    // Draw Stars
+    // Draw Stars & Bokeh Embers
     for (let i = 0; i < projected.length; i++) {
       const pt = projected[i];
-      const currentSize = pt.size * pt.scale * (1 + Math.sin(pt.pulse) * 0.22);
+      const currentSize = pt.size * pt.scale * (1 + Math.sin(pt.pulse) * 0.25);
       ctx.fillStyle = pt.color;
       ctx.globalAlpha = pt.alpha;
       ctx.beginPath();
       ctx.arc(pt.px, pt.py, Math.max(0.6, currentSize), 0, Math.PI * 2);
       ctx.fill();
 
-      // Atmospheric glow for near stars
-      if (pt.scale > 0.85) {
-        ctx.globalAlpha = pt.alpha * 0.25;
+      // Atmospheric golden aura for near motes and bokeh orbs
+      if (pt.isBokeh || pt.scale > 0.8) {
+        ctx.globalAlpha = pt.alpha * (pt.isBokeh ? 0.35 : 0.22);
         ctx.beginPath();
-        ctx.arc(pt.px, pt.py, currentSize * 2.4, 0, Math.PI * 2);
+        ctx.arc(pt.px, pt.py, currentSize * (pt.isBokeh ? 2.8 : 2.2), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -527,13 +552,13 @@ export function initSplash3D(onComplete) {
   document.addEventListener('visibilitychange', onVisibilityChange);
   cleanupFns.push(() => document.removeEventListener('visibilitychange', onVisibilityChange));
 
-  // Telemetry Progress Sequence
+  // Cinematic Narrative Chapters Sequence
   const stages = [
-    { pct: 24, label: 'INITIALIZING GEO-AI CORES...' },
-    { pct: 48, label: 'CALIBRATING TIME INTELLIGENCE...' },
-    { pct: 72, label: 'SYNCING TRANSIT & WEATHER GRIDS...' },
-    { pct: 92, label: 'OPTIMIZING SCENIC ITINERARIES...' },
-    { pct: 100, label: 'JOURNEY READY ✦' }
+    { pct: 24, label: 'BEYOND THE HORIZON...' },
+    { pct: 52, label: '5,000 YEARS OF TIMELESS WONDER...' },
+    { pct: 76, label: 'CHARTING SACRED PEAKS & SCENIC TRAILS...' },
+    { pct: 92, label: 'WHERE TIME MEETS DESTINY...' },
+    { pct: 100, label: 'WELCOME TO INDIA IN-TIME ✦' }
   ];
 
   let currentStage = 0;
