@@ -106,7 +106,9 @@ describe('Coordinate Integrity Engine (coordinateIntegrity.js)', () => {
     // Safely load frontend cities data module in CJS Jest environment
     const citiesPath = path.resolve(__dirname, '../frontend/app-src/src/data/cities.js');
     const code = fs.readFileSync(citiesPath, 'utf8');
-    const cjsCode = code.replace(/export\s*\{[^}]*\};?/, 'module.exports = { CITIES, LOCAL_PLACE_SEEDS, HIDDEN_GEM_SEEDS };');
+    const cjsCode = code
+      .replace(/import\s*\{[^}]*\}\s*from\s*['"][^'"]+['"];?/g, 'const isPermanentlyClosedPlace = () => false;')
+      .replace(/export\s*\{[^}]*\};?/, 'module.exports = { CITIES, LOCAL_PLACE_SEEDS, HIDDEN_GEM_SEEDS };');
     const mod = { exports: {} };
     const fn = new Function('module', 'exports', cjsCode);
     fn(mod, mod.exports);

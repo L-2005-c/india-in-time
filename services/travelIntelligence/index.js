@@ -6,12 +6,13 @@ const { dynamicAdvice, multiDayAdvice } = require('./advisoryEngine');
 const { buildMultiDayItinerary } = require('./multiDayPlanner');
 const festivalEngine = require('./festivalEngine');
 const { getTravelIntelligence } = require('./decisionEngine');
+const { isPermanentlyClosedPlace } = require('./tourismPoi/tourismBlacklist');
 
 function getBatchTravelIntelligence(places, now = new Date(), weather = null, options = {}) {
   return (places || []).map((p) => getTravelIntelligence(p, now, weather, options));
 }
 function suggestOpenAlternatives(closedPlace, allPlaces, now = new Date(), weather = null, limit = 3) {
-  return (allPlaces || []).filter((p) => p.name !== closedPlace.name && p.cat === closedPlace.cat)
+  return (allPlaces || []).filter((p) => p.name !== closedPlace.name && p.cat === closedPlace.cat && !isPermanentlyClosedPlace(p))
     .map((p) => ({ place: p, intel: getTravelIntelligence(p, now, weather) }))
     .filter((x) => x.intel.isOpenNow === true).slice(0, limit).map((x) => x.place.name);
 }
@@ -77,7 +78,8 @@ async function getTravelIntelligenceAsync(place, now = new Date(), weather = nul
 }
 
 function rankPlacesForDay(places, now = new Date(), weather = null, options = {}) {
-  const ranked = (places || []).map((p) => { const intel = getTravelIntelligence(p, now, weather, options); return { place: p, intel, score: intel.visitScore }; });
+  const validPlaces = (places || []).filter((p) => !isPermanentlyClosedPlace(p));
+  const ranked = validPlaces.map((p) => { const intel = getTravelIntelligence(p, now, weather, options); return { place: p, intel, score: intel.visitScore }; });
   ranked.sort((a, b) => b.score - a.score);
   return ranked;
 }

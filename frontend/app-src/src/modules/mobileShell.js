@@ -21,6 +21,15 @@ import { openBottomSheet } from './bottomSheet.js';
 
 let activeTabIdx = 0;
 let _currentAlertFilter = 'ALL';
+const ALL_MOBILE_VIEWS = [
+  'map-view',
+  'journey-view',
+  'plan-view',
+  'alerts-view',
+  'more-view',
+  'chat-view',
+  'tools-view',
+];
 
 /**
  * Canonical tab index resolver for all primary and secondary views.
@@ -86,12 +95,18 @@ export function initMobileShell() {
   // Expose global switcher
   window.switchMobileTab = switchMobileTab;
 
-  // Enhance existing switchToView to work with new tabs
-  const originalSwitch = window.switchToView;
+  // Enhance existing switchToView to coordinate smoothly with 5-tab mobile shell
   window.switchToView = function (viewId, idx, skipRender) {
     const tabIdx = resolveMobileTabIdx(viewId, idx);
-    if (typeof originalSwitch === 'function' && (viewId === 'map-view' || viewId === 'plan-view' || viewId === 'chat-view' || viewId === 'tools-view')) {
-      try { originalSwitch(viewId, tabIdx, skipRender); } catch {}
+    if (typeof window.mark === 'function') {
+      try { window.mark('view-' + viewId); } catch {}
+    }
+    if (typeof window._trackNavHistory === 'function') {
+      try { window._trackNavHistory(viewId); } catch {}
+    } else if (!skipRender && (tabIdx === 3 || viewId === 'tools-view')) {
+      if (typeof window.renderToolsHome === 'function') {
+        try { window.renderToolsHome(); } catch {}
+      }
     }
     switchMobileTab(viewId, tabIdx);
   };
@@ -167,27 +182,24 @@ function renderBottomNav(navEl) {
  */
 export function switchMobileTab(viewId, idx = 0) {
   const tabIdx = resolveMobileTabIdx(viewId, idx);
+  const target = document.getElementById(viewId);
+  // If target view is already active and tab index matches, avoid unnecessary DOM thrashing
+  if (target && target.classList.contains('active') && activeTabIdx === tabIdx) {
+    if (viewId === 'map-view' && typeof window.safeInvalidateMapSize === 'function') {
+      window.safeInvalidateMapSize();
+    }
+    return;
+  }
   activeTabIdx = tabIdx;
 
-  const allViews = [
-    'map-view',
-    'journey-view',
-    'plan-view',
-    'alerts-view',
-    'more-view',
-    'chat-view',
-    'tools-view',
-  ];
-
-  allViews.forEach(v => {
+  ALL_MOBILE_VIEWS.forEach(v => {
     const el = document.getElementById(v);
-    if (el) {
+    if (el && el.id !== viewId) {
       el.classList.remove('active');
       el.style.display = 'none';
     }
   });
 
-  const target = document.getElementById(viewId);
   if (target) {
     target.classList.add('active');
     target.style.display = (viewId === 'map-view' || viewId === 'chat-view') ? 'flex' : 'block';
@@ -236,7 +248,6 @@ export function switchMobileTab(viewId, idx = 0) {
   // Map refresh
   if (viewId === 'map-view' && typeof window.safeInvalidateMapSize === 'function') {
     window.safeInvalidateMapSize();
-    setTimeout(() => window.safeInvalidateMapSize(), 60);
   }
 
   if (viewId === 'alerts-view') {

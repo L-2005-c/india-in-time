@@ -33,6 +33,7 @@ import { isPlausibleGpsFix as _isPlausibleGpsFix, createGpsFixCoordinator as _cr
 import { closestPointOnSegment as _closestPointOnSegment, snapToRoute as _snapToRoute, turnArrowForInstruction as _turnArrowForInstruction, shouldSpeakNavInstruction as _shouldSpeakNavInstruction } from '../utils/nav-route.js';
 import { shouldRetryWeather as _shouldRetryWeather, weatherRetryDelayMs as _weatherRetryDelayMs, detectWeatherChange as _detectWeatherChange } from '../utils/weather-ui.js';
 import { CITIES, getHiddenGems, getTransportConfig, getLocalPlaces } from '../data/cities.js';
+import { isPermanentlyClosedPlace } from '../utils/closed-places.js';
 import { normalizeFetchedPlaces as _normalizeFetchedPlaces, pickNearestCityId as _pickNearestCityId } from '../utils/city-load.js';
 import {
   hvKm, hasValidCoords, withHiddenGems as _geoWithHiddenGems, mergePlacePools as _geoMergePools,
@@ -135,12 +136,34 @@ let mdPlan=[],dayIdx=0,itin=[];
 let map,rLine,mkrs=[],liveMkr=null;
 let lastRouteStopsSignature='';
 
+let _pendingMapInvalidateRaf = null;
 function safeInvalidateMapSize(animate = false) {
-  if (map && typeof map.invalidateSize === 'function') {
-    try { map.invalidateSize(animate); } catch (_e) { /* ignore */ }
-  } else if (map && typeof map.resize === 'function') {
-    try { map.resize(); } catch (_e) { /* ignore */ }
+  if (!map) return;
+  const mapEl = typeof document !== 'undefined' ? document.getElementById('map') : null;
+  const mapViewEl = typeof document !== 'undefined' ? document.getElementById('map-view') : null;
+  // Skip expensive layout reflows if the map container or view is hidden
+  if (mapEl && (mapEl.offsetParent === null || mapEl.clientWidth === 0 || mapEl.clientHeight === 0)) {
+    return;
   }
+  if (mapViewEl && (mapViewEl.style.display === 'none' || !mapViewEl.classList.contains('active'))) {
+    return;
+  }
+  if (typeof requestAnimationFrame !== 'function') {
+    try {
+      if (typeof map.invalidateSize === 'function') map.invalidateSize(animate);
+      else if (typeof map.resize === 'function') map.resize();
+    } catch (_e) { /* ignore */ }
+    return;
+  }
+  if (_pendingMapInvalidateRaf) return;
+  _pendingMapInvalidateRaf = requestAnimationFrame(() => {
+    _pendingMapInvalidateRaf = null;
+    if (map && typeof map.invalidateSize === 'function') {
+      try { map.invalidateSize(animate); } catch (_e) { /* ignore */ }
+    } else if (map && typeof map.resize === 'function') {
+      try { map.resize(); } catch (_e) { /* ignore */ }
+    }
+  });
 }
 window.safeInvalidateMapSize = safeInvalidateMapSize;
 
@@ -428,7 +451,7 @@ function getPreviewRouteStart(){
   return cityCenter || ((cLat && cLon) ? [cLat, cLon] : null);
 }
 
-function withHiddenGems(cityId, list){ return _geoWithHiddenGems(list, getHiddenGems(cityId)); }
+function withHiddenGems(cityId, list){ return _geoWithHiddenGems(list, getHiddenGems(cityId)).filter(p => !isPermanentlyClosedPlace(p)); }
 function mergePlacePools(...pools){ return _geoMergePools(...pools); }
 function _sortNearestNeighbor(arr,sLat,sLon){ return _geoSortNN(arr,sLat,sLon); }
 function _routeDistanceKm(stops,start){ return _geoRouteKm(stops,start); }
@@ -906,7 +929,7 @@ function switchCity(cityId, silent=false){
   const citySelect=document.getElementById('city-select');
   if(citySelect && citySelect.value!==cityId) citySelect.value=cityId;
   document.getElementById('city-input').value=city.name;
-  LOCS=getLocalPlaces(cityId, city.name);
+  LOCS=getLocalPlaces(cityId, city.name).filter(p => !isPermanentlyClosedPlace(p));
   document.getElementById('hdr-city').textContent=currentCityName;
   if(map){
     if(isFiniteLatLon(city.lat,city.lon)){
@@ -935,7 +958,7 @@ function switchCity(cityId, silent=false){
 function _placesFromCityCache(cityKey, minLen=8){
   for(const [k, places] of placeCache.entries()){
     if((k===`${cityKey}|any`||k.startsWith(cityKey+'|'))&&Array.isArray(places)&&places.length>=minLen)
-      return places.map(p=>({...p,coords:normalizeLatLon(p.coords)}));
+      return places.map(p=>({...p,coords:normalizeLatLon(p.coords)})).filter(p => !isPermanentlyClosedPlace(p));
   }
   return null;
 }
@@ -948,7 +971,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   const cityKey = String(cityName||'').toLowerCase();
   const cacheKey = `${cityKey}|${totalTripMinutesL}`;
   if(!force && placeCache.has(cacheKey)){
-    const cachedPlaces = (placeCache.get(cacheKey) || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
+    const cachedPlaces = (placeCache.get(cacheKey) || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) })).filter(p => !isPermanentlyClosedPlace(p));
     if(cachedPlaces.length){ LOCS = cachedPlaces; return { places: LOCS, source: 'cache' }; }
     placeCache.delete(cacheKey);
   }
@@ -956,7 +979,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
   if(!force){
     const fb=_placesFromCityCache(cityKey,8);
     if(fb){
-      if(LOCS.length < 8) LOCS=fb;
+      if(LOCS.length < 8) LOCS=fb.filter(p => !isPermanentlyClosedPlace(p));
       placeCache.set(cacheKey, (LOCS.length?LOCS:fb).map(p=>({...p,coords:[...p.coords]})));
       if(LOCS.length >= 8 && !force) return { places:LOCS, source:'cache-city-fallback' };
     }
@@ -985,7 +1008,7 @@ async function loadCityPlaces(lat, lon, cityName, opts = {}) {
       const retry = doFetch(); placeLoadPromises.set(cacheKey, retry); result = await retry;
     }
     placeLoadPromises.delete(cacheKey);
-    const fetchedPlaces=(result.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) }));
+    const fetchedPlaces=(result.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords) })).filter(p => !isPermanentlyClosedPlace(p));
     LOCS = withHiddenGems(currentCityId, mergePlacePools(localPlaces.length ? localPlaces : LOCS, fetchedPlaces));
     if(LOCS.length){
       const snap=LOCS.map(p=>({...p,coords:[...p.coords]}));
@@ -1023,7 +1046,7 @@ async function ensureCityPlaces(city, minCount=1){
       LOCS = withHiddenGems(currentCityId, (pending?.places || []).map(p => ({ ...p, coords: normalizeLatLon(p.coords), id: p.id || String(p.name||'').toLowerCase().replace(/[^a-z0-9]/g,'') })));
     }catch(_e){}
   }
-  if(LOCS.length < minCount){ const fb=_placesFromCityCache(cityKey,minCount); if(fb) LOCS=fb; }
+  if(LOCS.length < minCount){ const fb=_placesFromCityCache(cityKey,minCount); if(fb) LOCS=fb.filter(p => !isPermanentlyClosedPlace(p)); }
   if(LOCS.length>=minCount) return true;
   try{ await loadCityPlaces(city.lat, city.lon, city.name, { silent:true }); }catch(_e){}
   if(LOCS.length>=minCount) return true;
@@ -1151,11 +1174,11 @@ async function generatePlan(){
   const breakDuration=getBreakDurationMinutes();
   const totalTripMinutes = maxT * nDays; // tell backend how many total minutes needed
   mdPlan=[];itin=[];dayIdx=0;
-  let avail=LOCS.filter(l=>prefs.includes(l.cat) || l.isHiddenGem);
+  let avail=LOCS.filter(l=>(prefs.includes(l.cat) || l.isHiddenGem) && !isPermanentlyClosedPlace(l));
   
   if (window.customSelectedPlaces && window.customSelectedPlaces.length > 0) {
-    avail = LOCS.filter(l => window.customSelectedPlaces.includes(String(l.id)));
-    if(!avail.length) { addMsg('⚠️ None of your custom selected places could be found. Using filters instead.'); avail = LOCS.filter(l=>prefs.includes(l.cat)); }
+    avail = LOCS.filter(l => window.customSelectedPlaces.includes(String(l.id)) && !isPermanentlyClosedPlace(l));
+    if(!avail.length) { addMsg('⚠️ None of your custom selected places could be found. Using filters instead.'); avail = LOCS.filter(l=>prefs.includes(l.cat) && !isPermanentlyClosedPlace(l)); }
   }
 
   if(!avail.length && prefs.length===1 && prefs[0]==='food'){
@@ -1164,10 +1187,10 @@ async function generatePlan(){
     if(city){
       try{
         const result = await API.fetchPlaces(city.lat, city.lon, city.name, totalTripMinutes, { refresh:true, prefs:['food'] });
-        const foodPlaces=_normalizeFetchedPlaces(result.places, normalizeLatLon);
+        const foodPlaces=_normalizeFetchedPlaces(result.places, normalizeLatLon).filter(l => !isPermanentlyClosedPlace(l));
         avail=foodPlaces.filter(l=>prefs.includes(l.cat));
       }catch(_e){}
-      if(!avail.length) avail=LOCS.filter(l=>prefs.includes(l.cat));
+      if(!avail.length) avail=LOCS.filter(l=>prefs.includes(l.cat) && !isPermanentlyClosedPlace(l));
     }
   }
   if(!avail.length){addMsg('⚠️ No places match your selections. Enable more experiences.');return;}
@@ -2008,7 +2031,7 @@ function renderPassport(){
   switchToView('tools-view', 3, true);
   const catIcon={beach:'🏖️',temple:'🛕',food:'🍛',scenic:'⛰️'};
   const tc=document.getElementById('tools-content');
-  if(tc) tc.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🛂 Passport — ${stamps.size} Stamps</div></div><p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;text-align:center">Visit places to collect stamps!</p><div class="passport-grid">${LOCS.map(loc=>{const u=stamps.has(loc.id);return`<div class="passport-stamp${u?' unlocked':''}" data-action="${u?'chatAbout':''}" data-name="${escapeHtml(loc.name)}" role="button" tabindex="${u?0:-1}" style="${!u?'opacity:0.55;filter:grayscale(1)':''}"><div class="stamp-icon">${u?catIcon[loc.cat]||'📍':'🔒'}</div><div class="stamp-name${u?' unlocked':''}">${escapeHtml(loc.name)}</div>${u?'<div class="stamp-badge">✓</div>':''}</div>`;}).join('')}</div>`;
+  if(tc) tc.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><button data-action="renderToolsHome" style="background:var(--bg-glass);border:1px solid var(--border-default);border-radius:8px;padding:5px 10px;color:var(--text-secondary);font-size:12px;cursor:pointer">← Back</button><div class="tools-section-title" style="margin:0">🛂 Passport — ${stamps.size} Stamps</div></div><p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;text-align:center">Visit places to collect stamps!</p><div class="passport-grid">${LOCS.filter(loc => !isPermanentlyClosedPlace(loc)).map(loc=>{const u=stamps.has(loc.id);return`<div class="passport-stamp${u?' unlocked':''}" data-action="${u?'chatAbout':''}" data-name="${escapeHtml(loc.name)}" role="button" tabindex="${u?0:-1}" style="${!u?'opacity:0.55;filter:grayscale(1)':''}"><div class="stamp-icon">${u?catIcon[loc.cat]||'📍':'🔒'}</div><div class="stamp-name${u?' unlocked':''}">${escapeHtml(loc.name)}</div>${u?'<div class="stamp-badge">✓</div>':''}</div>`;}).join('')}</div>`;
 }
 
 // ── View switching ────────────────────────────────────────────────────────────
@@ -2024,8 +2047,7 @@ function switchToView(viewId,idx,skipRenderHome=false){
   document.querySelectorAll('.nav-item').forEach((n,i)=>{const on=i===idx||i===3&&idx>=3;n.classList.toggle('active',on);if(on)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
   if(viewId==='map-view'){
     safeInvalidateMapSize();
-    requestAnimationFrame(()=>safeInvalidateMapSize());
-    setTimeout(()=>safeInvalidateMapSize(),300);
+    setTimeout(()=>safeInvalidateMapSize(),250);
   }
   // Track history & render tools if needed (safe to call even before _trackNavHistory is defined)
   if(typeof _trackNavHistory==='function') _trackNavHistory(viewId);
@@ -2047,7 +2069,7 @@ function renderMapMarkers() {
   if (!window.LOCS || !window.LOCS.length) return;
   
   window.LOCS.forEach(l => {
-    if (!hasValidCoords(l.coords)) return;
+    if (!hasValidCoords(l.coords) || isPermanentlyClosedPlace(l)) return;
 
     if (l.isHiddenGem) {
       const ic = L.divIcon({
@@ -3274,7 +3296,7 @@ async function openCustomizeModal() {
   const listEl = document.getElementById('customize-places-list');
   listEl.innerHTML = '';
 
-  const availableToSelect = LOCS; // ALL PLACES, completely bypassing the 'prefs' experience filters
+  const availableToSelect = LOCS.filter(loc => !isPermanentlyClosedPlace(loc)); // ALL OPEN PLACES, completely bypassing the 'prefs' experience filters
 
   availableToSelect.forEach(loc => {
     const isSelected = window.customSelectedPlaces ? window.customSelectedPlaces.includes(loc.id) : true;
@@ -3539,7 +3561,20 @@ window.onload=()=>{
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
   };
-  initInteractiveApp();
+  // Yield frames so the 3D splash canvas, gyro listener, and audio drone
+  // establish their initial 60fps presentation before heavy map setup & network fetches begin
+  const scheduleInteractiveApp = () => {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => initInteractiveApp(), { timeout: 250 });
+    } else {
+      setTimeout(initInteractiveApp, 40);
+    }
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => requestAnimationFrame(scheduleInteractiveApp));
+  } else {
+    setTimeout(scheduleInteractiveApp, 50);
+  }
 };
 
 // Ensure chat widget actions are bound after all handler declarations.

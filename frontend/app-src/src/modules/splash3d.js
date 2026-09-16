@@ -302,7 +302,8 @@ export function initSplash3D(onComplete) {
   let height = window.innerHeight;
 
   const onResize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, isConstrainedDevice ? 1.25 : 2);
+    const maxDpr = isMobile ? 1.0 : (isConstrainedDevice ? 1.25 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     width = window.innerWidth;
     height = window.innerHeight;
     canvas.width = Math.floor(width * dpr);
@@ -343,6 +344,8 @@ export function initSplash3D(onComplete) {
   let targetStageRotY = 0;
   let currentStageRotX = 0;
   let currentStageRotY = 0;
+  let lastAppliedRotX = 0;
+  let lastAppliedRotY = 0;
 
   // 3D Parallax on Desktop
   const onMouseMove = (e) => {
@@ -396,11 +399,15 @@ export function initSplash3D(onComplete) {
     rotX += (targetRotX - rotX) * 0.05;
     rotY += 0.003 + (targetRotY - rotY) * 0.05;
 
-    // Smooth lerp for stage tilt (60 FPS)
+    // Smooth lerp for stage tilt (60 FPS) with threshold to prevent forced style recalculations
     currentStageRotX += (targetStageRotX - currentStageRotX) * 0.08;
     currentStageRotY += (targetStageRotY - currentStageRotY) * 0.08;
-    if (stage) {
-      stage.style.transform = `rotateY(${currentStageRotY.toFixed(2)}deg) rotateX(${currentStageRotX.toFixed(2)}deg)`;
+    const nextRotX = Number(currentStageRotX.toFixed(2));
+    const nextRotY = Number(currentStageRotY.toFixed(2));
+    if (stage && (Math.abs(nextRotX - lastAppliedRotX) >= 0.05 || Math.abs(nextRotY - lastAppliedRotY) >= 0.05)) {
+      lastAppliedRotX = nextRotX;
+      lastAppliedRotY = nextRotY;
+      stage.style.transform = `rotateY(${nextRotY}deg) rotateX(${nextRotX}deg)`;
     }
 
     const cosX = Math.cos(rotX);
@@ -448,24 +455,30 @@ export function initSplash3D(onComplete) {
     // Sort back-to-front
     projected.sort((a, b) => b.z - a.z);
 
-    // Draw connecting constellation lines between proximate stars
-    ctx.lineWidth = 0.7;
-    for (let i = 0; i < projected.length; i++) {
-      for (let j = i + 1; j < projected.length; j++) {
+    // Draw connecting constellation lines between proximate stars (single-pass batched path)
+    if (!isConstrainedDevice) {
+      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+      ctx.beginPath();
+      let hasLines = false;
+      const maxOuter = isMobile ? Math.min(projected.length, 12) : projected.length;
+      for (let i = 0; i < maxOuter; i++) {
         const p1 = projected[i];
-        const p2 = projected[j];
-        const dx = p1.px - p2.px;
-        const dy = p1.py - p2.py;
-        const dist = dx * dx + dy * dy;
+        for (let j = i + 1; j < projected.length; j++) {
+          const p2 = projected[j];
+          const dx = p1.px - p2.px;
+          const dy = p1.py - p2.py;
+          const dist = dx * dx + dy * dy;
 
-        if (dist < 3200) {
-          const lineAlpha = (1 - dist / 3200) * 0.18 * Math.min(p1.alpha, p2.alpha);
-          ctx.strokeStyle = `rgba(56, 189, 248, ${lineAlpha})`;
-          ctx.beginPath();
-          ctx.moveTo(p1.px, p1.py);
-          ctx.lineTo(p2.px, p2.py);
-          ctx.stroke();
+          if (dist < 3000) {
+            ctx.moveTo(p1.px, p1.py);
+            ctx.lineTo(p2.px, p2.py);
+            hasLines = true;
+          }
         }
+      }
+      if (hasLines) {
+        ctx.stroke();
       }
     }
 
@@ -572,6 +585,14 @@ export function dismissSplash() {
   const splash = document.getElementById('splash');
   if (!splash) return;
 
+  // Seamless transition: ensure login-screen is ready behind the splash
+  // before the warp fade starts, preventing a sudden flash of unrendered map
+  const login = document.getElementById('login-screen');
+  if (login && !window.currentUser) {
+    login.style.display = 'flex';
+    login.style.opacity = '1';
+  }
+
   splash.classList.add('splash-warp-exit');
   // Warm up map rendering behind the fading splash
   window.safeInvalidateMapSize?.(false);
@@ -580,26 +601,6 @@ export function dismissSplash() {
     splash.style.display = 'none';
     // Re-verify map geometry once splash overlay is fully removed
     window.safeInvalidateMapSize?.(false);
-
-    // Place 3D design before the sign-in option:
-    // Once splash finishes, reveal login screen smoothly if visitor is unauthenticated
-    const showLoginIfNeeded = () => {
-      const login = document.getElementById('login-screen');
-      if (login && !window.currentUser) {
-        login.style.display = 'flex';
-        login.style.opacity = '0';
-        requestAnimationFrame(() => {
-          login.style.transition = 'opacity 0.35s ease';
-          login.style.opacity = '1';
-        });
-      }
-    };
-
-    if (window.authCheckedPromise) {
-      Promise.race([window.authCheckedPromise, new Promise(r => setTimeout(r, 600))]).then(showLoginIfNeeded);
-    } else {
-      showLoginIfNeeded();
-    }
 
     // Stop animation loop and clear listeners
     if (animId) {

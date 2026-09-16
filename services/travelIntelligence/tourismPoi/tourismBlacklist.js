@@ -116,9 +116,14 @@ function normalizeName(name) {
 const PERMANENTLY_CLOSED_PATTERNS = [
   /\b(permanently\s*closed|closed\s*permanently)\b/i,
   /\b(temporarily\s*closed|closed\s*temporarily)\b/i,
-  /\b(defunct|demolished|abandoned|out\s*of\s*business)\b/i,
-  /\((?:permanently\s+)?closed\)/i,
-  /\[(?:permanently\s+)?closed\]/i,
+  /\b(closed\s+down|shut\s+down|permanently\s+shut|closed\s+forever)\b/i,
+  /\b(defunct|demolished|abandoned|out\s*of\s*business|ceased\s*operations)\b/i,
+  /\bno\s+longer\s+(?:exists?|operational|operating|open)\b/i,
+  /\b(non-operational|not\s+operational|decommissioned)\b/i,
+  /\((?:permanently\s+)?closed(?:\s+down)?\)/i,
+  /\[(?:permanently\s+)?closed(?:\s+down)?\]/i,
+  /\((?:defunct|demolished|abandoned|shut)\)/i,
+  /\[(?:defunct|demolished|abandoned|shut)\]/i,
 ];
 
 const KNOWN_DEFUNCT_ATTRACTIONS = new Set([
@@ -128,6 +133,24 @@ const KNOWN_DEFUNCT_ATTRACTIONS = new Set([
   'taraka rama water park',
   'mudfort amusement park',
   'hubba bubba amusement park',
+  'appu ghar',
+  'appu ghar okhla',
+  'appu ghar pragati maidan',
+  'great india place water park',
+  'fantasy land',
+  'fantasy land mumbai',
+  'fantasy land jogeshwari',
+  'dash n splash',
+  'dash n splash chennai',
+  'dolphin city',
+  'dolphin city chennai',
+  'coral reef aquarium',
+  'coral reef aquarium vizag',
+  'victoria public hall',
+  'esselworld',
+  'essel world',
+  'dias park',
+  'ansal riverdale',
 ].map(s => s.toLowerCase()));
 
 /**
@@ -139,9 +162,17 @@ function isPermanentlyClosedPlace(place) {
   const rawName = String(place.name || place.canonicalName || place.title || '').trim();
   const normName = normalizeName(rawName);
 
-  // 1. Defunct attraction exact match
+  // 1. Defunct attraction exact or alias match
   if (KNOWN_DEFUNCT_ATTRACTIONS.has(normName)) {
     return true;
+  }
+  for (const defunct of KNOWN_DEFUNCT_ATTRACTIONS) {
+    if (normName.includes(defunct) || defunct.includes(normName)) {
+      // guard minimum token length to prevent false positive short matches
+      if (normName.length >= 8 && defunct.length >= 8) {
+        return true;
+      }
+    }
   }
 
   // 2. Name patterns
@@ -149,30 +180,58 @@ function isPermanentlyClosedPlace(place) {
     if (re.test(rawName)) return true;
   }
 
-  // 3. Operational status attributes
+  // 3. Combined text inspection (description, about, why, explanation, display_name, notes, details)
+  const textFields = [
+    rawName,
+    place.display_name,
+    place.displayName,
+    place.description,
+    place.about,
+    place.why,
+    place.explanation,
+    place.notes,
+    place.details,
+    place.summary,
+    place.comment,
+  ].filter(Boolean).join(' ');
+
+  for (const re of PERMANENTLY_CLOSED_PATTERNS) {
+    if (re.test(textFields)) return true;
+  }
+
+  // 4. Operational status attributes
   const bStatus = String(place.business_status || place.businessStatus || '').toUpperCase();
-  if (bStatus === 'CLOSED_PERMANENTLY' || bStatus === 'CLOSED_TEMPORARILY') {
+  if (bStatus === 'CLOSED_PERMANENTLY' || bStatus === 'PERMANENTLY_CLOSED' || bStatus === 'CLOSED_TEMPORARILY' || bStatus === 'TEMPORARILY_CLOSED' || bStatus === 'CLOSED') {
     return true;
   }
 
-  const opStatus = String(place.operationalStatus || place.status || '').toUpperCase();
-  if (opStatus === 'PERMANENTLY_CLOSED' || opStatus === 'DEFUNCT') {
+  const opStatus = String(place.operationalStatus || place.operational_status || place.status || place.tourismStatus || '').toUpperCase();
+  if (opStatus === 'PERMANENTLY_CLOSED' || opStatus === 'CLOSED_PERMANENTLY' || opStatus === 'DEFUNCT' || opStatus === 'CLOSED' || opStatus === 'CLOSED_TEMPORARILY' || opStatus === 'TEMPORARILY_CLOSED' || opStatus === 'INACTIVE') {
     return true;
   }
 
-  if (place.isPermanentlyClosed === true || place.isClosed === true) {
+  // 5. Explicit boolean flags
+  if (place.isPermanentlyClosed === true || place.permanentlyClosed === true || place.isClosed === true || place.is_closed === true || place.closed === true) {
     return true;
   }
 
-  // 4. OSM extratags / tags
-  const tags = place.extratags || place.tags || {};
-  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags.demolished === 'yes') {
+  // 6. OSM extratags / tags
+  const tags = place.extratags || place.tags || place.osm_tags || {};
+  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags.demolished === 'yes' || tags.ruins === 'yes') {
     return true;
   }
-  if (String(tags.operational_status || tags.business_status || '').toLowerCase() === 'closed') {
+  if (tags.historic === 'ruins' && !tags.tourism) {
     return true;
   }
-  if (String(tags.opening_hours || '').toLowerCase() === 'closed') {
+  const tagOpStatus = String(tags.operational_status || tags.business_status || tags.status || '').toLowerCase();
+  if (tagOpStatus === 'closed' || tagOpStatus === 'closed_permanently' || tagOpStatus === 'permanently_closed') {
+    return true;
+  }
+  const tagOpening = String(tags.opening_hours || '').toLowerCase();
+  if (tagOpening === 'closed' || tagOpening === 'permanently closed') {
+    return true;
+  }
+  if (tags.end_date) {
     return true;
   }
 

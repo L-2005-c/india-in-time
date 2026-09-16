@@ -266,9 +266,9 @@ router.post('/optimize', async (req, res) => {
  */
 router.post('/cluster', (req, res) => {
   try {
-    const { places, centerCoord, radiusKm = 2 } = req.body;
+    const { places: rawPlaces, centerCoord, radiusKm = 2 } = req.body;
 
-    if (!Array.isArray(places) || places.length === 0) {
+    if (!Array.isArray(rawPlaces) || rawPlaces.length === 0) {
       return res.status(400).json({ error: 'No places provided' });
     }
 
@@ -276,6 +276,7 @@ router.post('/cluster', (req, res) => {
       return res.status(400).json({ error: 'Missing center coordinate' });
     }
 
+    const places = rawPlaces.filter(p => !isPermanentlyClosedPlace(p));
     const nearby = findNearbyPlaces(places, centerCoord, radiusKm);
     const clusters = clusterNearbyPlaces(nearby, 1.5);
 

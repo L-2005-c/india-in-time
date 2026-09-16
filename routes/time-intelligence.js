@@ -11,6 +11,7 @@ const { buildMultiDayItinerary } = require('../services/travelIntelligence/multi
 const { getCitySeeds } = require('../data/city-seeds');
 const { computeDnaMatch, deriveDnaFromPersonas, sanitizeDnaProfile } = require('../services/travelIntelligence/personalTravelDna');
 const { detectConflictingRequirements } = require('../services/travelIntelligence/requirementEngine');
+const { isPermanentlyClosedPlace } = require('../services/travelIntelligence/tourismPoi/tourismBlacklist');
 const MAX_PLACES = 50;
 const MAX_TRIP_DAYS = 21;
 const LIVE_ROUTING_CONCURRENCY = Math.max(1, parseInt(process.env.LIVE_ROUTING_CONCURRENCY, 10) || 5);
@@ -20,7 +21,7 @@ router.post('/status', (req, res) => {
     const { weather, at, fromCoords, personas, tripMode, preferredCategories, categories } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
-    const places = rawPlaces.slice(0, MAX_PLACES);
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
     const now = at ? new Date(at) : new Date();
     const options = { fromCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null, personas: Array.isArray(personas) ? personas : [],
       preferredCategories: Array.isArray(preferredCategories) ? preferredCategories : (Array.isArray(categories) ? categories : (Array.isArray(personas) ? personas : [])), tripMode: tripMode || null };
@@ -46,7 +47,7 @@ router.post('/score', (req, res) => {
     const { personas, tripMode } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
-    const places = rawPlaces.slice(0, MAX_PLACES);
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
     const scored = places.map((p) => ({ name: p.name, score: personalizeScore(p.baseScore ?? 1, p, personas || [], tripMode || null) }));
     res.json({ scored });
   } catch (err) {
@@ -60,7 +61,7 @@ router.post('/recommend', async (req, res) => {
     const { weather, at, fromCoords, personas, tripMode, publicHoliday, preferredCategories, categories } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
-    const places = rawPlaces.slice(0, MAX_PLACES);
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
     const now = at ? new Date(at) : new Date();
     const options = {
       fromCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
@@ -141,6 +142,7 @@ router.post('/optimize', async (req, res) => {
     } = body;
     const rawPlaces = body.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
     const now = at ? new Date(at) : new Date();
     if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
     const personaList = Array.isArray(personas) ? personas : [];
@@ -165,7 +167,7 @@ router.post('/optimize', async (req, res) => {
       lowCrowd: !!body.lowCrowd,
       vegetarian: !!body.vegetarian,
     };
-    const result = planAdvancedItinerary(rawPlaces.slice(0, MAX_PLACES), { ...body, ...shared });
+    const result = planAdvancedItinerary(places, { ...body, ...shared });
     res.json(result);
   } catch (err) {
     logger.error('[time-intelligence:optimize]', err.message);
@@ -179,10 +181,11 @@ router.post('/replan', async (req, res) => {
     const { weather, at, fromCoords, tripMode, startMin, endMin, maxStops, bufferMin, region, preferredCategories, categories, travelDna, personas } = req.body || {};
     const rawPlaces = req.body?.places;
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) return res.status(400).json({ error: 'places[] is required' });
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
     const now = at ? new Date(at) : new Date();
     if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
     const resolvedDna = travelDna || deriveDnaFromPersonas(Array.isArray(personas) ? personas : [], { tripMode });
-    const result = planAdvancedItinerary(rawPlaces.slice(0, MAX_PLACES), {
+    const result = planAdvancedItinerary(places, {
       ...req.body,
       now,
       weather: weather || null,
@@ -210,9 +213,10 @@ router.post('/day-plan', async (req, res) => {
     if (!Array.isArray(rawPlaces) || !rawPlaces.length) {
       return res.status(400).json({ error: 'places[] is required' });
     }
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
     const now = at ? new Date(at) : new Date();
     if (Number.isNaN(now.getTime())) return res.status(400).json({ error: 'Invalid at timestamp' });
-    const optimized = planAdvancedItinerary(rawPlaces.slice(0, MAX_PLACES), {
+    const optimized = planAdvancedItinerary(places, {
       ...req.body,
       now, weather: weather || null,
       originCoords: Array.isArray(fromCoords) && fromCoords.length >= 2 ? fromCoords : null,
@@ -237,6 +241,24 @@ router.post('/advice', (req, res) => {
     const { place, weather, at, fromCoords, personas, tripMode, preferredCategories, categories } = req.body || {};
     if (!place || typeof place !== 'object') {
       return res.status(400).json({ error: 'place object is required' });
+    }
+    if (isPermanentlyClosedPlace(place)) {
+      return res.json({
+        advice: 'This place is permanently closed or defunct and is not recommended for visits.',
+        intel: {
+          visitScore: 0,
+          visitLabel: 'Permanently Closed',
+          statusLabel: 'Permanently Closed',
+          isOpenNow: false,
+          crowdLevel: 'none',
+          confidence: 1.0,
+          explanation: 'Permanently closed attraction',
+          arrival: null,
+          scenic: null,
+          weather: null,
+          traffic: null,
+        }
+      });
     }
     const now = at ? new Date(at) : new Date();
     const intel = getTravelIntelligence(place, now, weather || null, {
@@ -280,7 +302,8 @@ router.post('/multi-day-plan', async (req, res) => {
     if (!Number.isFinite(numDays) || numDays < 1) return res.status(400).json({ error: 'days must be a positive integer' });
     if (numDays > MAX_TRIP_DAYS) return res.status(400).json({ error: `days must be at most ${MAX_TRIP_DAYS}` });
 
-    const result = await buildMultiDayItinerary(rawPlaces.slice(0, MAX_PLACES), {
+    const places = rawPlaces.filter((p) => !isPermanentlyClosedPlace(p)).slice(0, MAX_PLACES);
+    const result = await buildMultiDayItinerary(places, {
       startDate: parsedStart,
       days: numDays,
       pacing: ['relaxed', 'moderate', 'packed'].includes(pacing) ? pacing : 'moderate',
@@ -343,6 +366,7 @@ router.post('/circuit-plan', async (req, res) => {
     if (!candidates || !candidates.length) {
       candidates = getCitySeeds('paderu');
     }
+    candidates = candidates.filter((p) => !isPermanentlyClosedPlace(p));
 
     const result = await planMultiDayCircuit(candidates, {
       numDays: effectiveDays,

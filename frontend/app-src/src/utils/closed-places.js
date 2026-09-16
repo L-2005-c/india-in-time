@@ -3,22 +3,43 @@
  */
 
 const PERMANENTLY_CLOSED_PATTERNS = [
-  /\bpermanently\s+closed\b/i,
-  /\bdefunct\b/i,
-  /\bdemolished\b/i,
-  /\babandoned\b/i,
-  /\bclosed\s+down\b/i,
-  /\bshut\s+down\b/i,
-  /\bno\s+longer\s+(?:exists?|operational|open)\b/i,
-  /\bcease(?:d)?\s+operations\b/i,
-  /\bout\s+of\s+business\b/i,
-  /\bclosed\s+forever\b/i,
+  /\b(permanently\s*closed|closed\s*permanently)\b/i,
+  /\b(temporarily\s*closed|closed\s*temporarily)\b/i,
+  /\b(closed\s+down|shut\s+down|permanently\s+shut|closed\s+forever)\b/i,
+  /\b(defunct|demolished|abandoned|out\s*of\s*business|ceased\s*operations)\b/i,
+  /\bno\s+longer\s+(?:exists?|operational|operating|open)\b/i,
+  /\b(non-operational|not\s+operational|decommissioned)\b/i,
+  /\((?:permanently\s+)?closed(?:\s+down)?\)/i,
+  /\[(?:permanently\s+)?closed(?:\s+down)?\]/i,
+  /\((?:defunct|demolished|abandoned|shut)\)/i,
+  /\[(?:defunct|demolished|abandoned|shut)\]/i,
 ];
 
 const KNOWN_DEFUNCT_ATTRACTIONS = new Set([
   'mgm selvee water world',
+  'mgm water park',
+  'mgm water park vizag',
+  'taraka rama water park',
+  'mudfort amusement park',
+  'hubba bubba amusement park',
+  'appu ghar',
   'appu ghar okhla',
+  'appu ghar pragati maidan',
   'great india place water park',
+  'fantasy land',
+  'fantasy land mumbai',
+  'fantasy land jogeshwari',
+  'dash n splash',
+  'dash n splash chennai',
+  'dolphin city',
+  'dolphin city chennai',
+  'coral reef aquarium',
+  'coral reef aquarium vizag',
+  'victoria public hall',
+  'esselworld',
+  'essel world',
+  'dias park',
+  'ansal riverdale',
 ]);
 
 /**
@@ -29,26 +50,64 @@ const KNOWN_DEFUNCT_ATTRACTIONS = new Set([
 export function isPermanentlyClosedPlace(place) {
   if (!place || typeof place !== 'object') return false;
 
-  const busStatus = String(place.business_status || place.businessStatus || '').toUpperCase();
-  if (busStatus === 'CLOSED_PERMANENTLY' || busStatus === 'PERMANENTLY_CLOSED') return true;
-
-  const opStatus = String(place.operationalStatus || place.operational_status || '').toUpperCase();
-  if (opStatus === 'PERMANENTLY_CLOSED' || opStatus === 'DEFUNCT' || opStatus === 'CLOSED') return true;
-
-  if (place.isPermanentlyClosed === true || place.permanentlyClosed === true) return true;
-
-  const name = String(place.name || '').trim();
-  const nameNorm = name.toLowerCase().replace(/\s+/g, ' ');
+  const name = String(place.name || place.canonicalName || place.title || '').trim();
+  const nameNorm = name.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  
   if (KNOWN_DEFUNCT_ATTRACTIONS.has(nameNorm)) return true;
+  for (const defunct of KNOWN_DEFUNCT_ATTRACTIONS) {
+    if (nameNorm.includes(defunct) || defunct.includes(nameNorm)) {
+      if (nameNorm.length >= 8 && defunct.length >= 8) return true;
+    }
+  }
 
-  const combinedText = `${name} ${place.description || ''} ${place.about || ''} ${place.why || ''} ${place.explanation || ''}`;
+  for (const pattern of PERMANENTLY_CLOSED_PATTERNS) {
+    if (pattern.test(name)) return true;
+  }
+
+  const combinedText = [
+    name,
+    place.display_name,
+    place.displayName,
+    place.description,
+    place.about,
+    place.why,
+    place.explanation,
+    place.notes,
+    place.details,
+    place.summary,
+    place.comment,
+  ].filter(Boolean).join(' ');
+
   for (const pattern of PERMANENTLY_CLOSED_PATTERNS) {
     if (pattern.test(combinedText)) return true;
   }
 
-  const tags = place.tags || place.osm_tags || {};
-  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags.ruins === 'yes') return true;
+  const busStatus = String(place.business_status || place.businessStatus || '').toUpperCase();
+  if (busStatus === 'CLOSED_PERMANENTLY' || busStatus === 'PERMANENTLY_CLOSED' || busStatus === 'CLOSED_TEMPORARILY' || busStatus === 'TEMPORARILY_CLOSED' || busStatus === 'CLOSED') {
+    return true;
+  }
+
+  const opStatus = String(place.operationalStatus || place.operational_status || place.status || place.tourismStatus || '').toUpperCase();
+  if (opStatus === 'PERMANENTLY_CLOSED' || opStatus === 'CLOSED_PERMANENTLY' || opStatus === 'DEFUNCT' || opStatus === 'CLOSED' || opStatus === 'CLOSED_TEMPORARILY' || opStatus === 'TEMPORARILY_CLOSED' || opStatus === 'INACTIVE') {
+    return true;
+  }
+
+  if (place.isPermanentlyClosed === true || place.permanentlyClosed === true || place.isClosed === true || place.is_closed === true || place.closed === true) {
+    return true;
+  }
+
+  const tags = place.tags || place.osm_tags || place.extratags || {};
+  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags.demolished === 'yes' || tags.ruins === 'yes') return true;
   if (tags.historic === 'ruins' && !tags.tourism) return true;
+  const tagOpStatus = String(tags.operational_status || tags.business_status || tags.status || '').toLowerCase();
+  if (tagOpStatus === 'closed' || tagOpStatus === 'closed_permanently' || tagOpStatus === 'permanently_closed') {
+    return true;
+  }
+  const tagOpening = String(tags.opening_hours || '').toLowerCase();
+  if (tagOpening === 'closed' || tagOpening === 'permanently closed') {
+    return true;
+  }
+  if (tags.end_date) return true;
 
   return false;
 }

@@ -63,10 +63,10 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
   let hasLunch = false;
   let hasDinner = false;
   let lastFoodLeaveMin = -999;
-  const remaining = [...(stops || [])];
+  const remaining = [...(stops || [])].filter((s) => !isPermanentlyClosedPlace(s));
   const day = [];
   const usedIds = new Set();
-  const supplementalPool = LOCS.filter((l) => !(stops || []).some((s) => s.id === l.id));
+  const supplementalPool = LOCS.filter((l) => !isPermanentlyClosedPlace(l) && !(stops || []).some((s) => s.id === l.id));
 
   function pickBest(pool, requireFood = false) {
     let best = null;
@@ -250,7 +250,7 @@ export function buildTimeAwareDay(stops, startMin, maxT, startCoords, temp, brea
   const allUsed = new Set(day.map((d) => String(d.id || d.name)));
   day.forEach((stop) => {
     if (stop.isBreak || !stop.coords || stop.coords.length < 2) return;
-    const candidates = LOCS.filter((l) => !allUsed.has(String(l.id || l.name)) && l.coords && l.coords.length >= 2);
+    const candidates = LOCS.filter((l) => !allUsed.has(String(l.id || l.name)) && !isPermanentlyClosedPlace(l) && l.coords && l.coords.length >= 2);
     stop.nearbySpots = candidates
       .map((c) => ({
         id: c.id || c.name,

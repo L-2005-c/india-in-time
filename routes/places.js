@@ -14,7 +14,7 @@ const {
   getPlaces, fetchWiki, fetchCuratedCityFallback, fetchCuratedFoodFallback,
   fetchNominatimFallback, hydrateAiPlaces,
 } = require('../services/placesDiscovery');
-const { resolveCanonicalPlace, isPermanentlyClosedPlace, validatePoiCoordinates } = require('../services/travelIntelligence/tourismPoi');
+const { resolveCanonicalPlace, isPermanentlyClosedPlace, isBlacklistedEntity, validatePoiCoordinates } = require('../services/travelIntelligence/tourismPoi');
 function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
   return [
     String(cityName || '').trim().toLowerCase(),
@@ -26,12 +26,15 @@ function cacheKey(cityName, lat, lon, totalMinutes, prefs = []) {
 }
 
 function getCachedPlaces(key) {
-  return placesCache.get(key) || null;
+  const cached = placesCache.get(key);
+  if (!cached || !Array.isArray(cached.places)) return null;
+  return { ...cached, places: cached.places.filter(p => !isPermanentlyClosedPlace(p)) };
 }
 
 function setCachedPlaces(key, payload) {
   if (!payload || !Array.isArray(payload.places) || payload.places.length === 0) return;
-  placesCache.set(key, payload, PLACE_CACHE_TTL_MS);
+  const filtered = { ...payload, places: payload.places.filter(p => !isPermanentlyClosedPlace(p)) };
+  placesCache.set(key, filtered, PLACE_CACHE_TTL_MS);
 }
 
 const { staticCityPlaces } = require('../data/city-seeds');
@@ -162,12 +165,17 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
     // Canonical enrichment & quality scoring pass
     const canonicalPlaces = [];
     for (const p of dedupedMerged) {
+      if (!p || isPermanentlyClosedPlace(p) || isBlacklistedEntity(p).rejected) continue;
+
       const canonical = resolveCanonicalPlace(p, {
         cityHint: cityName,
         categoryHint: p.cat,
         cityCoords: { lat, lon },
       });
       if (canonical) {
+        if (isPermanentlyClosedPlace(canonical) || canonical.tourismStatus === 'PERMANENTLY_CLOSED' || canonical.tourismStatus === 'DEFUNCT') {
+          continue;
+        }
         canonicalPlaces.push({
           ...p,
           id: p.id || canonical.id,
@@ -182,6 +190,8 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
           qualityScore: canonical.qualityScore,
         });
       } else {
+        if (isPermanentlyClosedPlace(p) || isBlacklistedEntity(p).rejected) continue;
+
         const integrity = validatePoiCoordinates(p.coords[0], p.coords[1], {
           cityHint: cityName,
           category: p.cat,
@@ -196,7 +206,7 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
     }
 
     merged.length = 0;
-    merged.push(...canonicalPlaces);
+    merged.push(...canonicalPlaces.filter(p => !isPermanentlyClosedPlace(p)));
 
     appLogger.info(`[places] Final merged pool: ${merged.length} places (prefs: ${prefs.join(',') || 'all'})`);
 
@@ -207,7 +217,7 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
     // Last resort: below the 3-result threshold, but `merged` here is
     // already fully deduped (exact-name + proximity) — just relax the
     // count requirement rather than rebuilding from raw, non-deduped sources.
-    const anything = merged;
+    const anything = merged.filter(p => !isPermanentlyClosedPlace(p));
     return { places: anything, source: 'last_resort', count: anything.length };
 
   } catch(err) {
@@ -221,6 +231,7 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
           [...staticPlaces, ...curatedCity, ...wiki, ...nominatimFallback, ...curatedFood].filter((p, i, arr) =>
           p?.coords?.length >= 2 &&
           !isPermanentlyClosedPlace(p) &&
+          !isBlacklistedEntity(p).rejected &&
           arr.findIndex(x => String(x.name||'').toLowerCase() === String(p.name||'').toLowerCase()) === i
         ),
         prefs
@@ -255,6 +266,10 @@ router.post('/', async (req, res) => {
   const cached = refreshNow ? null : getCachedPlaces(key);
   if (!refreshNow && cached) {
     appLogger.info(`[places] Cache hit for ${cityName}`);
+    if (Array.isArray(cached.places)) {
+      cached.places = cached.places.filter(p => !isPermanentlyClosedPlace(p));
+      cached.count = cached.places.length;
+    }
     return res.json(cached);
   }
   const staticPlaces = filterPlacesByPrefs(staticCityPlaces(cityName), prefs);
@@ -267,6 +282,10 @@ router.post('/', async (req, res) => {
       setCachedPlaces(key, payload);
     } else {
       payload = await placesCache.getOrFetch(key, fetcher, PLACE_CACHE_TTL_MS);
+    }
+    if (payload && Array.isArray(payload.places)) {
+      payload.places = payload.places.filter(p => !isPermanentlyClosedPlace(p));
+      payload.count = payload.places.length;
     }
     return res.json(payload);
   } catch (_err) {

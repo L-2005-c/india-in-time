@@ -719,19 +719,22 @@ async function fetchNominatimFallback(lat, lon, cityName, opts = {}) {
 }
 
 async function hydrateAiPlaces(aiPlaces, knownPlaces, lat, lon, cityName) {
-  const candidates = (aiPlaces || []).slice(0, 18);
+  const candidates = (aiPlaces || []).filter(p => !isPermanentlyClosedPlace(p)).slice(0, 18);
   const grounded = [];
   const unmatched = [];
 
   for (const aiPlace of candidates) {
+    if (isPermanentlyClosedPlace(aiPlace)) continue;
     const exactKey = String(aiPlace?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    let best = (knownPlaces || []).find(place =>
-      String(place?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') === exactKey
-    );
+    let best = (knownPlaces || [])
+      .filter(place => !isPermanentlyClosedPlace(place))
+      .find(place =>
+        String(place?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') === exactKey
+      );
 
     if (!best) {
       best = (knownPlaces || [])
-        .filter(place => isConfidentWikiMatch(aiPlace, place))
+        .filter(place => !isPermanentlyClosedPlace(place) && isConfidentWikiMatch(aiPlace, place))
         .sort((a, b) => {
           const overlapDiff = tokenOverlap(aiPlace.name, b.name) - tokenOverlap(aiPlace.name, a.name);
           if (overlapDiff) return overlapDiff;
@@ -740,14 +743,17 @@ async function hydrateAiPlaces(aiPlaces, knownPlaces, lat, lon, cityName) {
     }
 
     if (best) {
-      grounded.push({
+      const merged = {
         ...best,
         ...aiPlace,
         coords: best.coords,
         groundedSource: best.fallbackSource || (String(best.id || '').startsWith('wiki_') ? 'wikipedia' : 'known_place'),
         aiRanked: true,
         importanceScore: Math.max(aiPlace.importanceScore || 0, best.importanceScore || 0),
-      });
+      };
+      if (!isPermanentlyClosedPlace(merged)) {
+        grounded.push(merged);
+      }
     } else {
       unmatched.push(aiPlace);
     }
@@ -756,8 +762,8 @@ async function hydrateAiPlaces(aiPlaces, knownPlaces, lat, lon, cityName) {
   const geocoded = await fixAiCoordsViaNominatim(unmatched, lat, lon, cityName);
   return dedupePlacesByName([
     ...grounded,
-    ...geocoded.map(place => ({ ...place, aiRanked: true })),
-  ]);
+    ...geocoded.filter(place => !isPermanentlyClosedPlace(place)).map(place => ({ ...place, aiRanked: true })),
+  ]).filter(place => !isPermanentlyClosedPlace(place));
 }
 
 

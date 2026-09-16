@@ -21,6 +21,23 @@ function computeVisitScore(components = {}, place = {}) {
   const sum = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
   const w = Object.fromEntries(Object.entries(weights).map(([k, v]) => [k, v / sum]));
   let raw = (w.weather || 0) * weatherScore + (w.crowd || 0) * crowdScore + (w.traffic || 0) * trafficScore + (w.scenic || 0) * scenicScore + (w.time || 0) * timeScore + (w.opening || 0) * openingScore + (w.preferences || 0) * preferenceScore;
+  if (openingScore === 0) {
+    return {
+      visitScore: 0,
+      label: 'Permanently Closed',
+      profile: profileName,
+      weights: w,
+      components: {
+        weather: Math.round(weatherScore),
+        crowd: Math.round(crowdScore),
+        traffic: Math.round(trafficScore),
+        scenic: Math.round(scenicScore),
+        time: Math.round(timeScore),
+        opening: 0,
+        preferences: Math.round(preferenceScore),
+      },
+    };
+  }
   if (openingScore <= 5) raw = Math.min(raw, 15);
   const score = Math.max(0, Math.min(100, Math.round(raw)));
   return { visitScore: score, label: bandLabel(score), profile: profileName, weights: w, components: { weather: Math.round(weatherScore), crowd: Math.round(crowdScore), traffic: Math.round(trafficScore), scenic: Math.round(scenicScore), time: Math.round(timeScore), opening: Math.round(openingScore), preferences: Math.round(preferenceScore) } };
@@ -39,6 +56,7 @@ function computeTimeScore(place, ctx = {}) {
 }
 function openingToScore(opening) {
   if (!opening || opening.status === 'UNKNOWN') return 40;
+  if (opening.status === 'PERMANENTLY_CLOSED') return 0;
   if (opening.status === 'OPEN') return 90;
   if (opening.status === 'CLOSING_SOON') return 55;
   if (opening.status === 'OPENS_SOON') return 35;

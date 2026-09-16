@@ -1,5 +1,6 @@
 // Curated city + seed-place database extracted from the original app.js.
 // Pure data + a couple of small pure lookup helpers — no shared app state.
+import { isPermanentlyClosedPlace } from '../utils/closed-places.js';
 
 // ══════════════════════════════════════════════════
 // CURATED CITIES DATABASE
@@ -1012,7 +1013,7 @@ function getHiddenGems(cityId){
     name:g.name, cat:g.cat, coords:g.coords, vt:g.vt, ot:g.ot, ct:g.ct,
     isHiddenGem:true, why:g.why, reviewGap:g.reviewGap, bestFor:g.bestFor,
     importance:'must_see', importanceScore:88, fallbackSource:'curated_hidden_gem',
-  }));
+  })).filter(g => !isPermanentlyClosedPlace(g));
 }
 
 // ══════════════════════════════════════════════════
@@ -1064,7 +1065,7 @@ function getLocalPlaces(cityId, cityName){
       importance:cat==='food'?'famous':i<6?'must_see':i<8?'famous':'local',
       importanceScore:cat==='food'?70:Math.max(35,100-i*6),
     };
-  });
+  }).filter(p => !isPermanentlyClosedPlace(p));
 }
 
 export {

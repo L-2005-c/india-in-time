@@ -5762,15 +5762,24 @@ html, body {
   line-height: 1.4;
 }
 
-/* ===== Mobile Smoothness Pass ===== */
+/* ===== Mobile Smoothness & Scalability Pass ===== */
 /* Isolate the heavy scrolling views from the rest of the document so
    scrolling #plan-view doesn't invalidate layout in the map or chat. */
 #plan-view, #chat-view, #tools-view, #journey-view, #alerts-view, #more-view {
   contain: layout style;
+  overscroll-behavior-y: contain;
 }
+
+/* Ensure scrollable views maintain momentum touch scrolling and avoid overflow clipping */
+#journey-view.active, #plan-view.active, #alerts-view.active, #more-view.active, #tools-view.active {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent nested content-visibility: auto on parent list when child .stop-card already uses it,
+   which causes viewport intersection thrashing and scroll jumping on mobile browsers. */
 #plan-list {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 500px;
+  contain: layout style;
 }
 
 /* Box-shadow animation on the active stop card repaints on every frame on
@@ -5779,24 +5788,54 @@ html, body {
   animation: none;
 }
 
-/* Promote the fixed chrome (header, bottom nav) to its own compositor layer
+/* Promote the fixed chrome (header, bottom nav) to dedicated compositor layers
    so content scroll doesn't repaint the nav. */
 #header, #bottom-nav {
   backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
 }
+
 @media (max-width: 640px) {
   /* Reduce the blur radius on the surfaces that scroll with content. */
   .stop-card, .bubble {
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
   }
-}
-/* The full-screen grain overlay forces a full-screen composite on every
-   frame on mobile. Cap it to a single static layer. */
-@media (max-width: 640px) {
+
+  /* Full-screen grain overlay GPU layer stabilization */
   body::before {
     transform: translateZ(0);
   }
+
+  /* Mobile GPU Splash screen optimization:
+     Reduces blur overhead, eliminates expensive blend-mode compositing,
+     and simplifies drop-shadows during 3D transforms */
+  #splash .glow-orb {
+    filter: blur(24px) !important;
+    opacity: 0.35 !important;
+    animation-duration: 12s !important;
+  }
+  #splash .glow-emerald {
+    width: 260px !important;
+    height: 260px !important;
+  }
+  #splash .glow-amber {
+    width: 240px !important;
+    height: 240px !important;
+  }
+  #splash .glow-purple {
+    width: 280px !important;
+    height: 280px !important;
+  }
+  #splash .sheen-overlay {
+    mix-blend-mode: normal !important;
+    background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.08) 52%, transparent 65%) !important;
+  }
+  #splash .splash-flag {
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.7)) !important;
+  }
 }
+
 
 

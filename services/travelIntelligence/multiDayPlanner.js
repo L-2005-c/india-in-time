@@ -17,6 +17,7 @@
 
 const { distKm } = require('../../utils/geo');
 const { estimateTravel } = require('./trafficEngine');
+const { isPermanentlyClosedPlace } = require('./tourismPoi/tourismBlacklist');
 
 // Lazily resolve the authoritative planner to avoid the index.js ↔
 // multiDayPlanner circular dependency during module initialization.
@@ -63,7 +64,7 @@ function hasCoords(p) {
  * a single dense pocket can't swallow the whole trip into one day.
  */
 function clusterPlaces(places, k) {
-  const all = Array.isArray(places) ? places : [];
+  const all = (Array.isArray(places) ? places : []).filter((p) => !isPermanentlyClosedPlace(p));
   const withCoords = all.filter(hasCoords);
   const withoutCoords = all.filter((p) => !hasCoords(p));
   const numClusters = Math.max(1, Math.min(k, withCoords.length || 1));
@@ -175,7 +176,7 @@ function orderClustersByTravelFlow(clusters, originCoords) {
  * @param {number} [options.maxStopsPerDay]
  */
 async function buildMultiDayItinerary(places, options = {}) {
-  const allPlaces = Array.isArray(places) ? places : [];
+  const allPlaces = (Array.isArray(places) ? places : []).filter((p) => !isPermanentlyClosedPlace(p));
   const days = Math.max(1, Math.min(21, Math.round(Number(options.days) || 1)));
   const startDate = options.startDate instanceof Date ? options.startDate : new Date(options.startDate || Date.now());
   if (Number.isNaN(startDate.getTime())) throw new Error('multiDayPlanner: invalid startDate');
