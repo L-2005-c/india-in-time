@@ -117,93 +117,58 @@
   </div>
 </div>
 
-<!-- SPLASH 3D CINEMATIC INTRO -->
-<div id="splash" class="cinematic-splash">
+<!-- SPLASH 3D ROLLING LOGO INTRO -->
+<div id="splash" class="modern-splash">
   <canvas id="splash-star-canvas"></canvas>
 
-  <!-- Anamorphic Lens Flare & Volumetric Lighting -->
-  <div class="cinematic-light-rays" aria-hidden="true"></div>
-  <div class="anamorphic-streak" aria-hidden="true"></div>
-  <div class="glow-orb glow-gold"></div>
-  <div class="glow-orb glow-amber"></div>
-  <div class="glow-orb glow-sapphire"></div>
-
-  <!-- Cinematic Letterbox Widescreen Framing -->
-  <div class="cinematic-letterbox letterbox-top" aria-hidden="true">
-    <div class="letterbox-accent">
-      <span class="rec-dot"></span>
-      <span class="letterbox-title">CINEMATIC ODYSSEY</span>
-      <span class="letterbox-sep">·</span>
-      <span class="letterbox-coords">20.5937° N · 78.9629° E</span>
-    </div>
-  </div>
-
-  <div class="cinematic-letterbox letterbox-bottom" aria-hidden="true">
-    <div class="letterbox-footer">
-      <span>THE TIMELESS REALM OF BHARAT</span>
-      <span class="aspect-ratio-tag">2.39:1 CINEMATIC</span>
-    </div>
+  <!-- Ambient Modern Lighting Orbs (Cyan & Azure) -->
+  <div class="ambient-mesh-glow" aria-hidden="true">
+    <div class="glow-orb glow-cyan"></div>
+    <div class="glow-orb glow-azure"></div>
+    <div class="glow-orb glow-indigo"></div>
   </div>
 
   <div class="splash-top-bar">
     <button class="btn-sound-splash" data-action="toggleSplashSound" id="splash-sound-btn" aria-label="Toggle Audio Effects" title="Sound Effects">🔊</button>
-    <button class="btn-skip-splash" data-action="dismissSplash" aria-label="Begin Journey">BEGIN JOURNEY ✦</button>
+    <button class="btn-skip-splash" data-action="dismissSplash" aria-label="Skip Intro">SKIP ➔</button>
   </div>
 
   <div class="stage-3d" id="splash-stage-3d">
-    <div class="gyro-wrapper">
-      <!-- 3D Celestial Horizon Mandala -->
-      <div class="holo-floor celestial-mandala">
-        <div class="mandala-spokes"></div>
-        <div class="holo-ripple celestial-pulse"></div>
-      </div>
+    <div class="roll-stage">
+      <!-- 3D Ground Shadow & Shockwave Ripple -->
+      <div class="ground-shadow" id="ground-shadow"></div>
+      <div class="landing-shockwave" id="landing-shockwave"></div>
 
-      <!-- Polished Celestial Orbit Bands -->
-      <div class="ring-3d ring-outer celestial-track">
-        <span class="orbit-node node-north"></span>
-        <span class="orbit-node node-south"></span>
-      </div>
-      <div class="ring-3d ring-mid celestial-track">
-        <span class="orbit-node node-east"></span>
-        <span class="orbit-node node-west"></span>
-      </div>
-      <div class="ring-3d ring-inner celestial-track"></div>
-
-      <!-- Volumetric Halo Glow -->
-      <div class="volumetric-halo" aria-hidden="true"></div>
-
-      <!-- 3D Monument Emblem -->
-      <div class="logo-3d-card cinematic-emblem-card">
-        <div class="sheen-overlay cinematic-sheen"></div>
-        <img class="splash-flag cinematic-flag" src="/logo-mark.png?v=20260910-logo" fetchpriority="high" alt="India In-Time logo" width="94" height="116" decoding="sync">
+      <!-- 3D Rolling Logo Container -->
+      <div class="logo-roller-3d" id="logo-roller-3d">
+        <div class="logo-badge-3d">
+          <div class="badge-sheen"></div>
+          <img class="splash-flag modern-flag" src="/logo-mark.png?v=20260910-logo" fetchpriority="high" alt="India In-Time logo" width="96" height="118" decoding="sync">
+        </div>
       </div>
     </div>
 
-    <!-- Cinematic Title Card & Narrative Chapter Reveal -->
-    <div class="brand-hud cinematic-hud">
-      <div class="cinematic-pretitle">A JOURNEY ACROSS TIME</div>
-      <h1 class="splash-title cinematic-title">
-        <span class="title-india">INDIA</span>
-        <span class="title-sep">✦</span>
-        <span class="title-intime">IN-TIME</span>
+    <!-- Sequential Brand Name Reveal (Appears after logo rolls and settles) -->
+    <div class="brand-reveal-box" id="brand-reveal-box">
+      <h1 class="splash-brand-title">
+        <span class="title-india">India</span>
+        <span class="title-in">in</span>
+        <span class="title-time">Time</span>
       </h1>
-      <p class="splash-sub cinematic-sub">WHERE EVERY SECOND TELLS A STORY</p>
+      <p class="splash-brand-tagline">Smart Travel · Brighter Journeys</p>
 
-      <div class="telemetry-box cinematic-meter-box">
-        <div class="status-row">
-          <span class="status-text cinematic-chapter-text">
-            <span class="status-dot gold-pulse"></span>
-            <span id="splash-status-lbl">AWAKENING THE TIMELESS REALM...</span>
-          </span>
-          <span class="status-percent cinematic-pct" id="splash-status-num">0%</span>
+      <div class="modern-meter-box">
+        <div class="modern-track">
+          <div class="modern-bar" id="splash-progress-bar"></div>
         </div>
-        <div class="progress-track cinematic-track">
-          <div class="progress-bar cinematic-bar" id="splash-progress-bar"></div>
+        <div class="modern-status-row">
+          <span class="modern-status-lbl" id="splash-status-lbl">Preparing your journey...</span>
+          <span class="modern-status-pct" id="splash-status-num">0%</span>
         </div>
       </div>
 
-      <button class="btn-hero-explore" data-action="dismissSplash" aria-label="Enter the Odyssey">
-        <span>ENTER THE ODYSSEY</span>
+      <button class="btn-hero-explore" data-action="dismissSplash" aria-label="Start Exploring">
+        <span>Start Exploring</span>
         <span class="hero-arrow">➔</span>
       </button>
     </div>

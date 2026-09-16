@@ -1,12 +1,12 @@
 /**
- * splash3d.js — High-Performance 3D Intro & Telemetry Engine for India In-Time
+ * splash3d.js — High-Performance 3D Intro & Brand Reveal Engine for India In-Time
  * 
- * Provides an interactive 3D astrolabe experience with:
- * - 3D geodesic constellation node field on Canvas
- * - Real-time mouse and gyroscope parallax tilt
- * - Synchronized travel telemetry progress ticker
- * - Cinematic hyperspace warp exit
- * - Web Audio API spatial synthesizer (cosmic drone, telemetry blips, ready chime, warp whoosh)
+ * Provides an interactive 3D brand intro experience:
+ * - 3D rolling emblem entry with physical deceleration and ground settle
+ * - Expanding ground shockwave ripple upon touchdown
+ * - Sequential "India in Time" typography reveal
+ * - Starlight & cyan aurora particle constellation canvas
+ * - Spatial Web Audio: rolling whoosh, touchdown impact, and crystalline brand chord
  * - Full memory, audio, and RAF cleanup upon exit
  */
 
@@ -17,8 +17,8 @@ let isDismissed = false;
 // ── Web Audio Synthesizer Engine ─────────────────────────────────────────────
 let audioCtx = null;
 let masterGain = null;
-let droneGain = null;
-let droneOscs = [];
+let ambientPadGain = null;
+let ambientOscs = [];
 let isAudioMuted = false;
 let audioStarted = false;
 
@@ -47,74 +47,65 @@ function ensureAudioStarted() {
 
   if (ctx.state === 'running') {
     audioStarted = true;
-    startCosmicDrone();
+    startAmbientPad();
   }
 }
 
-function startCosmicDrone() {
-  if (!audioCtx || isAudioMuted || droneOscs.length > 0 || isDismissed) return;
+function startAmbientPad() {
+  if (!audioCtx || isAudioMuted || ambientOscs.length > 0 || isDismissed) return;
   try {
     const now = audioCtx.currentTime;
 
-    // Cinematic deep resonant low-pass filter
     const filter = audioCtx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(260, now);
-    filter.Q.setValueAtTime(2.2, now);
+    filter.frequency.setValueAtTime(320, now);
+    filter.Q.setValueAtTime(1.8, now);
 
-    droneGain = audioCtx.createGain();
-    droneGain.gain.setValueAtTime(0.0001, now);
-    droneGain.gain.exponentialRampToValueAtTime(0.09, now + 1.6);
+    ambientPadGain = audioCtx.createGain();
+    ambientPadGain.gain.setValueAtTime(0.0001, now);
+    ambientPadGain.gain.exponentialRampToValueAtTime(0.07, now + 1.2);
 
-    droneGain.connect(filter);
+    ambientPadGain.connect(filter);
     filter.connect(masterGain);
 
-    // Deep cinematic sub-bass braam anchor: D1 (36.7Hz) with subtle slow glide
-    const sub = audioCtx.createOscillator();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(42, now);
-    sub.frequency.exponentialRampToValueAtTime(36.7, now + 2.5);
-
-    // Root fundamental: D2 (73.42Hz) warm analog triangle
+    // Modern atmospheric root (C2 65.41Hz)
     const root = audioCtx.createOscillator();
-    root.type = 'triangle';
-    root.frequency.setValueAtTime(73.42, now);
+    root.type = 'sine';
+    root.frequency.setValueAtTime(65.41, now);
 
-    // Warm fifth: A2 (110Hz) with gentle shimmer detune
+    // Warm fifth (G2 98Hz)
     const fifth = audioCtx.createOscillator();
-    fifth.type = 'sine';
-    fifth.frequency.setValueAtTime(110, now);
-    fifth.detune.setValueAtTime(4, now);
+    fifth.type = 'triangle';
+    fifth.frequency.setValueAtTime(98.0, now);
 
-    // Suspended cinematic octave: D3 (146.83Hz)
+    // Ambient shimmer (C3 130.81Hz)
     const oct = audioCtx.createOscillator();
     oct.type = 'sine';
-    oct.frequency.setValueAtTime(146.83, now);
+    oct.frequency.setValueAtTime(130.81, now);
+    oct.detune.setValueAtTime(3, now);
 
-    sub.connect(droneGain);
-    root.connect(droneGain);
-    fifth.connect(droneGain);
-    oct.connect(droneGain);
+    root.connect(ambientPadGain);
+    fifth.connect(ambientPadGain);
+    oct.connect(ambientPadGain);
 
-    sub.start(now);
     root.start(now);
     fifth.start(now);
     oct.start(now);
 
-    droneOscs = [sub, root, fifth, oct];
+    ambientOscs = [root, fifth, oct];
   } catch (_e) {}
 }
 
-function stopCosmicDrone(fadeDuration = 0.4) {
-  if (!audioCtx || droneOscs.length === 0) return;
+function stopAmbientPad(fadeDuration = 0.35) {
+  if (!audioCtx || ambientOscs.length === 0) return;
   try {
     const now = audioCtx.currentTime;
-    if (droneGain) {
-      droneGain.gain.setValueAtTime(Math.max(droneGain.gain.value, 0.0001), now);
-      droneGain.gain.exponentialRampToValueAtTime(0.00001, now + fadeDuration);
+    if (ambientPadGain) {
+      ambientPadGain.gain.setValueAtTime(Math.max(ambientPadGain.gain.value, 0.0001), now);
+      ambientPadGain.gain.exponentialRampToValueAtTime(0.00001, now + fadeDuration);
     }
-    const oscsToStop = [...droneOscs];
-    droneOscs = [];
+    const oscsToStop = [...ambientOscs];
+    ambientOscs = [];
     setTimeout(() => {
       for (const osc of oscsToStop) {
         try { osc.stop(); osc.disconnect(); } catch (_e) {}
@@ -123,61 +114,103 @@ function stopCosmicDrone(fadeDuration = 0.4) {
   } catch (_e) {}
 }
 
-function playTelemetryBlip(stageIdx) {
+function playRollWhoosh() {
   if (!audioCtx || isAudioMuted || isDismissed) return;
   ensureAudioStarted();
   try {
     const now = audioCtx.currentTime;
-    // Resonant singing-bowl & golden temple bell harmonics (D4, F#4, A4, D5)
-    const tones = [
-      [293.66, 587.33, 880.00],  // D4, D5, A5
-      [369.99, 739.99, 1108.73], // F#4, F#5, C#6
-      [440.00, 880.00, 1318.51], // A4, A5, E6
-      [587.33, 1174.66, 1760.00] // D5, D6, A6
-    ];
-    const freqs = tones[Math.min(stageIdx, tones.length - 1)] || [440, 880, 1320];
+    const osc = audioCtx.createOscillator();
+    const filter = audioCtx.createBiquadFilter();
+    const gain = audioCtx.createGain();
 
-    const bellGain = audioCtx.createGain();
-    bellGain.gain.setValueAtTime(0.0001, now);
-    bellGain.gain.linearRampToValueAtTime(0.08, now + 0.02);
-    bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
-    bellGain.connect(masterGain);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(95, now);
+    osc.frequency.exponentialRampToValueAtTime(360, now + 0.45);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 1.05);
 
-    freqs.forEach((f, idx) => {
-      const osc = audioCtx.createOscillator();
-      osc.type = idx === 0 ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(f, now);
-      osc.connect(bellGain);
-      osc.start(now);
-      osc.stop(now + 1.0);
-    });
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(220, now);
+    filter.frequency.exponentialRampToValueAtTime(800, now + 0.45);
+    filter.frequency.exponentialRampToValueAtTime(260, now + 1.05);
+    filter.Q.setValueAtTime(2.5, now);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.12, now + 0.22);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.15);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+
+    osc.start(now);
+    osc.stop(now + 1.2);
   } catch (_e) {}
 }
 
-function playReadyChime() {
+function playLandingImpact() {
   if (!audioCtx || isAudioMuted || isDismissed) return;
   ensureAudioStarted();
   try {
     const now = audioCtx.currentTime;
-    // Majestic golden chord flourish: D4, A4, D5, F#5, A5, D6
-    const chord = [293.66, 440.00, 587.33, 739.99, 880.00, 1174.66];
-    chord.forEach((freq, i) => {
-      const t = now + i * 0.065;
-      const osc = audioCtx.createOscillator();
-      const noteGain = audioCtx.createGain();
 
-      osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+    // Solid low-end touchdown punch (72Hz -> 38Hz)
+    const sub = audioCtx.createOscillator();
+    const subGain = audioCtx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(72, now);
+    sub.frequency.exponentialRampToValueAtTime(36, now + 0.32);
+
+    subGain.gain.setValueAtTime(0.18, now);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+
+    sub.connect(subGain);
+    subGain.connect(masterGain);
+
+    sub.start(now);
+    sub.stop(now + 0.4);
+
+    // Clean tactile impact snap
+    const snap = audioCtx.createOscillator();
+    const snapGain = audioCtx.createGain();
+    snap.type = 'triangle';
+    snap.frequency.setValueAtTime(480, now);
+    snap.frequency.exponentialRampToValueAtTime(160, now + 0.08);
+
+    snapGain.gain.setValueAtTime(0.09, now);
+    snapGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+
+    snap.connect(snapGain);
+    snapGain.connect(masterGain);
+
+    snap.start(now);
+    snap.stop(now + 0.1);
+  } catch (_e) {}
+}
+
+function playNameRevealChime() {
+  if (!audioCtx || isAudioMuted || isDismissed) return;
+  ensureAudioStarted();
+  try {
+    const now = audioCtx.currentTime;
+    // Crystalline brand chord: C5 (523.25), G5 (783.99), C6 (1046.50), E6 (1318.51)
+    const chord = [523.25, 783.99, 1046.50, 1318.51];
+    chord.forEach((freq, idx) => {
+      const t = now + idx * 0.055;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t);
 
-      noteGain.gain.setValueAtTime(0.0001, t);
-      noteGain.gain.linearRampToValueAtTime(0.09, t + 0.02);
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(0.08, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
 
-      osc.connect(noteGain);
-      noteGain.connect(masterGain);
+      osc.connect(gain);
+      gain.connect(masterGain);
 
       osc.start(t);
-      osc.stop(t + 1.5);
+      osc.stop(t + 1.15);
     });
   } catch (_e) {}
 }
@@ -186,7 +219,7 @@ function playWarpWhoosh() {
   if (!audioCtx || isAudioMuted) return;
   try {
     const now = audioCtx.currentTime;
-    stopCosmicDrone(0.35);
+    stopAmbientPad(0.3);
 
     const osc = audioCtx.createOscillator();
     const filter = audioCtx.createBiquadFilter();
@@ -194,25 +227,25 @@ function playWarpWhoosh() {
 
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(920, now + 0.26);
-    osc.frequency.exponentialRampToValueAtTime(65, now + 0.68);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.24);
+    osc.frequency.exponentialRampToValueAtTime(70, now + 0.65);
 
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(280, now);
-    filter.frequency.exponentialRampToValueAtTime(1500, now + 0.24);
-    filter.frequency.exponentialRampToValueAtTime(140, now + 0.68);
-    filter.Q.setValueAtTime(2.6, now);
+    filter.frequency.exponentialRampToValueAtTime(1400, now + 0.22);
+    filter.frequency.exponentialRampToValueAtTime(140, now + 0.65);
+    filter.Q.setValueAtTime(2.4, now);
 
     whooshGain.gain.setValueAtTime(0.0001, now);
-    whooshGain.gain.linearRampToValueAtTime(0.12, now + 0.16);
-    whooshGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    whooshGain.gain.linearRampToValueAtTime(0.12, now + 0.15);
+    whooshGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.68);
 
     osc.connect(filter);
     filter.connect(whooshGain);
     whooshGain.connect(masterGain);
 
     osc.start(now);
-    osc.stop(now + 0.72);
+    osc.stop(now + 0.7);
   } catch (_e) {}
 }
 
@@ -234,7 +267,7 @@ export function toggleSplashSound() {
 
   if (!isAudioMuted) {
     ensureAudioStarted();
-    playTelemetryBlip(0);
+    playNameRevealChime();
   }
 }
 
@@ -245,8 +278,6 @@ export function initSplash3D(onComplete) {
   const splash = document.getElementById('splash');
   if (!splash) return;
 
-  // The intro is decorative, so it must yield on devices that are likely to
-  // have a constrained GPU/CPU or when the user asks for less motion.
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   const isMobile = window.innerWidth <= 640;
@@ -258,9 +289,6 @@ export function initSplash3D(onComplete) {
   );
   splash.classList.toggle('performance-lite', isConstrainedDevice);
 
-  // Creating an AudioContext during boot can compete with rendering and is
-  // usually suspended by browser autoplay rules anyway. Create it only after
-  // a real user gesture.
   const unlockAudio = () => {
     ensureAudioStarted();
     ['pointerdown', 'keydown'].forEach(ev => {
@@ -310,6 +338,9 @@ export function initSplash3D(onComplete) {
 
   const canvas = document.getElementById('splash-star-canvas');
   const stage = document.getElementById('splash-stage-3d');
+  const logoRoller = document.getElementById('logo-roller-3d');
+  const shockwave = document.getElementById('landing-shockwave');
+  const brandReveal = document.getElementById('brand-reveal-box');
   const pBar = document.getElementById('splash-progress-bar');
   const pNum = document.getElementById('splash-status-num');
   const pLbl = document.getElementById('splash-status-lbl');
@@ -337,33 +368,30 @@ export function initSplash3D(onComplete) {
   window.addEventListener('resize', onResize);
   cleanupFns.push(() => window.removeEventListener('resize', onResize));
 
-  // The line renderer compares every visible point to every other point, so
-  // point count has a quadratic rendering cost. Keep the full effect on
-  // capable desktops while using a lighter profile on mobile/low-power devices.
-  // Golden stardust and floating ember field
+  // Starlight & Cyan Aurora Particle Field
   const points = [];
-  const NUM_POINTS = isConstrainedDevice ? (isMobile ? 18 : 42) : (isMobile ? 26 : 54);
-  const GOLDEN_PALETTE = ['#fde047', '#f59e0b', '#ffffff', '#fbbf24', '#fed7aa', '#38bdf8'];
+  const NUM_POINTS = isConstrainedDevice ? (isMobile ? 18 : 38) : (isMobile ? 24 : 48);
+  const MODERN_PALETTE = ['#38bdf8', '#818cf8', '#ffffff', '#67e8f9', '#a5b4fc', '#06b6d4'];
 
   for (let i = 0; i < NUM_POINTS; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = (Math.random() - 0.5) * Math.PI;
-    const radius = (isMobile ? 170 : 260) + Math.random() * (isMobile ? 120 : 220);
-    const isBokeh = Math.random() < 0.18;
+    const radius = (isMobile ? 160 : 250) + Math.random() * (isMobile ? 110 : 200);
+    const isBokeh = Math.random() < 0.16;
     points.push({
       x: radius * Math.cos(phi) * Math.cos(theta),
       y: radius * Math.sin(phi) * 0.72,
       z: radius * Math.cos(phi) * Math.sin(theta),
-      size: isBokeh ? Math.random() * 3.2 + 2.2 : Math.random() * 1.8 + 0.8,
-      color: GOLDEN_PALETTE[i % GOLDEN_PALETTE.length],
+      size: isBokeh ? Math.random() * 3.0 + 2.0 : Math.random() * 1.6 + 0.8,
+      color: MODERN_PALETTE[i % MODERN_PALETTE.length],
       pulse: Math.random() * Math.PI * 2,
       isBokeh,
     });
   }
 
-  let rotX = 0.15;
+  let rotX = 0.12;
   let rotY = 0;
-  let targetRotX = 0.15;
+  let targetRotX = 0.12;
   let targetRotY = 0;
   let targetStageRotX = 0;
   let targetStageRotY = 0;
@@ -380,26 +408,26 @@ export function initSplash3D(onComplete) {
     const cy = window.innerHeight / 2;
     const mx = (e.clientX - cx) / cx;
     const my = (e.clientY - cy) / cy;
-    targetRotY = mx * 0.45;
-    targetRotX = 0.15 - my * 0.3;
-    targetStageRotY = mx * 10;
-    targetStageRotX = -my * 8;
+    targetRotY = mx * 0.35;
+    targetRotX = 0.12 - my * 0.25;
+    targetStageRotY = mx * 8;
+    targetStageRotX = -my * 6;
   };
   if (!prefersReducedMotion) {
     window.addEventListener('mousemove', onMouseMove, { passive: true });
     cleanupFns.push(() => window.removeEventListener('mousemove', onMouseMove));
   }
 
-  // 3D Parallax on Mobile Gyroscope - subtle, non-dizzy micro-tilt
+  // 3D Parallax on Mobile Gyroscope
   const onDeviceOrientation = (e) => {
     if (isDismissed || e.gamma === null || e.beta === null) return;
     ensureAudioStarted();
     const tiltX = Math.min(Math.max(e.gamma / 35, -1), 1);
     const tiltY = Math.min(Math.max((e.beta - 45) / 35, -1), 1);
-    targetRotY = tiltX * 0.12;
-    targetRotX = 0.12 - tiltY * 0.08;
-    targetStageRotY = tiltX * 4;
-    targetStageRotX = -tiltY * 3;
+    targetRotY = tiltX * 0.1;
+    targetRotX = 0.1 - tiltY * 0.08;
+    targetStageRotY = tiltX * 3.5;
+    targetStageRotX = -tiltY * 2.5;
   };
   if (!prefersReducedMotion && !isConstrainedDevice) {
     window.addEventListener('deviceorientation', onDeviceOrientation, { passive: true });
@@ -411,8 +439,6 @@ export function initSplash3D(onComplete) {
   function render(timestamp) {
     if (isDismissed) return;
 
-    // Keep the decorative background smooth without rendering more often than
-    // needed. The browser/display may still impose a lower refresh rate.
     if (lastRenderAt && timestamp - lastRenderAt < 11.1) {
       animId = requestAnimationFrame(render);
       return;
@@ -424,7 +450,6 @@ export function initSplash3D(onComplete) {
     rotX += (targetRotX - rotX) * 0.05;
     rotY += 0.003 + (targetRotY - rotY) * 0.05;
 
-    // Smooth lerp for stage tilt (60 FPS) with threshold to prevent forced style recalculations
     currentStageRotX += (targetStageRotX - currentStageRotX) * 0.08;
     currentStageRotY += (targetStageRotY - currentStageRotY) * 0.08;
     const nextRotX = Number(currentStageRotX.toFixed(2));
@@ -442,7 +467,7 @@ export function initSplash3D(onComplete) {
 
     const fov = 420;
     const cx = width / 2;
-    const cy = height / 2 - 35;
+    const cy = height / 2 - 30;
 
     const projected = [];
 
@@ -456,13 +481,13 @@ export function initSplash3D(onComplete) {
 
       // Rotate X
       const y2 = p.y * cosX - z1 * sinX;
-      const z2 = z1 * cosX + p.y * sinX + 480;
+      const z2 = z1 * cosX + p.y * sinX + 460;
 
       if (z2 > 10) {
         const scale = fov / z2;
         const px = cx + x1 * scale;
         const py = cy + y2 * scale;
-        const alpha = Math.min(Math.max((z2 - 100) / 450, 0.12), 0.95);
+        const alpha = Math.min(Math.max((z2 - 100) / 450, 0.12), 0.9);
 
         projected.push({
           px,
@@ -477,10 +502,9 @@ export function initSplash3D(onComplete) {
       }
     }
 
-    // Sort back-to-front
     projected.sort((a, b) => b.z - a.z);
 
-    // Draw connecting constellation lines between proximate stars (single-pass batched path)
+    // Draw connecting constellation lines
     if (!isConstrainedDevice) {
       ctx.lineWidth = 0.7;
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
@@ -495,7 +519,7 @@ export function initSplash3D(onComplete) {
           const dy = p1.py - p2.py;
           const dist = dx * dx + dy * dy;
 
-          if (dist < 3000) {
+          if (dist < 2800) {
             ctx.moveTo(p1.px, p1.py);
             ctx.lineTo(p2.px, p2.py);
             hasLines = true;
@@ -510,18 +534,18 @@ export function initSplash3D(onComplete) {
     // Draw Stars & Bokeh Embers
     for (let i = 0; i < projected.length; i++) {
       const pt = projected[i];
-      const currentSize = pt.size * pt.scale * (1 + Math.sin(pt.pulse) * 0.25);
+      const currentSize = pt.size * pt.scale * (1 + Math.sin(pt.pulse) * 0.22);
       ctx.fillStyle = pt.color;
       ctx.globalAlpha = pt.alpha;
       ctx.beginPath();
       ctx.arc(pt.px, pt.py, Math.max(0.6, currentSize), 0, Math.PI * 2);
       ctx.fill();
 
-      // Atmospheric golden aura for near motes and bokeh orbs
+      // Atmospheric aura for near motes and bokeh orbs
       if (pt.isBokeh || pt.scale > 0.8) {
-        ctx.globalAlpha = pt.alpha * (pt.isBokeh ? 0.35 : 0.22);
+        ctx.globalAlpha = pt.alpha * (pt.isBokeh ? 0.32 : 0.18);
         ctx.beginPath();
-        ctx.arc(pt.px, pt.py, currentSize * (pt.isBokeh ? 2.8 : 2.2), 0, Math.PI * 2);
+        ctx.arc(pt.px, pt.py, currentSize * (pt.isBokeh ? 2.6 : 2.0), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -552,13 +576,32 @@ export function initSplash3D(onComplete) {
   document.addEventListener('visibilitychange', onVisibilityChange);
   cleanupFns.push(() => document.removeEventListener('visibilitychange', onVisibilityChange));
 
-  // Cinematic Narrative Chapters Sequence
+  // ── Sequential 3D Logo Roll & "India in Time" Reveal Sequence ──────────────
+  playRollWhoosh();
+
+  // Phase 1: Touchdown & Shockwave Ripple (at ~1100ms when logo lands)
+  const settleTimeout = setTimeout(() => {
+    if (isDismissed) return;
+    if (logoRoller) logoRoller.classList.add('is-settled');
+    if (shockwave) shockwave.classList.add('shockwave-active');
+    playLandingImpact();
+  }, 1100);
+  cleanupFns.push(() => clearTimeout(settleTimeout));
+
+  // Phase 2: Sequential Name Reveal (at ~1250ms right after landing)
+  const revealTimeout = setTimeout(() => {
+    if (isDismissed) return;
+    if (brandReveal) brandReveal.classList.add('is-revealed');
+    playNameRevealChime();
+  }, 1250);
+  cleanupFns.push(() => clearTimeout(revealTimeout));
+
+  // Progress Bar updates
   const stages = [
-    { pct: 24, label: 'BEYOND THE HORIZON...' },
-    { pct: 52, label: '5,000 YEARS OF TIMELESS WONDER...' },
-    { pct: 76, label: 'CHARTING SACRED PEAKS & SCENIC TRAILS...' },
-    { pct: 92, label: 'WHERE TIME MEETS DESTINY...' },
-    { pct: 100, label: 'WELCOME TO INDIA IN-TIME ✦' }
+    { pct: 32, label: 'Rolling into view...' },
+    { pct: 68, label: 'Syncing travel intelligence...' },
+    { pct: 88, label: 'Connecting routes & live weather...' },
+    { pct: 100, label: 'Welcome to India in Time ✦' }
   ];
 
   let currentStage = 0;
@@ -571,15 +614,10 @@ export function initSplash3D(onComplete) {
     }
     if (currentStage < stages.length) {
       const target = stages[currentStage];
-      progress += Math.floor(Math.random() * 8) + 5;
+      progress += Math.floor(Math.random() * 8) + 6;
       if (progress >= target.pct) {
         progress = target.pct;
         if (pLbl) pLbl.textContent = target.label;
-        if (currentStage < stages.length - 1) {
-          playTelemetryBlip(currentStage);
-        } else {
-          playReadyChime();
-        }
         currentStage++;
       }
       if (pBar) pBar.style.width = `${progress}%`;
@@ -594,9 +632,9 @@ export function initSplash3D(onComplete) {
             dismissSplash();
           }
         }
-      }, 550);
+      }, 700);
     }
-  }, 130);
+  }, 120);
 
   cleanupFns.push(() => clearInterval(progressInterval));
 }
@@ -610,8 +648,6 @@ export function dismissSplash() {
   const splash = document.getElementById('splash');
   if (!splash) return;
 
-  // Seamless transition: ensure login-screen is ready behind the splash
-  // before the warp fade starts, preventing a sudden flash of unrendered map
   const login = document.getElementById('login-screen');
   if (login && !window.currentUser) {
     login.style.display = 'flex';
@@ -619,26 +655,22 @@ export function dismissSplash() {
   }
 
   splash.classList.add('splash-warp-exit');
-  // Warm up map rendering behind the fading splash
   window.safeInvalidateMapSize?.(false);
 
   setTimeout(() => {
     splash.style.display = 'none';
-    // Re-verify map geometry once splash overlay is fully removed
     window.safeInvalidateMapSize?.(false);
 
-    // Stop animation loop and clear listeners
     if (animId) {
       cancelAnimationFrame(animId);
       animId = null;
     }
-    stopCosmicDrone(0.1);
+    stopAmbientPad(0.1);
     for (const fn of cleanupFns) {
       try { fn(); } catch (_e) {}
     }
     cleanupFns = [];
 
-    // Dispose audio context if active
     if (audioCtx) {
       try {
         if (audioCtx.state !== 'closed') {
@@ -647,5 +679,5 @@ export function dismissSplash() {
       } catch (_e) {}
       audioCtx = null;
     }
-  }, 750);
+  }, 650);
 }
