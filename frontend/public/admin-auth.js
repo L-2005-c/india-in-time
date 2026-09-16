@@ -17,14 +17,39 @@ const provider = new GoogleAuthProvider();
 export function watchAdminAuth({ onSignedIn, onSignedOut }) {
   return onAuthStateChanged(auth, async (user) => {
     if (!user) { onSignedOut?.(); return; }
-    const tokenResult = await user.getIdTokenResult();
-    const isAdmin = tokenResult.claims?.admin === true;
-    if (!isAdmin) {
+    try {
+      const tokenResult = await user.getIdTokenResult();
+      let isAdmin = tokenResult.claims?.admin === true;
+      let adminRole = tokenResult.claims?.role || (isAdmin ? 'owner' : null);
+
+      if (!isAdmin) {
+        // Fall back to server-side verification (e.g. ADMIN_EMAILS whitelist configured on server)
+        const token = await user.getIdToken();
+        const res = await fetch('/api/admin/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok) {
+            isAdmin = true;
+            adminRole = data.role || 'analytics';
+          }
+        }
+      }
+
+      if (!isAdmin) {
+        const userEmail = user.email || 'This account';
+        await auth.signOut();
+        onSignedOut?.(`${userEmail} does not have the admin role. Please add this email to ADMIN_EMAILS in Render environment variables or grant the Firebase admin custom claim.`);
+        return;
+      }
+
+      user.adminRole = adminRole;
+      onSignedIn?.(user);
+    } catch (err) {
       await auth.signOut();
-      onSignedOut?.('Your account does not have the admin role.');
-      return;
+      onSignedOut?.('Authentication error: ' + (err.message || String(err)));
     }
-    onSignedIn?.(user);
   });
 }
 

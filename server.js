@@ -270,18 +270,14 @@ app.get('/api/health/ready', requireAdminAuth, async (_req, res) => {
     memory:   `${memMB}MB`,
     checks,
     flags: listFlags(),
-    gemini: {
-      circuitState: gemini.circuitState,
-      totalCalls:   gemini.total,
-      successRate:  gemini.total > 0 ? ((gemini.success / gemini.total) * 100).toFixed(1) + '%' : 'N/A',
-    },
-    caches: {
-      places:  placesCache.getStats(),
-      gemini:  geminiCache.getStats(),
-      weather: weatherCache.getStats(),
-      geocode: geocodeCache.getStats(),
-    },
+    gemini: { circuitState: gemini.circuitState, totalCalls: gemini.total, successRate: gemini.total > 0 ? ((gemini.success / gemini.total) * 100).toFixed(1) + '%' : 'N/A' },
+    caches: { places: placesCache.getStats(), gemini: geminiCache.getStats(), weather: weatherCache.getStats(), geocode: geocodeCache.getStats() },
   });
+});
+
+// Admin session & role verification
+app.get('/api/admin/me', requireAdminRole('owner', 'admin', 'analytics'), (req, res) => {
+  res.json({ ok: true, uid: req.uid, email: req.adminEmail, role: req.adminRole, authMethod: req.adminAuthMethod });
 });
 
 // Feature flag admin
