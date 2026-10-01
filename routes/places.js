@@ -115,6 +115,7 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
         const k = String(p.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
         if (!k || k.length < 2 || seen.has(k)) continue;
         if (!p.coords || p.coords.length < 2) continue;
+
         const integrity = validatePoiCoordinates(p.coords[0], p.coords[1], {
           cityHint: cityName,
           category: p.cat,
@@ -129,8 +130,8 @@ async function computePlaces({ lat, lon, cityName, totalMinutes, prefs, wantFood
       }
     }
 
-    // Priority order: AI geocoded (has open/close times) → Wikipedia (trusted coords)
-    // → curated seeds → Nominatim fallback search
+    // Priority order: AI geocoded (has open/close times) → static places
+    // → curated seeds → Wikipedia → Nominatim
     addPlaces(aiRanked);
     addPlaces(staticPlaces);
     addPlaces(filterPlacesByPrefs(curatedCity, prefs));

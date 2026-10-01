@@ -74,7 +74,7 @@ async function geocodeViaPhoton(q) {
     });
 }
 
-const { findGoldenPoi } = require('../data/goldenPoiDataset');
+const { resolveCanonicalPlace, validatePoiCoordinates } = require('../services/travelIntelligence/tourismPoi');
 
 async function computeGeocode(q, cityHint = '') {
   const searchQuery = cityHint && !q.toLowerCase().includes(cityHint.toLowerCase())
@@ -84,7 +84,7 @@ async function computeGeocode(q, cityHint = '') {
   let data;
   try {
     data = await throttledNominatimCall(async () => {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}+India&format=json&limit=1`;
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}+India&format=json&limit=3`;
       const upstream = await fetch(url, {
         headers: {
           'Accept-Language': 'en-US,en',
@@ -116,7 +116,25 @@ async function computeGeocode(q, cityHint = '') {
     }
   }
 
-  return Array.isArray(data) ? data : [];
+  const rawList = Array.isArray(data) ? data : [];
+  const sanitized = [];
+  for (const item of rawList) {
+    let rLat = parseFloat(item.lat);
+    let rLon = parseFloat(item.lon);
+    if (Number.isNaN(rLat) || Number.isNaN(rLon)) continue;
+    // Auto-detect and correct inverted coordinates (longitude in latitude)
+    if (rLat >= 68 && rLat <= 98 && rLon >= 6 && rLon <= 38) {
+      const tmp = rLat; rLat = rLon; rLon = tmp;
+      item.lat = String(rLat);
+      item.lon = String(rLon);
+    }
+    const val = validatePoiCoordinates(rLat, rLon, { cityHint });
+    if (val.valid) {
+      sanitized.push(item);
+    }
+  }
+
+  return sanitized.length > 0 ? sanitized : rawList;
 }
 
 router.get('/', async (req, res) => {
@@ -128,17 +146,17 @@ router.get('/', async (req, res) => {
   const cached = geocodeCache.get(key);
   if (cached) return res.json(cached);
 
-  // Authoritative Golden POI resolution (0ms, 100% verified, immune to rate-limits)
-  const golden = findGoldenPoi(q, cityHint || null);
-  if (golden) {
+  // Authoritative Canonical POI resolution (0ms, 100% verified, immune to rate-limits)
+  const canon = resolveCanonicalPlace(q, { cityHint: cityHint || null });
+  if (canon && canon.latitude && canon.longitude) {
     const payload = [{
-      lat: String(golden.latitude),
-      lon: String(golden.longitude),
-      name: golden.displayName,
-      display_name: `${golden.displayName}, ${golden.city}, ${golden.state}, India`,
-      source: 'golden_verified',
+      lat: String(canon.latitude),
+      lon: String(canon.longitude),
+      name: canon.displayName,
+      display_name: `${canon.displayName}, ${canon.city || cityHint || 'India'}, ${canon.state || 'India'}, India`,
+      source: 'canonical_verified',
       isGolden: true,
-      canonicalId: golden.id,
+      canonicalId: canon.id,
     }];
     geocodeCache.set(key, payload);
     return res.json(payload);

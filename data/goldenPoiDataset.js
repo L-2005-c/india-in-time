@@ -169,7 +169,7 @@ const GOLDEN_POIS = [
 
   // ── TIRUPATI ─────────────────────────────────────────────────────────────
   poi('tpt_venkateswara', 'Tirumala Venkateswara Temple', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6833, 79.3472, ['Tirumala Temple', 'Balaji Temple', 'Lord Venkateswara Swamy Temple', 'Srivari Temple Tirumala']),
-  poi('tpt_padmavathi', 'Sri Padmavathi Ammavari Temple (Tiruchanur)', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6068, 79.4475, ['Padmavathi Temple', 'Tiruchanur Temple', 'Alamelumangapuram Temple']),
+  poi('tpt_padmavathi', 'Sri Padmavathi Ammavari Temple (Tiruchanur)', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6080, 79.4350, ['Padmavathi Temple', 'Tiruchanur Temple', 'Alamelumangapuram Temple']),
   poi('tpt_govindaraja', 'Sri Govindaraja Swamy Temple', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6298, 79.4180, ['Govindaraja Swamy Temple Tirupati']),
   poi('tpt_kapila_theertham', 'Kapila Theertham & Sacred Waterfall', 'temple', 'Tirupati', 'Andhra Pradesh', 13.6520, 79.4192, ['Kapila Theertham', 'Kapileswara Swamy Temple']),
   poi('tpt_srikalahasti', 'Sri Srikalahasti Temple (Rahu Kethu Kshetram)', 'temple', 'Tirupati', 'Andhra Pradesh', 13.7498, 79.6984, ['Srikalahasti Temple', 'Kalahasteeswara Temple']),
@@ -223,7 +223,7 @@ const GOLDEN_POIS = [
   // ── VARANASI ─────────────────────────────────────────────────────────────
   poi('var_kashi_vishwanath', 'Kashi Vishwanath Temple', 'temple', 'Varanasi', 'Uttar Pradesh', 25.3109, 83.0107, ['Golden Temple Varanasi', 'Vishwanath Temple', 'Kashi Vishwanath']),
   poi('var_dashashwamedh', 'Dashashwamedh Ghat', 'scenic', 'Varanasi', 'Uttar Pradesh', 25.3062, 83.0107, ['Dashashwamedh', 'Main Ghat Varanasi', 'Ganga Aarti Ghat']),
-  poi('var_sarnath', 'Sarnath Buddhist Complex', 'heritage', 'Varanasi', 'Uttar Pradesh', 25.3716, 83.0252, ['Sarnath', 'Deer Park Sarnath', 'Dhamekh Stupa']),
+  poi('var_sarnath', 'Sarnath Buddhist Complex', 'heritage', 'Varanasi', 'Uttar Pradesh', 25.3811, 83.0214, ['Sarnath', 'Deer Park Sarnath', 'Dhamekh Stupa']),
   poi('var_assi_ghat', 'Assi Ghat', 'scenic', 'Varanasi', 'Uttar Pradesh', 25.2887, 83.0061, ['Assi Ghat Varanasi']),
 ];
 

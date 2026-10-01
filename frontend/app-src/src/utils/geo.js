@@ -43,17 +43,25 @@ function isFiniteLatLon(lat, lon) {
 }
 
 function normalizeLatLon(coords){
-  // Expect [lat, lon]. If it looks swapped (common in older saved plans), fix it.
-  const a=Number(coords?.[0]);
-  const b=Number(coords?.[1]);
+  if (!coords) return coords;
+  let a, b;
+  if (Array.isArray(coords)) {
+    a = Number(coords[0]);
+    b = Number(coords[1]);
+  } else if (typeof coords === 'object') {
+    a = Number(coords.lat ?? coords.latitude);
+    b = Number(coords.lon ?? coords.lng ?? coords.longitude);
+  } else {
+    return coords;
+  }
   if (Number.isNaN(a) || Number.isNaN(b)) return coords;
-  const aIsLat=a>=6 && a<=38;
-  const aIsLon=a>=68 && a<=98;
-  const bIsLat=b>=6 && b<=38;
-  const bIsLon=b>=68 && b<=98;
-  if (aIsLat && bIsLon) return [a,b];
-  if (aIsLon && bIsLat) return [b,a];
-  return [a,b];
+  const aIsLat = a >= 6 && a <= 38;
+  const aIsLon = a >= 68 && a <= 98;
+  const bIsLat = b >= 6 && b <= 38;
+  const bIsLon = b >= 68 && b <= 98;
+  if (aIsLat && bIsLon) return [a, b];
+  if (aIsLon && bIsLat) return [b, a];
+  return [a, b];
 }
 
 function significantWords(n){

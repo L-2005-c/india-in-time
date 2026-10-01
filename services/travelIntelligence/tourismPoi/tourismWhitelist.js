@@ -219,7 +219,7 @@ const VARANASI = [
   entry('Dashashwamedh Ghat', 'scenic', 'S', 25.3062, 83.0107),
   entry('Kashi Vishwanath Temple', 'temple', 'S', 25.3109, 83.0107, ['kashi vishwanath']),
   entry('Assi Ghat', 'scenic', 'A', 25.2887, 83.0061),
-  entry('Sarnath', 'heritage', 'S', 25.3716, 83.0252),
+  entry('Sarnath', 'heritage', 'S', 25.3811, 83.0214),
   entry('Ramnagar Fort', 'heritage', 'A', 25.2694, 83.0292),
   entry('Manikarnika Ghat', 'scenic', 'A', 25.3102, 83.0140),
   entry('Dhamek Stupa Sarnath', 'heritage', 'S', 25.3808, 83.0245, ['dhamekh stupa']),
@@ -254,7 +254,7 @@ const KOLKATA = [
 
 const TIRUPATI = [
   entry('Tirumala Venkateswara Temple', 'temple', 'S', 13.6833, 79.3472, ['tirumala temple', 'balaji temple', 'lord venkateswara']),
-  entry('Sri Padmavathi Ammavari Temple (Tiruchanur)', 'temple', 'S', 13.6068, 79.4475, ['padmavathi temple', 'tiruchanur temple']),
+  entry('Sri Padmavathi Ammavari Temple (Tiruchanur)', 'temple', 'S', 13.6080, 79.4350, ['padmavathi temple', 'tiruchanur temple']),
   entry('Sri Govindaraja Swamy Temple', 'temple', 'A', 13.6298, 79.4180, ['govindaraja swamy temple']),
   entry('Kapila Theertham & Sacred Waterfall', 'temple', 'A', 13.6520, 79.4192, ['kapila theertham']),
   entry('Sri Srikalahasti Temple (Rahu Kethu Kshetram)', 'temple', 'S', 13.7498, 79.6984, ['srikalahasti temple']),

@@ -19,12 +19,38 @@
 
 const { findGoldenPoi } = require('../../../data/goldenPoiDataset');
 const { resolveWhitelist } = require('./tourismWhitelist');
+const { staticCityPlaces, resolveCityKey } = require('../../../data/city-seeds');
 const { isBlacklistedEntity, isLocalityOnlyName } = require('./tourismBlacklist');
 const { createCanonicalPlace } = require('./canonicalPlaceModel');
 const { classifyTourismCategory } = require('./tourismCategoryClassifier');
 const { distKm } = require('../../../utils/geo');
 
 const { verifyAttractionCoordinates } = require('./coordinateVerificationEngine');
+
+function findCitySeedMatch(rawName, cityHint) {
+  if (!rawName) return null;
+  const q = String(rawName).toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+  if (!q || q.length < 2) return null;
+
+  const qClean = q.replace(/\b(temple|beach|museum|park|fort|palace|lake|falls|waterfalls|garden|viewpoint|sanctuary|restaurant|hotel|bazaar|market|promenade|complex)\b/g, '').trim();
+
+  const candidateCities = [];
+  if (cityHint && cityHint !== 'Unknown') {
+    const k = resolveCityKey(cityHint);
+    if (k) candidateCities.push(k);
+  }
+
+  for (const cKey of candidateCities) {
+    const places = staticCityPlaces(cKey) || [];
+    for (const p of places) {
+      const pName = String(p.name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+      if (pName === q) return { ...p, city: cKey };
+      if (pName.includes(q) || q.includes(pName)) return { ...p, city: cKey };
+      if (qClean && qClean.length >= 4 && pName.includes(qClean)) return { ...p, city: cKey };
+    }
+  }
+  return null;
+}
 
 /**
  * Normalizes raw name strings (removes excess punctuation, normalizes spacing).
@@ -163,8 +189,56 @@ function resolveCanonicalPlace(input, options = {}) {
       openingHours: rawObj.openingHours || (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
       isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
       isSunsetSpot: Boolean(rawObj.isSunsetSpot || rawObj.is_sunset_spot),
-      indoorOutdoor: rawObj.indoorOutdoor || rawObj.indoor_outdoor || 'mixed',
+      });
+  }
+
+  // 3.5. Check Curated City Seeds Dataset (1000+ hand-surveyed municipal landmarks)
+  const seedMatch = findCitySeedMatch(rawName, cityHint);
+  if (seedMatch && Array.isArray(seedMatch.coords) && seedMatch.coords.length >= 2) {
+    const targetCity = cityHint !== 'Unknown' ? cityHint : seedMatch.city;
+    const sLat = seedMatch.coords[0];
+    const sLon = seedMatch.coords[1];
+    const verification = verifyAttractionCoordinates({
+      placeName: seedMatch.name,
+      city: targetCity,
+      state: 'India',
+      category: seedMatch.cat || categoryHint,
+      candidateCoords: [sLat, sLon],
+      provider: 'CURATED_CITY_SEEDS',
     });
+
+    if (verification.verified || verification.verificationStatus !== 'REJECTED') {
+      return createCanonicalPlace({
+        id: seedMatch.id || `seed_${seedMatch.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+        canonicalPlaceId: seedMatch.id,
+        canonicalName: seedMatch.name,
+        displayName: seedMatch.name,
+        aliases: [rawName],
+        category: seedMatch.cat || categoryHint,
+        latitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : sLat,
+        longitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : sLon,
+        city: targetCity,
+        state: 'India',
+        tourismStatus: 'VERIFIED_ATTRACTION',
+        coordinateSource: 'CURATED_SEEDS',
+        source: 'city_seeds',
+        sourceType: 'CURATED_SEED',
+        nameSource: 'CURATED_SEED',
+        verificationStatus: verification.verified ? 'VERIFIED' : verification.verificationStatus,
+        verificationMethod: 'CURATED_SEED_VERIFICATION',
+        confidence: 'HIGH',
+        evidence: [
+          'Curated city seed candidate',
+          ...(verification.evidence || []),
+        ],
+        lastValidatedAt: new Date().toISOString(),
+        visitMinutes: seedMatch.vt || rawObj.visitMinutes || rawObj.visit_minutes || 60,
+        openingHours: (seedMatch.ot && seedMatch.ct) ? { openTime: seedMatch.ot, closeTime: seedMatch.ct } : (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
+        isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
+        isSunsetSpot: Boolean(rawObj.isSunsetSpot || rawObj.is_sunset_spot),
+        indoorOutdoor: rawObj.indoorOutdoor || rawObj.indoor_outdoor || 'mixed',
+      });
+    }
   }
 
   // 4. Fallback / Discovery Resolution with Coordinate Integrity & Zero-Trust Validation

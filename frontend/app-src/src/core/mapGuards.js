@@ -6,17 +6,31 @@ import { browserLogger } from '../utils/browser-logger.js';
 export function installLeafletSafetyGuards(Lib = globalThis.L) {
   if (!Lib) return;
 
+  const cleanLatLngPair = value => {
+    if (Array.isArray(value)) {
+      if (value.length < 2) return null;
+      let lat = +value[0], lng = +value[1];
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      // Invert if passed as [longitude, latitude] in India (lat in 68-98, lng in 6-38)
+      if (lat >= 68 && lat <= 98 && lng >= 6 && lng <= 38) {
+        const tmp = lat; lat = lng; lng = tmp;
+      }
+      return [lat, lng];
+    }
+    if (value && typeof value === 'object') {
+      let lat = +value.lat, lng = +(value.lng ?? value.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      if (lat >= 68 && lat <= 98 && lng >= 6 && lng <= 38) {
+        const tmp = lat; lat = lng; lng = tmp;
+      }
+      return [lat, lng];
+    }
+    return null;
+  };
+
   if (!Lib.__coordGuardInstalled) {
     Lib.__coordGuardInstalled = true;
-    const isFiniteLatLngPair = value => {
-      if (Array.isArray(value)) {
-        return value.length >= 2 && Number.isFinite(+value[0]) && Number.isFinite(+value[1]);
-      }
-      if (value && typeof value === 'object') {
-        return Number.isFinite(+value.lat) && Number.isFinite(+(value.lng ?? value.lon));
-      }
-      return false;
-    };
+    const isFiniteLatLngPair = value => Boolean(cleanLatLngPair(value));
     const noopLayer = () => {
       const stub = {};
       ['addTo','bindPopup','bindTooltip','setLatLng','setStyle','setIcon','setLatLngs','on','off','remove','removeFrom']
@@ -31,19 +45,17 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
     if (typeof originalLatLng === 'function') {
       Lib.latLng = function latLngGuard(a, b, c) {
         try {
-          if (Array.isArray(a)) {
-            const lat = +a[0], lng = +a[1];
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return originalLatLng.call(Lib, 20.5937, 78.9629);
-            return originalLatLng.call(Lib, lat, lng);
+          if (Array.isArray(a) || (a && typeof a === 'object')) {
+            const cleaned = cleanLatLngPair(a);
+            if (!cleaned) return originalLatLng.call(Lib, 20.5937, 78.9629);
+            return originalLatLng.call(Lib, cleaned[0], cleaned[1]);
           }
-          if (a && typeof a === 'object') {
-            const lat = +a.lat, lng = +(a.lng ?? a.lon);
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return originalLatLng.call(Lib, 20.5937, 78.9629);
-            return originalLatLng.call(Lib, lat, lng);
-          }
-          const lat = +a, lng = +b;
+          let lat = +a, lng = +b;
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             return originalLatLng.call(Lib, 20.5937, 78.9629);
+          }
+          if (lat >= 68 && lat <= 98 && lng >= 6 && lng <= 38) {
+            const tmp = lat; lat = lng; lng = tmp;
           }
           return originalLatLng.call(Lib, lat, lng, c);
         } catch (_e) {
@@ -55,8 +67,11 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
     if (typeof Lib.LatLng === 'function') {
       const OrigLatLng = Lib.LatLng;
       Lib.LatLng = function SafeLatLng(lat, lng, alt) {
-        const safeLat = Number.isFinite(+lat) ? +lat : 20.5937;
-        const safeLng = Number.isFinite(+lng) ? +lng : 78.9629;
+        let safeLat = Number.isFinite(+lat) ? +lat : 20.5937;
+        let safeLng = Number.isFinite(+lng) ? +lng : 78.9629;
+        if (safeLat >= 68 && safeLat <= 98 && safeLng >= 6 && safeLng <= 38) {
+          const tmp = safeLat; safeLat = safeLng; safeLng = tmp;
+        }
         return new OrigLatLng(safeLat, safeLng, alt);
       };
       Lib.LatLng.prototype = OrigLatLng.prototype;
@@ -65,24 +80,26 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
     if (Lib.Marker && Lib.Marker.prototype) {
       const origSetLatLng = Lib.Marker.prototype.setLatLng;
       Lib.Marker.prototype.setLatLng = function guardedSetLatLng(latlng) {
-        if (!isFiniteLatLngPair(latlng)) return this;
-        try { return origSetLatLng.call(this, latlng); }
+        const cleaned = cleanLatLngPair(latlng);
+        if (!cleaned) return this;
+        try { return origSetLatLng.call(this, cleaned); }
         catch (_err) { return this; }
       };
     }
 
     const originalMarker = Lib.marker;
     Lib.marker = function markerGuard(coords, options) {
-      if (!isFiniteLatLngPair(coords)) {
+      const cleaned = cleanLatLngPair(coords);
+      if (!cleaned) {
         browserLogger.warn('[map guard] skipped L.marker — invalid coords:', coords, options?.icon?.options?.className || '');
         return noopLayer();
       }
-      return originalMarker.call(Lib, coords, options);
+      return originalMarker.call(Lib, cleaned, options);
     };
 
     const originalPolyline = Lib.polyline;
     Lib.polyline = function polylineGuard(latlngs, options) {
-      const clean = (Array.isArray(latlngs) ? latlngs : []).filter(isFiniteLatLngPair);
+      const clean = (Array.isArray(latlngs) ? latlngs : []).map(cleanLatLngPair).filter(Boolean);
       if (clean.length < 2) {
         browserLogger.warn('[map guard] skipped L.polyline — fewer than 2 valid points out of', (latlngs || []).length);
         return noopLayer();
@@ -97,8 +114,9 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
       if (typeof Lib[fn] === 'function') {
         const orig = Lib[fn];
         Lib[fn] = function safeCircle(latlng, options) {
-          if (!isFiniteLatLngPair(latlng)) return noopLayer();
-          return orig.call(Lib, latlng, options);
+          const cleaned = cleanLatLngPair(latlng);
+          if (!cleaned) return noopLayer();
+          return orig.call(Lib, cleaned, options);
         };
       }
     });
@@ -155,27 +173,27 @@ export function installLeafletSafetyGuards(Lib = globalThis.L) {
     const needsStop = methodName !== 'setView';
 
     Lib.Map.prototype[methodName] = function guardedMapMove(target, ...rest) {
-      const lat = Array.isArray(target) ? target[0] : target?.lat;
-      const lng = Array.isArray(target) ? target[1] : (target?.lng ?? target?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      const cleaned = cleanLatLngPair(target);
+      if (!cleaned) {
         browserLogger.warn(`[map guard] skipped ${methodName} — invalid target:`, target);
         return this;
       }
+      const safeTarget = cleaned;
 
       if (methodName === 'flyTo') {
         const size = this.getSize ? this.getSize() : null;
         if (!size || !(size.x > 0) || !(size.y > 0)) {
           browserLogger.warn('[map guard] flyTo on a hidden/zero-size map — using instant setView instead');
-          return originalSetView.call(this, target, rest[0]);
+          return originalSetView.call(this, safeTarget, rest[0]);
         }
       }
 
       if (needsStop) this.stop();
       try {
-        return original.call(this, target, ...rest);
+        return original.call(this, safeTarget, ...rest);
       } catch (error) {
         browserLogger.warn(`[map guard] ${methodName} threw, falling back to instant setView`, error);
-        try { return originalSetView.call(this, target, rest[0]); }
+        try { return originalSetView.call(this, safeTarget, rest[0]); }
         catch (fallbackError) {
           browserLogger.warn('[map guard] fallback setView also threw', fallbackError);
           return this;

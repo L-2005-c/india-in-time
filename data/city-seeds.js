@@ -716,7 +716,7 @@ function staticCityPlaces(cityName) {
       ['Dashashwamedh Ghat','scenic',25.3062,83.0107,75,'05:00','22:00'],
       ['Kashi Vishwanath Temple','temple',25.3109,83.0107,75,'04:00','23:00'],
       ['Assi Ghat','scenic',25.2887,83.0061,60,'05:00','22:00'],
-      ['Sarnath','scenic',25.3716,83.0252,90,'09:00','17:00'],
+      ['Sarnath','scenic',25.3811,83.0214,90,'09:00','17:00'],
       ['Ramnagar Fort','scenic',25.2694,83.0292,75,'10:00','17:00'],
       ['Manikarnika Ghat','scenic',25.3102,83.0140,45,'05:00','22:00'],
       ['Kashi Chaat Bhandar','food',25.3094,83.0061,40,'16:00','22:30'],
@@ -746,7 +746,7 @@ function staticCityPlaces(cityName) {
     ],
     tirupati: [
       ['Tirumala Venkateswara Temple','temple',13.6833,79.3472,180,'03:00','23:59'],
-      ['Sri Padmavathi Ammavari Temple (Tiruchanur)','temple',13.6068,79.4475,75,'05:00','21:00'],
+      ['Sri Padmavathi Ammavari Temple (Tiruchanur)','temple',13.6080,79.4350,75,'05:00','21:00'],
       ['Sri Govindaraja Swamy Temple','temple',13.6298,79.4180,60,'05:00','21:30'],
       ['Kapila Theertham & Sacred Waterfall','temple',13.6520,79.4192,60,'05:00','20:30'],
       ['Sri Srikalahasti Temple (Rahu Kethu Kshetram)','temple',13.7498,79.6984,90,'06:00','21:00'],
