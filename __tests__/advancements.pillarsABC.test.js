@@ -223,7 +223,8 @@ describe('Pillars A, B, C Advancements Suite', () => {
       expect(resolveRegionKey('Lambasingi', 'lambasingi')).toBe('alluri_paderu');
       expect(resolveRegionKey('Tirupati Town', 'tirupati')).toBe('tirupati');
       expect(resolveRegionKey('Visakhapatnam Port', 'visakhapatnam')).toBe('visakhapatnam');
-      expect(resolveRegionKey('Bengaluru City', 'bangalore')).toBeNull();
+      expect(resolveRegionKey('Bengaluru City', 'bangalore')).toBe('bengaluru');
+      expect(resolveRegionKey('Unknown Remote Place', 'unknown_city')).toBeNull();
     });
 
     test('EMERGENCY_DIRECTORIES contains authoritative contacts', () => {
