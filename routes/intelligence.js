@@ -27,10 +27,17 @@ const { getAggregateWeatherAccuracyMetrics } = require('../services/travelIntell
 const {
   createJourneyState,
   advanceJourneyProgress,
+  calculatePacingRecovery,
+  rollbackJourneyProgress,
   TRIP_HEALTH_STATES,
 } = require('../services/travelIntelligence/journey/journeyStateEngine');
 const { evaluateTripGuardian } = require('../services/travelIntelligence/guardian/travelGuardian');
 const { adaptJourneyPlan } = require('../services/travelIntelligence/decision/adaptationPipeline');
+const { findTopAlternatives } = require('../services/travelIntelligence/decision/alternativeGenerator');
+const {
+  findMidwayPitstops,
+  insertPitstopIntoJourney,
+} = require('../services/travelIntelligence/journey/pitstopRecommender');
 const {
   evaluateNextDecision,
   recordDecisionOutcome,
@@ -304,11 +311,145 @@ router.post('/trips/:id/state/progress', (req, res) => {
       activeStop: updatedState.activeStop,
       completedStopsCount: updatedState.completedStops.length,
       upcomingStopsCount: updatedState.upcomingStops.length,
+      progressMetrics: updatedState.progressMetrics,
+      pacingRecovery: calculatePacingRecovery(updatedState),
       isCompleted: Boolean(isTripFinished),
       nextIntentRequired: Boolean(isTripFinished),
     });
   } catch (err) {
     appLogger.warn(`[intelligence/progress] Warning: ${err.message}`);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── 6b. Journey State: Safe Rollback / Undo Last Action ──────────────────────
+router.post('/trips/:id/state/rollback', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  if (!record) {
+    return res.status(404).json({ error: `No active journey state found for trip '${tripId}'` });
+  }
+
+  try {
+    const rolledBackState = rollbackJourneyProgress(record.state);
+    record.state = rolledBackState;
+    activeTripsState.set(tripId, record);
+
+    res.json({
+      message: 'Previous action rolled back successfully',
+      tripId,
+      activeStop: rolledBackState.activeStop,
+      pacingLagMinutes: rolledBackState.pacingLagMinutes,
+      completedStopsCount: rolledBackState.completedStops.length,
+      upcomingStopsCount: rolledBackState.upcomingStops.length,
+      progressMetrics: rolledBackState.progressMetrics,
+    });
+  } catch (err) {
+    appLogger.warn(`[intelligence/rollback] Warning: ${err.message}`);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── 6c. Journey State: Pacing Recovery Optimizer ─────────────────────────────
+router.get('/trips/:id/state/pacing-recovery', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  if (!record) {
+    return res.status(404).json({ error: `No active journey state found for trip '${tripId}'` });
+  }
+
+  const recovery = calculatePacingRecovery(record.state);
+  res.json({ tripId, recovery });
+});
+
+// ── 6d. Travel Intelligence: Dynamic Top Alternatives Query ──────────────────
+router.post('/trips/:id/alternatives', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+  const { stop, reason = 'WEATHER_RAIN', limit = 3 } = req.body || {};
+
+  if (!stop) {
+    return res.status(400).json({ error: 'stop object is required' });
+  }
+
+  const alternatives = findTopAlternatives(stop, {
+    reason,
+    travelerDna: record?.travelerDna || {},
+    currentMinute: record?.state?.currentMinute || 600,
+    limit: Number(limit) || 3,
+  });
+
+  res.json({
+    tripId,
+    targetStop: stop.name || stop.id,
+    reason,
+    count: alternatives.length,
+    alternatives,
+  });
+});
+
+// ── 6e. Wayside Pitstops: Corridor Recharge & Pitstop Discovery ─────────────
+router.get('/trips/:id/pitstops', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+
+  if (!record || !record.state) {
+    return res.status(404).json({ error: `No active journey state found for trip '${tripId}'` });
+  }
+
+  const activeStop = record.state.activeStop || record.state.stops[0];
+  const nextStop = record.state.upcomingStops?.[0] || null;
+
+  if (!activeStop) {
+    return res.status(400).json({ error: 'No active stop available for pitstop calculation' });
+  }
+
+  const pitstops = findMidwayPitstops({
+    activeStop,
+    nextStop,
+    currentMinute: record.state.currentMinute || 720,
+    weather: req.query.tempC ? { temperatureC: Number(req.query.tempC), precipitationProb: Number(req.query.rainProb || 0) } : {},
+    limit: Number(req.query.limit) || 3,
+  });
+
+  res.json({
+    tripId,
+    activeStop: activeStop.name,
+    nextStop: nextStop?.name || null,
+    currentMinute: record.state.currentMinute || 720,
+    pitstops,
+  });
+});
+
+router.post('/trips/:id/pitstops', (req, res) => {
+  const tripId = req.params.id;
+  const record = activeTripsState.get(tripId);
+  const { pitstop, insertAfterStopId } = req.body || {};
+
+  if (!record || !record.state) {
+    return res.status(404).json({ error: `No active journey state found for trip '${tripId}'` });
+  }
+  if (!pitstop || !pitstop.name) {
+    return res.status(400).json({ error: 'Valid pitstop object with name is required' });
+  }
+
+  try {
+    const updatedState = insertPitstopIntoJourney(record.state, pitstop, insertAfterStopId);
+    record.state = updatedState;
+    activeTripsState.set(tripId, record);
+
+    res.json({
+      message: `Pitstop '${pitstop.name}' added to itinerary`,
+      tripId,
+      activePlanVersion: updatedState.activePlanVersion,
+      totalStopsCount: updatedState.stops.length,
+      upcomingStopsCount: updatedState.upcomingStops.length,
+      progressMetrics: updatedState.progressMetrics,
+    });
+  } catch (err) {
+    appLogger.warn(`[intelligence/pitstops] Warning: ${err.message}`);
     res.status(400).json({ error: err.message });
   }
 });

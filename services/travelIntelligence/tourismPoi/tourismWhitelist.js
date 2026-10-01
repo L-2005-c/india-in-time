@@ -52,8 +52,6 @@ const VIZAG = [
   entry('Tenneti Park', 'park', 'B', 17.7484, 83.3495),
   entry('Kambalakonda Jungle Trek', 'trekking', 'S', 17.7795, 83.3355, ['kambalakonda trek']),
   entry('Simhachalam Hill Pavani Trail', 'trekking', 'A', 17.7680, 83.2520, ['simhachalam trek']),
-  entry('Vanjangi Cloud Peak Trek', 'trekking', 'S', 18.0062, 82.7230, ['vanjangi trek', 'meghala konda']),
-  entry('Katiki Waterfalls Jungle Trail', 'trekking', 'A', 18.2910, 83.0080, ['katiki trek']),
   entry('Yarada Dolphin Ridge Hike', 'trekking', 'B', 17.6560, 83.2710, ['dolphin ridge trek']),
 ];
 
@@ -148,13 +146,13 @@ const BENGALURU = [
 ];
 
 const KOCHI = [
-  entry('Fort Kochi Beach', 'beach', 'A', 9.9658, 76.2421),
-  entry('Chinese Fishing Nets', 'scenic', 'S', 9.9681, 76.2441, ['chinese nets', 'cheena vala']),
+  entry('Fort Kochi Beach', 'beach', 'A', 9.9637, 76.2375),
+  entry('Chinese Fishing Nets', 'scenic', 'S', 9.9667, 76.2420, ['chinese nets', 'cheena vala']),
   entry('Mattancherry Palace', 'heritage', 'A', 9.9580, 76.2595, ['dutch palace']),
   entry('St Francis Church Kochi', 'temple', 'A', 9.9659, 76.2411, ['st francis church']),
   entry('Santa Cruz Cathedral Basilica', 'temple', 'A', 9.9644, 76.2410, ['santa cruz basilica']),
   entry('Jewish Synagogue Kochi', 'heritage', 'A', 9.9575, 76.2595, ['pardesi synagogue', 'jewish synagogue']),
-  entry('Marine Drive Kochi', 'scenic', 'A', 9.9816, 76.2754),
+  entry('Marine Drive Kochi', 'scenic', 'A', 9.9772, 76.2773, ['rainbow bridge', 'marine drive kochi']),
   entry('Hill Palace Museum Tripunithura', 'museum', 'A', 9.9535, 76.3638, ['hill palace kochi']),
   entry('Kumbalangi Model Eco-Tourism Village', 'scenic', 'A', 9.8761, 76.2871, ['kumbalangi']),
   entry('Cherai Beach & Sunset Point', 'beach', 'A', 10.1415, 76.1785, ['cherai beach']),

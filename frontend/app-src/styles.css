@@ -1289,6 +1289,7 @@ body::before {
   background:#070a13;
   display:flex; align-items:center; justify-content:center;
   overflow:hidden; perspective:1100px;
+  contain:strict;
 }
 
 #splash-star-canvas{
@@ -1370,6 +1371,7 @@ body::before {
 
 /* 3D Rolling Logo Container */
 .logo-roller-3d{
+  will-change:transform; backface-visibility:hidden;
   position:relative; z-index:10; transform-style:preserve-3d;
   animation:logo3dRollIn 1.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -1599,17 +1601,17 @@ body::before {
 
 /* Keep the introduction responsive on lower-power phones and honor the
    platform-wide reduced-motion preference. */
-#splash.performance-lite .glow-orb{
-  filter:blur(48px);
+#splash.performance-lite .glow-orb,
+#splash.is-mobile-device .glow-orb{
+  filter:none;
   animation:none;
-  opacity:0.3;
+  opacity:0.35;
+  transform:translateZ(0);
 }
 #splash.performance-lite .badge-sheen,
-#splash.performance-lite .logo-roller-3d,
-#splash.performance-lite .ground-shadow{
-  animation:none;
+#splash.is-mobile-device .badge-sheen{
+  opacity:0.15;
 }
-#splash.performance-lite .badge-sheen{ opacity:0.12; }
 
 @media (prefers-reduced-motion: reduce) {
   #splash .glow-orb,
@@ -1619,7 +1621,7 @@ body::before {
   #splash .landing-shockwave{
     animation:none;
   }
-  #splash .glow-orb { filter:blur(48px); }
+  #splash .glow-orb { filter:none; }
   .brand-reveal-box{ opacity:1 !important; transform:none !important; }
 }
 
@@ -5793,23 +5795,42 @@ html, body {
   will-change: transform;
 }
 
-@media (max-width: 640px) {
-  /* Reduce the blur radius on the surfaces that scroll with content. */
-  .stop-card, .bubble {
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+@media (max-width: 768px), (pointer: coarse) {
+  /* 1. Eliminate heavy background blur mesh & SVG noise on mobile devices */
+  .ambient-glow-canvas {
+    display: none !important;
+  }
+  body::before {
+    display: none !important;
   }
 
-  /* Full-screen grain overlay GPU layer stabilization */
-  body::before {
+  /* 2. Hardware acceleration & clean glass on fixed navigation chrome */
+  #header, #bottom-nav {
+    -webkit-backdrop-filter: blur(12px) !important;
+    backdrop-filter: blur(12px) !important;
+    background: rgba(10, 15, 29, 0.94) !important;
     transform: translateZ(0);
   }
 
-  /* Mobile GPU Splash screen optimization */
+  /* 3. High-performance scrollable cards: replace heavy backdrop-filter with rich opaque glass */
+  .faang-stop-card, .stop-card, .whatif-card, .recom-card, .timeline-card, .bubble {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: rgba(15, 23, 42, 0.96) !important;
+    contain: layout style;
+    touch-action: pan-y;
+  }
+
+  .faang-stop-card {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  /* 4. Mobile GPU Splash screen optimization */
   #splash .glow-orb {
-    filter: blur(24px) !important;
-    opacity: 0.32 !important;
-    animation-duration: 14s !important;
+    filter: none !important;
+    opacity: 0.35 !important;
+    animation: none !important;
+    transform: translateZ(0);
   }
   #splash .glow-cyan {
     width: 260px !important;
@@ -5826,11 +5847,24 @@ html, body {
   #splash .badge-sheen {
     mix-blend-mode: normal !important;
     background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.08) 48%, rgba(56,189,248,0.2) 50%, rgba(255,255,255,0.08) 52%, transparent 65%) !important;
+    transform: translateZ(0);
   }
   #splash .modern-flag, #splash .splash-flag {
-    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.75)) !important;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.7)) !important;
+    transform: translateZ(0);
+  }
+
+  /* Controls on mobile splash: lightweight translucent */
+  .btn-sound-splash, .btn-skip-splash, .btn-hero-explore {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+  }
+
+  /* Smooth momentum scrolling & containment */
+  .view-container, .scroll-container, #plan-list, #chat-box {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 }
-
-
-

@@ -3,20 +3,111 @@
 /**
  * services/travelIntelligence/guardian/travelGuardian.js
  *
- * Real-Time Travel Guardian for India In-Time v3.0.
- * Continuously evaluates journey health against weather, traffic, delays, and closures.
+ * Next-Gen Real-Time Travel Guardian for India In-Time v3.0.
+ * Continuously evaluates journey health against weather, traffic, delays, closures,
+ * Indian microclimate hazards, and predictive corridor risks.
  *
- * Possible Health States:
- * - ON_TRACK
- * - WATCH
- * - SUBOPTIMAL
- * - REPLAN_RECOMMENDED
- * - CRITICAL
- * - INSUFFICIENT_DATA
+ * Capabilities:
+ * - Authoritative Health Bands: ON_TRACK, WATCH, SUBOPTIMAL, SAFETY_CAUTION,
+ *   SAFETY_ACTION_RECOMMENDED, REPLAN_RECOMMENDED, CRITICAL, INSUFFICIENT_DATA.
+ * - Numerical Safety Score (0-100) reflecting overall corridor risk.
+ * - Predictive Forward-Horizon Timeline: Evaluates hazard risks at exact projected arrival minutes.
+ * - Smart Recovery Window Estimation: Detects transitory weather/traffic surges and suggests pause durations.
+ * - Plain-language Actionable Guidance for stress-free traveler decisions.
  */
 
 const { evaluateTriggers, TRIGGER_SEVERITY } = require('./triggerFramework');
 const { TRIP_HEALTH_STATES } = require('../journey/journeyStateEngine');
+
+/**
+ * Computes an authoritative Safety Health Score from active triggers.
+ * 100 = Pristine safety, 80-99 = Nominal, 60-79 = Caution, <60 = High Risk.
+ */
+function computeSafetyScore(activeTriggers = []) {
+  let score = 100;
+  for (const t of activeTriggers) {
+    if (t.severity === TRIGGER_SEVERITY.CRITICAL) {
+      score -= 35;
+    } else if (t.severity === TRIGGER_SEVERITY.SEVERE || t.severity === TRIGGER_SEVERITY.WARNING) {
+      score -= 20;
+    } else if (t.severity === TRIGGER_SEVERITY.SUBOPTIMAL || t.severity === TRIGGER_SEVERITY.CAUTION) {
+      score -= 10;
+    } else if (t.severity === TRIGGER_SEVERITY.WATCH) {
+      score -= 5;
+    }
+  }
+  return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Evaluates whether a detected disruption is transient and can be weathered via a short pause.
+ */
+function calculateRecoveryWindow(activeTriggers = [], weatherTelemetry = {}, trafficTelemetry = {}) {
+  const isRecovering = trafficTelemetry.isRecovering || trafficTelemetry.disruption?.recoveryTrend === 'IMPROVING';
+  const rainProb = weatherTelemetry.precipitationProb ?? 0;
+  const isHeavyRain = rainProb >= 65 || /heavy|storm|downpour/i.test(weatherTelemetry.condition || '');
+  const hasGhatRisk = activeTriggers.some(t => t.type === 'GHAT_ROAD_RISK');
+
+  if (isHeavyRain && !hasGhatRisk && rainProb < 80) {
+    return {
+      isRecoveryViable: true,
+      suggestedPauseMinutes: 40,
+      clearingOutlook: 'Moderate localized passing shower expected to ease within 40-50 minutes.',
+      guidance: 'Recommend a 40-minute coffee or sheltered stop; outdoor conditions should improve without needing major route changes.',
+    };
+  }
+
+  if (isRecovering) {
+    return {
+      isRecoveryViable: true,
+      suggestedPauseMinutes: 20,
+      clearingOutlook: 'Traffic flow is recovering back to normal corridor baseline.',
+      guidance: 'Corridor clearing underway; a brief 20-minute refreshment pause will allow traffic congestion to dissipate.',
+    };
+  }
+
+  return {
+    isRecoveryViable: false,
+    suggestedPauseMinutes: 0,
+    clearingOutlook: hasGhatRisk ? 'Persistent ghat hazard requires active replanning or detour.' : 'Stable observed conditions.',
+    guidance: null,
+  };
+}
+
+/**
+ * Generates forward-looking stop-by-stop health timeline at projected arrival minutes.
+ */
+function buildPredictiveTimeline(stops = [], activeTriggers = [], currentLag = 0) {
+  const triggerStopMap = new Map();
+  for (const t of activeTriggers) {
+    if (t.stopId) {
+      if (!triggerStopMap.has(t.stopId)) triggerStopMap.set(t.stopId, []);
+      triggerStopMap.get(t.stopId).push(t);
+    }
+  }
+
+  return stops.map(stop => {
+    const stopTriggers = triggerStopMap.get(stop.id) || [];
+    let status = 'HEALTHY';
+    if (stopTriggers.some(t => t.severity === TRIGGER_SEVERITY.CRITICAL)) {
+      status = 'CRITICAL';
+    } else if (stopTriggers.some(t => t.severity === TRIGGER_SEVERITY.WARNING || t.severity === TRIGGER_SEVERITY.SEVERE)) {
+      status = 'WARNING';
+    } else if (stopTriggers.length > 0) {
+      status = 'CAUTION';
+    }
+
+    return {
+      stopId: stop.id,
+      stopName: stop.name,
+      category: stop.category,
+      projectedArrivalMinute: stop.projectedArrivalMinute || (stop.plannedArrivalMinute + currentLag),
+      status,
+      triggerCount: stopTriggers.length,
+      primaryRisk: stopTriggers.length > 0 ? stopTriggers[0].message : null,
+    };
+  });
+}
 
 /**
  * Evaluates the active trip and determines whether adaptation is recommended.
@@ -35,6 +126,9 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
       activeTriggers: [],
       preservedStops: [],
       affectedUpcomingStops: [],
+      safetyScore: 50,
+      predictiveTimeline: [],
+      recoveryWindow: { isRecoveryViable: false },
     };
   }
 
@@ -54,6 +148,10 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
       activeTriggers: [],
       preservedStops: completedStops.map(s => s.name),
       affectedUpcomingStops: [],
+      safetyScore: 100,
+      predictiveTimeline: [],
+      recoveryWindow: { isRecoveryViable: false },
+      evaluatedAt: new Date().toISOString(),
     };
   }
 
@@ -108,6 +206,20 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
     reasons.push('Current plan remains optimal under observed conditions.');
   }
 
+  const safetyScore = computeSafetyScore(activeTriggers);
+  const recoveryWindow = calculateRecoveryWindow(activeTriggers, weatherTelemetry, trafficTelemetry);
+  const predictiveTimeline = buildPredictiveTimeline(candidateStops, activeTriggers, journeyState.pacingLagMinutes || 0);
+
+  // Derive plain-language actionable guidance
+  let actionableGuidance = 'Continue journey on current planned trajectory.';
+  if (tripHealth === TRIP_HEALTH_STATES.CRITICAL) {
+    actionableGuidance = 'Immediate adaptation required: Severe weather or route obstruction threatens safety. Reroute to sheltered haven.';
+  } else if (tripHealth === TRIP_HEALTH_STATES.SAFETY_ACTION_RECOMMENDED || tripHealth === TRIP_HEALTH_STATES.REPLAN_RECOMMENDED) {
+    actionableGuidance = 'Adaptation advised: Remaining stops impaired by closing times or worsening conditions. Tap Adapt Plan to optimize.';
+  } else if (recoveryWindow.isRecoveryViable) {
+    actionableGuidance = recoveryWindow.guidance;
+  }
+
   return {
     tripHealth,
     shouldReplan,
@@ -117,11 +229,18 @@ function evaluateTripGuardian(journeyState, context = {}, travelerDna = {}) {
     affectedUpcomingStops: upcomingStops.map(s => s.name),
     activeStop: journeyState.activeStop ? journeyState.activeStop.name : null,
     pacingLagMinutes: journeyState.pacingLagMinutes || 0,
+    safetyScore,
+    recoveryWindow,
+    predictiveTimeline,
+    actionableGuidance,
     evaluatedAt: new Date().toISOString(),
   };
 }
 
 module.exports = {
   evaluateTripGuardian,
+  computeSafetyScore,
+  calculateRecoveryWindow,
+  buildPredictiveTimeline,
   TRIP_HEALTH_STATES,
 };

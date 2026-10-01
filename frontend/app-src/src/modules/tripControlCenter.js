@@ -396,9 +396,17 @@ export function renderTripControlCenter({
 
           <!-- Subordinate Secondary Actions -->
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button id="btn-skip-active-stop" data-stop-id="${nextTarget.id}" data-trip-id="${tripId}" class="btn-subordinate">
                 ⏭ Skip
+              </button>
+              ${completedStops && completedStops.length > 0 ? `
+              <button id="btn-rollback-step" data-trip-id="${tripId}" class="btn-subordinate" title="Undo last completed or skipped stop">
+                ↩️ Undo Step
+              </button>
+              ` : ''}
+              <button id="btn-wayside-pitstop" data-trip-id="${tripId}" class="btn-subordinate" title="Discover midway tea, coffee, dhaba, and restroom stops" style="border-color:rgba(245, 158, 11, 0.4); color:#fbbf24;">
+                ☕ Wayside Pitstops
               </button>
               <button id="btn-finish-journey-to-next" data-trip-id="${tripId}" class="btn-subordinate">
                 🏁 Finish & Plan Next Leg
@@ -859,6 +867,144 @@ export function mountTripControlCenter(containerEl, tripData = {}, callbacks = {
           console.error('[TripControlCenter] Failed to skip stop:', err);
           skipBtn.disabled = false;
           skipBtn.textContent = '⏭ Skip';
+        }
+      };
+    }
+
+    // Rollback / Undo Last Action Button
+    const rollbackBtn = containerEl.querySelector('#btn-rollback-step');
+    if (rollbackBtn) {
+      rollbackBtn.onclick = async () => {
+        const tripId = rollbackBtn.getAttribute('data-trip-id');
+        try {
+          rollbackBtn.disabled = true;
+          rollbackBtn.textContent = 'Undoing...';
+          if (window.API?.rollbackJourneyProgress) {
+            const res = await window.API.rollbackJourneyProgress(tripId);
+            if (res) {
+              currentTripData.activeStop = res.activeStop;
+              currentTripData.completedStops = (currentTripData.completedStops || []).filter(s => s.id !== res.activeStop?.id);
+              currentTripData.pacingLagMinutes = res.pacingLagMinutes || 0;
+              currentTripData.isJourneyComplete = false;
+              if (callbacks.onProgress) callbacks.onProgress(res);
+            }
+          } else {
+            // Local memory fallback
+            if (currentTripData.completedStops?.length > 0) {
+              const lastDone = currentTripData.completedStops.pop();
+              if (currentTripData.activeStop) {
+                currentTripData.upcomingStops = [currentTripData.activeStop, ...(currentTripData.upcomingStops || [])];
+              }
+              currentTripData.activeStop = lastDone;
+              currentTripData.isJourneyComplete = false;
+            }
+          }
+          render();
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to rollback stop:', err);
+          rollbackBtn.disabled = false;
+          rollbackBtn.textContent = '↩️ Undo Step';
+        }
+      };
+    }
+
+    // Wayside Pitstop Discovery Button
+    const pitstopBtn = containerEl.querySelector('#btn-wayside-pitstop');
+    if (pitstopBtn) {
+      pitstopBtn.onclick = async () => {
+        const tripId = pitstopBtn.getAttribute('data-trip-id');
+        try {
+          pitstopBtn.disabled = true;
+          pitstopBtn.textContent = 'Finding...';
+          let pitstops = [];
+          if (window.API?.fetchWaysidePitstops) {
+            const data = await window.API.fetchWaysidePitstops(tripId, { limit: 3 });
+            pitstops = data?.pitstops || [];
+          }
+          pitstopBtn.disabled = false;
+          pitstopBtn.textContent = '☕ Wayside Pitstops';
+
+          openBottomSheet({
+            title: '☕ Wayside Pitstops & Corridor Recharge',
+            subtitle: 'Low-Detour Dhabas, Cafes & Rest Pavilions',
+            contentHtml: `
+              <div style="font-size:13px; color:#cbd5e1; line-height:1.5; padding:4px 0 12px;">
+                <div style="margin-bottom:12px; font-size:12px; color:#94a3b8;">
+                  Curated recharge stops matching your route corridor and time of day:
+                </div>
+                ${pitstops.length === 0 ? '<div style="color:#64748b; font-style:italic;">No wayside stops found along this immediate corridor.</div>' : `
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    ${pitstops.map(p => `
+                      <div class="pitstop-card" style="background:rgba(255,255,255,0.04); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                          <div>
+                            <div style="font-size:14px; font-weight:700; color:#f8fafc;">${p.name}</div>
+                            <div style="font-size:11px; color:#fbbf24; margin-top:2px;">
+                              ⭐ ${p.rechargeScore}/100 Match • ${p.detourKm <= 0.5 ? 'On-Route' : `+${p.detourKm}km detour`} • ~${p.visitMinutes || 25} min stop
+                            </div>
+                          </div>
+                          <span style="font-size:9px; font-weight:800; background:rgba(245,158,11,0.2); color:#fbbf24; padding:2px 7px; border-radius:4px; text-transform:uppercase;">
+                            ${(p.category || 'REST').replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:6px; line-height:1.4;">
+                          ${p.specialty || p.whyRecommended}
+                        </div>
+                        <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; font-size:10px; color:#cbd5e1;">
+                          ${p.hasCleanWashrooms ? '<span style="background:rgba(16,185,129,0.15); color:#34d399; padding:2px 6px; border-radius:3px;">🚻 Clean Washrooms</span>' : ''}
+                          ${p.hasAc ? '<span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:2px 6px; border-radius:3px;">❄️ Air Conditioned</span>' : ''}
+                          ${p.familyFriendly ? '<span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:2px 6px; border-radius:3px;">👨‍👩‍👧 Family Friendly</span>' : ''}
+                        </div>
+                        <div style="margin-top:10px; text-align:right;">
+                          <button class="btn-subordinate btn-insert-pitstop" data-pitstop-id="${p.id}" style="font-size:11px; border-color:#fbbf24; color:#fbbf24; font-weight:700; cursor:pointer;">
+                            + Add to Route
+                          </button>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                `}
+              </div>
+            `,
+          });
+
+          // Bind click handlers inside the newly opened bottom sheet
+          setTimeout(() => {
+            const sheetEl = document.querySelector('.bottom-sheet-modal') || document.querySelector('.bottom-sheet-container');
+            if (sheetEl) {
+              sheetEl.querySelectorAll('.btn-insert-pitstop').forEach(b => {
+                b.onclick = async () => {
+                  const pid = b.getAttribute('data-pitstop-id');
+                  const target = pitstops.find(p => p.id === pid);
+                  if (target && window.API?.insertWaysidePitstop) {
+                    b.disabled = true;
+                    b.textContent = 'Adding...';
+                    try {
+                      await window.API.insertWaysidePitstop(tripId, target);
+                      currentTripData.upcomingStops = currentTripData.upcomingStops || [];
+                      currentTripData.upcomingStops.unshift({
+                        id: target.id,
+                        name: target.name,
+                        category: target.category || 'tea_break',
+                        plannedDurationMinutes: target.visitMinutes || 25,
+                        arriveAt: 'Next Stop',
+                      });
+                      render();
+                      closeBottomSheet();
+                    } catch (e) {
+                      console.error('[TripControlCenter] Failed to insert pitstop:', e);
+                      b.disabled = false;
+                      b.textContent = '+ Add to Route';
+                    }
+                  }
+                };
+              });
+            }
+          }, 50);
+        } catch (err) {
+          console.error('[TripControlCenter] Failed to fetch pitstops:', err);
+          pitstopBtn.disabled = false;
+          pitstopBtn.textContent = '☕ Wayside Pitstops';
         }
       };
     }

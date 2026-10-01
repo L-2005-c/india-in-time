@@ -162,5 +162,62 @@ describe('Intelligence & Travel Operating System API (/api/intelligence)', () =>
       expect(res.body.history[0].versionNumber).toBe(1);
       expect(res.body.history[1].versionNumber).toBe(2);
     });
+
+    test('GET /api/intelligence/trips/:id/state/pacing-recovery returns pacing analysis', async () => {
+      const res = await request(app).get(`/api/intelligence/trips/${tripId}/state/pacing-recovery`);
+      expect(res.status).toBe(200);
+      expect(res.body.tripId).toBe(tripId);
+      expect(res.body.recovery).toBeDefined();
+    });
+
+    test('POST /api/intelligence/trips/:id/alternatives returns ranked alternatives', async () => {
+      const res = await request(app)
+        .post(`/api/intelligence/trips/${tripId}/alternatives`)
+        .send({
+          stop: { id: 'test_stop', name: 'Galikonda View Point', lat: 18.25, lon: 82.95, cat: 'viewpoint' },
+          reason: 'WEATHER_RAIN',
+          limit: 3,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.tripId).toBe(tripId);
+      expect(res.body.alternatives.length).toBeGreaterThan(0);
+      expect(res.body.alternatives[0]).toHaveProperty('substituteScore');
+    });
+
+    test('POST /api/intelligence/trips/:id/state/rollback successfully restores last action', async () => {
+      const res = await request(app).post(`/api/intelligence/trips/${tripId}/state/rollback`);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('rolled back successfully');
+      expect(res.body.progressMetrics).toBeDefined();
+    });
+
+    test('GET /api/intelligence/trips/:id/pitstops discovers wayside recharge stops', async () => {
+      const res = await request(app).get(`/api/intelligence/trips/${tripId}/pitstops?limit=3`);
+      expect(res.status).toBe(200);
+      expect(res.body.tripId).toBe(tripId);
+      expect(Array.isArray(res.body.pitstops)).toBe(true);
+      expect(res.body.pitstops.length).toBeGreaterThan(0);
+      expect(res.body.pitstops[0]).toHaveProperty('rechargeScore');
+    });
+
+    test('POST /api/intelligence/trips/:id/pitstops inserts pitstop into journey itinerary', async () => {
+      const res = await request(app)
+        .post(`/api/intelligence/trips/${tripId}/pitstops`)
+        .send({
+          pitstop: {
+            name: 'Tyda Jungle Bells Cafe',
+            category: 'cafe',
+            coords: [18.216, 83.052],
+            visitMinutes: 30,
+            whyRecommended: 'Midway coffee & restroom recharge',
+          },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('Tyda Jungle Bells Cafe');
+      expect(res.body.activePlanVersion).toBeGreaterThan(1);
+      expect(res.body.totalStopsCount).toBeGreaterThan(2);
+    });
   });
 });

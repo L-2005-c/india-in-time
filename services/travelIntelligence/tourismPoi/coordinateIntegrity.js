@@ -20,8 +20,8 @@ const INDIA_GEO_BOUNDS = {
 
 // Known city center centroids for sanity checks
 const CITY_CENTROIDS = {
-  visakhapatnam: { lat: 17.72, lon: 83.30, maxRadiusKm: 95 },
-  vizag: { lat: 17.72, lon: 83.30, maxRadiusKm: 95 },
+  visakhapatnam: { lat: 17.72, lon: 83.30, maxRadiusKm: 45 },
+  vizag: { lat: 17.72, lon: 83.30, maxRadiusKm: 45 },
   hyderabad: { lat: 17.385, lon: 78.486, maxRadiusKm: 75 },
   bengaluru: { lat: 12.9716, lon: 77.5946, maxRadiusKm: 60 },
   bangalore: { lat: 12.9716, lon: 77.5946, maxRadiusKm: 60 },

@@ -28,6 +28,52 @@ export const EMERGENCY_DIRECTORIES = {
     { title: 'Vizag City Traffic Control', num: '0891-2525555', icon: '🚦' },
     { title: 'Vizag Port Disaster Cell', num: '0891-2874000', icon: '⚓' },
   ],
+  delhi_ncr: [
+    { title: 'Delhi Police Control Room', num: '112 / 100', icon: '👮' },
+    { title: 'AIIMS Emergency Casualty', num: '011-26588500', icon: '🏥' },
+    { title: 'Delhi Traffic Helpline', num: '011-25844444', icon: '🚦' },
+    { title: 'Delhi Tourism Helpline', num: '011-23365320', icon: '🧭' },
+  ],
+  mumbai: [
+    { title: 'Mumbai Police Control', num: '100 / 022-22620111', icon: '👮' },
+    { title: 'KEM Hospital Casualty', num: '022-24107000', icon: '🏥' },
+    { title: 'Mumbai Traffic Control', num: '022-24937747', icon: '🚦' },
+    { title: 'Coast Guard Western Region', num: '022-24371932', icon: '🌊' },
+  ],
+  bengaluru: [
+    { title: 'Bengaluru City Police', num: '112', icon: '👮' },
+    { title: 'Victoria Hospital Emergency', num: '080-26701150', icon: '🏥' },
+    { title: 'Bengaluru Traffic Control (103)', num: '080-22868550', icon: '🚦' },
+    { title: 'Karnataka Tourist Assistance', num: '080-22352828', icon: '🧭' },
+  ],
+  jaipur: [
+    { title: 'Jaipur Police Control', num: '112 / 0141-2605555', icon: '👮' },
+    { title: 'SMS Hospital Emergency', num: '0141-2560291', icon: '🏥' },
+    { title: 'Rajasthan Tourist Assistance Force', num: '0141-2822863', icon: '🏰' },
+  ],
+  chennai: [
+    { title: 'Chennai Police Control Room', num: '100 / 044-23452359', icon: '👮' },
+    { title: 'Rajiv Gandhi Govt General Hospital', num: '044-25305000', icon: '🏥' },
+    { title: 'Chennai Coastal Security Group', num: '044-28447701', icon: '🌊' },
+    { title: 'Chennai Traffic Control (103)', num: '044-23452362', icon: '🚦' },
+  ],
+  kerala: [
+    { title: 'Kerala Police Help Desk', num: '112', icon: '👮' },
+    { title: 'High Range / Ghat Rescue Cell', num: '04865-230233', icon: '⛰️' },
+    { title: 'Highway Police Patrol', num: '9846100100', icon: '🚗' },
+    { title: 'District Disaster Cell', num: '1077', icon: '🚨' },
+  ],
+  kolkata: [
+    { title: 'Kolkata Police Control Room', num: '100 / 033-22143230', icon: '👮' },
+    { title: 'SSKM Hospital Casualty', num: '033-22231589', icon: '🏥' },
+    { title: 'Kolkata Traffic Helpline', num: '033-22143644', icon: '🚦' },
+  ],
+  goa: [
+    { title: 'Goa Police Helpline', num: '112', icon: '👮' },
+    { title: 'Goa Tourist Police', num: '0832-2425088', icon: '🏖️' },
+    { title: 'Goa Medical College Emergency', num: '0832-2458725', icon: '🏥' },
+    { title: 'Drishti Marine Coastal Rescue', num: '0832-2425000', icon: '🌊' },
+  ],
 };
 
 export function resolveRegionKey(cityName = '', cityId = '') {
@@ -40,6 +86,30 @@ export function resolveRegionKey(cityName = '', cityId = '') {
   }
   if (norm.includes('visakhapatnam') || norm.includes('vizag')) {
     return 'visakhapatnam';
+  }
+  if (norm.includes('delhi') || norm.includes('noida') || norm.includes('gurgaon') || norm.includes('ncr')) {
+    return 'delhi_ncr';
+  }
+  if (norm.includes('mumbai') || norm.includes('bombay') || norm.includes('pune')) {
+    return 'mumbai';
+  }
+  if (norm.includes('bangalore') || norm.includes('bengaluru') || norm.includes('mysore') || norm.includes('mysuru')) {
+    return 'bengaluru';
+  }
+  if (norm.includes('jaipur') || norm.includes('udaipur') || norm.includes('jodhpur')) {
+    return 'jaipur';
+  }
+  if (norm.includes('chennai') || norm.includes('madras') || norm.includes('madurai')) {
+    return 'chennai';
+  }
+  if (norm.includes('kochi') || norm.includes('cochin') || norm.includes('munnar') || norm.includes('kerala') || norm.includes('alleppey')) {
+    return 'kerala';
+  }
+  if (norm.includes('kolkata') || norm.includes('calcutta') || norm.includes('howrah')) {
+    return 'kolkata';
+  }
+  if (norm.includes('goa') || norm.includes('panaji')) {
+    return 'goa';
   }
   return null;
 }
@@ -70,6 +140,27 @@ const SURVIVAL_LINGO = {
     { en: 'Where is this place?', local: 'Ee jaaga ellidhe? (ಈ ಜಾಗ ಎಲ್ಲಿದೆ?)' },
     { en: 'Less spicy please', local: 'Khaara kadime maadi (ಖಾರ ಕಡಿಮೆ ಮಾಡಿ)' },
     { en: 'Thank you', local: 'Dhanyavaadagalu (ಧನ್ಯವಾದಗಳು)' },
+  ],
+  malayalam: [
+    { en: 'How much is this?', local: 'Idhinu ethraya? (ഇതിന് എത്രയാ?)' },
+    { en: 'Where is this place?', local: 'Ee sthalam evideya? (ഈ സ്ഥലം എവിടെയാ?)' },
+    { en: 'Less spicy please', local: 'Erivu kurakkumo? (എരിവ് കുറയ്ക്കുമോ?)' },
+    { en: 'Thank you', local: 'Nanni (നന്ദി)' },
+    { en: 'Help me please', local: 'Enne onnu sahayikkyumo? (എന്നെ ഒന്ന് സഹായിക്കുമോ?)' },
+  ],
+  marathi: [
+    { en: 'How much for this?', local: 'He kityala ahe? (हे कितीला आहे?)' },
+    { en: 'Where is this place?', local: 'Hi jaaga kuthe ahe? (ही जागा कुठे आहे?)' },
+    { en: 'Less spicy please', local: 'Tikhut kami theva (तिखट कमी ठेवा)' },
+    { en: 'Thank you', local: 'Dhanyavaad (धन्यवाद)' },
+    { en: 'Help me please', local: 'Krupaya mala madat kara (कृपया मला मदत करा)' },
+  ],
+  bengali: [
+    { en: 'How much is this?', local: 'Eta koto? (এটা কত?)' },
+    { en: 'Where is this place?', local: 'Ei jaygata kothay? (এই জায়গাটা কোথায়?)' },
+    { en: 'Less spicy please', local: 'Jhaal kom deben (ঝাল কম দেবেন)' },
+    { en: 'Thank you', local: 'Dhonnobad (ধন্যবাদ)' },
+    { en: 'Help me please', local: 'Doya kore amake sahajyo korun (দয়া করে আমাকে সাহায্য করুন)' },
   ],
 };
 
@@ -115,11 +206,20 @@ export function generateWhatsAppShareText(mdPlan, currentCityName, dayIdx = 0, c
   });
 
   if (regionalEmer && regionalEmer.length) {
-    const regionTitle = regionKey === 'alluri_paderu'
-      ? 'ALLURI SITHARAMA RAJU / PADERU / ARAKU'
-      : regionKey === 'tirupati'
-        ? 'TIRUPATI & TIRUMALA PILGRIM ARMOR'
-        : 'VISAKHAPATNAM COASTAL & MARINE';
+    const REGION_TITLES = {
+      alluri_paderu: 'ALLURI SITHARAMA RAJU / PADERU / ARAKU',
+      tirupati: 'TIRUPATI & TIRUMALA PILGRIM ARMOR',
+      visakhapatnam: 'VISAKHAPATNAM COASTAL & MARINE',
+      delhi_ncr: 'DELHI NCR CAPITAL CORRIDOR',
+      mumbai: 'MUMBAI METROPOLITAN & HARBOR',
+      bengaluru: 'BENGALURU TECH & GARDEN CORRIDOR',
+      jaipur: 'JAIPUR & RAJASTHAN HERITAGE',
+      chennai: 'CHENNAI & COROMANDEL COAST',
+      kerala: 'KERALA GODS OWN COUNTRY & GHATS',
+      kolkata: 'KOLKATA & BENGAL HERITAGE',
+      goa: 'GOA COASTAL & TOURISM ARMOR',
+    };
+    const regionTitle = REGION_TITLES[regionKey] || city.toUpperCase();
     text += `━━━━━━━━━━━━━━━━━━━━\n`;
     text += `🛡️ *REGIONAL EMERGENCY ARMOR (${regionTitle})*\n`;
     regionalEmer.forEach(em => {
@@ -145,13 +245,19 @@ export function generateWhatsAppShareText(mdPlan, currentCityName, dayIdx = 0, c
 export function buildOfflineTravelPassHtml(mdPlan, currentCityName, dayIdx = 0, cityId = 'visakhapatnam') {
   const day = mdPlan[dayIdx] || mdPlan[0] || [];
   const city = currentCityName || 'India';
-  const lingoKey = cityId.includes('vizag') || cityId.includes('hyderabad')
+  const lingoKey = cityId.includes('vizag') || cityId.includes('hyderabad') || cityId.includes('tirupati') || cityId.includes('vijayawada')
     ? 'telugu'
-    : cityId.includes('chennai')
+    : cityId.includes('chennai') || cityId.includes('madurai')
       ? 'tamil'
-      : cityId.includes('bangalore') || cityId.includes('mysore')
+      : cityId.includes('bangalore') || cityId.includes('bengaluru') || cityId.includes('mysore') || cityId.includes('mysuru')
         ? 'kannada'
-        : 'hindi';
+        : cityId.includes('mumbai') || cityId.includes('pune')
+          ? 'marathi'
+          : cityId.includes('kochi') || cityId.includes('munnar') || cityId.includes('kerala') || cityId.includes('alleppey')
+            ? 'malayalam'
+            : cityId.includes('kolkata') || cityId.includes('howrah')
+              ? 'bengali'
+              : 'hindi';
   const phrases = SURVIVAL_LINGO[lingoKey] || SURVIVAL_LINGO.hindi;
 
   return `

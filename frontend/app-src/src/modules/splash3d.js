@@ -278,16 +278,24 @@ export function initSplash3D(onComplete) {
   const splash = document.getElementById('splash');
   if (!splash) return;
 
-  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  const isMobile = window.innerWidth <= 640;
+  const isMobile = Boolean(
+    (typeof window !== 'undefined' && (window.innerWidth <= 768 || window.innerHeight <= 640)) ||
+    (typeof navigator !== 'undefined' && (
+      navigator.maxTouchPoints > 1 ||
+      /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    ))
+  );
   const isConstrainedDevice = Boolean(
+    isMobile ||
     prefersReducedMotion ||
     connection?.saveData ||
     (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
   );
   splash.classList.toggle('performance-lite', isConstrainedDevice);
+  splash.classList.toggle('is-mobile-device', isMobile);
 
   const unlockAudio = () => {
     ensureAudioStarted();
@@ -354,7 +362,7 @@ export function initSplash3D(onComplete) {
   let height = window.innerHeight;
 
   const onResize = () => {
-    const maxDpr = isMobile ? 1.0 : (isConstrainedDevice ? 1.25 : 2);
+    const maxDpr = isMobile ? 1.0 : (isConstrainedDevice ? 1.25 : 1.75);
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     width = window.innerWidth;
     height = window.innerHeight;
@@ -370,7 +378,7 @@ export function initSplash3D(onComplete) {
 
   // Starlight & Cyan Aurora Particle Field
   const points = [];
-  const NUM_POINTS = isConstrainedDevice ? (isMobile ? 18 : 38) : (isMobile ? 24 : 48);
+  const NUM_POINTS = isMobile ? 16 : (isConstrainedDevice ? 24 : 44);
   const MODERN_PALETTE = ['#38bdf8', '#818cf8', '#ffffff', '#67e8f9', '#a5b4fc', '#06b6d4'];
 
   for (let i = 0; i < NUM_POINTS; i++) {
@@ -439,7 +447,8 @@ export function initSplash3D(onComplete) {
   function render(timestamp) {
     if (isDismissed) return;
 
-    if (lastRenderAt && timestamp - lastRenderAt < 11.1) {
+    const minFrameInterval = isMobile ? 15.8 : 11.1;
+    if (lastRenderAt && timestamp - lastRenderAt < minFrameInterval) {
       animId = requestAnimationFrame(render);
       return;
     }
@@ -502,15 +511,18 @@ export function initSplash3D(onComplete) {
       }
     }
 
-    projected.sort((a, b) => b.z - a.z);
+    // Avoid per-frame sort on mobile/constrained devices to prevent garbage-collection pauses
+    if (!isConstrainedDevice && !isMobile) {
+      projected.sort((a, b) => b.z - a.z);
+    }
 
-    // Draw connecting constellation lines
-    if (!isConstrainedDevice) {
+    // Draw connecting constellation lines (skip on mobile to preserve 60 FPS)
+    if (!isConstrainedDevice && !isMobile) {
       ctx.lineWidth = 0.7;
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
       ctx.beginPath();
       let hasLines = false;
-      const maxOuter = isMobile ? Math.min(projected.length, 12) : projected.length;
+      const maxOuter = projected.length;
       for (let i = 0; i < maxOuter; i++) {
         const p1 = projected[i];
         for (let j = i + 1; j < projected.length; j++) {
@@ -541,8 +553,8 @@ export function initSplash3D(onComplete) {
       ctx.arc(pt.px, pt.py, Math.max(0.6, currentSize), 0, Math.PI * 2);
       ctx.fill();
 
-      // Atmospheric aura for near motes and bokeh orbs
-      if (pt.isBokeh || pt.scale > 0.8) {
+      // Atmospheric aura for near motes and bokeh orbs (desktop only)
+      if (!isMobile && (pt.isBokeh || pt.scale > 0.8)) {
         ctx.globalAlpha = pt.alpha * (pt.isBokeh ? 0.32 : 0.18);
         ctx.beginPath();
         ctx.arc(pt.px, pt.py, currentSize * (pt.isBokeh ? 2.6 : 2.0), 0, Math.PI * 2);
@@ -585,6 +597,10 @@ export function initSplash3D(onComplete) {
     if (logoRoller) logoRoller.classList.add('is-settled');
     if (shockwave) shockwave.classList.add('shockwave-active');
     playLandingImpact();
+    if (typeof window !== 'undefined') {
+      window.__splashSettled = true;
+      try { window.dispatchEvent(new CustomEvent('splash:settled')); } catch (_e) {}
+    }
   }, 1100);
   cleanupFns.push(() => clearTimeout(settleTimeout));
 
@@ -642,6 +658,10 @@ export function initSplash3D(onComplete) {
 export function dismissSplash() {
   if (isDismissed) return;
   isDismissed = true;
+  if (typeof window !== 'undefined') {
+    window.__splashDismissed = true;
+    try { window.dispatchEvent(new CustomEvent('splash:dismissed')); } catch (_e) {}
+  }
 
   playWarpWhoosh();
 

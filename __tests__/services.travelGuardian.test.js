@@ -8,9 +8,18 @@
  * - Severe weather & Ghat road risk detection
  * - Opening hours conflict detection
  * - Anti-churn hysteresis (minor warnings do not trigger replanning)
+ * - Indian microclimate triggers (Heat Stroke Index, AQI Hazard, Monsoon Flood)
+ * - Numerical safety score & predictive forward-horizon timeline
+ * - Smart recovery window estimation
  */
 
-const { evaluateTripGuardian, TRIP_HEALTH_STATES } = require('../services/travelIntelligence/guardian/travelGuardian');
+const {
+  evaluateTripGuardian,
+  computeSafetyScore,
+  calculateRecoveryWindow,
+  buildPredictiveTimeline,
+  TRIP_HEALTH_STATES,
+} = require('../services/travelIntelligence/guardian/travelGuardian');
 const { createJourneyState } = require('../services/travelIntelligence/journey/journeyStateEngine');
 
 describe('Travel Guardian (v3.0)', () => {
@@ -32,6 +41,8 @@ describe('Travel Guardian (v3.0)', () => {
     const guardian = evaluateTripGuardian(state, context);
     expect(guardian.tripHealth).toBe(TRIP_HEALTH_STATES.ON_TRACK);
     expect(guardian.shouldReplan).toBe(false);
+    expect(guardian.safetyScore).toBeGreaterThanOrEqual(95);
+    expect(guardian.actionableGuidance).toBeDefined();
   });
 
   test('triggers CRITICAL and recommends replanning when heavy rain hits a ghat road corridor', () => {
@@ -45,6 +56,7 @@ describe('Travel Guardian (v3.0)', () => {
     expect(guardian.tripHealth).toBe(TRIP_HEALTH_STATES.CRITICAL);
     expect(guardian.shouldReplan).toBe(true);
     expect(guardian.reasons.some(r => r.includes('Ghat Road'))).toBe(true);
+    expect(guardian.safetyScore).toBeLessThan(70);
   });
 
   test('detects opening hours breach when projected arrival is past closing time', () => {
@@ -68,5 +80,92 @@ describe('Travel Guardian (v3.0)', () => {
     const guardian = evaluateTripGuardian(state, context);
     expect(guardian.shouldReplan).toBe(false);
     expect(guardian.tripHealth).toBe(TRIP_HEALTH_STATES.ON_TRACK);
+  });
+
+  test('detects extreme Heat Stroke Index during Indian summer conditions', () => {
+    const state = createJourneyState({ tripId: 'trip_heat', plan });
+    const context = {
+      weather: {
+        temperatureC: 41,
+        apparentTempC: 45,
+        relativeHumidity: 65,
+        condition: 'Extreme Heat',
+      },
+      traffic: {},
+    };
+
+    const guardian = evaluateTripGuardian(state, context);
+    expect(guardian.activeTriggers.some(t => t.type === 'HEAT_STROKE_INDEX')).toBe(true);
+    expect(guardian.reasons.some(r => /heat|thermal/i.test(r))).toBe(true);
+  });
+
+  test('detects AQI Hazard when particulate levels are hazardous in northern/urban circuits', () => {
+    const state = createJourneyState({ tripId: 'trip_aqi', plan });
+    const context = {
+      weather: {
+        temperatureC: 22,
+        aqi: 310,
+        pm25: 160,
+        condition: 'Dense Winter Smog',
+      },
+      traffic: {},
+    };
+
+    const guardian = evaluateTripGuardian(state, context);
+    expect(guardian.activeTriggers.some(t => t.type === 'AQI_HAZARD')).toBe(true);
+    expect(guardian.reasons.some(r => /air pollution|aqi/i.test(r))).toBe(true);
+  });
+
+  test('detects Monsoon Flood Risk when rainfall intensity exceeds 25mm/hr', () => {
+    const state = createJourneyState({ tripId: 'trip_flood', plan });
+    const context = {
+      weather: {
+        temperatureC: 24,
+        precipitationMm: 35,
+        precipitationProb: 95,
+        condition: 'Severe Torrential Cloudburst',
+      },
+      traffic: {},
+    };
+
+    const guardian = evaluateTripGuardian(state, context);
+    expect(guardian.activeTriggers.some(t => t.type === 'MONSOON_FLOOD_RISK')).toBe(true);
+    expect(guardian.tripHealth).toBe(TRIP_HEALTH_STATES.CRITICAL);
+  });
+
+  test('computes smart recovery window when disruption is transitory and recovering', () => {
+    const triggers = [{ severity: 'SUBOPTIMAL', message: 'Traffic delay' }];
+    const recovery = calculateRecoveryWindow(triggers, { precipitationProb: 40 }, { isRecovering: true });
+    expect(recovery.isRecoveryViable).toBe(true);
+    expect(recovery.suggestedPauseMinutes).toBe(20);
+    expect(recovery.clearingOutlook).toContain('normal corridor baseline');
+  });
+
+  test('builds forward-looking predictive timeline across stops', () => {
+    const stops = [
+      { id: 's1', name: 'Stop 1', category: 'nature', plannedArrivalMinute: 600 },
+      { id: 's2', name: 'Stop 2', category: 'museum', plannedArrivalMinute: 720 },
+    ];
+    const triggers = [
+      { stopId: 's1', severity: 'CRITICAL', message: 'Downpour' },
+    ];
+    const timeline = buildPredictiveTimeline(stops, triggers, 15);
+    expect(timeline).toHaveLength(2);
+    expect(timeline[0].status).toBe('CRITICAL');
+    expect(timeline[1].status).toBe('HEALTHY');
+    expect(timeline[0].projectedArrivalMinute).toBe(615);
+  });
+
+  test('computeSafetyScore penalizes risks by severity and clamps between 0 and 100', () => {
+    expect(computeSafetyScore([])).toBe(100);
+    expect(computeSafetyScore([{ severity: 'WATCH' }])).toBe(95);
+    expect(computeSafetyScore([{ severity: 'SUBOPTIMAL' }])).toBe(90);
+    expect(computeSafetyScore([{ severity: 'WARNING' }])).toBe(80);
+    expect(computeSafetyScore([{ severity: 'CRITICAL' }])).toBe(65);
+    expect(computeSafetyScore([
+      { severity: 'CRITICAL' },
+      { severity: 'CRITICAL' },
+      { severity: 'CRITICAL' },
+    ])).toBe(0);
   });
 });

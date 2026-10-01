@@ -45,6 +45,11 @@ const TRIGGER_TYPES = Object.freeze({
   SAFETY_DATA_STALE: 'SAFETY_DATA_STALE',
   SAFETY_DATA_CONFLICT: 'SAFETY_DATA_CONFLICT',
   SAFETY_PROVIDER_FAILURE: 'SAFETY_PROVIDER_FAILURE',
+  // Advanced Environmental & Predictive Triggers
+  HEAT_STROKE_INDEX: 'HEAT_STROKE_INDEX',
+  AQI_HAZARD: 'AQI_HAZARD',
+  MONSOON_FLOOD_RISK: 'MONSOON_FLOOD_RISK',
+  PREDICTIVE_HORIZON_RISK: 'PREDICTIVE_HORIZON_RISK',
 });
 
 const TRIGGER_SEVERITY = Object.freeze({
@@ -264,6 +269,46 @@ function evaluateTriggers({
         type: TRIGGER_TYPES.HEAT_SURGE,
         severity: TRIGGER_SEVERITY.SUBOPTIMAL,
         message: `High apparent temperature (${temp}°C) exceeds heat comfort threshold at ${stop.name}.`,
+        stopId: stop.id,
+        stopName: stop.name,
+      });
+    }
+
+    // Extreme Indian Summer Heat Stroke Index (>40°C apparent temp or lethal wet-bulb combination)
+    const humidity = weatherTelemetry.humidity ?? weatherTelemetry.relativeHumidity ?? 50;
+    const isExtremeHeat = temp >= 41 || (temp >= 38 && humidity >= 60);
+    if (isOutdoor && isExtremeHeat) {
+      triggers.push({
+        type: TRIGGER_TYPES.HEAT_STROKE_INDEX,
+        severity: temp >= 44 ? TRIGGER_SEVERITY.CRITICAL : TRIGGER_SEVERITY.WARNING,
+        message: `Dangerous heat index (${temp}°C with ${humidity}% humidity) risks thermal exhaustion at ${stop.name}. Indoor AC retreat strongly advised.`,
+        stopId: stop.id,
+        stopName: stop.name,
+        apparentTempC: temp,
+      });
+    }
+
+    // Winter Smog / Air Quality Index (AQI) hazard check (common in North Indian circuits)
+    const aqi = weatherTelemetry.aqi ?? weatherTelemetry.airQualityIndex ?? null;
+    const pm25 = weatherTelemetry.pm25 ?? null;
+    if (isOutdoor && (aqi >= 250 || pm25 >= 120)) {
+      triggers.push({
+        type: TRIGGER_TYPES.AQI_HAZARD,
+        severity: aqi >= 350 ? TRIGGER_SEVERITY.CRITICAL : TRIGGER_SEVERITY.WARNING,
+        message: `Severe air pollution (AQI: ${aqi || pm25 + ' PM2.5'}) exceeds safe exposure limit at ${stop.name}. Recommend indoor sanctuary.`,
+        stopId: stop.id,
+        stopName: stop.name,
+        aqi: aqi || Math.round(pm25 * 2.5),
+      });
+    }
+
+    // Monsoon Downpour & Flash Flooding Risk
+    const precipRate = weatherTelemetry.precipitationMm ?? weatherTelemetry.rainRate ?? 0;
+    if (isOutdoor && precipRate >= 25) {
+      triggers.push({
+        type: TRIGGER_TYPES.MONSOON_FLOOD_RISK,
+        severity: TRIGGER_SEVERITY.CRITICAL,
+        message: `Intense tropical precipitation (${precipRate} mm/hr) risks waterlogging and access blockage at ${stop.name}.`,
         stopId: stop.id,
         stopName: stop.name,
       });

@@ -113,6 +113,7 @@ export function openBottomSheet({ title, subtitle = '', contentHtml, onClose = n
   let startY = 0;
   let currentTranslateY = 0;
   let isDragging = false;
+  let dragRafId = null;
 
   const onPointerDown = (e) => {
     startY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
@@ -126,13 +127,24 @@ export function openBottomSheet({ title, subtitle = '', contentHtml, onClose = n
     const deltaY = y - startY;
     if (deltaY > 0) {
       currentTranslateY = deltaY;
-      container.style.transform = `translateY(${deltaY}px)`;
+      if (!dragRafId) {
+        dragRafId = requestAnimationFrame(() => {
+          dragRafId = null;
+          if (isDragging) {
+            container.style.transform = `translateY(${currentTranslateY}px)`;
+          }
+        });
+      }
     }
   };
 
   const onPointerUp = () => {
     if (!isDragging) return;
     isDragging = false;
+    if (dragRafId) {
+      cancelAnimationFrame(dragRafId);
+      dragRafId = null;
+    }
     container.style.transition = 'transform 0.25s cubic-bezier(0.32, 1, 0.23, 1)';
     if (currentTranslateY > 120) {
       closeBottomSheet();
@@ -144,10 +156,14 @@ export function openBottomSheet({ title, subtitle = '', contentHtml, onClose = n
 
   dragHandle.addEventListener('pointerdown', onPointerDown);
   header.addEventListener('pointerdown', onPointerDown);
-  window.addEventListener('pointermove', onPointerMove);
-  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', onPointerUp, { passive: true });
 
   backdrop._cleanupDrag = () => {
+    if (dragRafId) {
+      cancelAnimationFrame(dragRafId);
+      dragRafId = null;
+    }
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
   };

@@ -243,6 +243,8 @@ function getAggregateWeatherAccuracyMetrics() {
       totalEvaluated: 0,
       temperatureMae: null,
       rainEventHitRatePercent: null,
+      brierScore: null,
+      byProvider: {},
       accuracyDistribution: { EXACT: 0, ACCEPTABLE: 0, DIVERGENT: 0 },
       dataState: 'NO_OBSERVATIONS_LOGGED',
     };
@@ -252,7 +254,9 @@ function getAggregateWeatherAccuracyMetrics() {
   let countWithTemp = 0;
   let rainHits = 0;
   let totalRainScenarios = 0;
+  let totalBrierError = 0;
   const dist = { EXACT: 0, ACCEPTABLE: 0, DIVERGENT: 0 };
+  const providerStats = {};
 
   for (const rec of inMemoryAccuracyRecords) {
     if (rec.tempAbsoluteError != null) {
@@ -262,25 +266,70 @@ function getAggregateWeatherAccuracyMetrics() {
     if (dist[rec.accuracyClassification] !== undefined) {
       dist[rec.accuracyClassification]++;
     }
+
     const snap = inMemorySnapshots.find(s => s.id === rec.snapshotId);
+    const providerName = snap?.provider || 'CONSENSUS';
+
+    if (!providerStats[providerName]) {
+      providerStats[providerName] = {
+        totalEvaluated: 0,
+        totalTempError: 0,
+        countWithTemp: 0,
+        rainHits: 0,
+        totalRainScenarios: 0,
+        totalBrierError: 0,
+      };
+    }
+    const pStat = providerStats[providerName];
+    pStat.totalEvaluated++;
+
+    if (rec.tempAbsoluteError != null) {
+      pStat.totalTempError += rec.tempAbsoluteError;
+      pStat.countWithTemp++;
+    }
+
     if (snap && snap.forecastRainProb != null) {
       totalRainScenarios++;
+      pStat.totalRainScenarios++;
+
       const predictedRain = snap.forecastRainProb >= 50;
       if (predictedRain === rec.rainDetectedActual) {
         rainHits++;
+        pStat.rainHits++;
       }
+
+      // Brier Score calculation: (forecast_prob - actual_binary)^2
+      const fProb = snap.forecastRainProb / 100;
+      const actualBinary = rec.rainDetectedActual ? 1 : 0;
+      const brierSq = Math.pow(fProb - actualBinary, 2);
+      totalBrierError += brierSq;
+      pStat.totalBrierError += brierSq;
     }
   }
 
   const countSufficient = countWithTemp >= 3;
   const mae = countWithTemp > 0 ? Math.round((totalTempError / countWithTemp) * 10) / 10 : null;
   const hitRate = totalRainScenarios > 0 ? Math.round((rainHits / totalRainScenarios) * 100) : null;
+  const brierScore = totalRainScenarios > 0 ? Math.round((totalBrierError / totalRainScenarios) * 1000) / 1000 : null;
+
+  // Compile per-provider breakdown
+  const byProvider = {};
+  for (const [pName, pStat] of Object.entries(providerStats)) {
+    byProvider[pName] = {
+      sampleSize: pStat.countWithTemp,
+      temperatureMae: pStat.countWithTemp > 0 ? Math.round((pStat.totalTempError / pStat.countWithTemp) * 10) / 10 : null,
+      rainEventHitRatePercent: pStat.totalRainScenarios > 0 ? Math.round((pStat.rainHits / pStat.totalRainScenarios) * 100) : null,
+      brierScore: pStat.totalRainScenarios > 0 ? Math.round((pStat.totalBrierError / pStat.totalRainScenarios) * 1000) / 1000 : null,
+    };
+  }
 
   return {
     totalEvaluated: inMemoryAccuracyRecords.length,
     sampleSize: countWithTemp,
     temperatureMae: mae,
     rainEventHitRatePercent: hitRate,
+    brierScore,
+    byProvider,
     accuracyDistribution: dist,
     dataState: 'EMPIRICAL_MEASUREMENT',
     sampleSizeStatus: countSufficient ? 'SUFFICIENT' : 'PRELIMINARY',

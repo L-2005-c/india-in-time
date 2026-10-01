@@ -205,16 +205,62 @@ const GOLDEN_POIS = [
   poi('mun_kundala', 'Kundala Dam Lake & Shikara Rides', 'scenic', 'Munnar', 'Kerala', 10.1280, 77.1720, ['Kundala Lake', 'Kundala Arch Dam']),
   poi('mun_kolukkumalai', 'Kolukkumalai Highest Organic Tea Estate', 'scenic', 'Munnar', 'Kerala', 10.0930, 77.2280, ['Kolukkumalai Tea Estate', 'Kolukkumalai Sunrise Point']),
   poi('mun_attukad', 'Attukad Waterfalls Mountain Cascades', 'scenic', 'Munnar', 'Kerala', 10.0480, 77.0420, ['Attukad Falls', 'Attukal Waterfalls']),
+
+  // ── UDAIPUR ──────────────────────────────────────────────────────────────
+  poi('uda_city_palace', 'City Palace Udaipur', 'scenic', 'Udaipur', 'Rajasthan', 24.5764, 73.6835, ['City Palace Udaipur', 'Udaipur City Palace']),
+  poi('uda_lake_pichola', 'Lake Pichola', 'scenic', 'Udaipur', 'Rajasthan', 24.5720, 73.6790, ['Pichola Lake', 'Lake Pichola Udaipur']),
+  poi('uda_fateh_sagar', 'Fateh Sagar Lake', 'scenic', 'Udaipur', 'Rajasthan', 24.6015, 73.6748, ['Fateh Sagar', 'Fatehsagar Lake']),
+  poi('uda_jag_mandir', 'Jag Mandir', 'scenic', 'Udaipur', 'Rajasthan', 24.5675, 73.6775, ['Lake Garden Palace', 'Jagmandir']),
+  poi('uda_saheliyon_bari', 'Saheliyon Ki Bari', 'park', 'Udaipur', 'Rajasthan', 24.6032, 73.6868, ['Garden of the Maidens', 'Saheliyon-ki-Bari']),
+  poi('uda_sajjangarh', 'Sajjangarh Monsoon Palace', 'scenic', 'Udaipur', 'Rajasthan', 24.5898, 73.6375, ['Monsoon Palace', 'Sajjangarh Fort']),
+
+  // ── AGRA ─────────────────────────────────────────────────────────────────
+  poi('agr_taj_mahal', 'Taj Mahal', 'monument', 'Agra', 'Uttar Pradesh', 27.1751, 78.0421, ['Taj', 'The Taj Mahal']),
+  poi('agr_agra_fort', 'Agra Fort', 'heritage', 'Agra', 'Uttar Pradesh', 27.1795, 78.0211, ['Red Fort Agra', 'Agra Fort Red']),
+  poi('agr_fatehpur_sikri', 'Fatehpur Sikri', 'heritage', 'Agra', 'Uttar Pradesh', 27.0945, 77.6679, ['Fatehpur', 'City of Victory']),
+  poi('agr_mehtab_bagh', 'Mehtab Bagh', 'park', 'Agra', 'Uttar Pradesh', 27.1797, 78.0419, ['Moonlight Garden Agra']),
+
+  // ── VARANASI ─────────────────────────────────────────────────────────────
+  poi('var_kashi_vishwanath', 'Kashi Vishwanath Temple', 'temple', 'Varanasi', 'Uttar Pradesh', 25.3109, 83.0107, ['Golden Temple Varanasi', 'Vishwanath Temple', 'Kashi Vishwanath']),
+  poi('var_dashashwamedh', 'Dashashwamedh Ghat', 'scenic', 'Varanasi', 'Uttar Pradesh', 25.3062, 83.0107, ['Dashashwamedh', 'Main Ghat Varanasi', 'Ganga Aarti Ghat']),
+  poi('var_sarnath', 'Sarnath Buddhist Complex', 'heritage', 'Varanasi', 'Uttar Pradesh', 25.3716, 83.0252, ['Sarnath', 'Deer Park Sarnath', 'Dhamekh Stupa']),
+  poi('var_assi_ghat', 'Assi Ghat', 'scenic', 'Varanasi', 'Uttar Pradesh', 25.2887, 83.0061, ['Assi Ghat Varanasi']),
 ];
+
+const CITY_ALIASES = {
+  vizag: 'visakhapatnam',
+  visakhapatnam: 'visakhapatnam',
+  bangalore: 'bengaluru',
+  bengaluru: 'bengaluru',
+  bombay: 'mumbai',
+  mumbai: 'mumbai',
+  madras: 'chennai',
+  chennai: 'chennai',
+  calcutta: 'kolkata',
+  kolkata: 'kolkata',
+  mysuru: 'mysore',
+  mysore: 'mysore',
+  newdelhi: 'delhi',
+  delhi: 'delhi',
+  benares: 'varanasi',
+  varanasi: 'varanasi',
+  cochin: 'kochi',
+  kochi: 'kochi',
+  bezawada: 'vijayawada',
+  vijayawada: 'vijayawada',
+  tirumala: 'tirupati',
+  tirupati: 'tirupati',
+};
 
 /** Quick index of golden POIs by city */
 const GOLDEN_POIS_BY_CITY = new Map();
 for (const p of GOLDEN_POIS) {
   const cityKey = p.city.toLowerCase().trim();
-  if (!GOLDEN_POIS_BY_CITY.has(cityKey)) {
-    GOLDEN_POIS_BY_CITY.set(cityKey, []);
+  const canonical = CITY_ALIASES[cityKey] || cityKey;
+  if (!GOLDEN_POIS_BY_CITY.has(canonical)) {
+    GOLDEN_POIS_BY_CITY.set(canonical, []);
   }
-  GOLDEN_POIS_BY_CITY.get(cityKey).push(p);
+  GOLDEN_POIS_BY_CITY.get(canonical).push(p);
 }
 
 /** Search golden POI by name or alias across all cities or within a city hint */
@@ -223,8 +269,35 @@ function findGoldenPoi(nameQuery, cityHint = null) {
   const q = String(nameQuery).toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
   if (!q) return null;
 
-  const candidatePool = cityHint && GOLDEN_POIS_BY_CITY.has(cityHint.toLowerCase().trim())
-    ? GOLDEN_POIS_BY_CITY.get(cityHint.toLowerCase().trim())
+  let resolvedCityHint = null;
+  if (cityHint) {
+    const rawHint = String(cityHint).toLowerCase().trim();
+    resolvedCityHint = CITY_ALIASES[rawHint] || rawHint;
+  }
+
+  if (!resolvedCityHint) {
+    for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
+      if (q.includes(alias)) {
+        resolvedCityHint = canonical;
+        break;
+      }
+    }
+  }
+
+  // Guard: If no city context exists and query is an ambiguous multi-city landmark name,
+  // do not guess an arbitrary city (e.g. "City Palace" or "Birla Mandir" without city context)
+  const AMBIGUOUS_MULTI_CITY_LANDMARKS = new Set([
+    'city palace', 'birla mandir', 'jantar mantar', 'marine drive', 'botanical garden',
+    'national park', 'clock tower', 'railway museum', 'cable bridge', 'zoo', 'central park'
+  ]);
+  if (!resolvedCityHint && AMBIGUOUS_MULTI_CITY_LANDMARKS.has(q)) {
+    return null;
+  }
+
+  // If a city hint is present, strictly restrict search to that city.
+  // Never bleed landmarks from another city when a city context is established.
+  const candidatePool = resolvedCityHint
+    ? (GOLDEN_POIS_BY_CITY.get(resolvedCityHint) || [])
     : GOLDEN_POIS;
 
   // 1. Exact canonical name match
@@ -241,8 +314,19 @@ function findGoldenPoi(nameQuery, cityHint = null) {
     }
   }
 
-  // 3. Substring / Token containment match (at least 2 matching words)
+  // 3. Substring / Token containment match (at least 2 matching words, including at least 1 distinctive word)
   const INFRASTRUCTURE_SUFFIXES = new Set(['road', 'street', 'colony', 'layout', 'junction', 'area', 'circle', 'lane', 'bypass', 'extension', 'ward']);
+  const COMMON_STOP_WORDS = new Set([
+    'sri', 'shri', 'temple', 'mandir', 'park', 'beach', 'museum', 'fort',
+    'palace', 'lake', 'waterfalls', 'falls', 'viewpoint', 'point', 'hill',
+    'hills', 'garden', 'gardens', 'national', 'zoo', 'resort', 'road',
+    'complex', 'memorial', 'center', 'centre', 'heritage', 'buddhist',
+    'jain', 'coffee', 'plantation', 'plantations', 'swamy', 'aquarium',
+    'kali', 'vishwanath', 'mangalagiri',
+    'visakhapatnam', 'vizag', 'hyderabad', 'bengaluru', 'bangalore',
+    'mumbai', 'delhi', 'jaipur', 'goa', 'chennai', 'kochi', 'paderu',
+    'tirupati', 'vijayawada', 'agra', 'varanasi', 'kolkata', 'mysore', 'munnar', 'udaipur'
+  ]);
   const qWords = q.split(/\s+/).filter(w => w.length >= 3);
   let bestMatch = null;
   let bestScore = 0;
@@ -257,10 +341,16 @@ function findGoldenPoi(nameQuery, cityHint = null) {
       if (hasUnmatchedInfra) continue;
 
       let matchCount = 0;
+      let hasDistinctiveWord = false;
       for (const qw of qWords) {
-        if (nWords.includes(qw)) matchCount++;
+        if (nWords.includes(qw)) {
+          matchCount++;
+          if (!COMMON_STOP_WORDS.has(qw)) {
+            hasDistinctiveWord = true;
+          }
+        }
       }
-      if (matchCount >= 2 && matchCount > bestScore) {
+      if (matchCount >= 2 && hasDistinctiveWord && matchCount > bestScore) {
         bestScore = matchCount;
         bestMatch = item;
       }

@@ -391,6 +391,26 @@
   async function adaptTripPlan(tripId, triggerType = 'MANUAL_OPTIMIZATION', options = {}) {
     return post(`/api/intelligence/trips/${tripId}/replan`, { triggerType, ...options });
   }
+  async function rollbackJourneyProgress(tripId) {
+    return post(`/api/intelligence/trips/${tripId}/state/rollback`);
+  }
+  async function fetchPacingRecovery(tripId) {
+    return get(`/api/intelligence/trips/${tripId}/state/pacing-recovery`);
+  }
+  async function fetchAlternativeStops(tripId, stop, reason = 'WEATHER_RAIN', limit = 3) {
+    return post(`/api/intelligence/trips/${tripId}/alternatives`, { stop, reason, limit });
+  }
+  async function fetchWaysidePitstops(tripId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.tempC != null) params.set('tempC', options.tempC);
+    if (options.rainProb != null) params.set('rainProb', options.rainProb);
+    if (options.limit != null) params.set('limit', options.limit);
+    const qs = params.toString();
+    return get(`/api/intelligence/trips/${tripId}/pitstops${qs ? '?' + qs : ''}`);
+  }
+  async function insertWaysidePitstop(tripId, pitstop, insertAfterStopId = null) {
+    return post(`/api/intelligence/trips/${tripId}/pitstops`, { pitstop, insertAfterStopId });
+  }
   async function simulateDisruptionEvent(tripId, event = {}) {
     return post(`/api/intelligence/trips/${tripId}/simulate-event`, event);
   }
@@ -501,7 +521,7 @@
   // ── Expose as window.API ─────────────────────────────────────────────────────
   window.API = {
     geocode, fetchPlaces, fetchWeather, fetchWeatherAlerts, fetchRoute, fetchRouteMatrix, fetchEta, timeIntelligenceStatus, timeIntelligenceRecommend, timeIntelligenceDayPlan, timeIntelligenceTemporalProfile, timeIntelligenceOptimize, timeIntelligenceReplan, timeIntelligenceAdvice, timeIntelligenceMultiDayAdvice, timeIntelligenceMultiDayPlan, timeIntelligenceCircuitPlan,
-    initJourneyState, advanceJourneyProgress, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
+    initJourneyState, advanceJourneyProgress, rollbackJourneyProgress, fetchPacingRecovery, fetchAlternativeStops, fetchWaysidePitstops, insertWaysidePitstop, fetchTripGuardianHealth, adaptTripPlan, simulateDisruptionEvent,
     getTripDecision, recordDecisionOutcome, fetchDecisionMetrics,
     evaluateTripDisruptions, simulateTripDisruption, fetchTripNotifications, recordNotificationAction, fetchDisruptionEvents,
     evaluateTripSafety, simulateTripSafety, fetchTripSafety, recordSafetyAction, fetchSafetyProviders, fetchSafetyMetrics, fetchSafetyNotifications,

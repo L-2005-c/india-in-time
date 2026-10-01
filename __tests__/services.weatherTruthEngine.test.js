@@ -184,6 +184,57 @@ describe('Weather Truth Engine (v3.0)', () => {
       expect(metrics.totalEvaluated).toBe(1);
       expect(metrics.temperatureMae).toBe(1.5);
       expect(metrics.rainEventHitRatePercent).toBe(100);
+      expect(typeof metrics.brierScore).toBe('number');
+      expect(metrics.byProvider.OPEN_METEO).toBeDefined();
+      expect(metrics.byProvider.OPEN_METEO.temperatureMae).toBe(1.5);
+    });
+
+    test('computes Brier score and per-provider metrics across multiple providers', async () => {
+      // Provider 1: IMD predicts 80% rain, actual rain occurs (1.0) -> (0.8 - 1.0)^2 = 0.04
+      const snapImd = await recordForecastSnapshot({
+        provider: 'IMD',
+        lat: 17.68,
+        lon: 83.21,
+        forecastTargetAt: new Date(),
+        forecastTempC: 26.0,
+        forecastRainProb: 80,
+      });
+      await verifyForecastWithObservation({
+        snapshotId: snapImd.id,
+        observedTempC: 26.5,
+        observedRainMm: 12.0,
+      });
+
+      // Provider 2: OPEN_METEO predicts 20% rain, actual rain occurs (1.0) -> (0.2 - 1.0)^2 = 0.64
+      const snapOm = await recordForecastSnapshot({
+        provider: 'OPEN_METEO',
+        lat: 17.68,
+        lon: 83.21,
+        forecastTargetAt: new Date(),
+        forecastTempC: 28.0,
+        forecastRainProb: 20,
+      });
+      await verifyForecastWithObservation({
+        snapshotId: snapOm.id,
+        observedTempC: 26.5,
+        observedRainMm: 12.0,
+      });
+
+      const metrics = getAggregateWeatherAccuracyMetrics();
+      expect(metrics.totalEvaluated).toBe(2);
+      expect(metrics.byProvider.IMD).toBeDefined();
+      expect(metrics.byProvider.OPEN_METEO).toBeDefined();
+
+      // IMD Brier score = 0.04
+      expect(metrics.byProvider.IMD.brierScore).toBe(0.04);
+      expect(metrics.byProvider.IMD.rainEventHitRatePercent).toBe(100);
+
+      // OPEN_METEO Brier score = 0.64
+      expect(metrics.byProvider.OPEN_METEO.brierScore).toBe(0.64);
+      expect(metrics.byProvider.OPEN_METEO.rainEventHitRatePercent).toBe(0);
+
+      // Overall Brier score average = (0.04 + 0.64) / 2 = 0.34
+      expect(metrics.brierScore).toBe(0.34);
     });
   });
 });

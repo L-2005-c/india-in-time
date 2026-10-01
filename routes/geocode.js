@@ -76,11 +76,15 @@ async function geocodeViaPhoton(q) {
 
 const { findGoldenPoi } = require('../data/goldenPoiDataset');
 
-async function computeGeocode(q) {
+async function computeGeocode(q, cityHint = '') {
+  const searchQuery = cityHint && !q.toLowerCase().includes(cityHint.toLowerCase())
+    ? `${q} ${cityHint}`
+    : q;
+
   let data;
   try {
     data = await throttledNominatimCall(async () => {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}+India&format=json&limit=1`;
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}+India&format=json&limit=1`;
       const upstream = await fetch(url, {
         headers: {
           'Accept-Language': 'en-US,en',
@@ -105,7 +109,7 @@ async function computeGeocode(q) {
   // Nominatim errored, or came back with nothing — try Photon before giving up
   if (!Array.isArray(data) || data.length === 0) {
     try {
-      data = await geocodeViaPhoton(q);
+      data = await geocodeViaPhoton(searchQuery);
     } catch (photonErr) {
       appLogger.warn('[geocode] Photon fallback also failed:', photonErr.message);
       data = [];
@@ -119,12 +123,13 @@ router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'Missing query param: q' });
 
-  const key = q.toLowerCase();
+  const cityHint = (req.query.city || req.query.cityName || '').trim();
+  const key = cityHint ? `${q.toLowerCase()}__${cityHint.toLowerCase()}` : q.toLowerCase();
   const cached = geocodeCache.get(key);
   if (cached) return res.json(cached);
 
   // Authoritative Golden POI resolution (0ms, 100% verified, immune to rate-limits)
-  const golden = findGoldenPoi(q);
+  const golden = findGoldenPoi(q, cityHint || null);
   if (golden) {
     const payload = [{
       lat: String(golden.latitude),
@@ -143,12 +148,12 @@ router.get('/', async (req, res) => {
     let data;
     if (typeof geocodeCache.getOrFetch === 'function') {
       data = await geocodeCache.getOrFetch(key, async () => {
-        const fresh = await computeGeocode(q);
+        const fresh = await computeGeocode(q, cityHint);
         return fresh && fresh.length > 0 ? fresh : undefined;
       });
-      if (!data) data = await computeGeocode(q);
+      if (!data) data = await computeGeocode(q, cityHint);
     } else {
-      data = await computeGeocode(q);
+      data = await computeGeocode(q, cityHint);
       if (Array.isArray(data) && data.length > 0) {
         geocodeCache.set(key, data);
       }

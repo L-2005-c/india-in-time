@@ -1471,7 +1471,7 @@ const STATIC_ACTIONS = {
   continueAsGuest,
   openWhatIfModal: () => { const root = document.getElementById('what-if-modal-root'); if (root) root.innerHTML = _whatIfSimulatorUi.renderWhatIfModal(); const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'flex'; },
   closeWhatIfModal: () => { const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'none'; },
-  onWhatIfParamChange: () => { const timeShift = document.getElementById('what-if-time-shift')?.value || '0'; const weatherMode = document.getElementById('what-if-weather-mode')?.value || 'normal'; const delta = _whatIfSimulatorUi.calculateWhatIfDelta({ timeShiftHours: timeShift, weatherMode }); const scenicEl = document.getElementById('what-if-scenic-val'); const trafficEl = document.getElementById('what-if-traffic-val'); const crowdEl = document.getElementById('what-if-crowd-val'); if (scenicEl) scenicEl.textContent = (delta.scenicDelta >= 0 ? '+' : '') + delta.scenicDelta + '%'; if (trafficEl) trafficEl.textContent = (delta.trafficDeltaMin >= 0 ? '+' : '') + delta.trafficDeltaMin + 'm'; if (crowdEl) crowdEl.textContent = (delta.crowdDelta >= 0 ? '+' : '') + delta.crowdDelta + '%'; },
+  onWhatIfParamChange: () => { const timeShift = document.getElementById('what-if-time-shift')?.value || '0'; const weatherMode = document.getElementById('what-if-weather-mode')?.value || 'normal'; const pacingLag = document.getElementById('what-if-pacing-lag')?.value || '0'; const delta = _whatIfSimulatorUi.calculateWhatIfDelta({ timeShiftHours: timeShift, weatherMode, pacingLagMinutes: pacingLag }); const scenicEl = document.getElementById('what-if-scenic-val'); const trafficEl = document.getElementById('what-if-traffic-val'); const crowdEl = document.getElementById('what-if-crowd-val'); const safetyEl = document.getElementById('what-if-safety-val'); const guidanceEl = document.getElementById('what-if-guidance-val'); if (scenicEl) scenicEl.textContent = (delta.scenicDelta >= 0 ? '+' : '') + delta.scenicDelta + '%'; if (trafficEl) trafficEl.textContent = (delta.trafficDeltaMin >= 0 ? '+' : '') + delta.trafficDeltaMin + 'm'; if (crowdEl) crowdEl.textContent = (delta.crowdDelta >= 0 ? '+' : '') + delta.crowdDelta + '%'; if (safetyEl) { safetyEl.textContent = (delta.safetyDelta >= 0 ? '+' : '') + delta.safetyDelta + '%'; safetyEl.className = 'diff-metric-val ' + (delta.safetyDelta >= 0 ? 'diff-positive' : 'diff-negative'); } if (guidanceEl && delta.actionableGuidance) guidanceEl.textContent = delta.actionableGuidance; },
   applyWhatIfSimulation: () => { const modal = document.getElementById('what-if-modal'); if (modal) modal.style.display = 'none'; _showMicroToast('⚡ What-If simulation applied!', { icon: '✨' }); generatePlan(); },
   exportGoogleMapsTrip: () => { const url = _mapHud.generateMultiStopGoogleMapsUrl(itin, getCityCenter()); if (url && url !== '#') { window.open(url, '_blank', 'noopener,noreferrer'); _showMicroToast('🧭 Opening multi-stop trip in Google Maps', { icon: '🗺️' }); } else { _showMicroToast('⚠️ Build an itinerary first to sync with Google Maps', { icon: '📍' }); } },
   exportGpxTrack: () => { const ok = _mapHud.exportItineraryAsGpx(itin, currentCityName || 'India'); if (ok) _showMicroToast('📥 GPX GPS track downloaded', { icon: '✅' }); else _showMicroToast('⚠️ Build an itinerary first to export GPX', { icon: '📍' }); },
@@ -3357,7 +3357,7 @@ window.onload=()=>{
   const crCnt = document.getElementById('cr-cnt');
   if(crCnt) crCnt.textContent=credits;
   try {
-    map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120}).setView([20.5937,78.9629],5);
+    map=L.map('map',{zoomControl:false,zoomSnap:1,zoomDelta:1,wheelPxPerZoomLevel:120,preferCanvas:true,bounceAtZoomLimits:false}).setView([20.5937,78.9629],5);
     L.control.zoom({position:'topleft'}).addTo(map);
     // The app chrome is always dark, but the map itself always uses the
 // …
@@ -3561,20 +3561,26 @@ window.onload=()=>{
   if(window.speechSynthesis)window.speechSynthesis.getVoices();
   updatePlannerShowcase();
   };
-  // Yield frames so the 3D splash canvas, gyro listener, and audio drone
-  // establish their initial 60fps presentation before heavy map setup & network fetches begin
-  const scheduleInteractiveApp = () => {
-    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(() => initInteractiveApp(), { timeout: 250 });
-    } else {
-      setTimeout(initInteractiveApp, 40);
-    }
+  let interactiveAppInitialized = false;
+  const runInteractiveBootstrapOnce = () => {
+    if (interactiveAppInitialized) return;
+    interactiveAppInitialized = true;
+    initInteractiveApp();
   };
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(() => requestAnimationFrame(scheduleInteractiveApp));
-  } else {
-    setTimeout(scheduleInteractiveApp, 50);
-  }
+
+  // Keep main thread 100% free while the 3D intro logo rolls in.
+  // Bootstrap interactive map & network tasks immediately upon logo settlement or user skip.
+  window.addEventListener('splash:dismissed', runInteractiveBootstrapOnce, { once: true });
+  window.addEventListener('splash:settled', () => {
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(runInteractiveBootstrapOnce, { timeout: 350 });
+    } else {
+      setTimeout(runInteractiveBootstrapOnce, 80);
+    }
+  }, { once: true });
+
+  // Safety net to guarantee interactive initialization if events are missed
+  setTimeout(runInteractiveBootstrapOnce, 1300);
 };
 
 // Ensure chat widget actions are bound after all handler declarations.
