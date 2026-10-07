@@ -21,6 +21,9 @@ export default defineConfig({
     // duplicate files Express already serves from public/).
     copyPublicDir: false,
     assetsDir: 'assets',
+    rollupOptions: {
+      external: ['@sentry/browser', 'web-vitals'],
+    },
   },
   server: {
     port: 5173,

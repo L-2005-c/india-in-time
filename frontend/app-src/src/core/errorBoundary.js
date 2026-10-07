@@ -3,7 +3,7 @@
  * Catches uncaught exceptions and displays graceful fallback UI
  */
 
-import { captureException } from '@/services/client-observability';
+import { captureException } from '../services/client-observability.js';
 
 const errorHandlers = new Set();
 let lastError = null;

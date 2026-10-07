@@ -225,9 +225,22 @@ const GOLDEN_POIS = [
   poi('var_dashashwamedh', 'Dashashwamedh Ghat', 'scenic', 'Varanasi', 'Uttar Pradesh', 25.3062, 83.0107, ['Dashashwamedh', 'Main Ghat Varanasi', 'Ganga Aarti Ghat']),
   poi('var_sarnath', 'Sarnath Buddhist Complex', 'heritage', 'Varanasi', 'Uttar Pradesh', 25.3811, 83.0214, ['Sarnath', 'Deer Park Sarnath', 'Dhamekh Stupa']),
   poi('var_assi_ghat', 'Assi Ghat', 'scenic', 'Varanasi', 'Uttar Pradesh', 25.2887, 83.0061, ['Assi Ghat Varanasi']),
+
+  // ── MADURAI ──────────────────────────────────────────────────────────────
+  poi('mad_meenakshi', 'Meenakshi Temple', 'temple', 'Madurai', 'Tamil Nadu', 9.9195, 78.1193, ['Meenakshi Amman Temple', 'Madurai Meenakshi', 'Meenakshi Sundareswarar Temple']),
+
+  // ── AMRITSAR ─────────────────────────────────────────────────────────────
+  poi('asr_golden_temple', 'Golden Temple', 'temple', 'Amritsar', 'Punjab', 31.6200, 74.8765, ['Harmandir Sahib', 'Darbar Sahib', 'Sri Harmandir Sahib', 'Golden Temple Amritsar']),
+
+  // ── PURI ─────────────────────────────────────────────────────────────────
+  poi('puri_konark', 'Konark Sun Temple', 'monument', 'Puri', 'Odisha', 19.8876, 86.0945, ['Sun Temple Konark', 'Black Pagoda', 'Konark Temple']),
+  poi('puri_jagannath', 'Jagannath Temple', 'temple', 'Puri', 'Odisha', 19.8048, 85.8179, ['Puri Jagannath Temple', 'Shree Jagannatha Temple']),
 ];
 
 const CITY_ALIASES = {
+  madurai: 'madurai',
+  amritsar: 'amritsar',
+  puri: 'puri',
   vizag: 'visakhapatnam',
   visakhapatnam: 'visakhapatnam',
   bangalore: 'bengaluru',
@@ -270,7 +283,7 @@ function findGoldenPoi(nameQuery, cityHint = null) {
   if (!q) return null;
 
   let resolvedCityHint = null;
-  if (cityHint) {
+  if (cityHint && String(cityHint).toLowerCase().trim() !== 'unknown') {
     const rawHint = String(cityHint).toLowerCase().trim();
     resolvedCityHint = CITY_ALIASES[rawHint] || rawHint;
   }

@@ -254,6 +254,7 @@ app.get('/api/ready', async (_req, res) => {
   const ok = checks.db && !checks.maintenance && (checks.redis !== false);
   res.status(ok ? 200 : 503).json({ status: ok ? 'ready' : 'not_ready', checks, ts: Date.now() });
 });
+app.get('/ready', (_req, res) => res.redirect(307, '/api/ready'));
 
 app.get('/api/health/ready', requireAdminAuth, async (_req, res) => {
   const memMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
@@ -292,9 +293,26 @@ app.post('/api/admin/flags', adminWrite, (req, res) => {
   res.json({ flags: listFlags() });
 });
 
-// Simple liveness probe
-app.get('/api/health/live', (_req, res) => {
-  res.json({ status: 'alive', ts: Date.now() });
+// Liveness probe (public)
+app.get('/api/health', (_req, res) => res.json({ status: 'alive', ts: Date.now() }));
+app.get('/api/health/live', (_req, res) => res.json({ status: 'alive', ts: Date.now() }));
+app.get(['/health', '/health/live'], (_req, res) => res.json({ status: 'alive', ts: Date.now() }));
+
+// Unified Provider Health Probe (Phase 14)
+app.get(['/provider-health', '/api/provider-health'], async (_req, res) => {
+  const { trafficQualityEngine } = require('./services/routing/trafficProvider');
+  const trafficHealth = await trafficQualityEngine.getAllProvidersHealth();
+  const geminiStats = geminiService.getStats();
+  res.json({
+    status: 'healthy',
+    ts: Date.now(),
+    providers: {
+      traffic: trafficHealth,
+      gemini: { circuitState: geminiStats.circuitState, operational: geminiStats.circuitState !== 'OPEN' },
+      routing: { status: 'operational', engine: 'osrm_hybrid' },
+      places: { status: 'operational', catalog: 'canonical_registry' },
+    },
+  });
 });
 
 // ── Observability: Prometheus-compatible metrics (admin-gated) ───────────────

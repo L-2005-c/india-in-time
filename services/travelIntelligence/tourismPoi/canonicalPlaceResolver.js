@@ -79,8 +79,8 @@ function resolveCanonicalPlace(input, options = {}) {
   const rawName = normalizePlaceName(rawObj.name || rawObj.canonicalName || rawObj.displayName);
   if (!rawName || rawName.length < 2) return null;
 
-  const cityHint = options.cityHint || rawObj.city || 'Unknown';
-  const categoryHint = options.categoryHint || rawObj.category || rawObj.cat || 'scenic';
+  const cityHint = options.cityHint || options.city || rawObj.city || rawObj.cityHint || 'Unknown';
+  const categoryHint = options.categoryHint || options.category || rawObj.category || rawObj.cat || 'scenic';
 
   // 1. Locality & Noise Guard: Reject purely residential / administrative localities, roads, colonies
   const endsWithInfra = /\b(colony|road|rd|street|nagar|junction|layout|ward|suburb|circle|bypass|extension|area)\s*$/i.test(rawName);
@@ -120,9 +120,15 @@ function resolveCanonicalPlace(input, options = {}) {
       category: goldenMatch.category,
       latitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : goldenMatch.latitude,
       longitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : goldenMatch.longitude,
+      navigationLatitude: verification.navigationPoint ? verification.navigationPoint[0] : (verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : goldenMatch.latitude),
+      navigationLongitude: verification.navigationPoint ? verification.navigationPoint[1] : (verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : goldenMatch.longitude),
+      entranceLatitude: verification.entrancePoint ? verification.entrancePoint[0] : null,
+      entranceLongitude: verification.entrancePoint ? verification.entrancePoint[1] : null,
       city: goldenMatch.city,
       state: goldenMatch.state,
       country: goldenMatch.country,
+      provider: 'GOLDEN_BENCHMARK',
+      providerPlaceId: goldenMatch.id,
       tourismStatus: goldenMatch.tourismStatus || 'VERIFIED_ATTRACTION',
       coordinateSource: 'AUTHORITATIVE_SURVEY',
       source: 'golden_poi_dataset',
@@ -170,8 +176,14 @@ function resolveCanonicalPlace(input, options = {}) {
       category: whitelistMatch.category || categoryHint,
       latitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : whitelistMatch.lat,
       longitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : whitelistMatch.lon,
+      navigationLatitude: verification.navigationPoint ? verification.navigationPoint[0] : null,
+      navigationLongitude: verification.navigationPoint ? verification.navigationPoint[1] : null,
+      entranceLatitude: verification.entrancePoint ? verification.entrancePoint[0] : null,
+      entranceLongitude: verification.entrancePoint ? verification.entrancePoint[1] : null,
       city: targetCity,
       state: whitelistMatch.state || 'Andhra Pradesh',
+      provider: 'TOURISM_WHITELIST',
+      providerPlaceId: whitelistMatch.id,
       tourismStatus: 'VERIFIED_ATTRACTION',
       coordinateSource: 'CURATED_WHITELIST',
       source: 'tourism_whitelist',
@@ -189,7 +201,7 @@ function resolveCanonicalPlace(input, options = {}) {
       openingHours: rawObj.openingHours || (rawObj.open_time && rawObj.close_time ? { openTime: rawObj.open_time, closeTime: rawObj.close_time } : null),
       isSunriseSpot: Boolean(rawObj.isSunriseSpot || rawObj.is_sunrise_spot),
       isSunsetSpot: Boolean(rawObj.isSunsetSpot || rawObj.is_sunset_spot),
-      });
+    });
   }
 
   // 3.5. Check Curated City Seeds Dataset (1000+ hand-surveyed municipal landmarks)
@@ -217,8 +229,14 @@ function resolveCanonicalPlace(input, options = {}) {
         category: seedMatch.cat || categoryHint,
         latitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[0] : sLat,
         longitude: verification.canonicalCoordinates ? verification.canonicalCoordinates[1] : sLon,
+        navigationLatitude: verification.navigationPoint ? verification.navigationPoint[0] : null,
+        navigationLongitude: verification.navigationPoint ? verification.navigationPoint[1] : null,
+        entranceLatitude: verification.entrancePoint ? verification.entrancePoint[0] : null,
+        entranceLongitude: verification.entrancePoint ? verification.entrancePoint[1] : null,
         city: targetCity,
         state: 'India',
+        provider: 'CURATED_CITY_SEEDS',
+        providerPlaceId: seedMatch.id,
         tourismStatus: 'VERIFIED_ATTRACTION',
         coordinateSource: 'CURATED_SEEDS',
         source: 'city_seeds',
@@ -276,8 +294,14 @@ function resolveCanonicalPlace(input, options = {}) {
     category: prodCategory,
     latitude: verifiedCoords[0],
     longitude: verifiedCoords[1],
+    navigationLatitude: verification.navigationPoint ? verification.navigationPoint[0] : null,
+    navigationLongitude: verification.navigationPoint ? verification.navigationPoint[1] : null,
+    entranceLatitude: verification.entrancePoint ? verification.entrancePoint[0] : null,
+    entranceLongitude: verification.entrancePoint ? verification.entrancePoint[1] : null,
     city: cityHint,
     state: rawObj.state || 'Unknown',
+    provider: rawObj.source || 'discovery_service',
+    providerPlaceId: rawObj.id,
     tourismStatus: verification.verified ? 'VERIFIED_ATTRACTION' : 'ESTIMATED_ATTRACTION',
     coordinateSource: rawObj.source === 'nominatim' ? 'PROVIDER' : 'UNKNOWN',
     source: rawObj.source || 'discovery_service',

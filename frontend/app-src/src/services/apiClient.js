@@ -21,12 +21,14 @@ export class ApiError extends Error {
   }
 }
 
+const inFlightGets = new Map();
+
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
- * Fetch wrapper with timeout, retry, and error normalization
+ * Fetch wrapper with timeout, retry, in-flight deduplication, and error normalization
  */
 export async function fetchWithRetry(url, options = {}) {
   const {
@@ -35,57 +37,79 @@ export async function fetchWithRetry(url, options = {}) {
     body = null,
     timeout = DEFAULT_TIMEOUT,
     retries = MAX_RETRIES,
+    signal = null,
+    bypassDedup = false,
   } = options;
 
-  let lastError;
+  const isGet = method.toUpperCase() === 'GET';
+  const dedupKey = isGet && !bypassDedup ? url : null;
+  if (dedupKey && inFlightGets.has(dedupKey)) {
+    // Return clone or identical in-flight promise
+    return inFlightGets.get(dedupKey);
+  }
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const execute = async () => {
+    let lastError;
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-        body: body ? JSON.stringify(body) : null,
-        signal: controller.signal,
-      });
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      clearTimeout(timeoutId);
+        if (signal) {
+          signal.addEventListener('abort', () => controller.abort(), { once: true });
+        }
 
-      if (!response.ok) {
-        if (response.status >= 500 && attempt < retries) {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            ...headers,
+          },
+          body: body ? JSON.stringify(body) : null,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          if (response.status >= 500 && attempt < retries) {
+            await delay(RETRY_DELAY * Math.pow(2, attempt));
+            continue;
+          }
+          const error = new ApiError(`HTTP ${response.status}`, 'HTTP_ERROR', response.status, response);
+          throw error;
+        }
+
+        return response;
+      } catch (err) {
+        lastError = err;
+
+        if ((err.name === 'AbortError' || err instanceof TypeError) && attempt < retries) {
           await delay(RETRY_DELAY * Math.pow(2, attempt));
           continue;
         }
-        const error = new ApiError(`HTTP ${response.status}`, 'HTTP_ERROR', response.status, response);
-        throw error;
-      }
 
-      return response;
-    } catch (err) {
-      lastError = err;
-
-      if ((err.name === 'AbortError' || err instanceof TypeError) && attempt < retries) {
-        await delay(RETRY_DELAY * Math.pow(2, attempt));
-        continue;
-      }
-
-      if (err.status && err.status >= 400 && err.status < 500) {
-        setLastError(err);
-        browserLogger.warn('[apiClient]', url, err.status, err.message);
-        throw err;
+        if (err.status && err.status >= 400 && err.status < 500) {
+          setLastError(err);
+          browserLogger.warn('[apiClient]', url, err.status, err.message);
+          throw err;
+        }
       }
     }
-  }
 
-  const normalized = lastError instanceof ApiError ? lastError : new ApiError(lastError?.message || String(lastError), 'NETWORK_ERROR', 0, lastError);
-  setLastError(normalized);
-  browserLogger.warn('[apiClient]', url, normalized.code, normalized.message);
-  throw normalized;
+    const normalized = lastError instanceof ApiError ? lastError : new ApiError(lastError?.message || String(lastError), 'NETWORK_ERROR', 0, lastError);
+    setLastError(normalized);
+    browserLogger.warn('[apiClient]', url, normalized.code, normalized.message);
+    throw normalized;
+  };
+
+  const promise = execute();
+  if (dedupKey) {
+    inFlightGets.set(dedupKey, promise);
+    promise.finally(() => inFlightGets.delete(dedupKey));
+  }
+  return promise;
 }
 
 /**

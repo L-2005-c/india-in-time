@@ -1,6 +1,7 @@
 /**
  * v4 boot — platform services + domain modules.
  */
+import { initializeErrorBoundary } from './core/errorBoundary.js';
 import { browserLogger } from './utils/browser-logger.js';
 import { ensureFocusVisibleStyles, announce } from './a11y/helpers.js';
 import { initializeThemeSystem } from './design/theme.js';
@@ -15,6 +16,7 @@ import './core/app.js';
 if (typeof document !== 'undefined') {
   const boot = async () => {
     try {
+      initializeErrorBoundary();
       mark('boot-start');
       initializeThemeSystem();
       ensureFocusVisibleStyles();

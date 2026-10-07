@@ -251,24 +251,12 @@ if (process.env.REDIS_URL) {
   appLogger.info('[cache] REDIS_URL not set — per-process in-memory caching only (no cross-instance sharing).');
 }
 
-const placesCache = new LRUCache({
-  name:        'places',
-  maxEntries:  200,
-  defaultTtlMs: config.cache.placesTtlMs,
-  redis,
-});
+// ── Segregated Production Caches (Phase 8 Architecture) ───────────────────────
 
-const geminiCache = new LRUCache({
-  name:        'gemini',
-  maxEntries:  300,
-  defaultTtlMs: config.cache.geminiTtlMs,
-  redis,
-});
-
-const weatherCache = new LRUCache({
-  name:        'weather',
-  maxEntries:  50,
-  defaultTtlMs: config.cache.weatherTtlMs,
+const poiCache = new LRUCache({
+  name:        'poi',
+  maxEntries:  500,
+  defaultTtlMs: config.cache.placesTtlMs || 30 * 60 * 1000,
   redis,
 });
 
@@ -279,16 +267,108 @@ const geocodeCache = new LRUCache({
   redis,
 });
 
+const placeDetailsCache = new LRUCache({
+  name:        'place_details',
+  maxEntries:  500,
+  defaultTtlMs: 2 * 60 * 60 * 1000, // 2 hours
+  redis,
+});
+
+const routeCache = new LRUCache({
+  name:        'route',
+  maxEntries:  1200,
+  defaultTtlMs: 15 * 60 * 1000, // 15 mins
+  redis,
+});
+
+const trafficCache = new LRUCache({
+  name:        'traffic',
+  maxEntries:  600,
+  defaultTtlMs: 3 * 60 * 1000, // 3 mins live traffic window
+  redis,
+});
+
+const weatherCache = new LRUCache({
+  name:        'weather',
+  maxEntries:  100,
+  defaultTtlMs: config.cache.weatherTtlMs || 15 * 60 * 1000,
+  redis,
+});
+
+const decisionCache = new LRUCache({
+  name:        'decision',
+  maxEntries:  300,
+  defaultTtlMs: 10 * 60 * 1000, // 10 mins
+  redis,
+});
+
+const sessionCache = new LRUCache({
+  name:        'session',
+  maxEntries:  500,
+  defaultTtlMs: 30 * 60 * 1000,
+  redis,
+});
+
+const geminiCache = new LRUCache({
+  name:        'gemini',
+  maxEntries:  300,
+  defaultTtlMs: config.cache.geminiTtlMs || 10 * 60 * 1000,
+  redis,
+});
+
+// Backward compatibility: placesCache is an alias of poiCache
+const placesCache = poiCache;
+
+const ALL_CACHES = [
+  poiCache,
+  geocodeCache,
+  placeDetailsCache,
+  routeCache,
+  trafficCache,
+  weatherCache,
+  decisionCache,
+  sessionCache,
+  geminiCache,
+];
+
 // Periodic cleanup every 5 minutes
 setInterval(() => {
-  [placesCache, geminiCache, weatherCache, geocodeCache].forEach(c => c.purgeExpired());
+  ALL_CACHES.forEach(c => c.purgeExpired());
 }, 5 * 60 * 1000).unref();
+
+/**
+ * Universal async getter across tiered L1 memory and L2 Redis.
+ * Ensures services like routeCache.js can read-through without errors.
+ */
+async function getAsync(key, cacheName = 'route') {
+  if (!key) return undefined;
+  const targetCache = ALL_CACHES.find(c => c.name === cacheName) || routeCache;
+  return targetCache.getAsync(key);
+}
+
+/**
+ * Universal async setter across tiered L1 memory and L2 Redis.
+ */
+async function setAsync(key, value, ttlSec = 300, cacheName = 'route') {
+  if (!key) return;
+  const targetCache = ALL_CACHES.find(c => c.name === cacheName) || routeCache;
+  const ttlMs = (Number(ttlSec) || 300) * 1000;
+  targetCache.set(key, value, ttlMs);
+}
 
 module.exports = {
   LRUCache,
+  poiCache,
   placesCache,
-  geminiCache,
-  weatherCache,
   geocodeCache,
+  placeDetailsCache,
+  routeCache,
+  trafficCache,
+  weatherCache,
+  decisionCache,
+  sessionCache,
+  geminiCache,
+  getAsync,
+  setAsync,
   getSharedRedis: () => redis,
 };

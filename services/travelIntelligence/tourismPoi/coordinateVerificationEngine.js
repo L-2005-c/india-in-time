@@ -274,11 +274,15 @@ function verifyAttractionCoordinates(params = {}) {
     ? (distanceFromCandidateMeters != null && distanceFromCandidateMeters < 300 ? 'HIGH' : 'MEDIUM')
     : (conflict ? 'LOW' : null);
 
+  const navAndEnt = resolveNavigationAndEntrancePoints(cleanName, city, [integrity.lat, integrity.lon]);
+
   return {
     verified,
     verificationStatus,
     confidence,
     canonicalCoordinates: [integrity.lat, integrity.lon],
+    navigationPoint: navAndEnt.navigationPoint,
+    entrancePoint: navAndEnt.entrancePoint,
     source: provider,
     evidence,
     evidenceCount: evidence.length,
@@ -299,10 +303,165 @@ function isQuarantinedPoi(poi) {
   return status === 'QUARANTINED' || status === 'REJECTED' || status === 'INVALID_COORDINATES';
 }
 
+/**
+ * Deterministic Place Identity Matching Formula (Phase 3 Specification).
+ * Weighted scoring:
+ * identityScore =
+ *   0.35 * providerIdentity +
+ *   0.20 * nameSimilarity +
+ *   0.15 * addressSimilarity +
+ *   0.10 * localityMatch +
+ *   0.15 * spatialConsistency +
+ *   0.05 * categoryConsistency
+ */
+function computeIdentityScore(candidate = {}, target = {}, options = {}) {
+  const cName = String(candidate.name || candidate.canonicalName || '').trim();
+  const tName = String(target.name || target.placeName || target.canonicalName || '').trim();
+  const cAddress = String(candidate.address?.area || candidate.address || '').toLowerCase().trim();
+  const tAddress = String(target.address?.area || target.address || '').toLowerCase().trim();
+  const cLocality = String(candidate.locality || candidate.district || '').toLowerCase().trim();
+  const tLocality = String(target.locality || target.district || '').toLowerCase().trim();
+  const cCat = String(candidate.category || candidate.cat || 'scenic').toLowerCase().trim();
+  const tCat = String(target.category || target.cat || 'scenic').toLowerCase().trim();
+
+  // 1. Provider Identity (0.35)
+  let providerIdentity = 0.0;
+  if (candidate.providerPlaceId && target.providerPlaceId && candidate.providerPlaceId === target.providerPlaceId) {
+    providerIdentity = 1.0;
+  } else if (candidate.providerPlaceId || candidate.id || candidate.osm_id) {
+    providerIdentity = 0.6;
+  }
+
+  // 2. Name Similarity (0.20)
+  const nameSim = computeStringSimilarity(cName, tName);
+
+  // 3. Address Similarity (0.15)
+  let addressSim = 0.5;
+  if (cAddress && tAddress) {
+    addressSim = computeStringSimilarity(cAddress, tAddress);
+  } else if (!cAddress && !tAddress) {
+    addressSim = 0.7;
+  }
+
+  // 4. Locality Match (0.10)
+  let localityMatch = 0.5;
+  if (cLocality && tLocality) {
+    localityMatch = cLocality === tLocality ? 1.0 : (cLocality.includes(tLocality) || tLocality.includes(cLocality) ? 0.8 : 0.0);
+  }
+
+  // 5. Spatial Consistency (0.15)
+  let spatialConsistency = 0.8;
+  const cLat = candidate.lat ?? candidate.latitude ?? candidate.coords?.[0];
+  const cLon = candidate.lon ?? candidate.longitude ?? candidate.coords?.[1];
+  const tLat = target.lat ?? target.latitude ?? target.coords?.[0];
+  const tLon = target.lon ?? target.longitude ?? target.coords?.[1];
+
+  if (Number.isFinite(Number(cLat)) && Number.isFinite(Number(tLat))) {
+    const dKm = distKm(Number(cLat), Number(cLon), Number(tLat), Number(tLon));
+    if (dKm <= 0.2) spatialConsistency = 1.0;
+    else if (dKm <= 0.8) spatialConsistency = 0.8;
+    else if (dKm <= 2.0) spatialConsistency = 0.5;
+    else spatialConsistency = 0.1;
+  }
+
+  // 6. Category Consistency (0.05)
+  let categoryConsistency = 0.3;
+  if (cCat === tCat) {
+    categoryConsistency = 1.0;
+  } else if (['scenic', 'viewpoint', 'hill', 'park'].includes(cCat) && ['scenic', 'viewpoint', 'hill', 'park'].includes(tCat)) {
+    categoryConsistency = 0.8;
+  } else if (['temple', 'heritage', 'monument'].includes(cCat) && ['temple', 'heritage', 'monument'].includes(tCat)) {
+    categoryConsistency = 0.7;
+  }
+
+  const rawScore = (
+    0.35 * providerIdentity +
+    0.20 * nameSim +
+    0.15 * addressSim +
+    0.10 * localityMatch +
+    0.15 * spatialConsistency +
+    0.05 * categoryConsistency
+  );
+
+  const normalizedScore = Math.min(100, Math.max(0, Math.round(rawScore * 100)));
+
+  return {
+    score: normalizedScore,
+    weights: {
+      providerIdentity: Math.round(providerIdentity * 35),
+      nameSimilarity: Math.round(nameSim * 20),
+      addressSimilarity: Math.round(addressSim * 15),
+      localityMatch: Math.round(localityMatch * 10),
+      spatialConsistency: Math.round(spatialConsistency * 15),
+      categoryConsistency: Math.round(categoryConsistency * 5),
+    },
+  };
+}
+
+// Curated Entrance and Navigation Drop-off Points for large Indian destinations
+const KNOWN_NAVIGATION_POINTS = {
+  // Visakhapatnam
+  'kailasagiri': { nav: [17.7478, 83.3402], entrance: [17.7478, 83.3402] },
+  'ramakrishna beach': { nav: [17.7142, 83.3237], entrance: [17.7142, 83.3237] },
+  'ins kursura submarine museum': { nav: [17.7170, 83.3300], entrance: [17.7172, 83.3301] },
+  'simhachalam': { nav: [17.7660, 83.2505], entrance: [17.7666, 83.2501] },
+  'indira gandhi zoological park': { nav: [17.7662, 83.3485], entrance: [17.7662, 83.3485] },
+  // Tirupati
+  'sri venkateswara swamy temple': { nav: [13.6833, 79.3482], entrance: [13.6833, 79.3482] },
+  'tirumala': { nav: [13.6833, 79.3482], entrance: [13.6833, 79.3482] },
+  // Hyderabad
+  'golconda fort': { nav: [17.3828, 78.4018], entrance: [17.3828, 78.4018] },
+  'charminar': { nav: [17.3614, 78.4745], entrance: [17.3614, 78.4745] },
+  'salar jung museum': { nav: [17.3710, 78.4800], entrance: [17.3713, 78.4804] },
+  'ramoji film city': { nav: [17.2540, 78.6800], entrance: [17.2543, 78.6808] },
+  // Jaipur
+  'amber palace': { nav: [26.9855, 75.8513], entrance: [26.9855, 75.8513] },
+  'city palace': { nav: [26.9258, 75.8236], entrance: [26.9258, 75.8236] },
+  'hawa mahal': { nav: [26.9238, 75.8266], entrance: [26.9239, 75.8267] },
+  // Mumbai
+  'gateway of india': { nav: [18.9220, 72.8347], entrance: [18.9220, 72.8347] },
+  'chhatrapati shivaji maharaj terminus': { nav: [18.9401, 72.8353], entrance: [18.9401, 72.8353] },
+  // Delhi
+  'red fort': { nav: [28.6558, 77.2385], entrance: [28.6558, 77.2385] },
+  'qutub minar': { nav: [28.5245, 77.1855], entrance: [28.5245, 77.1855] },
+  // Kolkata
+  'victoria memorial': { nav: [22.5448, 88.3426], entrance: [22.5448, 88.3426] },
+  // Agra
+  'taj mahal': { nav: [27.1751, 78.0421], entrance: [27.1751, 78.0421] },
+  // Mysuru
+  'mysore palace': { nav: [12.3051, 76.6551], entrance: [12.3051, 76.6551] },
+  // Madurai
+  'meenakshi temple': { nav: [9.9195, 78.1193], entrance: [9.9195, 78.1193] },
+  // Amritsar
+  'golden temple': { nav: [31.6200, 74.8765], entrance: [31.6200, 74.8765] },
+  // Puri
+  'konark sun temple': { nav: [19.8876, 86.0945], entrance: [19.8876, 86.0945] },
+  'jagannath temple': { nav: [19.8048, 85.8179], entrance: [19.8048, 85.8179] },
+};
+
+function resolveNavigationAndEntrancePoints(placeName, _city, coords) {
+  if (!placeName) return { navigationPoint: coords, entrancePoint: coords };
+  const clean = String(placeName).toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+  for (const [k, v] of Object.entries(KNOWN_NAVIGATION_POINTS)) {
+    if (clean.includes(k) || k.includes(clean)) {
+      return {
+        navigationPoint: v.nav,
+        entrancePoint: v.entrance,
+      };
+    }
+  }
+  return {
+    navigationPoint: coords || null,
+    entrancePoint: coords || null,
+  };
+}
+
 module.exports = {
   CATEGORY_TOLERANCES_METERS,
   computeStringSimilarity,
   scoreCandidateMatch,
+  computeIdentityScore,
+  resolveNavigationAndEntrancePoints,
   verifyAttractionCoordinates,
   isQuarantinedPoi,
 };

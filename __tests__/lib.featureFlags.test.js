@@ -36,4 +36,21 @@ describe('featureFlags', () => {
     maintenanceGuard(req, res, next);
     expect(next).toHaveBeenCalled();
   });
+
+  test('Phase 15 flags are available and normalize casing/underscores', () => {
+    const { killSwitch, evaluateCanary } = require('../lib/featureFlags');
+    expect(getFlag('TRAFFIC_V2')).toBe(true);
+    expect(getFlag('trafficV2')).toBe(true);
+    expect(getFlag('poiVerificationV2')).toBe(true);
+
+    killSwitch('TRAFFIC_V2');
+    expect(getFlag('TRAFFIC_V2')).toBe(false);
+    expect(getFlag('trafficV2')).toBe(false);
+
+    clearOverride('TRAFFIC_V2');
+    expect(getFlag('trafficV2')).toBe(true);
+
+    expect(evaluateCanary('trafficV2', 'user_123', 100)).toBe(true);
+    expect(evaluateCanary('trafficV2', 'user_123', 0)).toBe(false);
+  });
 });

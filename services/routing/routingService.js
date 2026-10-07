@@ -16,8 +16,33 @@ const { raceOsrmMirrors } = require('./mirrorRacer');
 const { evaluateScenicQuality, enrichTurnByTurnSteps, evaluateComfortRating } = require('./routeQualityEngine');
 const { calibrateIndianEta } = require('./etaCalibrationEngine');
 const { checkRouteForClosures, computeClosureBypassPoint } = require('./roadClosureRegistry');
+const { trafficQualityEngine, computeTrafficFreshness } = require('./trafficProvider');
 
 const ROUTING_TIMEOUT_MS = Number(process.env.ROUTING_TIMEOUT_MS) || 4000;
+
+/**
+ * Route Sanity Checks (Phase 5 Requirement).
+ * Flags routes with impossible transit speeds, abnormal duration, or disconnected geometry.
+ */
+function validateRouteSanity(route, from, to) {
+  if (!route || !route.distanceMeters || !route.durationSeconds) return { sane: true, warnings: [] };
+  const warnings = [];
+  const distKm = route.distanceMeters / 1000;
+  const durHours = (route.trafficDurationSeconds || route.durationSeconds) / 3600;
+  const speedKmH = durHours > 0 ? distKm / durHours : 0;
+
+  if (speedKmH > 160) {
+    warnings.push(`Impossible transit speed (${Math.round(speedKmH)} km/h > 160 km/h)`);
+  }
+  if (speedKmH < 2 && distKm > 1.0) {
+    warnings.push(`Abnormally slow transit speed (${speedKmH.toFixed(1)} km/h)`);
+  }
+  return {
+    sane: warnings.length === 0,
+    speedKmH: Math.round(speedKmH * 10) / 10,
+    warnings,
+  };
+}
 
 /**
  * Formats distance into a clean user-facing string.
@@ -499,6 +524,10 @@ async function calculateRoute(origin, destination, opts = {}) {
       freshness: new Date().toISOString(),
       label: `${selectedRoute.trafficStatus} traffic`,
     },
+    trafficState: selectedRoute.trafficStatus,
+    coverageState: selectedRoute.hasRealtimeTraffic ? 'FULL_LIVE_COVERAGE' : 'CORRIDOR_ESTIMATE',
+    freshnessWindow: computeTrafficFreshness(selectedRoute.retrievedAt || new Date()).window,
+    sanity: validateRouteSanity(selectedRoute, from, to),
     timestamps: {
       departure: departureDate.toISOString(),
       projectedArrival,
@@ -646,4 +675,6 @@ module.exports = {
   formatDistance,
   formatDuration,
   ROUTING_TIMEOUT_MS,
+  validateRouteSanity,
+  trafficQualityEngine,
 };

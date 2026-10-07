@@ -56,14 +56,58 @@ function normalizeVerificationStatus(status) {
   return VERIFICATION_STATUSES[upper] || VERIFICATION_STATUSES.UNVERIFIED;
 }
 
+const PLACE_CONFIDENCE_STATES = Object.freeze({
+  VERIFIED: 'VERIFIED',
+  HIGH_CONFIDENCE: 'HIGH_CONFIDENCE',
+  MEDIUM_CONFIDENCE: 'MEDIUM_CONFIDENCE',
+  LOW_CONFIDENCE: 'LOW_CONFIDENCE',
+  UNVERIFIED: 'UNVERIFIED',
+  REJECTED: 'REJECTED',
+});
+
 /**
- * Creates a Canonical Tourist Place record without dangerous auto-verified defaults.
+ * Resolves one of the 6 standard Phase 3 place confidence states.
+ */
+function resolvePlaceConfidenceState({
+  verificationStatus,
+  coordinateSource,
+  qualityScore,
+  confidence,
+  validCoords,
+}) {
+  if (!validCoords || verificationStatus === 'REJECTED' || verificationStatus === 'INVALID_COORDINATES') {
+    return PLACE_CONFIDENCE_STATES.REJECTED;
+  }
+  if (
+    verificationStatus === 'VERIFIED' ||
+    verificationStatus === 'HUMAN_VERIFIED' ||
+    coordinateSource === 'AUTHORITATIVE_SURVEY' ||
+    coordinateSource === 'HUMAN_VERIFIED'
+  ) {
+    return PLACE_CONFIDENCE_STATES.VERIFIED;
+  }
+  const score = typeof qualityScore === 'object' ? (qualityScore.overall || 0) : Number(qualityScore || 0);
+  if (confidence === 'HIGH' || score >= 80 || verificationStatus === 'PROVIDER_VERIFIED') {
+    return PLACE_CONFIDENCE_STATES.HIGH_CONFIDENCE;
+  }
+  if (confidence === 'MEDIUM' || score >= 50 || verificationStatus === 'AUTO_VALIDATED') {
+    return PLACE_CONFIDENCE_STATES.MEDIUM_CONFIDENCE;
+  }
+  if (confidence === 'LOW' || verificationStatus === 'QUARANTINED' || score < 50) {
+    return PLACE_CONFIDENCE_STATES.LOW_CONFIDENCE;
+  }
+  return PLACE_CONFIDENCE_STATES.UNVERIFIED;
+}
+
+/**
+ * Creates a Canonical Tourist Place record conforming strictly to Phase 3 specification.
  *
  * @param {Object} params
  * @returns {CanonicalTouristPlace}
  */
 function createCanonicalPlace({
   id,
+  placeId,
   canonicalPlaceId,
   canonicalName,
   displayName,
@@ -72,11 +116,18 @@ function createCanonicalPlace({
   category = 'scenic',
   latitude,
   longitude,
+  navigationLatitude = null,
+  navigationLongitude = null,
+  entranceLatitude = null,
+  entranceLongitude = null,
   address = null,
+  locality = '',
   city = 'Unknown',
   district = '',
   state = 'Unknown',
   country = 'India',
+  provider = 'unknown',
+  providerPlaceId = null,
   providerIds = {},
   source = 'unknown',
   sourceType = 'REFERENCE',
@@ -87,6 +138,11 @@ function createCanonicalPlace({
   verificationMethod = 'HEURISTIC_CHECK',
   verificationTimestamp = new Date().toISOString(),
   confidence = null,
+  sourceConfidence = null,
+  coordinateConfidence = null,
+  identityConfidence = null,
+  freshness = 'FRESH',
+  lastVerifiedAt = null,
   evidence = [],
   lastValidatedAt = new Date().toISOString(),
   openingHours = null,
@@ -115,7 +171,8 @@ function createCanonicalPlace({
   }
 
   const cleanDistrict = String(district || (address && address.district) || '').trim();
-  const placeId = canonicalPlaceId || id || generateDeterministicPlaceId(city, cleanCanonicalName);
+  const cleanLocality = String(locality || (address && (address.locality || address.area)) || cleanDistrict || '').trim();
+  const finalPlaceId = placeId || canonicalPlaceId || id || generateDeterministicPlaceId(city, cleanCanonicalName);
 
   const qualityScore = calculatePlaceDataQuality({
     canonicalName: cleanCanonicalName,
@@ -128,36 +185,86 @@ function createCanonicalPlace({
     updatedAt,
   });
 
+  const verifiedLat = validCoords ? Math.round(lat * 1e6) / 1e6 : null;
+  const verifiedLon = validCoords ? Math.round(lon * 1e6) / 1e6 : null;
+
+  const navLat = navigationLatitude != null && Number.isFinite(Number(navigationLatitude))
+    ? Math.round(Number(navigationLatitude) * 1e6) / 1e6
+    : verifiedLat;
+  const navLon = navigationLongitude != null && Number.isFinite(Number(navigationLongitude))
+    ? Math.round(Number(navigationLongitude) * 1e6) / 1e6
+    : verifiedLon;
+
+  const entLat = entranceLatitude != null && Number.isFinite(Number(entranceLatitude))
+    ? Math.round(Number(entranceLatitude) * 1e6) / 1e6
+    : navLat;
+  const entLon = entranceLongitude != null && Number.isFinite(Number(entranceLongitude))
+    ? Math.round(Number(entranceLongitude) * 1e6) / 1e6
+    : navLon;
+
+  const confidenceState = resolvePlaceConfidenceState({
+    verificationStatus: normVerificationStatus,
+    coordinateSource: normCoordSource,
+    qualityScore,
+    confidence,
+    validCoords,
+  });
+
+  const cleanProvider = String(provider || source || 'reference').trim();
+  const cleanProviderId = String(providerPlaceId || providerIds?.osm || providerIds?.google || providerIds?.wiki || finalPlaceId).trim();
+
+  // Freshness calculation
+  let calculatedFreshness = freshness || 'FRESH';
+  const effectiveVerifiedAt = lastVerifiedAt || verificationTimestamp || updatedAt || new Date().toISOString();
+  if (effectiveVerifiedAt) {
+    const ageMs = Date.now() - new Date(effectiveVerifiedAt).getTime();
+    const ageHours = ageMs / (1000 * 60 * 60);
+    if (ageHours <= 24) calculatedFreshness = 'FRESH';
+    else if (ageHours <= 168) calculatedFreshness = 'RECENT';
+    else if (ageHours <= 720) calculatedFreshness = 'AGING';
+    else calculatedFreshness = 'STALE';
+  }
+
   return {
-    id: placeId,
-    canonicalPlaceId: placeId,
+    id: finalPlaceId,
+    placeId: finalPlaceId,
+    canonicalPlaceId: finalPlaceId,
     canonicalName: cleanCanonicalName,
     displayName: cleanDisplayName,
     aliases: normalizedAliases,
     entityType: String(entityType || 'tourist_attraction'),
     category,
-    latitude: validCoords ? Math.round(lat * 1e6) / 1e6 : null,
-    longitude: validCoords ? Math.round(lon * 1e6) / 1e6 : null,
-    coords: validCoords ? [Math.round(lat * 1e6) / 1e6, Math.round(lon * 1e6) / 1e6] : null,
+    latitude: verifiedLat,
+    longitude: verifiedLon,
+    coords: validCoords ? [verifiedLat, verifiedLon] : null,
+    navigationLatitude: navLat,
+    navigationLongitude: navLon,
+    entranceLatitude: entLat,
+    entranceLongitude: entLon,
     address: address && typeof address === 'object' ? {
-      area: address.area || '',
+      area: address.area || cleanLocality,
+      locality: cleanLocality,
       city: address.city || city,
       district: cleanDistrict,
       state: address.state || state,
       country: address.country || country,
     } : {
-      area: '',
+      area: cleanLocality,
+      locality: cleanLocality,
       city,
       district: cleanDistrict,
       state,
       country,
     },
+    locality: cleanLocality,
     city,
     district: cleanDistrict,
     state,
     country,
+    provider: cleanProvider,
+    providerPlaceId: cleanProviderId,
     providerIds: typeof providerIds === 'object' && providerIds !== null ? { ...providerIds } : {},
-    source: String(source || 'unknown'),
+    source: String(source || cleanProvider),
     sourceType: String(sourceType || 'REFERENCE'),
     tourismStatus,
     coordinateSource: normCoordSource,
@@ -166,6 +273,12 @@ function createCanonicalPlace({
     verificationMethod: String(verificationMethod || 'HEURISTIC_CHECK'),
     verificationTimestamp: verificationTimestamp || new Date().toISOString(),
     confidence: validCoords ? (typeof confidence === 'string' ? confidence : (confidence != null ? (confidence >= 80 ? 'HIGH' : confidence >= 50 ? 'MEDIUM' : 'LOW') : null)) : null,
+    confidenceState,
+    sourceConfidence: sourceConfidence != null ? Number(sourceConfidence) : (normCoordSource === 'AUTHORITATIVE_SURVEY' ? 100 : normCoordSource === 'CURATED_WHITELIST' ? 95 : 80),
+    coordinateConfidence: coordinateConfidence != null ? Number(coordinateConfidence) : (validCoords ? qualityScore.coordinateValidity : 0),
+    identityConfidence: identityConfidence != null ? Number(identityConfidence) : qualityScore.overall,
+    freshness: calculatedFreshness,
+    lastVerifiedAt: effectiveVerifiedAt,
     evidence: Array.isArray(evidence) ? [...evidence] : (evidence ? [evidence] : []),
     lastValidatedAt: lastValidatedAt || updatedAt || new Date().toISOString(),
     qualityScore,
@@ -265,7 +378,9 @@ function generateDeterministicPlaceId(city, name) {
 module.exports = {
   VERIFICATION_STATUSES,
   COORDINATE_SOURCES,
+  PLACE_CONFIDENCE_STATES,
   createCanonicalPlace,
   calculatePlaceDataQuality,
   generateDeterministicPlaceId,
+  resolvePlaceConfidenceState,
 };
